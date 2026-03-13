@@ -29,8 +29,8 @@ namespace Sma5h.ResourceProviders.BgmPropertyFile.Helpers
             if (!File.Exists(inputFile))
                 throw new Exception($"YML File does not exist: {inputFile}");
 
-            //Open file
-            var yamlStr = File.ReadAllText(inputFile);
+            //Open file (normalize CRLF to LF so YAML parser doesn't embed \r in string values)
+            var yamlStr = File.ReadAllText(inputFile).Replace("\r\n", "\n");
 
             //Deserialize
             var outputObj = _yamlDeserializer.Deserialize<T>(yamlStr);

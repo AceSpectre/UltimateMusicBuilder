@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,7 +21,7 @@
 
   <ItemGroup>
     <Reference Include="paracobNET">
-      <HintPath>..\..\..\Sma5h.CLI\bin\Debug\netcoreapp3.1\Tools\paracobNET.dll</HintPath>
+      <HintPath>..\..\..\Sma5h.CLI\bin\Debug\net8.0\Tools\paracobNET.dll</HintPath>
     </Reference>
     <Reference Include="VGAudioCli">
       <HintPath>..\..\..\Tools\VGAudioCli.exe</HintPath>

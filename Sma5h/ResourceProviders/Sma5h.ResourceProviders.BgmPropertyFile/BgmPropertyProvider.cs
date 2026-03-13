@@ -67,7 +67,8 @@ namespace Sma5h.ResourceProviders
 
             if (output[0].NameId.EndsWith('\r'))
             {
-                throw new Exception("Error while generating YML for BGM Property. Your bgm_hashes may have crlf endings which are known to cause an issue with bgm-property");
+                foreach (var entry in output)
+                    entry.NameId = entry.NameId.TrimEnd('\r');
             }
 
 

@@ -12,6 +12,12 @@ namespace Sma5h.CLI
     {
         async static Task Main(string[] args)
         {
+            var appRoot = new DirectoryInfo(AppContext.BaseDirectory);
+            while (appRoot != null && !Directory.Exists(Path.Combine(appRoot.FullName, "Resources")))
+                appRoot = appRoot.Parent;
+            if (appRoot != null)
+                Directory.SetCurrentDirectory(appRoot.FullName);
+
             var services = new ServiceCollection();
             ConfigureServices(services, args);
             var serviceProvider = services.BuildServiceProvider();
@@ -30,7 +36,7 @@ namespace Sma5h.CLI
         private static void ConfigureServices(IServiceCollection services, string[] args)
         {
             var configuration = new ConfigurationBuilder()
-               .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+               .SetBasePath(AppContext.BaseDirectory)
                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
                .AddCommandLine(args)
                .Build();

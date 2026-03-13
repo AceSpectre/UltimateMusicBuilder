@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Sma5h.CLI": {
+      "commandName": "Project",
+      "workingDirectory": "C:\\Projects\\smash music modding\\UltimateMusicBuilder"
+    }
+  }
+}
