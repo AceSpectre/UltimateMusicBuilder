@@ -68,6 +68,8 @@ namespace Sma5h.Mods.Music
                     _audioStateService.AddGameTitleEntry(gameTitleEntry);
                 foreach (var bgmPropertiesEntry in musicModEntries.BgmPropertyEntries)
                     _audioStateService.AddBgmPropertyEntry(bgmPropertiesEntry);
+                foreach (var playlistEntry in musicModEntries.PlaylistEntries)
+                    _audioStateService.AddPlaylistEntry(playlistEntry);
             }
 
             return true;

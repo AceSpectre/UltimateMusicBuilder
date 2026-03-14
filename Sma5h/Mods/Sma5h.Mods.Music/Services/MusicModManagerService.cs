@@ -6,9 +6,11 @@ using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
 using Sma5h.Mods.Music.Models;
 using Sma5h.Mods.Music.MusicMods;
+using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Sma5h.Mods.Music.Services
@@ -72,21 +74,26 @@ namespace Sma5h.Mods.Music.Services
 
         private IMusicMod GetMusicModManager(string musicModFolder)
         {
-            IMusicMod musicMod = null;
+            // JSON-based mod (existing format)
             var jsonBaseFilename = Path.Combine(musicModFolder, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE);
             if (File.Exists(jsonBaseFilename))
             {
                 var modBase = LoadJsonBaseMod(jsonBaseFilename);
-                if (modBase.Version == 2 || modBase.Version == 3 || modBase.Version == 4 || modBase.Version == 5)
+                if (modBase != null && (modBase.Version == 2 || modBase.Version == 3 || modBase.Version == 4 || modBase.Version == 5))
                 {
-                    musicMod = ActivatorUtilities.CreateInstance<MusicMod>(_serviceProvider, musicModFolder);
+                    var jsonMod = ActivatorUtilities.CreateInstance<MusicMod>(_serviceProvider, musicModFolder);
+                    if (jsonMod?.Mod != null)
+                        return jsonMod;
                 }
             }
 
-            if (musicMod?.Mod == null)
-                return null;
+            // Folder-based mod: any subfolder containing series.toml
+            var hasFolderMod = Directory.GetDirectories(musicModFolder)
+                .Any(sub => File.Exists(Path.Combine(sub, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE)));
+            if (hasFolderMod)
+                return ActivatorUtilities.CreateInstance<FolderMusicMod>(_serviceProvider, musicModFolder);
 
-            return musicMod;
+            return null;
         }
 
         private MusicModInformation LoadJsonBaseMod(string filename)
