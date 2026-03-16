@@ -316,7 +316,7 @@ __pycache__/
 # Telerik's JustMock configuration file
 *.jmconfig
 
-# BizTalk build output
+# BizTalk build `output`
 *.btp.cs
 *.btm.cs
 *.odx.cs
@@ -364,3 +364,5 @@ Resources/Game/*
 *.nus3bank
 *.nus3audio
 Mods/*
+.claude
+ArcOutput/*
