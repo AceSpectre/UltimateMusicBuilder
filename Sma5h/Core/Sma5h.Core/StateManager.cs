@@ -91,7 +91,8 @@ namespace Sma5h
 
             foreach (var resource in _resources)
             {
-                var outputResourceFile = Path.Combine(outputPath, resource.Key);
+                var outputKey = StripMsbtLocale(resource.Key);
+                var outputResourceFile = Path.Combine(outputPath, outputKey);
                 var inputResourceFile = Path.Combine(gameResourcesPath, resource.Key);
                 Directory.CreateDirectory(Path.GetDirectoryName(outputResourceFile));
                 var resourceProvider = GetResourceProvider(resource.Key);
@@ -133,6 +134,19 @@ namespace Sma5h
         {
             //Removed for now because resources are not being reset through ResetResource
             return input; // JsonConvert.DeserializeObject<T>(JsonConvert.SerializeObject(input));
+        }
+
+        private static string StripMsbtLocale(string resourceKey)
+        {
+            var fileName = Path.GetFileNameWithoutExtension(resourceKey);
+            if (fileName.StartsWith("msg_bgm+") || fileName.StartsWith("msg_title+"))
+            {
+                var dir = Path.GetDirectoryName(resourceKey);
+                var baseName = fileName.Substring(0, fileName.IndexOf('+'));
+                var ext = Path.GetExtension(resourceKey);
+                return Path.Combine(dir, baseName + ext);
+            }
+            return resourceKey;
         }
 
         private Dictionary<string, IResourceProvider> InitializeResourceProviders()

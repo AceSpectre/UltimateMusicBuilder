@@ -96,6 +96,12 @@ namespace Sma5h.Mods.Music
             //AutoAddToBgmSelector - TODO Optimize :-)
             ProcessPlaylistAutoMapping();
 
+            //Add mod songs to all existing playlists so they appear on every stage
+            AddModSongsToAllPlaylists();
+
+            //Enable album selection (My Music) on all stages
+            EnableBgmSelectorOnAllStages();
+
             //Sort Series by Sound Test - TODO Allow for manual ordering
             ProcessSeriesOrderAutoMapping();
 
@@ -284,6 +290,70 @@ namespace Sma5h.Mods.Music
             }
 
             return true;
+        }
+
+        private void AddModSongsToAllPlaylists()
+        {
+            var battlefieldPlaylists = new HashSet<string> { "bgmsmashbtl" };
+
+            var modSongs = _audioStateService.GetBgmDbRootEntries()
+                .Where(p => p.TestDispOrder >= 0 && p.MusicMod != null)
+                .ToList();
+
+            if (modSongs.Count == 0)
+                return;
+
+            var playlists = _audioStateService.GetPlaylists()
+                .Where(p => battlefieldPlaylists.Contains(p.Id))
+                .ToList();
+
+            int totalAdded = 0;
+
+            foreach (var playlist in playlists)
+            {
+                var existingIds = playlist.Tracks.Select(t => t.UiBgmId).ToHashSet();
+
+                foreach (var song in modSongs)
+                {
+                    if (existingIds.Contains(song.UiBgmId))
+                        continue;
+
+                    var order = playlist.Tracks.Count > 0
+                        ? (short)(playlist.Tracks.Max(t => t.Order0) + 1)
+                        : (short)0;
+
+                    playlist.Tracks.Add(new PlaylistValueEntry
+                    {
+                        UiBgmId = song.UiBgmId,
+                        Incidence0 = 100, Incidence1 = 100, Incidence2 = 100, Incidence3 = 100,
+                        Incidence4 = 100, Incidence5 = 100, Incidence6 = 100, Incidence7 = 100,
+                        Incidence8 = 100, Incidence9 = 100, Incidence10 = 100, Incidence11 = 100,
+                        Incidence12 = 100, Incidence13 = 100, Incidence14 = 100, Incidence15 = 100,
+                        Order0 = order, Order1 = order, Order2 = order, Order3 = order,
+                        Order4 = order, Order5 = order, Order6 = order, Order7 = order,
+                        Order8 = order, Order9 = order, Order10 = order, Order11 = order,
+                        Order12 = order, Order13 = order, Order14 = order, Order15 = order
+                    });
+                    totalAdded++;
+                }
+            }
+
+            _logger.LogInformation("Added {ModSongCount} mod song(s) to {PlaylistCount} battlefield playlist(s) ({TotalAdded} total insertions).",
+                modSongs.Count, playlists.Count, totalAdded);
+        }
+
+        private void EnableBgmSelectorOnAllStages()
+        {
+            int count = 0;
+            foreach (var stage in _audioStateService.GetStagesEntries())
+            {
+                if (!stage.BgmSelector)
+                {
+                    stage.BgmSelector = true;
+                    count++;
+                }
+            }
+            _logger.LogInformation("Enabled BgmSelector (album selection) on {Count} stage(s).", count);
         }
 
         private bool ProcessSeriesOrderAutoMapping()

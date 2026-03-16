@@ -24,6 +24,7 @@ Configuration is in `Sma5h.CLI/bin/Debug/net8.0/appsettings.json`.
 
 ## Key Concepts
 - Mod output goes to `Sma5h.CLI/bin/Debug/net8.0/ArcOutput/`
+- `EnableBgmSelectorOnAllStages()` in Sma5hMusic.cs sets `bgm_selector=true` on all stages during build, enabling My Music/album selection on every stage.
 
 ## Testing
 Test on Nintendo Switch by copying ArcOutput to the SD card mod folder. No automated test suite exists.

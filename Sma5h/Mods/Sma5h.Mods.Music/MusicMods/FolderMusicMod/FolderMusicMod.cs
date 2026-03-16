@@ -227,6 +227,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 {
                     var gametitlePlaylistId = "bgm_gametitle_" + seriesFile.Series.Id;
                     output.PlaylistEntries.Add(BuildPlaylistEntry(gametitlePlaylistId, playlistTracks));
+                    _logger.LogInformation("Created playlist {PlaylistId} with {TrackCount} track(s).", gametitlePlaylistId, playlistTracks.Count);
 
                     // Explicit stage playlists from [[playlists]] in series.toml
                     foreach (var playlistOverride in seriesFile.Playlists)
@@ -236,6 +237,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                             .Select(t => (t.uiBgmId, playlistOverride.Incidence))
                             .ToList();
                         output.PlaylistEntries.Add(BuildPlaylistEntry(playlistOverride.Id, overrideTracks));
+                        _logger.LogInformation("Created playlist {PlaylistId} with {TrackCount} track(s) (from [[playlists]] override).", playlistOverride.Id, overrideTracks.Count);
                     }
                 }
             }

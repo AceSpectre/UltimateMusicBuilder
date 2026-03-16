@@ -338,10 +338,11 @@ namespace Sma5h.Mods.Music.Services
             if (!_playlistsEntries.ContainsKey(playlistEntry.Id))
             {
                 _playlistsEntries.Add(playlistEntry.Id, playlistEntry);
+                _logger.LogInformation("Registered playlist {PlaylistId} with {TrackCount} track(s).", playlistEntry.Id, playlistEntry.Tracks.Count);
             }
             else
             {
-                _logger.LogWarning("PlaylistId {PlaylistId} already exist... ", playlistEntry.Id);
+                _logger.LogWarning("PlaylistId {PlaylistId} already exists, skipping {TrackCount} new track(s).", playlistEntry.Id, playlistEntry.Tracks.Count);
             }
 
             return true;
@@ -613,6 +614,7 @@ namespace Sma5h.Mods.Music.Services
 
             //Playlists
             paramBgmDatabase.PlaylistEntries.Clear(); //Wiping everything :)
+            _logger.LogInformation("Writing {PlaylistCount} playlist(s) to PRC.", _playlistsEntries.Count);
             foreach (var playlist in _playlistsEntries)
             {
                 var tracks = new List<PrcBgmPlaylistEntry>();
@@ -627,8 +629,9 @@ namespace Sma5h.Mods.Music.Services
                     if (_bgmDbRootEntries.ContainsKey(track.UiBgmId))
                         tracks.Add(_mapper.Map<PrcBgmPlaylistEntry>(track));
                     else
-                        _logger.LogWarning("The track with BGM ID {UiBgmId}", track.UiBgmId);
+                        _logger.LogWarning("The track with BGM ID {UiBgmId} not found in db_root entries, skipping from playlist {PlaylistId}.", track.UiBgmId, playlist.Key);
                 }
+                _logger.LogInformation("Wrote playlist {PlaylistId} with {TrackCount} track(s) to PRC.", playlist.Key, tracks.Count);
             }
 
             //Mapping stage
