@@ -99,6 +99,14 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     NameId = seriesFile.Series.Id
                 };
                 seriesEntry.MSBTTitle["en_us"] = seriesFile.Series.Name ?? seriesFile.Series.Id;
+
+                // ── Icon (optional) ────────────────────────────────────────
+                var iconPath = Path.Combine(subfolder, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
+                if (File.Exists(iconPath))
+                {
+                    seriesEntry.IconPath = iconPath;
+                    _logger.LogInformation("Found icon.png for series {SeriesId}.", uiSeriesId);
+                }
                 output.SeriesEntries.Add(seriesEntry);
 
                 // ── GameTitleEntries ───────────────────────────────────────

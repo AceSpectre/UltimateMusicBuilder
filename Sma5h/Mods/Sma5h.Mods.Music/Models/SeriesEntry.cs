@@ -19,6 +19,11 @@ namespace Sma5h.Mods.Music.Models
         public Dictionary<string, string> MSBTTitle { get; set; }
         public string MSBTTitleKey { get { return !string.IsNullOrEmpty(NameId) ? string.Format(MusicConstants.InternalIds.MSBT_SERIES_TITLE, NameId) : null; } }
 
+        /// <summary>
+        /// Optional path to an icon.png that will be converted to BNTX during build.
+        /// </summary>
+        public string IconPath { get; set; }
+
         public override string ToString()
         {
             return UiSeriesId;

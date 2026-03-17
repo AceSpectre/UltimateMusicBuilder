@@ -19,16 +19,18 @@ namespace Sma5h.Mods.Music
         private readonly IAudioStateService _audioStateService;
         private readonly IMusicModManagerService _musicModManagerService;
         private readonly INus3AudioService _nus3AudioService;
+        private readonly IProcessService _processService;
 
         public override string ModName => "Sma5hMusic";
 
         public Sma5hMusic(IOptionsMonitor<Sma5hMusicOptions> config, IMusicModManagerService musicModManagerService, IAudioStateService audioStateService,
-            INus3AudioService nus3AudioService, IStateManager state, ILogger<Sma5hMusic> logger)
+            INus3AudioService nus3AudioService, IProcessService processService, IStateManager state, ILogger<Sma5hMusic> logger)
             : base(state)
         {
             _logger = logger;
             _audioStateService = audioStateService;
             _nus3AudioService = nus3AudioService;
+            _processService = processService;
             _musicModManagerService = musicModManagerService;
             _state = state;
             _config = config;
@@ -127,6 +129,9 @@ namespace Sma5h.Mods.Music
                     _logger.LogError("Error! The song with ToneId {NameId}, File {Filename} could not be processed.", bgmPropertyEntry.NameId, bgmPropertyEntry.Filename);
             }
 
+            //Convert series icon PNGs to BNTX
+            ConvertSeriesIcons();
+
             return true;
         }
 
@@ -159,6 +164,41 @@ namespace Sma5h.Mods.Music
             }
 
             return result;
+        }
+
+        private void ConvertSeriesIcons()
+        {
+            var ultimateTexCli = Path.Combine(_config.CurrentValue.ToolsPath, "Windows", "ultimate_tex_cli.exe");
+            if (!File.Exists(ultimateTexCli))
+            {
+                _logger.LogWarning("ultimate_tex_cli.exe not found at {Path}. Skipping series icon conversion.", ultimateTexCli);
+                return;
+            }
+
+            foreach (var seriesEntry in _audioStateService.GetSeriesEntries())
+            {
+                if (string.IsNullOrEmpty(seriesEntry.IconPath) || !File.Exists(seriesEntry.IconPath))
+                    continue;
+
+                // ui_series_cuphead -> series_0_cuphead
+                var bntxName = seriesEntry.UiSeriesId.Replace(
+                    MusicConstants.InternalIds.SERIES_ID_PREFIX, "series_0_");
+                var outputDir = Path.Combine(_config.CurrentValue.OutputPath,
+                    "ui", "replace", "series", "series_0");
+                Directory.CreateDirectory(outputDir);
+                var outputFile = Path.Combine(outputDir, bntxName + ".bntx");
+
+                _logger.LogInformation("Converting icon {IconPath} to BNTX {OutputFile}",
+                    seriesEntry.IconPath, outputFile);
+
+                _processService.RunProcess(ultimateTexCli,
+                    $"\"{seriesEntry.IconPath}\" \"{outputFile}\" --format BC7RgbaUnormSrgb --no-mipmaps");
+
+                if (File.Exists(outputFile))
+                    _logger.LogInformation("Successfully generated series icon {OutputFile}.", outputFile);
+                else
+                    _logger.LogError("Failed to generate series icon {OutputFile} from {IconPath}.", outputFile, seriesEntry.IconPath);
+            }
         }
 
         private bool ProcessPlaylistAutoMapping()
