@@ -25,6 +25,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
     public class FolderMusicMod : IMusicMod
     {
         private readonly ILogger _logger;
+        private readonly IAudioMetadataService _audioMetadataService;
         private readonly string _modPath;
         private readonly FolderMusicModInformation _modInfo;
 
@@ -33,9 +34,10 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public string ModPath => _modPath;
         public MusicModInformation Mod => _modInfo;
 
-        public FolderMusicMod(ILogger<IMusicMod> logger, string modPath)
+        public FolderMusicMod(ILogger<IMusicMod> logger, IAudioMetadataService audioMetadataService, string modPath)
         {
             _logger = logger;
+            _audioMetadataService = audioMetadataService;
             _modPath = modPath;
             var folderName = Path.GetFileName(modPath);
             _modInfo = new FolderMusicModInformation(folderName, folderName);
@@ -216,6 +218,31 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     {
                         AudioVolume = row.Volume
                     };
+                    try
+                    {
+                        AudioCuePoints cuePoints = null;
+
+                        // For .nus3audio files, parse the inner OPUS header directly.
+                        // VGMStream cannot open nus3audio containers, producing NaN-based garbage values.
+                        if (Path.GetExtension(audioFile).Equals(".nus3audio", StringComparison.OrdinalIgnoreCase))
+                            cuePoints = ReadNus3AudioOpusCuePoints(audioFile);
+
+                        // For other formats, use the audio metadata service (VGMStream)
+                        if (cuePoints == null)
+                            cuePoints = _audioMetadataService.GetCuePoints(audioFile).GetAwaiter().GetResult();
+
+                        bgmProp.TotalTimeMs = cuePoints.TotalTimeMs;
+                        bgmProp.TotalSamples = cuePoints.TotalSamples;
+                        bgmProp.LoopStartMs = cuePoints.LoopStartMs;
+                        bgmProp.LoopStartSample = cuePoints.LoopStartSample;
+                        bgmProp.LoopEndMs = cuePoints.LoopEndMs;
+                        bgmProp.LoopEndSample = cuePoints.LoopEndSample;
+                        _logger.LogInformation("Audio metadata for {ToneId}: {TotalTimeMs}ms, {TotalSamples} samples.", toneId, cuePoints.TotalTimeMs, cuePoints.TotalSamples);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Could not read audio metadata for {Filename}. Song length will show as 0.", row.Filename);
+                    }
                     output.BgmPropertyEntries.Add(bgmProp);
 
                     playlistTracks.Add((uiBgmId, seriesFile.Series.PlaylistIncidence));
@@ -362,6 +389,86 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 sb.Append(char.ToLower(name[i]));
             }
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// Reads cue points directly from the Namco OPUS header inside a .nus3audio container.
+        /// Returns null if the file doesn't contain an OPUS inner stream.
+        /// </summary>
+        private AudioCuePoints ReadNus3AudioOpusCuePoints(string filePath)
+        {
+            using var fs = File.Open(filePath, FileMode.Open, FileAccess.Read);
+            using var reader = new BinaryReader(fs);
+
+            // Scan for the "PACK" chunk (typically at a fixed offset, but search to be safe)
+            var header = reader.ReadBytes((int)Math.Min(fs.Length, 512));
+            int packOffset = -1;
+            for (int i = 0; i <= header.Length - 4; i++)
+            {
+                if (header[i] == (byte)'P' && header[i + 1] == (byte)'A' &&
+                    header[i + 2] == (byte)'C' && header[i + 3] == (byte)'K')
+                {
+                    packOffset = i;
+                    break;
+                }
+            }
+            if (packOffset < 0)
+            {
+                _logger.LogWarning("No PACK chunk found in nus3audio file {FilePath}.", filePath);
+                return null;
+            }
+
+            // Skip PACK magic (4 bytes) + size (4 bytes LE) to reach inner audio data
+            int dataStart = packOffset + 8;
+            if (dataStart + 4 > header.Length)
+                return null;
+
+            var magic = Encoding.ASCII.GetString(header, dataStart, 4);
+            if (magic != "OPUS")
+            {
+                _logger.LogWarning("Inner audio format '{Magic}' in {FilePath} is not OPUS; cannot read cue points.", magic, filePath);
+                return null;
+            }
+
+            // Namco OPUS header (big-endian) layout from PACK data start:
+            // +0x00: "OPUS" (4 bytes)
+            // +0x04: padding (4 bytes)
+            // +0x08: total samples (4 bytes BE)
+            // +0x0C: channel count (4 bytes BE)
+            // +0x10: sample rate (4 bytes BE)
+            // +0x14: loop start sample (4 bytes BE)
+            // +0x18: loop end sample (4 bytes BE)
+            int hdrBase = dataStart + 8; // skip "OPUS" + padding
+            if (hdrBase + 20 > header.Length)
+                return null;
+
+            uint totalSamples   = ReadBE32(header, hdrBase);
+            // skip channels at hdrBase + 4
+            uint sampleRate     = ReadBE32(header, hdrBase + 8);
+            uint loopStartSample = ReadBE32(header, hdrBase + 12);
+            uint loopEndSample  = ReadBE32(header, hdrBase + 16);
+
+            if (sampleRate == 0)
+            {
+                _logger.LogWarning("Sample rate is 0 in OPUS header of {FilePath}.", filePath);
+                return null;
+            }
+
+            return new AudioCuePoints
+            {
+                TotalSamples    = totalSamples,
+                TotalTimeMs     = (uint)((ulong)totalSamples * 1000 / sampleRate),
+                LoopStartSample = loopStartSample,
+                LoopStartMs     = (uint)((ulong)loopStartSample * 1000 / sampleRate),
+                LoopEndSample   = loopEndSample,
+                LoopEndMs       = (uint)((ulong)loopEndSample * 1000 / sampleRate)
+            };
+        }
+
+        private static uint ReadBE32(byte[] data, int offset)
+        {
+            return ((uint)data[offset] << 24) | ((uint)data[offset + 1] << 16) |
+                   ((uint)data[offset + 2] << 8) | data[offset + 3];
         }
     }
 }
