@@ -2,7 +2,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
+using Spectre.Console;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -22,15 +24,72 @@ namespace Sma5h.CLI
             ConfigureServices(services, args);
             var serviceProvider = services.BuildServiceProvider();
 
-            using (var scope = serviceProvider.CreateScope())
+            // If args provided, run once and exit
+            if (args.Length > 0)
             {
-                Script entry = scope.ServiceProvider.GetService<Script>();
-                await entry.Run();
+                using var scope = serviceProvider.CreateScope();
+                var entry = scope.ServiceProvider.GetService<Script>();
+                await RunAction(args[0].ToLowerInvariant(), entry);
+                return;
             }
 
-            await Task.Delay(1000);
-            Console.WriteLine("The program has completed its task. Press enter to exit");
-            Console.ReadLine();
+            // Interactive loop
+            while (true)
+            {
+                var action = ShowMenu();
+                if (action == "quit")
+                    return;
+
+                using (var scope = serviceProvider.CreateScope())
+                {
+                    var entry = scope.ServiceProvider.GetService<Script>();
+                    await RunAction(action, entry);
+                }
+
+                AnsiConsole.WriteLine();
+            }
+        }
+
+        private static async Task RunAction(string action, Script entry)
+        {
+            switch (action)
+            {
+                case "build":
+                    await entry.RunBuild();
+                    break;
+                case "scaffold":
+                    entry.RunScaffold();
+                    break;
+                case "populate":
+                    entry.RunPopulate();
+                    break;
+                default:
+                    Console.WriteLine($"Unknown command: {action}");
+                    Console.WriteLine("Usage: dotnet run [build|scaffold|populate]");
+                    break;
+            }
+        }
+
+        private static readonly Dictionary<string, string> MenuOptions = new()
+        {
+            ["Build     - Build mods and generate ArcOutput"] = "build",
+            ["Scaffold  - Create series.toml and tracks.csv for new series folders"] = "scaffold",
+            ["Populate  - Add new music files to tracks.csv using series defaults"] = "populate",
+            ["Quit"] = "quit",
+        };
+
+        private static string ShowMenu()
+        {
+            AnsiConsole.MarkupLine("[bold]Sma5h Music Mod Builder[/]");
+            AnsiConsole.WriteLine();
+
+            var choice = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Select an action:")
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(MenuOptions.Keys));
+
+            return MenuOptions[choice];
         }
 
         private static void ConfigureServices(IServiceCollection services, string[] args)

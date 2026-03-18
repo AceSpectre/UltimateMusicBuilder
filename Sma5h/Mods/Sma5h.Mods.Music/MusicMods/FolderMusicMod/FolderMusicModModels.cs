@@ -26,12 +26,22 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public int Incidence { get; set; } = 100;
     }
 
+    public class FolderDefaultTrackDataConfig
+    {
+        public string Game { get; set; }
+        public string Author { get; set; }
+        public string Copyright { get; set; }
+        public string RecordType { get; set; } = "original";
+        public float Volume { get; set; } = 2.7f;
+    }
+
     /// <summary>Root POCO for series.toml deserialization.</summary>
     public class FolderSeriesFileConfig
     {
         public FolderSeriesConfig Series { get; set; }
         public List<FolderGameConfig> Games { get; set; } = new();
         public List<FolderPlaylistOverrideConfig> Playlists { get; set; } = new();
+        public FolderDefaultTrackDataConfig DefaultTrackData { get; set; }
     }
 
     // ── CSV models (CsvHelper mapping) ───────────────────────────────────────

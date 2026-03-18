@@ -313,7 +313,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             var tomlText = File.ReadAllText(tomlPath);
             var options = new TomlModelOptions
             {
-                ConvertPropertyName = ToSnakeCase
+                ConvertPropertyName = ToKebabCase
             };
             return Toml.ToModel<FolderSeriesFileConfig>(tomlText, options: options);
         }
@@ -387,13 +387,13 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             return entry;
         }
 
-        private static string ToSnakeCase(string name)
+        private static string ToKebabCase(string name)
         {
             var sb = new StringBuilder(name.Length + 4);
             for (var i = 0; i < name.Length; i++)
             {
                 if (char.IsUpper(name[i]) && i > 0)
-                    sb.Append('_');
+                    sb.Append('-');
                 sb.Append(char.ToLower(name[i]));
             }
             return sb.ToString();
