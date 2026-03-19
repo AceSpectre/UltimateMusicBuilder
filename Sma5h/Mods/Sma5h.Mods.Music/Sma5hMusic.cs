@@ -401,6 +401,9 @@ namespace Sma5h.Mods.Music
             var series = _audioStateService.GetSeriesEntries().Where(s => s.DispOrderSound > -1).ToDictionary(p => p.UiSeriesId, p => p);
             sbyte i = 0;
 
+            // "Other" (ui_series_etc) should always sort last
+            var etcSeriesId = MusicConstants.InternalIds.SERIES_ID_PREFIX + "etc";
+
             var sortedGames = _audioStateService.GetBgmDbRootEntries()
                 .Where(p => p.TestDispOrder >= 0)
                 .OrderBy(p => p.TestDispOrder)
@@ -412,12 +415,21 @@ namespace Sma5h.Mods.Music
                 .GroupBy(g => g.UiSeriesId)
                 .Select(p => p.First().UiSeriesId))
             {
+                if (sortedSeries == etcSeriesId)
+                    continue; // defer "Other" to the end
+
                 if (series.ContainsKey(sortedSeries))
                 {
                     series[sortedSeries].DispOrderSound = i;
                     if (i != sbyte.MaxValue)
                         i++;
                 }
+            }
+
+            // Assign "Other" last
+            if (series.ContainsKey(etcSeriesId))
+            {
+                series[etcSeriesId].DispOrderSound = i;
             }
 
             return true;
