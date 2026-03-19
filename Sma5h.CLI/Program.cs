@@ -63,9 +63,12 @@ namespace Sma5h.CLI
                 case "populate":
                     entry.RunPopulate();
                     break;
+                case "convert":
+                    entry.RunConvert();
+                    break;
                 default:
                     Console.WriteLine($"Unknown command: {action}");
-                    Console.WriteLine("Usage: dotnet run [build|scaffold|populate]");
+                    Console.WriteLine("Usage: dotnet run [build|scaffold|populate|convert]");
                     break;
             }
         }
@@ -75,6 +78,7 @@ namespace Sma5h.CLI
             ["Build     - Build mods and generate ArcOutput"] = "build",
             ["Scaffold  - Create series.toml and tracks.csv for new series folders"] = "scaffold",
             ["Populate  - Add new music files to tracks.csv using series defaults"] = "populate",
+            ["Convert   - Import a Sma5h mod to UMB folder format"] = "convert",
             ["Quit"] = "quit",
         };
 

@@ -12,6 +12,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public string Id { get; set; }
         public string Name { get; set; }
         public int PlaylistIncidence { get; set; } = 100;
+        public bool ExistingSeries { get; set; }
     }
 
     public class FolderGameConfig
@@ -56,6 +57,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public string RecordType { get; set; }
         public string SpecialCategory { get; set; }
         public float Volume { get; set; } = 2.7f;
+        public string Info1 { get; set; }
     }
 
     public class FolderTrackCsvRowMap : ClassMap<FolderTrackCsvRow>
@@ -70,6 +72,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             Map(m => m.RecordType).Name("record_type").Optional().Default("original");
             Map(m => m.SpecialCategory).Name("special_category").Optional();
             Map(m => m.Volume).Name("volume").Optional().Default(2.7f);
+            Map(m => m.Info1).Name("info1").Optional().Default("");
         }
     }
 

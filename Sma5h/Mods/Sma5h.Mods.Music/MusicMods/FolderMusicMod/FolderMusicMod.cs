@@ -92,24 +92,32 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 }
 
                 var uiSeriesId = MusicConstants.InternalIds.SERIES_ID_PREFIX + seriesFile.Series.Id;
+                var isExistingSeries = seriesFile.Series.ExistingSeries;
 
-                // ── SeriesEntry ────────────────────────────────────────────
-                var seriesEntry = new SeriesEntry(uiSeriesId, EntrySource.Mod)
+                // ── SeriesEntry (skip for existing in-game series) ────────
+                if (!isExistingSeries)
                 {
-                    NameId = seriesFile.Series.Id
-                };
-                seriesEntry.MSBTTitle["en_us"] = seriesFile.Series.Name ?? seriesFile.Series.Id;
+                    var seriesEntry = new SeriesEntry(uiSeriesId, EntrySource.Mod)
+                    {
+                        NameId = seriesFile.Series.Id
+                    };
+                    seriesEntry.MSBTTitle["en_us"] = seriesFile.Series.Name ?? seriesFile.Series.Id;
 
-                // ── Icon (optional) ────────────────────────────────────────
-                var iconPath = Path.Combine(subfolder, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
-                if (File.Exists(iconPath))
-                {
-                    seriesEntry.IconPath = iconPath;
-                    _logger.LogInformation("Found icon.png for series {SeriesId}.", uiSeriesId);
+                    // ── Icon (optional) ────────────────────────────────────
+                    var iconPath = Path.Combine(subfolder, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
+                    if (File.Exists(iconPath))
+                    {
+                        seriesEntry.IconPath = iconPath;
+                        _logger.LogInformation("Found icon.png for series {SeriesId}.", uiSeriesId);
+                    }
+                    output.SeriesEntries.Add(seriesEntry);
                 }
-                output.SeriesEntries.Add(seriesEntry);
+                else
+                {
+                    _logger.LogInformation("Series {SeriesId} is flagged as existing — skipping SeriesEntry creation.", uiSeriesId);
+                }
 
-                // ── GameTitleEntries ───────────────────────────────────────
+                // ── GameTitleEntries (skip for existing in-game series) ───
                 var gameIdLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var game in seriesFile.Games)
                 {
@@ -119,13 +127,16 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                         continue;
                     }
                     var uiGameTitleId = MusicConstants.InternalIds.GAME_TITLE_ID_PREFIX + game.Id;
-                    var gameTitleEntry = new GameTitleEntry(uiGameTitleId, EntrySource.Mod)
+                    if (!isExistingSeries)
                     {
-                        NameId = game.Id,
-                        UiSeriesId = uiSeriesId
-                    };
-                    gameTitleEntry.MSBTTitle["en_us"] = game.Name ?? game.Id;
-                    output.GameTitleEntries.Add(gameTitleEntry);
+                        var gameTitleEntry = new GameTitleEntry(uiGameTitleId, EntrySource.Mod)
+                        {
+                            NameId = game.Id,
+                            UiSeriesId = uiSeriesId
+                        };
+                        gameTitleEntry.MSBTTitle["en_us"] = game.Name ?? game.Id;
+                        output.GameTitleEntries.Add(gameTitleEntry);
+                    }
                     gameIdLookup[game.Id] = uiGameTitleId;
                 }
 
@@ -142,6 +153,8 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 }
 
                 var playlistTracks = new List<(string uiBgmId, int incidence)>();
+                var filenameToInfoId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var deferredInfo1 = new List<(BgmStreamSetEntry streamSet, string info1Filename)>();
 
                 foreach (var row in tracks)
                 {
@@ -207,6 +220,10 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                         streamSet.SpecialCategory = row.SpecialCategory;
                     output.BgmStreamSetEntries.Add(streamSet);
 
+                    filenameToInfoId[row.Filename] = infoId;
+                    if (!string.IsNullOrEmpty(row.Info1))
+                        deferredInfo1.Add((streamSet, row.Info1));
+
                     // BgmAssignedInfoEntry (defaults set by constructor)
                     var assignedInfo = new BgmAssignedInfoEntry(infoId, this)
                     {
@@ -254,6 +271,24 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     output.BgmPropertyEntries.Add(bgmProp);
 
                     playlistTracks.Add((uiBgmId, seriesFile.Series.PlaylistIncidence));
+                }
+
+                // ── Resolve info1 references ─────────────────────────────
+                foreach (var (streamSet, info1Filename) in deferredInfo1)
+                {
+                    if (info1Filename.StartsWith("info_"))
+                    {
+                        // Direct base game info ID reference
+                        streamSet.Info1 = info1Filename;
+                    }
+                    else if (filenameToInfoId.TryGetValue(info1Filename, out var info1Id))
+                    {
+                        streamSet.Info1 = info1Id;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Track {StreamSetId}: info1 references '{Info1Filename}' which was not found in this series.", streamSet.StreamSetId, info1Filename);
+                    }
                 }
 
                 // ── Playlist entries ───────────────────────────────────────
