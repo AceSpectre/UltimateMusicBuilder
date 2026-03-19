@@ -10,6 +10,7 @@ using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -171,7 +172,9 @@ namespace Sma5h.CLI
                 return;
             }
 
+            var validExtensions = new HashSet<string>(MusicConstants.VALID_MUSIC_EXTENSIONS, StringComparer.OrdinalIgnoreCase);
             int totalScaffolded = 0;
+            int totalAdded = 0;
 
             foreach (var modDir in modDirs)
             {
@@ -184,62 +187,26 @@ namespace Sma5h.CLI
                     var tomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
                     var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
 
-                    bool hasToml = File.Exists(tomlPath);
-                    bool hasCsv = File.Exists(csvPath);
-
-                    if (hasToml && hasCsv)
-                        continue;
-
-                    if (!hasToml)
+                    // ── Step 1: Create missing series.toml / tracks.csv ──
+                    bool wasScaffolded = false;
+                    if (!File.Exists(tomlPath))
                     {
                         var tomlContent = $"[series]\nid = \"{folderName}\"\nname = \"{folderName}\"\nplaylist-incidence = 100\n\n[[games]]\nid = \"{folderName}\"\nname = \"{folderName}\"\n\n[[playlists]]\nid = \"bgm_{folderName}\"\nincidence = 100\n\n[default-track-data]\ngame = \"{folderName}\"\nauthor = \"\"\ncopyright = \"\"\nrecord-type = \"original\"\nvolume = 2.7\n";
                         File.WriteAllText(tomlPath, tomlContent);
                         _logger.LogInformation("Created {Path}", tomlPath);
+                        wasScaffolded = true;
                     }
-
-                    if (!hasCsv)
+                    if (!File.Exists(csvPath))
                     {
                         var csvContent = "filename,game,title,author,copyright,record_type,volume,order\n";
                         File.WriteAllText(csvPath, csvContent);
                         _logger.LogInformation("Created {Path}", csvPath);
+                        wasScaffolded = true;
                     }
+                    if (wasScaffolded)
+                        totalScaffolded++;
 
-                    totalScaffolded++;
-                }
-            }
-
-            if (totalScaffolded == 0)
-                _logger.LogInformation("All series folders already have series.toml and tracks.csv.");
-            else
-                _logger.LogInformation("Scaffolded {Count} series folder(s).", totalScaffolded);
-        }
-
-        public void RunPopulate()
-        {
-            PrintBanner();
-
-            var modPath = _musicConfig.CurrentValue.Sma5hMusic.ModPath;
-            Directory.CreateDirectory(modPath);
-
-            var validExtensions = new HashSet<string>(MusicConstants.VALID_MUSIC_EXTENSIONS, StringComparer.OrdinalIgnoreCase);
-            int totalAdded = 0;
-
-            foreach (var modDir in Directory.GetDirectories(modPath, "*", SearchOption.TopDirectoryOnly))
-            {
-                if (Path.GetFileName(modDir).StartsWith("."))
-                    continue;
-
-                foreach (var seriesDir in Directory.GetDirectories(modDir))
-                {
-                    var tomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
-                    var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
-
-                    if (!File.Exists(tomlPath) || !File.Exists(csvPath))
-                    {
-                        _logger.LogDebug("Skipping {Dir}: missing series.toml or tracks.csv. Run scaffold first.", seriesDir);
-                        continue;
-                    }
-
+                    // ── Step 2: Populate tracks.csv with any new music files ──
                     // Parse series.toml for defaults
                     var tomlText = File.ReadAllText(tomlPath);
                     var tomlOptions = new TomlModelOptions { ConvertPropertyName = ToKebabCase };
@@ -250,12 +217,11 @@ namespace Sma5h.CLI
                     }
                     catch (Exception e)
                     {
-                        _logger.LogError(e, "Failed to parse {Path}, skipping.", tomlPath);
+                        _logger.LogError(e, "Failed to parse {Path}, skipping populate.", tomlPath);
                         continue;
                     }
 
                     var defaults = seriesFile.DefaultTrackData;
-                    var folderName = Path.GetFileName(seriesDir);
 
                     // Read existing CSV rows to find already-listed filenames
                     var existingFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -318,10 +284,12 @@ namespace Sma5h.CLI
                 }
             }
 
-            if (totalAdded == 0)
-                _logger.LogInformation("No new music files found to add.");
-            else
+            if (totalScaffolded > 0)
+                _logger.LogInformation("Scaffolded {Count} series folder(s).", totalScaffolded);
+            if (totalAdded > 0)
                 _logger.LogInformation("Populated {Count} new track(s) total.", totalAdded);
+            if (totalScaffolded == 0 && totalAdded == 0)
+                _logger.LogInformation("All series folders are up to date.");
         }
 
         public void RunConvert()
@@ -534,6 +502,137 @@ namespace Sma5h.CLI
             _logger.LogInformation("--------------------");
             _logger.LogInformation("Conversion complete: {SeriesCount} series, {TrackCount} tracks → {OutputDir}",
                 totalSeries, totalTracks, outputModDir);
+        }
+
+        public void RunExtractIcons()
+        {
+            PrintBanner();
+
+            var ultimateTexCli = Path.Combine(_musicConfig.CurrentValue.ToolsPath, "Windows", "ultimate_tex_cli.exe");
+            if (!File.Exists(ultimateTexCli))
+            {
+                _logger.LogError("ultimate_tex_cli.exe not found at {Path}.", ultimateTexCli);
+                return;
+            }
+
+            var sourceModPath = AnsiConsole.Prompt(
+                new TextPrompt<string>("Enter path to source Sma5h mod folder (with metadata_mod.json):")
+                    .Validate(path =>
+                    {
+                        if (!Directory.Exists(path))
+                            return ValidationResult.Error("Directory does not exist.");
+                        if (!File.Exists(Path.Combine(path, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE)))
+                            return ValidationResult.Error("No metadata_mod.json found in that folder.");
+                        return ValidationResult.Success();
+                    }));
+
+            var builtModPath = AnsiConsole.Prompt(
+                new TextPrompt<string>("Enter path to built Sma5h mod folder (containing ui/replace/series/series_0/):")
+                    .Validate(path =>
+                    {
+                        if (!Directory.Exists(path))
+                            return ValidationResult.Error("Directory does not exist.");
+                        var series0Dir = Path.Combine(path, "ui", "replace", "series", "series_0");
+                        if (!Directory.Exists(series0Dir))
+                            return ValidationResult.Error("No ui/replace/series/series_0/ folder found.");
+                        return ValidationResult.Success();
+                    }));
+
+            // Parse metadata_mod.json to get series name_ids
+            var jsonPath = Path.Combine(sourceModPath, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE);
+            JObject json;
+            try
+            {
+                json = JObject.Parse(File.ReadAllText(jsonPath));
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Failed to parse {Path}.", jsonPath);
+                return;
+            }
+
+            // Build set of series name_ids from the source mod
+            var seriesIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seriesArray = json["series"] as JArray;
+            if (seriesArray != null)
+            {
+                foreach (var series in seriesArray)
+                {
+                    var nameId = series["name_id"]?.ToString();
+                    if (!string.IsNullOrWhiteSpace(nameId))
+                        seriesIds.Add(nameId);
+                }
+            }
+
+            if (seriesIds.Count == 0)
+            {
+                _logger.LogWarning("No series found in metadata_mod.json.");
+                return;
+            }
+
+            // Find the UMB mod folder to place icons into
+            var modPath = _musicConfig.CurrentValue.Sma5hMusic.ModPath;
+            var series0Dir = Path.Combine(builtModPath, "ui", "replace", "series", "series_0");
+            int totalExtracted = 0;
+
+            foreach (var seriesId in seriesIds)
+            {
+                // Built BNTX file: series_0_{seriesId}.bntx
+                var bntxFile = Path.Combine(series0Dir, $"series_0_{seriesId}.bntx");
+                if (!File.Exists(bntxFile))
+                    continue;
+
+                // Find the matching UMB series subfolder across all mod folders
+                string targetSeriesDir = null;
+                foreach (var modDir in Directory.GetDirectories(modPath, "*", SearchOption.TopDirectoryOnly))
+                {
+                    var candidate = Path.Combine(modDir, seriesId);
+                    if (Directory.Exists(candidate))
+                    {
+                        targetSeriesDir = candidate;
+                        break;
+                    }
+                }
+
+                if (targetSeriesDir == null)
+                {
+                    _logger.LogWarning("No UMB series folder found for '{SeriesId}', skipping icon.", seriesId);
+                    continue;
+                }
+
+                var outputPng = Path.Combine(targetSeriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
+
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = ultimateTexCli,
+                        Arguments = $"\"{bntxFile}\" \"{outputPng}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+                process.Start();
+                process.WaitForExit();
+
+                if (File.Exists(outputPng))
+                {
+                    _logger.LogInformation("Extracted icon for '{SeriesId}' → {OutputPath}", seriesId, outputPng);
+                    totalExtracted++;
+                }
+                else
+                {
+                    _logger.LogError("Failed to extract icon for '{SeriesId}' from {BntxFile}.", seriesId, bntxFile);
+                }
+            }
+
+            _logger.LogInformation("--------------------");
+            if (totalExtracted > 0)
+                _logger.LogInformation("Extracted {Count} icon(s).", totalExtracted);
+            else
+                _logger.LogInformation("No icons found to extract.");
         }
 
         private HashSet<string> LoadExistingSeriesIds()

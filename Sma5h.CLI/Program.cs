@@ -60,25 +60,25 @@ namespace Sma5h.CLI
                 case "scaffold":
                     entry.RunScaffold();
                     break;
-                case "populate":
-                    entry.RunPopulate();
-                    break;
                 case "convert":
                     entry.RunConvert();
                     break;
+                case "extract-icons":
+                    entry.RunExtractIcons();
+                    break;
                 default:
                     Console.WriteLine($"Unknown command: {action}");
-                    Console.WriteLine("Usage: dotnet run [build|scaffold|populate|convert]");
+                    Console.WriteLine("Usage: dotnet run [build|scaffold|convert|extract-icons]");
                     break;
             }
         }
 
         private static readonly Dictionary<string, string> MenuOptions = new()
         {
-            ["Build     - Build mods and generate ArcOutput"] = "build",
-            ["Scaffold  - Create series.toml and tracks.csv for new series folders"] = "scaffold",
-            ["Populate  - Add new music files to tracks.csv using series defaults"] = "populate",
-            ["Convert   - Import a Sma5h mod to UMB folder format"] = "convert",
+            ["Build          - Build mods and generate ArcOutput"] = "build",
+            ["Scaffold       - Create series.toml/tracks.csv and populate new music files"] = "scaffold",
+            ["Convert        - Import a Sma5h mod to UMB folder format"] = "convert",
+            ["Extract Icons  - Extract series icons from a built Sma5h mod"] = "extract-icons",
             ["Quit"] = "quit",
         };
 
