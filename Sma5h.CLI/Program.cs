@@ -135,6 +135,13 @@ namespace Sma5h.CLI
 
             //CLI
             services.AddScoped<IWorkspaceManager, WorkspaceManager>();
+            services.AddScoped<Services.BuildService>();
+            services.AddScoped<Services.ScaffoldService>();
+            services.AddScoped<Services.ConvertService>();
+            services.AddScoped<Services.ExtractIconsService>();
+            services.AddScoped<Services.Nus3ConvertService>();
+            services.AddScoped<Services.AcceptNus3Service>();
+            services.AddScoped<Services.CleanupService>();
             services.AddScoped<Script>();
 
             services.AddLogging();
