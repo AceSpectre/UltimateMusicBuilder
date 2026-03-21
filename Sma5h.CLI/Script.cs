@@ -699,28 +699,55 @@ namespace Sma5h.CLI
 
                 // Step 1: Detect loop points via pymusiclooper
                 var loopCandidates = RunPymusiclooper(sourceFile);
+                var sourceSampleRate = GetSourceSampleRate(sourceFile);
                 long loopStart, loopEnd;
+                bool isFullSongLoop;
 
-                if (loopCandidates.Count > 0 && loopCandidates[0].score >= loopScoreThreshold)
+                if (loopCandidates.Count > 0 && loopCandidates.Any(c => c.score >= loopScoreThreshold))
                 {
-                    loopStart = loopCandidates[0].loopStart;
-                    loopEnd = loopCandidates[0].loopEnd;
-                    _logger.LogInformation("  Loop points: {Start}-{End} (score: {Score:P1})", loopStart, loopEnd, loopCandidates[0].score);
-                    goodLoops++;
+                    // Build selection choices from all candidates with full info
+                    var choices = new List<string>();
+                    for (int i = 0; i < loopCandidates.Count; i++)
+                    {
+                        var c = loopCandidates[i];
+                        var startTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopStart / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
+                        var endTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopEnd / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
+                        choices.Add($"Score: {c.score:P1}  Start: {startTime} ({c.loopStart})  End: {endTime} ({c.loopEnd})  NoteDist: {c.noteDistance:F4}  LoudnessDiff: {c.loudnessDiff:F4} dB");
+                    }
+                    choices.Add("Reject all (use full-song loop)");
+
+                    var selection = AnsiConsole.Prompt(
+                        new SelectionPrompt<string>()
+                            .Title($"Loop candidates for '{Markup.Escape(basename)}':")
+                            .HighlightStyle(new Style(Color.Cyan1))
+                            .AddChoices(choices));
+
+                    var selectedIndex = choices.IndexOf(selection);
+                    if (selectedIndex < loopCandidates.Count)
+                    {
+                        var selected = loopCandidates[selectedIndex];
+                        loopStart = selected.loopStart;
+                        loopEnd = selected.loopEnd;
+                        isFullSongLoop = false;
+                        _logger.LogInformation("  Selected loop: {Start}-{End} (score: {Score:P1})", loopStart, loopEnd, selected.score);
+                        goodLoops++;
+                    }
+                    else
+                    {
+                        loopStart = 0;
+                        loopEnd = 0; // will be set from WAV after conversion
+                        isFullSongLoop = true;
+                        fullLoops++;
+                    }
                 }
                 else
                 {
-                    // Full-song loop: 0 to total samples
-                    var totalSamples = GetTotalSamples(sourceFile);
-                    if (totalSamples <= 0)
-                    {
-                        _logger.LogError("  Could not determine total samples for '{Basename}', skipping.", basename);
-                        continue;
-                    }
+                    // No candidates above threshold — auto-reject
                     loopStart = 0;
-                    loopEnd = totalSamples;
+                    loopEnd = 0; // will be set from WAV after conversion
+                    isFullSongLoop = true;
                     var bestScore = loopCandidates.Count > 0 ? loopCandidates[0].score : 0;
-                    _logger.LogInformation("  No good loop found (best score: {Score:P1}), using full-song loop: 0-{End}", bestScore, loopEnd);
+                    _logger.LogInformation("  No candidates above threshold (best: {Score:P1}), using full-song loop.", bestScore);
                     fullLoops++;
                 }
 
@@ -736,6 +763,20 @@ namespace Sma5h.CLI
                         continue;
                     }
                     tempWav = true;
+                }
+
+                // For full-song loops, get exact sample count from the converted WAV
+                if (isFullSongLoop)
+                {
+                    var wavSamples = GetWavSampleCount(wavFile);
+                    if (wavSamples <= 0)
+                    {
+                        _logger.LogError("  Could not determine sample count for '{Basename}', skipping.", basename);
+                        if (tempWav && File.Exists(wavFile)) File.Delete(wavFile);
+                        continue;
+                    }
+                    loopEnd = wavSamples - 1;
+                    _logger.LogInformation("  Full-song loop: 0-{End}", loopEnd);
                 }
 
                 // Step 3: Convert WAV → lopus via VGAudioCli library
@@ -813,6 +854,15 @@ namespace Sma5h.CLI
                 {
                     _logger.LogInformation("  → {OutputPath}", outputNus3);
                     converted++;
+
+                    // Generate loop preview clip if a loop was selected
+                    if (!isFullSongLoop)
+                    {
+                        var loopsDir = Path.Combine(validateDir, "loops");
+                        Directory.CreateDirectory(loopsDir);
+                        var previewPath = Path.Combine(loopsDir, basename + "_loop.wav");
+                        CreateLoopPreview(sourceFile, loopStart, loopEnd, previewPath);
+                    }
                 }
                 else
                 {
@@ -1005,9 +1055,9 @@ namespace Sma5h.CLI
             return (selectedModDir, selectedSeriesDir);
         }
 
-        private List<(long loopStart, long loopEnd, double score)> RunPymusiclooper(string filePath)
+        private List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)> RunPymusiclooper(string filePath)
         {
-            var results = new List<(long loopStart, long loopEnd, double score)>();
+            var results = new List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)>();
             try
             {
                 var process = new Process
@@ -1026,16 +1076,18 @@ namespace Sma5h.CLI
                 var output = process.StandardOutput.ReadToEnd();
                 process.WaitForExit();
 
-                // Format: loop_start loop_end val1 val2 score
+                // Format: loop_start loop_end note_distance loudness_difference score
                 foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
                 {
                     var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length >= 5
                         && long.TryParse(parts[0], out var start)
                         && long.TryParse(parts[1], out var end)
-                        && double.TryParse(parts[4], System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var score))
+                        && double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var noteDist)
+                        && double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var loudness)
+                        && double.TryParse(parts[4], NumberStyles.Float, CultureInfo.InvariantCulture, out var score))
                     {
-                        results.Add((start, end, score));
+                        results.Add((start, end, noteDist, loudness, score));
                     }
                 }
 
@@ -1049,7 +1101,7 @@ namespace Sma5h.CLI
             return results;
         }
 
-        private long GetTotalSamples(string filePath)
+        private long GetWavSampleCount(string filePath)
         {
             try
             {
@@ -1058,7 +1110,7 @@ namespace Sma5h.CLI
                     StartInfo = new ProcessStartInfo
                     {
                         FileName = "ffprobe",
-                        Arguments = $"-v error -select_streams a:0 -show_entries format=duration -of csv=p=0 \"{filePath}\"",
+                        Arguments = $"-v error -select_streams a:0 -show_entries stream=sample_rate:stream=duration -of csv=p=0 \"{filePath}\"",
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
@@ -1069,14 +1121,106 @@ namespace Sma5h.CLI
                 var output = process.StandardOutput.ReadToEnd().Trim();
                 process.WaitForExit();
 
-                if (double.TryParse(output, NumberStyles.Float, CultureInfo.InvariantCulture, out var durationSeconds))
-                    return (long)(durationSeconds * 48000);
+                // Output format: "sample_rate,duration" e.g. "48000,185.365979"
+                var parts = output.Split(',');
+                if (parts.Length >= 2
+                    && int.TryParse(parts[0], out var sampleRate)
+                    && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var duration))
+                {
+                    return (long)(duration * sampleRate);
+                }
             }
             catch (Exception e)
             {
                 _logger.LogWarning(e, "ffprobe failed for {File}.", filePath);
             }
             return -1;
+        }
+
+        private int GetSourceSampleRate(string filePath)
+        {
+            try
+            {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "ffprobe",
+                        Arguments = $"-v error -select_streams a:0 -show_entries stream=sample_rate -of csv=p=0 \"{filePath}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+                process.Start();
+                var output = process.StandardOutput.ReadToEnd().Trim();
+                process.WaitForExit();
+
+                if (int.TryParse(output, out var rate))
+                    return rate;
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "ffprobe failed for {File}.", filePath);
+            }
+            return -1;
+        }
+
+        private void CreateLoopPreview(string sourceFile, long loopStart, long loopEnd, string outputPath)
+        {
+            try
+            {
+                var sampleRate = GetSourceSampleRate(sourceFile);
+                if (sampleRate <= 0)
+                {
+                    _logger.LogWarning("  Could not determine sample rate for loop preview.");
+                    return;
+                }
+
+                double startSec = (double)loopStart / sampleRate;
+                double endSec = (double)loopEnd / sampleRate;
+
+                // Preview: 10s before loop end → 10s after loop start (simulates the loop transition)
+                double seg1Start = Math.Max(0, endSec - 10);
+                double seg1End = endSec;
+                double seg2Start = startSec;
+                double seg2End = startSec + 10;
+
+                var s1s = seg1Start.ToString("F4", CultureInfo.InvariantCulture);
+                var s1e = seg1End.ToString("F4", CultureInfo.InvariantCulture);
+                var s2s = seg2Start.ToString("F4", CultureInfo.InvariantCulture);
+                var s2e = seg2End.ToString("F4", CultureInfo.InvariantCulture);
+
+                var filter = $"[0:a]atrim=start={s1s}:end={s1e},asetpts=PTS-STARTPTS[a];" +
+                             $"[0:a]atrim=start={s2s}:end={s2e},asetpts=PTS-STARTPTS[b];" +
+                             $"[a][b]concat=n=2:v=0:a=1";
+
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "ffmpeg",
+                        Arguments = $"-i \"{sourceFile}\" -filter_complex \"{filter}\" \"{outputPath}\" -y",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+                process.Start();
+                process.StandardError.ReadToEnd();
+                process.WaitForExit();
+
+                if (File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
+                    _logger.LogInformation("  Loop preview: {Path}", outputPath);
+                else
+                    _logger.LogWarning("  Failed to create loop preview.");
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "  Failed to create loop preview.");
+            }
         }
 
         private bool RunFfmpeg(string inputFile, string outputWav)
