@@ -66,9 +66,18 @@ namespace Sma5h.CLI
                 case "extract-icons":
                     entry.RunExtractIcons();
                     break;
+                case "nus3-convert":
+                    entry.RunNus3Convert();
+                    break;
+                case "accept-nus3":
+                    entry.RunAcceptValidatedNus3();
+                    break;
+                case "cleanup":
+                    entry.RunCleanup();
+                    break;
                 default:
                     Console.WriteLine($"Unknown command: {action}");
-                    Console.WriteLine("Usage: dotnet run [build|scaffold|convert|extract-icons]");
+                    Console.WriteLine("Usage: dotnet run [build|scaffold|convert|extract-icons|nus3-convert|accept-nus3|cleanup]");
                     break;
             }
         }
@@ -77,8 +86,11 @@ namespace Sma5h.CLI
         {
             ["Build          - Build mods and generate ArcOutput"] = "build",
             ["Scaffold       - Create series.toml/tracks.csv and populate new music files"] = "scaffold",
+            ["Nus3 Convert   - Convert audio files to nus3audio with loop points"] = "nus3-convert",
+            ["Accept Nus3    - Accept validated nus3audio files into series"] = "accept-nus3",
             ["Convert        - Import a Sma5h mod to UMB folder format"] = "convert",
             ["Extract Icons  - Extract series icons from a built Sma5h mod"] = "extract-icons",
+            ["Cleanup        - Remove tracks.csv entries for missing audio files"] = "cleanup",
             ["Quit"] = "quit",
         };
 

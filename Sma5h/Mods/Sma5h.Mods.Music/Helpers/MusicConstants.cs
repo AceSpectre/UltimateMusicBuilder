@@ -108,8 +108,7 @@ namespace Sma5h.Mods.Music.Helpers
             ".idsp",
             ".lopus",
             ".brstm",
-            ".nus3audio",
-            ".wav"
+            ".nus3audio"
         };
 
         public static string[] EXTENSIONS_NEED_CONVERSION = new string[]

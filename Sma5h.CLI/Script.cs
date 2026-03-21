@@ -18,6 +18,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Spectre.Console;
 using Tomlyn;
+using VGAudio.Cli;
 
 namespace Sma5h.CLI
 {
@@ -29,6 +30,13 @@ namespace Sma5h.CLI
         private readonly IWorkspaceManager _workspace;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
         private const double CLIVersion = 1.41;
+
+        private static readonly HashSet<string> SOURCE_AUDIO_EXTENSIONS = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".mp3", ".flac", ".wav", ".ogg"
+        };
+
+        private const string VALIDATE_FOLDER = "songs-to-validate";
 
         public Script(IServiceProvider serviceProvider, IWorkspaceManager workspace, IStateManager state,
             IOptionsMonitor<Sma5hMusicOptions> musicConfig, ILogger<Script> logger)
@@ -198,7 +206,7 @@ namespace Sma5h.CLI
                     }
                     if (!File.Exists(csvPath))
                     {
-                        var csvContent = "filename,game,title,author,copyright,record_type,volume,order\n";
+                        var csvContent = "filename,game,title,author,copyright,record_type,special_category,volume,info1\n";
                         File.WriteAllText(csvPath, csvContent);
                         _logger.LogInformation("Created {Path}", csvPath);
                         wasScaffolded = true;
@@ -223,24 +231,24 @@ namespace Sma5h.CLI
 
                     var defaults = seriesFile.DefaultTrackData;
 
-                    // Read existing CSV rows to find already-listed filenames
-                    var existingFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    // Read existing CSV rows
                     var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
                     {
                         HasHeaderRecord = true,
                         TrimOptions = TrimOptions.Trim,
                         MissingFieldFound = null
                     };
+                    List<FolderTrackCsvRow> existingRows;
                     using (var reader = new StreamReader(csvPath))
                     using (var csv = new CsvReader(reader, csvConfig))
                     {
                         csv.Context.RegisterClassMap<FolderTrackCsvRowMap>();
-                        foreach (var row in csv.GetRecords<FolderTrackCsvRow>())
-                        {
-                            if (!string.IsNullOrWhiteSpace(row.Filename))
-                                existingFilenames.Add(row.Filename);
-                        }
+                        existingRows = csv.GetRecords<FolderTrackCsvRow>().ToList();
                     }
+
+                    var existingFilenames = new HashSet<string>(
+                        existingRows.Where(r => !string.IsNullOrWhiteSpace(r.Filename)).Select(r => r.Filename),
+                        StringComparer.OrdinalIgnoreCase);
 
                     // Find music files not already in CSV, sorted alphabetically
                     var newFiles = Directory.GetFiles(seriesDir)
@@ -253,30 +261,30 @@ namespace Sma5h.CLI
                     if (newFiles.Count == 0)
                         continue;
 
-                    // Determine starting order value (after existing rows)
-                    int nextOrder = existingFilenames.Count;
+                    // Add new rows
+                    foreach (var filename in newFiles)
+                    {
+                        existingRows.Add(new FolderTrackCsvRow
+                        {
+                            Filename = filename,
+                            Game = defaults?.Game ?? folderName,
+                            Title = Path.GetFileNameWithoutExtension(filename),
+                            Author = defaults?.Author ?? "",
+                            Copyright = defaults?.Copyright ?? "",
+                            RecordType = defaults?.RecordType ?? "original",
+                            Volume = defaults?.Volume ?? 2.7f
+                        });
+                    }
 
-                    // Append new rows to CSV
-                    using (var writer = new StreamWriter(csvPath, append: true))
+                    // Rewrite CSV with all rows
+                    using (var writer = new StreamWriter(csvPath))
                     using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
                     {
-                        HasHeaderRecord = false
+                        HasHeaderRecord = true
                     }))
                     {
                         csv.Context.RegisterClassMap<FolderTrackCsvRowMap>();
-                        foreach (var filename in newFiles)
-                        {
-                            csv.WriteField(filename);
-                            csv.WriteField(defaults?.Game ?? folderName);
-                            csv.WriteField(Path.GetFileNameWithoutExtension(filename));
-                            csv.WriteField(defaults?.Author ?? "");
-                            csv.WriteField(defaults?.Copyright ?? "");
-                            csv.WriteField(defaults?.RecordType ?? "original");
-                            csv.WriteField(defaults?.Volume ?? 2.7f);
-                            csv.WriteField(nextOrder);
-                            csv.NextRecord();
-                            nextOrder++;
-                        }
+                        csv.WriteRecords(existingRows);
                     }
 
                     _logger.LogInformation("Added {Count} track(s) to {Path}", newFiles.Count, csvPath);
@@ -635,6 +643,482 @@ namespace Sma5h.CLI
                 _logger.LogInformation("No icons found to extract.");
         }
 
+        public void RunNus3Convert()
+        {
+            PrintBanner();
+
+            var (modDir, seriesDir) = PromptModAndSeries();
+            if (modDir == null || seriesDir == null)
+                return;
+
+            // Find source audio files that aren't already game formats
+            var sourceFiles = Directory.GetFiles(seriesDir)
+                .Where(f => SOURCE_AUDIO_EXTENSIONS.Contains(Path.GetExtension(f)))
+                .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (sourceFiles.Count == 0)
+            {
+                _logger.LogWarning("No source audio files (.mp3, .flac, .wav, .ogg) found in {Dir}.", seriesDir);
+                return;
+            }
+
+            var loopScoreThreshold = (double)AnsiConsole.Prompt(
+                new TextPrompt<float>("Minimum loop score (only increase if subpar loops are being accepted):")
+                    .DefaultValue(94.5f)) / 100.0;
+
+            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
+            Directory.CreateDirectory(validateDir);
+
+            var tempDir = Path.Combine(_musicConfig.CurrentValue.TempPath, "nus3convert");
+            Directory.CreateDirectory(tempDir);
+
+            var nus3AudioExe = Path.Combine(_musicConfig.CurrentValue.ToolsPath, MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
+            if (!File.Exists(nus3AudioExe))
+            {
+                _logger.LogError("nus3audio.exe not found at {Path}.", nus3AudioExe);
+                return;
+            }
+
+            int converted = 0;
+            int goodLoops = 0;
+            int fullLoops = 0;
+
+            foreach (var sourceFile in sourceFiles)
+            {
+                var basename = Path.GetFileNameWithoutExtension(sourceFile);
+                var outputNus3 = Path.Combine(validateDir, basename + ".nus3audio");
+
+                if (File.Exists(outputNus3))
+                {
+                    _logger.LogInformation("Skipping '{Basename}': already exists in songs-to-validate.", basename);
+                    continue;
+                }
+
+                _logger.LogInformation("Processing '{Basename}'...", basename);
+
+                // Step 1: Detect loop points via pymusiclooper
+                var loopCandidates = RunPymusiclooper(sourceFile);
+                long loopStart, loopEnd;
+
+                if (loopCandidates.Count > 0 && loopCandidates[0].score >= loopScoreThreshold)
+                {
+                    loopStart = loopCandidates[0].loopStart;
+                    loopEnd = loopCandidates[0].loopEnd;
+                    _logger.LogInformation("  Loop points: {Start}-{End} (score: {Score:P1})", loopStart, loopEnd, loopCandidates[0].score);
+                    goodLoops++;
+                }
+                else
+                {
+                    // Full-song loop: 0 to total samples
+                    var totalSamples = GetTotalSamples(sourceFile);
+                    if (totalSamples <= 0)
+                    {
+                        _logger.LogError("  Could not determine total samples for '{Basename}', skipping.", basename);
+                        continue;
+                    }
+                    loopStart = 0;
+                    loopEnd = totalSamples;
+                    var bestScore = loopCandidates.Count > 0 ? loopCandidates[0].score : 0;
+                    _logger.LogInformation("  No good loop found (best score: {Score:P1}), using full-song loop: 0-{End}", bestScore, loopEnd);
+                    fullLoops++;
+                }
+
+                // Step 2: Convert to WAV at 48kHz if needed
+                var wavFile = sourceFile;
+                bool tempWav = false;
+                if (!sourceFile.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                {
+                    wavFile = Path.Combine(tempDir, basename + ".wav");
+                    if (!RunFfmpeg(sourceFile, wavFile))
+                    {
+                        _logger.LogError("  ffmpeg conversion failed for '{Basename}', skipping.", basename);
+                        continue;
+                    }
+                    tempWav = true;
+                }
+
+                // Step 3: Convert WAV → lopus via VGAudioCli library
+                var lopusFile = Path.Combine(tempDir, basename + ".lopus");
+                try
+                {
+                    var oldOut = Console.Out;
+                    using (var writer = new StringWriter())
+                    {
+                        Console.SetOut(writer);
+                        Converter.RunConverterCli(new string[]
+                        {
+                            "-i", wavFile,
+                            "-o", lopusFile,
+                            "--opusheader", "Namco",
+                            "--cbr",
+                            "-l", $"{loopStart}-{loopEnd}"
+                        });
+                    }
+                    Console.SetOut(oldOut);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "  VGAudioCli conversion failed for '{Basename}'.", basename);
+                    continue;
+                }
+
+                if (!File.Exists(lopusFile) || new FileInfo(lopusFile).Length == 0)
+                {
+                    _logger.LogError("  VGAudioCli produced no output for '{Basename}', skipping.", basename);
+                    continue;
+                }
+
+                // Step 4: Wrap lopus → nus3audio
+                var toneId = DeriveToneId(basename);
+                try
+                {
+                    var process = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = nus3AudioExe,
+                            Arguments = $"-n -w \"{outputNus3}\"",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        }
+                    };
+                    process.Start();
+                    process.WaitForExit();
+
+                    process = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = nus3AudioExe,
+                            Arguments = $"-A {toneId} \"{lopusFile}\" -w \"{outputNus3}\"",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        }
+                    };
+                    process.Start();
+                    process.WaitForExit();
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "  nus3audio.exe wrapping failed for '{Basename}'.", basename);
+                    continue;
+                }
+
+                if (File.Exists(outputNus3) && new FileInfo(outputNus3).Length > 0)
+                {
+                    _logger.LogInformation("  → {OutputPath}", outputNus3);
+                    converted++;
+                }
+                else
+                {
+                    _logger.LogError("  nus3audio output was empty for '{Basename}'.", basename);
+                }
+
+                // Clean up temp files
+                if (tempWav && File.Exists(wavFile))
+                    File.Delete(wavFile);
+                if (File.Exists(lopusFile))
+                    File.Delete(lopusFile);
+            }
+
+            // Clean up temp dir
+            try { Directory.Delete(tempDir, recursive: false); } catch { }
+
+            _logger.LogInformation("--------------------");
+            _logger.LogInformation("Nus3 conversion complete: {Converted} file(s) converted ({Good} with detected loops, {Full} with full-song loop).",
+                converted, goodLoops, fullLoops);
+            _logger.LogInformation("Output: {ValidateDir}", validateDir);
+            _logger.LogInformation("Listen to the files in foobar2000 (with vgmstream) to verify loop points.");
+            _logger.LogInformation("Delete any files you don't like, then run 'Accept Validated Nus3'.");
+        }
+
+        public void RunAcceptValidatedNus3()
+        {
+            PrintBanner();
+
+            var (modDir, seriesDir) = PromptModAndSeries();
+            if (modDir == null || seriesDir == null)
+                return;
+
+            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
+            if (!Directory.Exists(validateDir))
+            {
+                _logger.LogWarning("No songs-to-validate folder found in {Dir}.", seriesDir);
+                return;
+            }
+
+            var nus3Files = Directory.GetFiles(validateDir, "*.nus3audio").ToList();
+            if (nus3Files.Count == 0)
+            {
+                _logger.LogWarning("No .nus3audio files found in {Dir}.", validateDir);
+                return;
+            }
+
+            int accepted = 0;
+            int sourcesRemoved = 0;
+            int csvUpdated = 0;
+
+            // Read tracks.csv if it exists, for updating filenames
+            var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
+            List<FolderTrackCsvRow> csvRows = null;
+            bool csvExists = File.Exists(csvPath);
+            if (csvExists)
+            {
+                var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
+                {
+                    HasHeaderRecord = true,
+                    TrimOptions = TrimOptions.Trim,
+                    MissingFieldFound = null
+                };
+                using var reader = new StreamReader(csvPath);
+                using var csv = new CsvReader(reader, csvConfig);
+                csv.Context.RegisterClassMap<FolderTrackCsvRowMap>();
+                csvRows = csv.GetRecords<FolderTrackCsvRow>().ToList();
+            }
+
+            foreach (var nus3File in nus3Files)
+            {
+                var basename = Path.GetFileNameWithoutExtension(nus3File);
+                var destFile = Path.Combine(seriesDir, Path.GetFileName(nus3File));
+
+                // Move nus3audio into series folder
+                if (File.Exists(destFile))
+                    File.Delete(destFile);
+                File.Move(nus3File, destFile);
+                _logger.LogInformation("Accepted: {Filename}", Path.GetFileName(nus3File));
+                accepted++;
+
+                // Delete original source file(s) with matching basename
+                foreach (var ext in SOURCE_AUDIO_EXTENSIONS)
+                {
+                    var sourceFile = Path.Combine(seriesDir, basename + ext);
+                    if (File.Exists(sourceFile))
+                    {
+                        var oldSourceName = basename + ext;
+                        File.Delete(sourceFile);
+                        _logger.LogInformation("  Removed source: {Filename}", oldSourceName);
+                        sourcesRemoved++;
+
+                        // Update tracks.csv if it had a row with the old filename
+                        if (csvRows != null)
+                        {
+                            var matchingRow = csvRows.FirstOrDefault(r =>
+                                string.Equals(r.Filename, oldSourceName, StringComparison.OrdinalIgnoreCase));
+                            if (matchingRow != null)
+                            {
+                                matchingRow.Filename = basename + ".nus3audio";
+                                csvUpdated++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Rewrite tracks.csv if any rows were updated
+            if (csvUpdated > 0 && csvRows != null)
+            {
+                using var writer = new StreamWriter(csvPath);
+                using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
+                {
+                    HasHeaderRecord = true
+                });
+                csv.Context.RegisterClassMap<FolderTrackCsvRowMap>();
+                csv.WriteRecords(csvRows);
+                _logger.LogInformation("Updated {Count} filename(s) in tracks.csv.", csvUpdated);
+            }
+
+            // Remove validate folder if empty
+            if (Directory.GetFiles(validateDir).Length == 0)
+            {
+                Directory.Delete(validateDir);
+                _logger.LogInformation("Removed empty songs-to-validate folder.");
+            }
+
+            _logger.LogInformation("--------------------");
+            _logger.LogInformation("Accepted {Accepted} file(s), removed {Removed} source file(s).", accepted, sourcesRemoved);
+        }
+
+        private (string modDir, string seriesDir) PromptModAndSeries()
+        {
+            var modPath = _musicConfig.CurrentValue.Sma5hMusic.ModPath;
+            Directory.CreateDirectory(modPath);
+
+            var modDirs = Directory.GetDirectories(modPath, "*", SearchOption.TopDirectoryOnly)
+                .Where(d => !Path.GetFileName(d).StartsWith("."))
+                .ToList();
+
+            if (modDirs.Count == 0)
+            {
+                _logger.LogWarning("No mod folders found in {ModPath}.", modPath);
+                return (null, null);
+            }
+
+            // Select mod
+            string selectedModDir;
+            if (modDirs.Count == 1)
+            {
+                selectedModDir = modDirs[0];
+                _logger.LogInformation("Using mod: {ModName}", Path.GetFileName(selectedModDir));
+            }
+            else
+            {
+                var modChoice = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("Select a mod:")
+                        .HighlightStyle(new Style(Color.Cyan1))
+                        .AddChoices(modDirs.Select(d => Path.GetFileName(d))));
+                selectedModDir = modDirs.First(d => Path.GetFileName(d) == modChoice);
+            }
+
+            // Select series
+            var seriesDirs = Directory.GetDirectories(selectedModDir)
+                .Where(d => !Path.GetFileName(d).StartsWith(".") && Path.GetFileName(d) != VALIDATE_FOLDER)
+                .ToList();
+
+            if (seriesDirs.Count == 0)
+            {
+                _logger.LogWarning("No series folders found in {ModDir}.", selectedModDir);
+                return (null, null);
+            }
+
+            string selectedSeriesDir;
+            if (seriesDirs.Count == 1)
+            {
+                selectedSeriesDir = seriesDirs[0];
+                _logger.LogInformation("Using series: {SeriesName}", Path.GetFileName(selectedSeriesDir));
+            }
+            else
+            {
+                var seriesChoice = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("Select a series:")
+                        .HighlightStyle(new Style(Color.Cyan1))
+                        .AddChoices(seriesDirs.Select(d => Path.GetFileName(d))));
+                selectedSeriesDir = seriesDirs.First(d => Path.GetFileName(d) == seriesChoice);
+            }
+
+            return (selectedModDir, selectedSeriesDir);
+        }
+
+        private List<(long loopStart, long loopEnd, double score)> RunPymusiclooper(string filePath)
+        {
+            var results = new List<(long loopStart, long loopEnd, double score)>();
+            try
+            {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "pymusiclooper",
+                        Arguments = $"export-points --path \"{filePath}\" --alt-export-top 10 --fmt samples --export-to stdout",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+                process.Start();
+                var output = process.StandardOutput.ReadToEnd();
+                process.WaitForExit();
+
+                // Format: loop_start loop_end val1 val2 score
+                foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length >= 5
+                        && long.TryParse(parts[0], out var start)
+                        && long.TryParse(parts[1], out var end)
+                        && double.TryParse(parts[4], System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out var score))
+                    {
+                        results.Add((start, end, score));
+                    }
+                }
+
+                // Sort by score descending (should already be sorted, but be safe)
+                results.Sort((a, b) => b.score.CompareTo(a.score));
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "pymusiclooper failed for {File}. Falling back to full-song loop.", filePath);
+            }
+            return results;
+        }
+
+        private long GetTotalSamples(string filePath)
+        {
+            try
+            {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "ffprobe",
+                        Arguments = $"-v error -select_streams a:0 -show_entries format=duration -of csv=p=0 \"{filePath}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+                process.Start();
+                var output = process.StandardOutput.ReadToEnd().Trim();
+                process.WaitForExit();
+
+                if (double.TryParse(output, NumberStyles.Float, CultureInfo.InvariantCulture, out var durationSeconds))
+                    return (long)(durationSeconds * 48000);
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "ffprobe failed for {File}.", filePath);
+            }
+            return -1;
+        }
+
+        private bool RunFfmpeg(string inputFile, string outputWav)
+        {
+            try
+            {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "ffmpeg",
+                        Arguments = $"-i \"{inputFile}\" -ar 48000 -ac 2 \"{outputWav}\" -y",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+                process.Start();
+                process.StandardError.ReadToEnd(); // ffmpeg outputs to stderr
+                process.WaitForExit();
+                return File.Exists(outputWav) && new FileInfo(outputWav).Length > 0;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "ffmpeg failed converting {File}.", inputFile);
+                return false;
+            }
+        }
+
+        private static string DeriveToneId(string filename)
+        {
+            var nameOnly = Path.GetFileNameWithoutExtension(filename).ToLowerInvariant();
+            var sb = new StringBuilder(nameOnly.Length);
+            foreach (var c in nameOnly)
+                sb.Append(char.IsAsciiLetterOrDigit(c) || c == '_' ? c : '_');
+            var toneId = sb.ToString().Trim('_');
+            if (toneId.Length > MusicConstants.GameResources.ToneIdMaximumSize)
+                toneId = toneId[..MusicConstants.GameResources.ToneIdMaximumSize];
+            return toneId;
+        }
+
         private HashSet<string> LoadExistingSeriesIds()
         {
             var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -780,6 +1264,88 @@ namespace Sma5h.CLI
             public float Volume { get; set; }
             public int OriginalOrder { get; set; }
             public string Info1 { get; set; }
+        }
+
+        public void RunCleanup()
+        {
+            PrintBanner();
+
+            var modPath = _musicConfig.CurrentValue.Sma5hMusic.ModPath;
+            Directory.CreateDirectory(modPath);
+
+            var modDirs = Directory.GetDirectories(modPath, "*", SearchOption.TopDirectoryOnly)
+                .Where(d => !Path.GetFileName(d).StartsWith("."))
+                .ToList();
+
+            if (modDirs.Count == 0)
+            {
+                _logger.LogWarning("No mod folders found in {ModPath}.", modPath);
+                return;
+            }
+
+            int totalRemoved = 0;
+            int totalFiles = 0;
+
+            foreach (var modDir in modDirs)
+            {
+                var seriesDirs = Directory.GetDirectories(modDir)
+                    .Where(d => !Path.GetFileName(d).StartsWith(".") && Path.GetFileName(d) != VALIDATE_FOLDER)
+                    .ToList();
+
+                foreach (var seriesDir in seriesDirs)
+                {
+                    var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
+                    if (!File.Exists(csvPath))
+                        continue;
+
+                    totalFiles++;
+
+                    var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
+                    {
+                        HasHeaderRecord = true,
+                        TrimOptions = TrimOptions.Trim,
+                        MissingFieldFound = null
+                    };
+                    List<FolderTrackCsvRow> rows;
+                    using (var reader = new StreamReader(csvPath))
+                    using (var csv = new CsvReader(reader, csvConfig))
+                    {
+                        csv.Context.RegisterClassMap<FolderTrackCsvRowMap>();
+                        rows = csv.GetRecords<FolderTrackCsvRow>().ToList();
+                    }
+
+                    var removedRows = new List<FolderTrackCsvRow>();
+                    foreach (var row in rows)
+                    {
+                        var audioFile = Path.Combine(seriesDir, row.Filename);
+                        if (!File.Exists(audioFile))
+                            removedRows.Add(row);
+                    }
+
+                    if (removedRows.Count == 0)
+                        continue;
+
+                    var relativeCsv = Path.Combine(Path.GetFileName(modDir), Path.GetFileName(seriesDir), "tracks.csv");
+                    foreach (var row in removedRows)
+                    {
+                        _logger.LogInformation("Removing '{Filename}' from {CsvPath} (file not found)", row.Filename, relativeCsv);
+                        rows.Remove(row);
+                        totalRemoved++;
+                    }
+
+                    // Rewrite tracks.csv
+                    using var writer = new StreamWriter(csvPath);
+                    using var csvWriter = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
+                    {
+                        HasHeaderRecord = true
+                    });
+                    csvWriter.Context.RegisterClassMap<FolderTrackCsvRowMap>();
+                    csvWriter.WriteRecords(rows);
+                }
+            }
+
+            _logger.LogInformation("--------------------");
+            _logger.LogInformation("Cleanup complete: removed {Removed} entries from {Files} tracks.csv file(s).", totalRemoved, totalFiles);
         }
 
         private static string ToKebabCase(string name)
