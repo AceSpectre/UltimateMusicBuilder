@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using Spectre.Console;
 
 namespace Sma5h.CLI.Services
 {
@@ -53,6 +54,13 @@ namespace Sma5h.CLI.Services
                 return;
             }
 
+            var deleteSources = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Delete original source audio files after accepting?")
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices("Yes - delete source files", "No - keep source files"));
+            bool shouldDeleteSources = deleteSources.StartsWith("Yes");
+
             int accepted = 0;
             int sourcesRemoved = 0;
             int csvUpdated = 0;
@@ -87,16 +95,20 @@ namespace Sma5h.CLI.Services
                 _logger.LogInformation("Accepted: {Filename}", Path.GetFileName(nus3File));
                 accepted++;
 
-                // Delete original source file(s) with matching basename
+                // Handle original source file(s) with matching basename
                 foreach (var ext in SOURCE_AUDIO_EXTENSIONS)
                 {
                     var sourceFile = Path.Combine(seriesDir, basename + ext);
                     if (File.Exists(sourceFile))
                     {
                         var oldSourceName = basename + ext;
-                        File.Delete(sourceFile);
-                        _logger.LogInformation("  Removed source: {Filename}", oldSourceName);
-                        sourcesRemoved++;
+
+                        if (shouldDeleteSources)
+                        {
+                            File.Delete(sourceFile);
+                            _logger.LogInformation("  Removed source: {Filename}", oldSourceName);
+                            sourcesRemoved++;
+                        }
 
                         // Update tracks.csv if it had a row with the old filename
                         if (csvRows != null)
@@ -126,11 +138,11 @@ namespace Sma5h.CLI.Services
                 _logger.LogInformation("Updated {Count} filename(s) in tracks.csv.", csvUpdated);
             }
 
-            // Remove validate folder if empty
-            if (Directory.GetFiles(validateDir).Length == 0)
+            // Remove validate folder if no nus3audio files remain
+            if (Directory.GetFiles(validateDir, "*.nus3audio").Length == 0)
             {
-                Directory.Delete(validateDir);
-                _logger.LogInformation("Removed empty songs-to-validate folder.");
+                Directory.Delete(validateDir, true);
+                _logger.LogInformation("Removed songs-to-validate folder.");
             }
 
             _logger.LogInformation("--------------------");

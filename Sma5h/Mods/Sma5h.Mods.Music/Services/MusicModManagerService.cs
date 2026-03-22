@@ -24,6 +24,12 @@ namespace Sma5h.Mods.Music.Services
 
         public IEnumerable<IMusicMod> MusicMods => _musicMods;
 
+        /// <summary>
+        /// When set, only mod folders whose names are in this set will be loaded.
+        /// When null, all mod folders are loaded.
+        /// </summary>
+        public static HashSet<string> ModFilter { get; set; }
+
         public MusicModManagerService(IServiceProvider serviceProvider, IOptionsMonitor<Sma5hMusicOptions> config, ILogger<IMusicModManagerService> logger)
         {
             _config = config;
@@ -43,6 +49,13 @@ namespace Sma5h.Mods.Music.Services
                 if (Path.GetFileName(musicModPath).StartsWith("."))
                 {
                     _logger.LogDebug("{MusicModFile} is disabled.");
+                    continue;
+                }
+
+                // Apply mod filter if set
+                if (ModFilter != null && !ModFilter.Contains(Path.GetFileName(musicModPath)))
+                {
+                    _logger.LogDebug("Skipping mod {MusicModFile}: not in mod filter.", Path.GetFileName(musicModPath));
                     continue;
                 }
 

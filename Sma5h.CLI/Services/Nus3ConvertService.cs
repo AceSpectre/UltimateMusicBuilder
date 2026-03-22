@@ -56,6 +56,10 @@ namespace Sma5h.CLI.Services
                 new TextPrompt<float>("Minimum loop score (only increase if subpar loops are being accepted):")
                     .DefaultValue(94.5f)) / 100.0;
 
+            var previewLength = (double)AnsiConsole.Prompt(
+                new TextPrompt<float>("Loop preview length in seconds (total, split evenly before/after loop point):")
+                    .DefaultValue(10f));
+
             var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
             Directory.CreateDirectory(validateDir);
 
@@ -94,27 +98,74 @@ namespace Sma5h.CLI.Services
 
                 if (loopCandidates.Count > 0 && loopCandidates.Any(c => c.score >= loopScoreThreshold))
                 {
-                    // Build selection choices from all candidates with full info
+                    // Build table display and interleaved select/preview choices
                     var choices = new List<string>();
                     for (int i = 0; i < loopCandidates.Count; i++)
                     {
                         var c = loopCandidates[i];
                         var startTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopStart / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
                         var endTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopEnd / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
-                        choices.Add($"Score: {c.score:P1}  Start: {startTime} ({c.loopStart})  End: {endTime} ({c.loopEnd})  NoteDist: {c.noteDistance:F4}  LoudnessDiff: {c.loudnessDiff:F4} dB");
+                        choices.Add($"#{i + 1}  {c.score:P1}  {startTime} ({c.loopStart})  {endTime} ({c.loopEnd})  {c.noteDistance:F4}  {c.loudnessDiff:F4} dB");
+                        choices.Add($"#{i + 1}  Preview loop");
                     }
                     choices.Add("Reject all (use full-song loop)");
 
-                    var selection = AnsiConsole.Prompt(
-                        new SelectionPrompt<string>()
-                            .Title($"Loop candidates for '{Markup.Escape(basename)}':")
-                            .HighlightStyle(new Style(Color.Cyan1))
-                            .AddChoices(choices));
-
-                    var selectedIndex = choices.IndexOf(selection);
-                    if (selectedIndex < loopCandidates.Count)
+                    int selectedCandidateIndex = -1;
+                    while (selectedCandidateIndex < 0)
                     {
-                        var selected = loopCandidates[selectedIndex];
+                        // Render the table
+                        var table = new Table()
+                            .Border(TableBorder.Rounded)
+                            .Title($"Loop candidates for [cyan]{Markup.Escape(basename)}[/]")
+                            .AddColumn("#")
+                            .AddColumn("Score")
+                            .AddColumn("Start")
+                            .AddColumn("End")
+                            .AddColumn("Note Dist")
+                            .AddColumn("Loudness Diff");
+                        for (int i = 0; i < loopCandidates.Count; i++)
+                        {
+                            var c = loopCandidates[i];
+                            var startTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopStart / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
+                            var endTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopEnd / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
+                            table.AddRow(
+                                (i + 1).ToString(),
+                                $"{c.score:P1}",
+                                $"{startTime} ({c.loopStart})",
+                                $"{endTime} ({c.loopEnd})",
+                                $"{c.noteDistance:F4}",
+                                $"{c.loudnessDiff:F4} dB");
+                        }
+                        AnsiConsole.Write(table);
+
+                        var selection = AnsiConsole.Prompt(
+                            new SelectionPrompt<string>()
+                                .Title("Select a loop or preview:")
+                                .HighlightStyle(new Style(Color.Cyan1))
+                                .AddChoices(choices));
+
+                        if (selection.Contains("Preview loop"))
+                        {
+                            // Extract the candidate index from the choice prefix "#N"
+                            var previewIdx = int.Parse(selection.Substring(1, selection.IndexOf(' ') - 1)) - 1;
+                            var pc = loopCandidates[previewIdx];
+                            PlayLoopPreview(sourceFile, pc.loopStart, pc.loopEnd, previewLength / 2);
+                            // Loop back to show table and prompt again
+                        }
+                        else if (selection.StartsWith("#"))
+                        {
+                            selectedCandidateIndex = int.Parse(selection.Substring(1, selection.IndexOf(' ') - 1)) - 1;
+                        }
+                        else
+                        {
+                            // "Reject all"
+                            break;
+                        }
+                    }
+
+                    if (selectedCandidateIndex >= 0)
+                    {
+                        var selected = loopCandidates[selectedCandidateIndex];
                         loopStart = selected.loopStart;
                         loopEnd = selected.loopEnd;
                         isFullSongLoop = false;
@@ -250,7 +301,7 @@ namespace Sma5h.CLI.Services
                         var loopsDir = Path.Combine(validateDir, "loops");
                         Directory.CreateDirectory(loopsDir);
                         var previewPath = Path.Combine(loopsDir, basename + "_loop.wav");
-                        CreateLoopPreview(sourceFile, loopStart, loopEnd, previewPath);
+                        CreateLoopPreview(sourceFile, loopStart, loopEnd, previewPath, previewLength / 2);
                     }
                 }
                 else
@@ -388,7 +439,7 @@ namespace Sma5h.CLI.Services
             return -1;
         }
 
-        private void CreateLoopPreview(string sourceFile, long loopStart, long loopEnd, string outputPath)
+        private void CreateLoopPreview(string sourceFile, long loopStart, long loopEnd, string outputPath, double previewHalfLength = 5)
         {
             try
             {
@@ -402,11 +453,11 @@ namespace Sma5h.CLI.Services
                 double startSec = (double)loopStart / sampleRate;
                 double endSec = (double)loopEnd / sampleRate;
 
-                // Preview: 10s before loop end → 10s after loop start (simulates the loop transition)
-                double seg1Start = Math.Max(0, endSec - 10);
+                // Preview: N seconds before loop end → N seconds after loop start (simulates the loop transition)
+                double seg1Start = Math.Max(0, endSec - previewHalfLength);
                 double seg1End = endSec;
                 double seg2Start = startSec;
-                double seg2End = startSec + 10;
+                double seg2End = startSec + previewHalfLength;
 
                 var s1s = seg1Start.ToString("F4", CultureInfo.InvariantCulture);
                 var s1e = seg1End.ToString("F4", CultureInfo.InvariantCulture);
@@ -441,6 +492,58 @@ namespace Sma5h.CLI.Services
             catch (Exception e)
             {
                 _logger.LogWarning(e, "  Failed to create loop preview.");
+            }
+        }
+
+        private void PlayLoopPreview(string sourceFile, long loopStart, long loopEnd, double previewHalfLength = 5)
+        {
+            string tempPreview = null;
+            try
+            {
+                var sampleRate = GetSourceSampleRate(sourceFile);
+                if (sampleRate <= 0)
+                {
+                    _logger.LogWarning("  Could not determine sample rate for preview playback.");
+                    return;
+                }
+
+                // Create a temporary preview WAV
+                tempPreview = Path.Combine(Path.GetTempPath(), $"loop_preview_{Guid.NewGuid():N}.wav");
+                CreateLoopPreview(sourceFile, loopStart, loopEnd, tempPreview, previewHalfLength);
+
+                if (!File.Exists(tempPreview) || new FileInfo(tempPreview).Length == 0)
+                {
+                    _logger.LogWarning("  Could not generate preview audio.");
+                    return;
+                }
+
+                AnsiConsole.MarkupLine("[yellow]Playing loop preview... press Q to stop.[/]");
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "ffplay",
+                        Arguments = $"-nodisp -autoexit \"{tempPreview}\"",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    }
+                };
+                process.Start();
+                process.StandardError.ReadToEnd();
+                process.WaitForExit();
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "  Failed to play loop preview. Make sure ffplay is installed (comes with ffmpeg).");
+            }
+            finally
+            {
+                if (tempPreview != null && File.Exists(tempPreview))
+                {
+                    try { File.Delete(tempPreview); } catch { }
+                }
             }
         }
 

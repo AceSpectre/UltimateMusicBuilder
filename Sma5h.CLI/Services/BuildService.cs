@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music;
+using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
+using Sma5h.Mods.Music.Services;
 using Spectre.Console;
 using System;
 using System.Collections.Generic;
@@ -69,21 +71,50 @@ namespace Sma5h.CLI.Services
                     selectedMod = choice;
             }
 
-            // Temporarily disable unselected mods by prefixing with '.'
-            var disabledDirs = new List<(string original, string disabled)>();
+            // Set mod filter if a specific mod was selected
             if (selectedMod != null)
+                MusicModManagerService.ModFilter = new HashSet<string> { selectedMod };
+
+            // Let user pick which series to build within the selected mod(s)
+            var activeMods = selectedMod != null
+                ? new List<string> { modDirs.First(d => Path.GetFileName(d).Equals(selectedMod, StringComparison.OrdinalIgnoreCase)) }
+                : modDirs;
+
+            var seriesFilters = new Dictionary<string, HashSet<string>>();
+
+            foreach (var modDir in activeMods)
             {
-                foreach (var dir in modDirs)
+                var seriesDirs = Directory.GetDirectories(modDir)
+                    .Where(d => !Path.GetFileName(d).StartsWith("."))
+                    .ToList();
+
+                if (seriesDirs.Count > 1)
                 {
-                    var name = Path.GetFileName(dir);
-                    if (!name.Equals(selectedMod, StringComparison.OrdinalIgnoreCase))
+                    var buildScope = AnsiConsole.Prompt(
+                        new SelectionPrompt<string>()
+                            .Title($"Build scope for [cyan]{Markup.Escape(Path.GetFileName(modDir))}[/]:")
+                            .HighlightStyle(new Style(Color.Cyan1))
+                            .AddChoices("Compile all series", "Select series to compile"));
+
+                    if (buildScope == "Select series to compile")
                     {
-                        var disabledPath = Path.Combine(Path.GetDirectoryName(dir), "." + name);
-                        Directory.Move(dir, disabledPath);
-                        disabledDirs.Add((dir, disabledPath));
+                        var seriesNames = seriesDirs.Select(d => Path.GetFileName(d)).OrderBy(n => n).ToList();
+
+                        var selectedSeries = AnsiConsole.Prompt(
+                            new MultiSelectionPrompt<string>()
+                                .Title("Select series to compile:")
+                                .HighlightStyle(new Style(Color.Cyan1))
+                                .InstructionsText("(Press [cyan]space[/] to toggle, [green]enter[/] to confirm)")
+                                .NotRequired()
+                                .AddChoices(seriesNames));
+
+                        seriesFilters[modDir] = new HashSet<string>(selectedSeries);
                     }
                 }
             }
+
+            // Set the series filter so FolderMusicMod can read it during Init
+            FolderMusicMod.SeriesFilterByMod = seriesFilters.Count > 0 ? seriesFilters : null;
 
             try
             {
@@ -126,12 +157,9 @@ namespace Sma5h.CLI.Services
             }
             finally
             {
-                // Re-enable disabled mods
-                foreach (var (original, disabled) in disabledDirs)
-                {
-                    if (Directory.Exists(disabled))
-                        Directory.Move(disabled, original);
-                }
+                // Clear filters
+                MusicModManagerService.ModFilter = null;
+                FolderMusicMod.SeriesFilterByMod = null;
             }
         }
     }

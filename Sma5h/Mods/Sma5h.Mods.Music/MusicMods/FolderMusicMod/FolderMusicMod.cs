@@ -34,6 +34,12 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public string ModPath => _modPath;
         public MusicModInformation Mod => _modInfo;
 
+        /// <summary>
+        /// When set, only series folders whose names are in this set will be processed.
+        /// Keyed by mod path (case-insensitive). When a mod path is absent, all series are processed.
+        /// </summary>
+        public static Dictionary<string, HashSet<string>> SeriesFilterByMod { get; set; }
+
         public FolderMusicMod(ILogger<IMusicMod> logger, IAudioMetadataService audioMetadataService, string modPath)
         {
             _logger = logger;
@@ -50,6 +56,15 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
 
             foreach (var subfolder in Directory.GetDirectories(_modPath))
             {
+                // Apply series filter if set for this mod
+                if (SeriesFilterByMod != null
+                    && SeriesFilterByMod.TryGetValue(_modPath, out var allowedSeries)
+                    && !allowedSeries.Contains(Path.GetFileName(subfolder)))
+                {
+                    _logger.LogDebug("Skipping subfolder {Subfolder}: not in series filter.", subfolder);
+                    continue;
+                }
+
                 var tomlPath = Path.Combine(subfolder, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
                 var csvPath = Path.Combine(subfolder, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
 
