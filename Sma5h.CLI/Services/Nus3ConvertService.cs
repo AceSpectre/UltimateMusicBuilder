@@ -169,6 +169,13 @@ namespace Sma5h.CLI.Services
                         loopStart = selected.loopStart;
                         loopEnd = selected.loopEnd;
                         isFullSongLoop = false;
+                        // Convert loop points from source sample rate to 48kHz (the WAV output rate)
+                        if (sourceSampleRate > 0 && sourceSampleRate != 48000)
+                        {
+                            loopStart = (long)Math.Round((double)loopStart / sourceSampleRate * 48000);
+                            loopEnd = (long)Math.Round((double)loopEnd / sourceSampleRate * 48000);
+                            _logger.LogDebug("  Resampled loop points to 48kHz: {Start}-{End}", loopStart, loopEnd);
+                        }
                         _logger.LogInformation("  Selected loop: {Start}-{End} (score: {Score:P1})", loopStart, loopEnd, selected.score);
                         goodLoops++;
                     }
