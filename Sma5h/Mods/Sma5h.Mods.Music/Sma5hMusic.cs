@@ -21,6 +21,13 @@ namespace Sma5h.Mods.Music
         private readonly INus3AudioService _nus3AudioService;
         private readonly IProcessService _processService;
 
+        /// <summary>
+        /// When set, defines explicit display ordering for custom series.
+        /// Keys are series IDs (e.g. "cuphead"), values are 0-based position.
+        /// Set by BuildService before build, cleared in finally block.
+        /// </summary>
+        public static Dictionary<string, int> ExplicitSeriesOrder { get; set; }
+
         public override string ModName => "Sma5hMusic";
 
         public Sma5hMusic(IOptionsMonitor<Sma5hMusicOptions> config, IMusicModManagerService musicModManagerService, IAudioStateService audioStateService,
@@ -403,7 +410,9 @@ namespace Sma5h.Mods.Music
 
             // "Other" (ui_series_etc) should always sort last
             var etcSeriesId = MusicConstants.InternalIds.SERIES_ID_PREFIX + "etc";
+            var processedSeriesIds = new HashSet<string>();
 
+            // Phase 1: Official series ordered by Sound Test
             var sortedGames = _audioStateService.GetBgmDbRootEntries()
                 .Where(p => p.TestDispOrder >= 0)
                 .OrderBy(p => p.TestDispOrder)
@@ -420,13 +429,43 @@ namespace Sma5h.Mods.Music
 
                 if (series.ContainsKey(sortedSeries))
                 {
+                    // If explicit order is active, skip custom series (they go in Phase 2)
+                    var shortId = sortedSeries.Replace(MusicConstants.InternalIds.SERIES_ID_PREFIX, "");
+                    if (ExplicitSeriesOrder != null && ExplicitSeriesOrder.ContainsKey(shortId))
+                    {
+                        processedSeriesIds.Add(sortedSeries);
+                        continue;
+                    }
+
                     series[sortedSeries].DispOrderSound = i;
-                    if (i != sbyte.MaxValue)
-                        i++;
+                    if (i != sbyte.MaxValue) i++;
+                    processedSeriesIds.Add(sortedSeries);
                 }
             }
 
-            // Assign "Other" last
+            // Phase 2: Custom series with explicit order
+            if (ExplicitSeriesOrder != null)
+            {
+                foreach (var seriesId in ExplicitSeriesOrder
+                    .OrderBy(kv => kv.Value)
+                    .Select(kv => MusicConstants.InternalIds.SERIES_ID_PREFIX + kv.Key)
+                    .Where(id => series.ContainsKey(id)))
+                {
+                    series[seriesId].DispOrderSound = i;
+                    if (i != sbyte.MaxValue) i++;
+                    processedSeriesIds.Add(seriesId);
+                }
+            }
+
+            // Phase 3: Any remaining unprocessed series (not "Other")
+            foreach (var remaining in series.Keys
+                .Where(k => k != etcSeriesId && !processedSeriesIds.Contains(k)))
+            {
+                series[remaining].DispOrderSound = i;
+                if (i != sbyte.MaxValue) i++;
+            }
+
+            // Phase 4: "Other" always last
             if (series.ContainsKey(etcSeriesId))
             {
                 series[etcSeriesId].DispOrderSound = i;

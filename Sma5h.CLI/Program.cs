@@ -75,6 +75,9 @@ namespace Sma5h.CLI
                 case "cleanup":
                     entry.RunCleanup();
                     break;
+                case "order-series":
+                    entry.RunOrderSeries();
+                    break;
                 default:
                     Console.WriteLine($"Unknown command: {action}");
                     Console.WriteLine("Usage: dotnet run [build|scaffold|convert|extract-icons|nus3-convert|accept-nus3|cleanup]");
@@ -91,6 +94,7 @@ namespace Sma5h.CLI
             ["Convert        - Import a Sma5h mod to UMB folder format"] = "convert",
             ["Extract Icons  - Extract series icons from a built Sma5h mod"] = "extract-icons",
             ["Cleanup        - Remove tracks.csv entries for missing audio files"] = "cleanup",
+            ["Order Series   - Reorder custom series display order via drag-and-drop"] = "order-series",
             ["Quit"] = "quit",
         };
 
@@ -142,6 +146,7 @@ namespace Sma5h.CLI
             services.AddScoped<Services.Nus3ConvertService>();
             services.AddScoped<Services.AcceptNus3Service>();
             services.AddScoped<Services.CleanupService>();
+            services.AddScoped<Services.SeriesOrderService>();
             services.AddScoped<Script>();
 
             services.AddLogging();

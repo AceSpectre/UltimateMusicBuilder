@@ -32,7 +32,7 @@ All contributors: https://github.com/vgmstream/vgmstream/graphs/contributors
 - If relevant please provide the metadata_mod.json files or override json files (from /Mods) that you think might have an issue. If you're having issues to start the program you can link the appsettings.json (Root folder) file too.
 
 ## Vulnerabilities
-This project uses AutoMapper 14.0.0, which has a [known high severity denial-of-service (DoS) vulnerability](https://github.com/advisories/GHSA-rvv3-g6hj-g44x). AutoMapper 14 is the latest version available under the MIT license; newer versions use a commercial license. Since this tool is designed to run locally on your own machine, this vulnerability poses no practical risk. **Do not deploy this tool as a service or make it publicly accessible over a network.**
+This project uses AutoMapper 14.0.0, which has a [known high severity denial-of-service (DoS) vulnerability](https://github.com/advisories/GHSA-rvv3-g6hj-g44x). AutoMapper 14 is the latest version available under the MIT license. Since this tool is designed to run locally on your own machine, this vulnerability poses no practical risk. **Do not deploy this tool as a service or make it publicly accessible over a network.**
 
 ## How to create an issue - enhancements ##
 * Enhancement requests are welcome! But it may take a while for me to answer back on them.

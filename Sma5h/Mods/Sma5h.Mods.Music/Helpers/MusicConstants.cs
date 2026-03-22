@@ -13,6 +13,7 @@ namespace Sma5h.Mods.Music.Helpers
             public const string FOLDER_MOD_SERIES_TOML_FILE = "series.toml";
             public const string FOLDER_MOD_TRACKS_CSV_FILE = "tracks.csv";
             public const string FOLDER_MOD_ICON_PNG_FILE = "icon.png";
+            public const string FOLDER_MOD_SERIES_ORDER_TOML_FILE = "series-order.toml";
             public const string MUSIC_OVERRIDE_ORDER_JSON_FILE = "order_override.json";
             public const string MUSIC_OVERRIDE_PLAYLIST_JSON_FILE = "playlist_override.json";
             public const string MUSIC_OVERRIDE_CORE_BGM_JSON_FILE = "core_bgm_override.json";

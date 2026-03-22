@@ -21,10 +21,11 @@ namespace Sma5h.CLI
         private readonly Nus3ConvertService _nus3Convert;
         private readonly AcceptNus3Service _acceptNus3;
         private readonly CleanupService _cleanup;
+        private readonly SeriesOrderService _orderSeries;
 
         public Script(BuildService build, ScaffoldService scaffold, ConvertService convert,
             ExtractIconsService extractIcons, Nus3ConvertService nus3Convert,
-            AcceptNus3Service acceptNus3, CleanupService cleanup)
+            AcceptNus3Service acceptNus3, CleanupService cleanup, SeriesOrderService orderSeries)
         {
             _build = build;
             _scaffold = scaffold;
@@ -33,6 +34,7 @@ namespace Sma5h.CLI
             _nus3Convert = nus3Convert;
             _acceptNus3 = acceptNus3;
             _cleanup = cleanup;
+            _orderSeries = orderSeries;
         }
 
         public async Task RunBuild() => await _build.Run();
@@ -42,6 +44,7 @@ namespace Sma5h.CLI
         public void RunNus3Convert() => _nus3Convert.Run();
         public void RunAcceptValidatedNus3() => _acceptNus3.Run();
         public void RunCleanup() => _cleanup.Run();
+        public void RunOrderSeries() => _orderSeries.Run();
 
         // ── Shared helpers used by services ──
 

@@ -1,0 +1,59 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Sma5h.CLI.Views.SeriesOrderWindow"
+        Title="Order Custom Series"
+        Width="720" Height="600"
+        WindowStartupLocation="CenterScreen"
+        CanResize="True">
+
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top"
+                   Text="Drag series icons to reorder. Custom series appear after official series, before Other."
+                   Margin="0,0,0,12"
+                   TextWrapping="Wrap"
+                   FontSize="14" />
+
+        <StackPanel DockPanel.Dock="Bottom"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,0,0"
+                    Spacing="8">
+            <Button x:Name="SaveButton" Content="Save Order" Click="OnSave" />
+            <Button x:Name="CancelButton" Content="Cancel" Click="OnCancel" />
+        </StackPanel>
+
+        <ScrollViewer>
+            <ItemsControl x:Name="SeriesItemsControl"
+                          DragDrop.AllowDrop="True">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel ItemWidth="128" ItemHeight="148" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="Gray"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Margin="4"
+                                Padding="4"
+                                Background="Transparent"
+                                PointerPressed="OnItemPointerPressed">
+                            <StackPanel HorizontalAlignment="Center">
+                                <Image Source="{Binding IconBitmap}"
+                                       Width="80" Height="80"
+                                       Stretch="Uniform"
+                                       Margin="0,0,0,4" />
+                                <TextBlock Text="{Binding Name}"
+                                           TextAlignment="Center"
+                                           FontSize="12"
+                                           TextTrimming="CharacterEllipsis"
+                                           MaxWidth="110" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

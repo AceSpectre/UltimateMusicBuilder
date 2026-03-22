@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music;
+using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using Sma5h.Mods.Music.Services;
 using Spectre.Console;
@@ -11,6 +12,8 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Tomlyn;
+using Tomlyn.Model;
 
 namespace Sma5h.CLI.Services
 {
@@ -116,6 +119,40 @@ namespace Sma5h.CLI.Services
             // Set the series filter so FolderMusicMod can read it during Init
             FolderMusicMod.SeriesFilterByMod = seriesFilters.Count > 0 ? seriesFilters : null;
 
+            // Load explicit series order from series-order.toml
+            foreach (var modDir in activeMods)
+            {
+                var orderPath = Path.Combine(modDir,
+                    MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE);
+                if (File.Exists(orderPath))
+                {
+                    try
+                    {
+                        var tomlText = File.ReadAllText(orderPath);
+                        var model = Toml.ToModel(tomlText);
+                        if (model.TryGetValue("order", out var val) && val is TomlArray arr)
+                        {
+                            var orderDict = new Dictionary<string, int>();
+                            int idx = 0;
+                            foreach (var item in arr.OfType<string>())
+                                orderDict[item] = idx++;
+                            Sma5hMusic.ExplicitSeriesOrder = orderDict;
+                            _logger.LogInformation("Loaded explicit series order from {Path} ({Count} entries).",
+                                orderPath, orderDict.Count);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to parse series-order.toml at {Path}. Using auto-ordering.", orderPath);
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("No series-order.toml found in {ModDir}. Custom series will be auto-ordered.",
+                        Path.GetFileName(modDir));
+                }
+            }
+
             try
             {
                 await Task.Delay(1000);
@@ -160,6 +197,7 @@ namespace Sma5h.CLI.Services
                 // Clear filters
                 MusicModManagerService.ModFilter = null;
                 FolderMusicMod.SeriesFilterByMod = null;
+                Sma5hMusic.ExplicitSeriesOrder = null;
             }
         }
     }
