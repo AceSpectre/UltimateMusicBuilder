@@ -18,6 +18,7 @@ namespace Sma5h.CLI.Services
     {
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
+        private readonly ScaffoldService _scaffold;
 
         private static readonly HashSet<string> SOURCE_AUDIO_EXTENSIONS = new(StringComparer.OrdinalIgnoreCase)
         {
@@ -26,10 +27,12 @@ namespace Sma5h.CLI.Services
 
         private const string VALIDATE_FOLDER = "songs-to-validate";
 
-        public AcceptNus3Service(IOptionsMonitor<Sma5hMusicOptions> musicConfig, ILogger<AcceptNus3Service> logger)
+        public AcceptNus3Service(IOptionsMonitor<Sma5hMusicOptions> musicConfig,
+            ILogger<AcceptNus3Service> logger, ScaffoldService scaffold)
         {
             _musicConfig = musicConfig;
             _logger = logger;
+            _scaffold = scaffold;
         }
 
         public void Run()
@@ -147,6 +150,10 @@ namespace Sma5h.CLI.Services
 
             _logger.LogInformation("--------------------");
             _logger.LogInformation("Accepted {Accepted} file(s), removed {Removed} source file(s).", accepted, sourcesRemoved);
+
+            // Run scaffold to add tracks.csv entries for any newly accepted files
+            _logger.LogInformation("Running scaffold to populate tracks.csv...");
+            _scaffold.Run();
         }
     }
 }

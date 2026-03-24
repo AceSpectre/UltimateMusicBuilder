@@ -1,0 +1,72 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Sma5h.CLI.Views.TrackOrderWindow"
+        Title="Order Tracks"
+        Width="600" Height="700"
+        WindowStartupLocation="CenterScreen"
+        CanResize="True">
+
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top"
+                   Text="Drag tracks to reorder. The order will be saved to the tracks.csv order column."
+                   Margin="0,0,0,12"
+                   TextWrapping="Wrap"
+                   FontSize="14" />
+
+        <StackPanel DockPanel.Dock="Bottom"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,0,0"
+                    Spacing="8">
+            <Button x:Name="SaveButton" Content="Save Order" Click="OnSave" />
+            <Button x:Name="CancelButton" Content="Cancel" Click="OnCancel" />
+        </StackPanel>
+
+        <ScrollViewer>
+            <ItemsControl x:Name="TrackItemsControl"
+                          DragDrop.AllowDrop="True">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="Gray"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Margin="2,2,2,2"
+                                Padding="8,6"
+                                Background="Transparent"
+                                PointerPressed="OnItemPointerPressed">
+                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                <TextBlock Grid.Column="0"
+                                           Text="☰"
+                                           FontSize="16"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,10,0"
+                                           Foreground="Gray" />
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Subtitle}"
+                                               FontSize="11"
+                                               Foreground="Gray"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding OrderDisplay}"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           Foreground="Gray"
+                                           Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>
