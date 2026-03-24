@@ -1,3 +1,5 @@
+using CsvHelper;
+using CsvHelper.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,6 +11,7 @@ using Sma5h.Mods.Music.Services;
 using Spectre.Console;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -153,6 +156,28 @@ namespace Sma5h.CLI.Services
                 }
             }
 
+            // ── Pre-build validation ──────────────────────────────────────
+            var warnings = ValidateSeries(activeMods, seriesFilters);
+
+            if (warnings.Count > 0)
+            {
+                _logger.LogWarning("Pre-build validation found {Count} warning(s):", warnings.Count);
+                foreach (var w in warnings)
+                    _logger.LogWarning("{Warning}", w);
+
+                var proceed = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("[yellow]Validation warnings found. Proceed with build?[/]")
+                        .HighlightStyle(new Style(Color.Cyan1))
+                        .AddChoices("Yes - build anyway", "No - cancel build"));
+
+                if (proceed.StartsWith("No"))
+                {
+                    _logger.LogInformation("Build cancelled.");
+                    return;
+                }
+            }
+
             try
             {
                 await Task.Delay(1000);
@@ -199,6 +224,136 @@ namespace Sma5h.CLI.Services
                 FolderMusicMod.SeriesFilterByMod = null;
                 Sma5hMusic.ExplicitSeriesOrder = null;
             }
+        }
+        private List<string> ValidateSeries(List<string> activeMods, Dictionary<string, HashSet<string>> seriesFilters)
+        {
+            var warnings = new List<string>();
+
+            foreach (var modDir in activeMods)
+            {
+                var seriesDirs = Directory.GetDirectories(modDir)
+                    .Where(d => !Path.GetFileName(d).StartsWith("."))
+                    .ToList();
+
+                if (seriesFilters.TryGetValue(modDir, out var filter))
+                    seriesDirs = seriesDirs.Where(d => filter.Contains(Path.GetFileName(d))).ToList();
+
+                var modName = Path.GetFileName(modDir);
+
+                foreach (var seriesDir in seriesDirs)
+                {
+                    var seriesName = Path.GetFileName(seriesDir);
+                    var prefix = $"{modName}/{seriesName}";
+                    var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
+                    var tomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
+
+                    if (!File.Exists(csvPath))
+                        continue;
+
+                    // Parse series.toml to get valid game IDs
+                    var validGameIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (File.Exists(tomlPath))
+                    {
+                        try
+                        {
+                            var tomlText = File.ReadAllText(tomlPath);
+                            var seriesConfig = Toml.ToModel<FolderSeriesFileConfig>(tomlText,
+                                options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
+                            foreach (var game in seriesConfig.Games ?? new List<FolderGameConfig>())
+                            {
+                                if (!string.IsNullOrWhiteSpace(game.Id))
+                                    validGameIds.Add(game.Id);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to parse {Path} for validation.", tomlPath);
+                        }
+                    }
+
+                    // Read tracks.csv with all columns (including order)
+                    var csvFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    try
+                    {
+                        var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
+                        {
+                            HasHeaderRecord = true,
+                            TrimOptions = TrimOptions.Trim,
+                            MissingFieldFound = null,
+                            BadDataFound = null,
+                        };
+                        using var reader = new StreamReader(csvPath);
+                        using var csv = new CsvReader(reader, csvConfig);
+                        csv.Read();
+                        csv.ReadHeader();
+                        var headers = csv.HeaderRecord;
+                        bool hasOrderColumn = headers.Contains("order");
+
+                        int rowNum = 0;
+                        while (csv.Read())
+                        {
+                            rowNum++;
+                            var filename = csv.GetField("filename")?.Trim() ?? "";
+                            var game = csv.GetField("game")?.Trim() ?? "";
+                            var title = csv.GetField("title")?.Trim() ?? "";
+
+                            if (string.IsNullOrWhiteSpace(filename))
+                                continue;
+
+                            csvFilenames.Add(filename);
+
+                            // Check: game exists in series.toml
+                            if (validGameIds.Count > 0 && !string.IsNullOrWhiteSpace(game)
+                                && !validGameIds.Contains(game))
+                            {
+                                warnings.Add($"  {prefix}: \"{title}\" ({filename}) has game \"{game}\" not found in series.toml");
+                            }
+
+                            // Check: order column exists and has a value
+                            if (!hasOrderColumn)
+                            {
+                                if (rowNum == 1) // only warn once per file
+                                    warnings.Add($"  {prefix}: tracks.csv is missing the \"order\" column");
+                            }
+                            else
+                            {
+                                var orderVal = csv.GetField("order")?.Trim() ?? "";
+                                if (string.IsNullOrWhiteSpace(orderVal) || !int.TryParse(orderVal, out _))
+                                    warnings.Add($"  {prefix}: \"{title}\" ({filename}) is missing a valid order number");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to validate {Path}.", csvPath);
+                        continue;
+                    }
+
+                    // Check: .nus3audio files not in tracks.csv
+                    var orphanedNus3 = Directory.GetFiles(seriesDir, "*.nus3audio")
+                        .Select(Path.GetFileName)
+                        .Where(f => !csvFilenames.Contains(f))
+                        .OrderBy(f => f)
+                        .ToList();
+
+                    foreach (var file in orphanedNus3)
+                        warnings.Add($"  {prefix}: {file} is not listed in tracks.csv");
+                }
+            }
+
+            return warnings;
+        }
+
+        private static string ToKebabCase(string name)
+        {
+            var sb = new System.Text.StringBuilder(name.Length + 4);
+            for (int i = 0; i < name.Length; i++)
+            {
+                if (char.IsUpper(name[i]) && i > 0)
+                    sb.Append('-');
+                sb.Append(char.ToLower(name[i]));
+            }
+            return sb.ToString();
         }
     }
 }
