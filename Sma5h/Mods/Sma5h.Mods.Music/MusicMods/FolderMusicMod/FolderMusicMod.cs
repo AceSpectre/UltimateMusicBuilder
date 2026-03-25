@@ -132,7 +132,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     _logger.LogInformation("Series {SeriesId} is flagged as existing — skipping SeriesEntry creation.", uiSeriesId);
                 }
 
-                // ── GameTitleEntries (skip for existing in-game series) ───
+                // ── GameTitleEntries (always created — duplicates handled by AudioStateService) ───
                 var gameIdLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var game in seriesFile.Games)
                 {
@@ -142,16 +142,13 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                         continue;
                     }
                     var uiGameTitleId = MusicConstants.InternalIds.GAME_TITLE_ID_PREFIX + game.Id;
-                    if (!isExistingSeries)
+                    var gameTitleEntry = new GameTitleEntry(uiGameTitleId, EntrySource.Mod)
                     {
-                        var gameTitleEntry = new GameTitleEntry(uiGameTitleId, EntrySource.Mod)
-                        {
-                            NameId = game.Id,
-                            UiSeriesId = uiSeriesId
-                        };
-                        gameTitleEntry.MSBTTitle["en_us"] = game.Name ?? game.Id;
-                        output.GameTitleEntries.Add(gameTitleEntry);
-                    }
+                        NameId = game.Id,
+                        UiSeriesId = uiSeriesId
+                    };
+                    gameTitleEntry.MSBTTitle["en_us"] = game.Name ?? game.Id;
+                    output.GameTitleEntries.Add(gameTitleEntry);
                     gameIdLookup[game.Id] = uiGameTitleId;
                 }
 

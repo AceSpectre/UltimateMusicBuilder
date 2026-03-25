@@ -341,8 +341,6 @@ namespace Sma5h.Mods.Music
 
         private void AddModSongsToAllPlaylists()
         {
-            var battlefieldPlaylists = new HashSet<string> { "bgmsmashbtl" };
-
             var modSongs = _audioStateService.GetBgmDbRootEntries()
                 .Where(p => p.TestDispOrder >= 0 && p.MusicMod != null)
                 .ToList();
@@ -350,18 +348,47 @@ namespace Sma5h.Mods.Music
             if (modSongs.Count == 0)
                 return;
 
-            var playlists = _audioStateService.GetPlaylists()
-                .Where(p => battlefieldPlaylists.Contains(p.Id))
-                .ToList();
+            // Build lookup: game title -> series
+            var gameToSeries = _audioStateService.GetGameTitleEntries()
+                .ToDictionary(p => p.UiGameTitleId, p => p.UiSeriesId);
 
+            // Build lookup: series -> set of stage playlist IDs (BgmSetId)
+            var seriesToPlaylists = new Dictionary<string, HashSet<string>>();
+            foreach (var stage in _audioStateService.GetStagesEntries())
+            {
+                if (string.IsNullOrEmpty(stage.UiSeriesId) || string.IsNullOrEmpty(stage.BgmSetId))
+                    continue;
+                if (!seriesToPlaylists.TryGetValue(stage.UiSeriesId, out var playlistIds))
+                {
+                    playlistIds = new HashSet<string>();
+                    seriesToPlaylists[stage.UiSeriesId] = playlistIds;
+                }
+                playlistIds.Add(stage.BgmSetId);
+            }
+
+            var allPlaylists = _audioStateService.GetPlaylists().ToDictionary(p => p.Id, p => p);
             int totalAdded = 0;
 
-            foreach (var playlist in playlists)
+            foreach (var song in modSongs)
             {
-                var existingIds = playlist.Tracks.Select(t => t.UiBgmId).ToHashSet();
+                // Determine which playlists this song should be added to
+                var targetPlaylistIds = new HashSet<string> { "bgmsmashbtl" };
 
-                foreach (var song in modSongs)
+                // Add to series-specific stage playlists based on song's game title -> series -> stages
+                if (!string.IsNullOrEmpty(song.UiGameTitleId) &&
+                    gameToSeries.TryGetValue(song.UiGameTitleId, out var seriesId) &&
+                    seriesToPlaylists.TryGetValue(seriesId, out var seriesPlaylistIds))
                 {
+                    foreach (var id in seriesPlaylistIds)
+                        targetPlaylistIds.Add(id);
+                }
+
+                foreach (var playlistId in targetPlaylistIds)
+                {
+                    if (!allPlaylists.TryGetValue(playlistId, out var playlist))
+                        continue;
+
+                    var existingIds = playlist.Tracks.Select(t => t.UiBgmId).ToHashSet();
                     if (existingIds.Contains(song.UiBgmId))
                         continue;
 
@@ -382,11 +409,12 @@ namespace Sma5h.Mods.Music
                         Order12 = order, Order13 = order, Order14 = order, Order15 = order
                     });
                     totalAdded++;
+                    _logger.LogDebug("Added {UiBgmId} to playlist {PlaylistId}.", song.UiBgmId, playlistId);
                 }
             }
 
-            _logger.LogInformation("Added {ModSongCount} mod song(s) to {PlaylistCount} battlefield playlist(s) ({TotalAdded} total insertions).",
-                modSongs.Count, playlists.Count, totalAdded);
+            _logger.LogInformation("Added {ModSongCount} mod song(s) to stage playlists ({TotalAdded} total insertions).",
+                modSongs.Count, totalAdded);
         }
 
         private void EnableBgmSelectorOnAllStages()

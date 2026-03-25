@@ -342,7 +342,20 @@ namespace Sma5h.Mods.Music.Services
             }
             else
             {
-                _logger.LogWarning("PlaylistId {PlaylistId} already exists, skipping {TrackCount} new track(s).", playlistEntry.Id, playlistEntry.Tracks.Count);
+                // Merge new tracks into the existing playlist (for existing series like Final Fantasy, Persona, etc.)
+                var existing = _playlistsEntries[playlistEntry.Id];
+                var existingIds = existing.Tracks.Select(t => t.UiBgmId).ToHashSet();
+                int added = 0;
+                foreach (var track in playlistEntry.Tracks)
+                {
+                    if (!existingIds.Contains(track.UiBgmId))
+                    {
+                        existing.Tracks.Add(track);
+                        added++;
+                    }
+                }
+                _logger.LogInformation("Merged {AddedCount} new track(s) into existing playlist {PlaylistId} ({SkippedCount} duplicate(s) skipped).",
+                    added, playlistEntry.Id, playlistEntry.Tracks.Count - added);
             }
 
             return true;
