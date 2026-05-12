@@ -157,7 +157,7 @@ namespace Sma5h.CLI.Services
             }
 
             // Copy series-order.toml from priority mod if it exists, otherwise from first mod that has one
-            CopySeriesOrderToml(selectedDirs, priorityMod, outputModDir);
+            MergeSeriesOrderToml(selectedDirs, priorityMod, outputModDir);
 
             _logger.LogInformation("--------------------");
             _logger.LogInformation("Merge complete: {SeriesCount} series, {TrackCount} tracks → {OutputDir}",
@@ -395,22 +395,60 @@ namespace Sma5h.CLI.Services
             }
         }
 
-        private void CopySeriesOrderToml(List<string> selectedDirs, string priorityMod, string outputDir)
+        private void MergeSeriesOrderToml(List<string> selectedDirs, string priorityMod, string outputDir)
         {
             var orderedDirs = priorityMod != null
                 ? selectedDirs.OrderByDescending(d => Path.GetFileName(d) == priorityMod).ToList()
                 : selectedDirs;
 
+            var mergedOrder = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var modDir in orderedDirs)
             {
-                var orderFile = Path.Combine(modDir, "series-order.toml");
-                if (File.Exists(orderFile))
+                var orderFile = Path.Combine(modDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE);
+                if (!File.Exists(orderFile)) continue;
+
+                try
                 {
-                    File.Copy(orderFile, Path.Combine(outputDir, "series-order.toml"), overwrite: false);
-                    _logger.LogInformation("Copied series-order.toml from {Mod}", Path.GetFileName(modDir));
-                    return;
+                    var model = Toml.ToModel(File.ReadAllText(orderFile));
+                    if (model.TryGetValue("order", out var val) && val is Tomlyn.Model.TomlArray arr)
+                    {
+                        foreach (var item in arr.OfType<string>())
+                        {
+                            if (seen.Add(item))
+                                mergedOrder.Add(item);
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    _logger.LogWarning(e, "Failed to parse {Path}, skipping.", orderFile);
                 }
             }
+
+            if (mergedOrder.Count == 0)
+                return;
+
+            var sb = new StringBuilder();
+            sb.AppendLine("# Custom series display order");
+            sb.AppendLine("# Listed series appear after official series, before \"Other\"");
+            sb.AppendLine("# Unlisted custom series will be placed after these");
+            sb.Append("order = [");
+            foreach (var id in mergedOrder)
+            {
+                sb.AppendLine();
+                sb.Append($"    \"{EscapeToml(id)}\",");
+            }
+            sb.AppendLine();
+            sb.AppendLine("]");
+
+            File.WriteAllText(
+                Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE),
+                sb.ToString());
+            _logger.LogInformation("Merged series-order.toml with {Count} series from {ModCount} mod(s).",
+                mergedOrder.Count, orderedDirs.Count(d => File.Exists(
+                    Path.Combine(d, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE))));
         }
 
         private int CountTracksInCsv(string csvPath)
