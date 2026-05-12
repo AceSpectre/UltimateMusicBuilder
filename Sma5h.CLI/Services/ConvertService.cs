@@ -30,16 +30,36 @@ namespace Sma5h.CLI.Services
         {
             Script.PrintBanner(_logger);
 
-            var oldModPath = AnsiConsole.Prompt(
-                new TextPrompt<string>("Enter path to old Sma5h mod folder:")
-                    .Validate(path =>
-                    {
-                        if (!Directory.Exists(path))
-                            return ValidationResult.Error("Directory does not exist.");
-                        if (!File.Exists(Path.Combine(path, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE)))
-                            return ValidationResult.Error("No metadata_mod.json found in that folder.");
-                        return ValidationResult.Success();
-                    }));
+            // Look for old mods in Mods/OldMods (sibling of the MusicMods folder)
+            var modPath = _musicConfig.CurrentValue.Sma5hMusic.ModPath;
+            var oldModsRoot = Path.Combine(Path.GetDirectoryName(modPath), "OldMods");
+
+            if (!Directory.Exists(oldModsRoot))
+            {
+                _logger.LogError("OldMods directory not found at {Path}. Create it and place old Sma5h mod folders inside.", oldModsRoot);
+                return;
+            }
+
+            var candidates = Directory.GetDirectories(oldModsRoot)
+                .Where(d => File.Exists(Path.Combine(d, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE)))
+                .OrderBy(d => Path.GetFileName(d), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                _logger.LogError("No valid mods found in {Path}. Each subfolder must contain a {File}.",
+                    oldModsRoot, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE);
+                return;
+            }
+
+            var choices = candidates.Select(Path.GetFileName).ToList();
+            var selected = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Select an old Sma5h mod to convert:")
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(choices));
+
+            var oldModPath = Path.Combine(oldModsRoot, selected);
 
             var jsonPath = Path.Combine(oldModPath, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE);
             JObject json;
@@ -65,7 +85,6 @@ namespace Sma5h.CLI.Services
                 new TextPrompt<string>("Name for the new UMB mod folder:")
                     .DefaultValue(SanitizeFolderName(modName)));
 
-            var modPath = _musicConfig.CurrentValue.Sma5hMusic.ModPath;
             var outputModDir = Path.Combine(modPath, outputModName);
 
             if (Directory.Exists(outputModDir))
@@ -85,6 +104,7 @@ namespace Sma5h.CLI.Services
 
             int totalTracks = 0;
             int totalSeries = 0;
+            var customSeriesOrder = new List<string>();
 
             foreach (var series in seriesArray)
             {
@@ -98,6 +118,9 @@ namespace Sma5h.CLI.Services
                     _logger.LogWarning("Skipping series with empty name_id.");
                     continue;
                 }
+
+                if (!isExisting)
+                    customSeriesOrder.Add(seriesNameId);
 
                 var seriesDir = Path.Combine(outputModDir, seriesNameId);
                 Directory.CreateDirectory(seriesDir);
@@ -231,6 +254,27 @@ namespace Sma5h.CLI.Services
                 totalSeries++;
                 _logger.LogInformation("Converted series '{SeriesName}' ({SeriesId}): {TrackCount} tracks{Existing}",
                     seriesName, seriesNameId, trackRows.Count, isExisting ? " [existing series]" : "");
+            }
+
+            // Write series-order.toml if there are multiple custom series
+            if (customSeriesOrder.Count >= 2)
+            {
+                var orderSb = new StringBuilder();
+                orderSb.AppendLine("# Custom series display order");
+                orderSb.AppendLine("# Listed series appear after official series, before \"Other\"");
+                orderSb.AppendLine("# Unlisted custom series will be placed after these");
+                orderSb.Append("order = [");
+                foreach (var id in customSeriesOrder)
+                {
+                    orderSb.AppendLine();
+                    orderSb.Append($"    \"{EscapeTomlString(id)}\",");
+                }
+                orderSb.AppendLine();
+                orderSb.AppendLine("]");
+                File.WriteAllText(
+                    Path.Combine(outputModDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE),
+                    orderSb.ToString());
+                _logger.LogInformation("Wrote series-order.toml with {Count} custom series.", customSeriesOrder.Count);
             }
 
             _logger.LogInformation("--------------------");

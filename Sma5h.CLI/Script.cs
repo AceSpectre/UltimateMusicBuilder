@@ -17,6 +17,7 @@ namespace Sma5h.CLI
         private readonly BuildService _build;
         private readonly ScaffoldService _scaffold;
         private readonly ConvertService _convert;
+        private readonly MergeService _merge;
         private readonly ExtractIconsService _extractIcons;
         private readonly Nus3ConvertService _nus3Convert;
         private readonly AcceptNus3Service _acceptNus3;
@@ -25,13 +26,14 @@ namespace Sma5h.CLI
         private readonly TrackOrderService _orderTracks;
 
         public Script(BuildService build, ScaffoldService scaffold, ConvertService convert,
-            ExtractIconsService extractIcons, Nus3ConvertService nus3Convert,
+            MergeService merge, ExtractIconsService extractIcons, Nus3ConvertService nus3Convert,
             AcceptNus3Service acceptNus3, CleanupService cleanup, SeriesOrderService orderSeries,
             TrackOrderService orderTracks)
         {
             _build = build;
             _scaffold = scaffold;
             _convert = convert;
+            _merge = merge;
             _extractIcons = extractIcons;
             _nus3Convert = nus3Convert;
             _acceptNus3 = acceptNus3;
@@ -43,6 +45,7 @@ namespace Sma5h.CLI
         public async Task RunBuild() => await _build.Run();
         public void RunScaffold() => _scaffold.Run();
         public void RunConvert() => _convert.Run();
+        public void RunMerge() => _merge.Run();
         public void RunExtractIcons() => _extractIcons.Run();
         public void RunNus3Convert() => _nus3Convert.Run();
         public void RunAcceptValidatedNus3() => _acceptNus3.Run();
