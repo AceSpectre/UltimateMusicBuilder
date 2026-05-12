@@ -63,6 +63,9 @@ namespace Sma5h.CLI
                 case "convert":
                     entry.RunConvert();
                     break;
+                case "merge":
+                    entry.RunMerge();
+                    break;
                 case "extract-icons":
                     entry.RunExtractIcons();
                     break;
@@ -83,7 +86,7 @@ namespace Sma5h.CLI
                     break;
                 default:
                     Console.WriteLine($"Unknown command: {action}");
-                    Console.WriteLine("Usage: dotnet run [build|scaffold|convert|extract-icons|nus3-convert|accept-nus3|cleanup|order-series|order-tracks]");
+                    Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|accept-nus3|cleanup|order-series|order-tracks]");
                     break;
             }
         }
@@ -95,6 +98,7 @@ namespace Sma5h.CLI
             ["Nus3 Convert   - Convert audio files to nus3audio with loop points"] = "nus3-convert",
             ["Accept Nus3    - Accept validated nus3audio files into series"] = "accept-nus3",
             ["Convert        - Import a Sma5h mod to UMB folder format"] = "convert",
+            ["Merge          - Merge two or more UMB mods into one"] = "merge",
             ["Extract Icons  - Extract series icons from a built Sma5h mod"] = "extract-icons",
             ["Cleanup        - Remove tracks.csv entries for missing audio files"] = "cleanup",
             ["Order Series   - Reorder custom series display order via drag-and-drop"] = "order-series",
@@ -146,6 +150,7 @@ namespace Sma5h.CLI
             services.AddScoped<Services.BuildService>();
             services.AddScoped<Services.ScaffoldService>();
             services.AddScoped<Services.ConvertService>();
+            services.AddScoped<Services.MergeService>();
             services.AddScoped<Services.ExtractIconsService>();
             services.AddScoped<Services.Nus3ConvertService>();
             services.AddScoped<Services.AcceptNus3Service>();
