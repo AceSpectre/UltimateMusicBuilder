@@ -1,7 +1,3 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
-
 using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
@@ -14,7 +10,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Threading;
 
 namespace Sma5h.CLI.Services
 {
@@ -94,36 +89,21 @@ namespace Sma5h.CLI.Services
                 });
             }
 
-            // Launch Avalonia window on STA thread
+            // Show Avalonia window via the shared host (Avalonia can only be Setup once per process)
             List<int> result = null;
-            var thread = new Thread(() =>
+            try
             {
-                try
-                {
-                    var lifetime = new ClassicDesktopStyleApplicationLifetime
+                result = AvaloniaHost.ShowWindow(
+                    () => new TrackOrderWindow(viewModels)
                     {
-                        ShutdownMode = ShutdownMode.OnMainWindowClose
-                    };
-
-                    var builder = AppBuilder.Configure<SeriesOrderApp>()
-                        .UsePlatformDetect()
-                        .SetupWithLifetime(lifetime);
-
-                    var window = new TrackOrderWindow(viewModels);
-                    window.Title = $"Order Tracks — {Path.GetFileName(seriesDir)}";
-                    window.Closed += (_, _) => result = window.Result;
-                    lifetime.MainWindow = window;
-                    lifetime.Start(Array.Empty<string>());
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to launch track order window.");
-                }
-            });
-            if (OperatingSystem.IsWindows())
-                thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
+                        Title = $"Order Tracks — {Path.GetFileName(seriesDir)}"
+                    },
+                    w => w.Result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to launch track order window.");
+            }
 
             // Save result
             if (result != null)

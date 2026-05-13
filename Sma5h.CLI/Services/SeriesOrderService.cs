@@ -1,7 +1,3 @@
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Controls.ApplicationLifetimes;
-
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sma5h.CLI.Views;
@@ -14,7 +10,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading;
 using Tomlyn;
 using Tomlyn.Model;
 
@@ -134,35 +129,18 @@ namespace Sma5h.CLI.Services
                 IconPath = s.iconPath,
             }).ToList();
 
-            // Launch Avalonia window on STA thread
+            // Show Avalonia window via the shared host (Avalonia can only be Setup once per process)
             List<string> result = null;
-            var thread = new Thread(() =>
+            try
             {
-                try
-                {
-                    var lifetime = new ClassicDesktopStyleApplicationLifetime
-                    {
-                        ShutdownMode = ShutdownMode.OnMainWindowClose
-                    };
-
-                    var builder = AppBuilder.Configure<SeriesOrderApp>()
-                        .UsePlatformDetect()
-                        .SetupWithLifetime(lifetime);
-
-                    var window = new SeriesOrderWindow(viewModels);
-                    window.Closed += (_, _) => result = window.Result;
-                    lifetime.MainWindow = window;
-                    lifetime.Start(Array.Empty<string>());
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Failed to launch series order window.");
-                }
-            });
-            if (OperatingSystem.IsWindows())
-                thread.SetApartmentState(ApartmentState.STA);
-            thread.Start();
-            thread.Join();
+                result = AvaloniaHost.ShowWindow(
+                    () => new SeriesOrderWindow(viewModels),
+                    w => w.Result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to launch series order window.");
+            }
 
             // Save result
             if (result != null)
