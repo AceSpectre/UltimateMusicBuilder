@@ -79,6 +79,8 @@ namespace Sma5h.Mods.Music
                     _audioStateService.AddBgmPropertyEntry(bgmPropertiesEntry);
                 foreach (var playlistEntry in musicModEntries.PlaylistEntries)
                     _audioStateService.AddPlaylistEntry(playlistEntry);
+                foreach (var ordering in musicModEntries.SeriesSongOrderings)
+                    _audioStateService.RegisterSeriesSongOrdering(ordering.Key, ordering.Value);
             }
 
             return true;

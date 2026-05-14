@@ -12,6 +12,7 @@ namespace Sma5h.Mods.Music.Models
         public List<GameTitleEntry> GameTitleEntries { get; }
         public List<SeriesEntry> SeriesEntries { get; }
         public List<PlaylistEntry> PlaylistEntries { get; }
+        public Dictionary<string, List<string>> SeriesSongOrderings { get; }
 
         public MusicModEntries()
         {
@@ -23,6 +24,7 @@ namespace Sma5h.Mods.Music.Models
             GameTitleEntries = new List<GameTitleEntry>();
             SeriesEntries = new List<SeriesEntry>();
             PlaylistEntries = new List<PlaylistEntry>();
+            SeriesSongOrderings = new Dictionary<string, List<string>>();
         }
 
         public MusicModDeleteEntries GetMusicModDeleteEntries()

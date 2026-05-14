@@ -8,7 +8,7 @@
 
     <DockPanel Margin="16">
         <TextBlock DockPanel.Dock="Top"
-                   Text="Drag tracks to reorder. The order will be saved to the tracks.csv order column."
+                   Text="Drag tracks to reorder. Vanilla rows are shown in italic; for existing-series mods, both vanilla and custom songs can be interleaved freely."
                    Margin="0,0,0,12"
                    TextWrapping="Wrap"
                    FontSize="14" />
@@ -47,10 +47,18 @@
                                            Margin="0,0,10,0"
                                            Foreground="Gray" />
                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Title}"
-                                               FontSize="14"
-                                               FontWeight="SemiBold"
-                                               TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontSize="14"
+                                                   FontWeight="SemiBold"
+                                                   FontStyle="{Binding TitleFontStyle}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <Border Background="#444" CornerRadius="3" Padding="4,1"
+                                                VerticalAlignment="Center"
+                                                IsVisible="{Binding IsVanilla}">
+                                            <TextBlock Text="vanilla" FontSize="10" Foreground="#DDD" />
+                                        </Border>
+                                    </StackPanel>
                                     <TextBlock Text="{Binding Subtitle}"
                                                FontSize="11"
                                                Foreground="Gray"

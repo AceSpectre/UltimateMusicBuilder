@@ -130,6 +130,26 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 else
                 {
                     _logger.LogInformation("Series {SeriesId} is flagged as existing — skipping SeriesEntry creation.", uiSeriesId);
+
+                    // Optional song_order.toml: lets the user interleave modded songs with vanilla
+                    // ones in the Sound Test / My Music ordering. Only meaningful for existing series.
+                    var songOrderPath = Path.Combine(subfolder, MusicConstants.MusicModFiles.FOLDER_MOD_SONG_ORDER_TOML_FILE);
+                    if (File.Exists(songOrderPath))
+                    {
+                        try
+                        {
+                            var orderedIds = ParseSongOrderFile(songOrderPath);
+                            if (orderedIds.Count > 0)
+                            {
+                                output.SeriesSongOrderings[uiSeriesId] = orderedIds;
+                                _logger.LogInformation("Loaded song_order.toml for {SeriesId} ({Count} entries).", uiSeriesId, orderedIds.Count);
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            _logger.LogError(e, "Failed to parse song_order.toml in {Subfolder}.", subfolder);
+                        }
+                    }
                 }
 
                 // ── GameTitleEntries (always created — duplicates handled by AudioStateService) ───
@@ -365,6 +385,22 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             return Toml.ToModel<FolderSeriesFileConfig>(tomlText, options: options);
         }
 
+        private List<string> ParseSongOrderFile(string tomlPath)
+        {
+            var tomlText = File.ReadAllText(tomlPath);
+            var table = Toml.ToModel(tomlText);
+            var result = new List<string>();
+            if (table.TryGetValue("song_order", out var raw) && raw is TomlArray array)
+            {
+                foreach (var item in array)
+                {
+                    if (item is string s && !string.IsNullOrWhiteSpace(s))
+                        result.Add(s.Trim());
+                }
+            }
+            return result;
+        }
+
         private IEnumerable<FolderTrackCsvRow> ParseTracksFile(string csvPath)
         {
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
@@ -379,7 +415,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             return csv.GetRecords<FolderTrackCsvRow>().ToList();
         }
 
-        private static string DeriveToneId(string filename)
+        public static string DeriveToneId(string filename)
         {
             var nameOnly = Path.GetFileNameWithoutExtension(filename).ToLowerInvariant();
             var sb = new StringBuilder(nameOnly.Length);

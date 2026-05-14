@@ -13,7 +13,7 @@ namespace Sma5h.CLI.Views
 {
     public partial class TrackOrderWindow : Window
     {
-        public List<int> Result { get; private set; }
+        public List<TrackViewModel> Result { get; private set; }
 
         private readonly ObservableCollection<TrackViewModel> _tracks = new();
 
@@ -77,8 +77,7 @@ namespace Sma5h.CLI.Views
 
         private void OnSave(object sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
-            // Return the original row indices in the new order
-            Result = _tracks.Select(t => t.OriginalIndex).ToList();
+            Result = _tracks.ToList();
             Close();
         }
 
@@ -94,6 +93,9 @@ namespace Sma5h.CLI.Views
         public int OriginalIndex { get; set; }
         public string Title { get; set; }
         public string Subtitle { get; set; }
+        public bool IsVanilla { get; set; }
+        public string BgmId { get; set; }
+        public Avalonia.Media.FontStyle TitleFontStyle => IsVanilla ? Avalonia.Media.FontStyle.Italic : Avalonia.Media.FontStyle.Normal;
 
         private string _orderDisplay;
         public string OrderDisplay

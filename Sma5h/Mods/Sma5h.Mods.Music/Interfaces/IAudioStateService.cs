@@ -49,5 +49,6 @@ namespace Sma5h.Mods.Music.Interfaces
 
         void InitBgmEntriesFromStateManager();
         bool SaveBgmEntriesToStateManager();
+        void RegisterSeriesSongOrdering(string uiSeriesId, IReadOnlyList<string> orderedUiBgmIds);
     }
 }

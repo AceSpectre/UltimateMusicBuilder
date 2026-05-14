@@ -44,6 +44,7 @@ namespace Sma5h.Mods.Music.Services
         private readonly Dictionary<string, PlaylistEntry> _playlistsEntries;
         private readonly Dictionary<string, StageEntry> _stageEntries;
         private readonly Dictionary<string, float> _coreVolumes;
+        private readonly Dictionary<string, List<string>> _seriesSongOrderings;
 
         public double GameVersion { get; private set; }
 
@@ -65,6 +66,13 @@ namespace Sma5h.Mods.Music.Services
             _playlistsEntries = new Dictionary<string, PlaylistEntry>();
             _stageEntries = new Dictionary<string, StageEntry>();
             _coreVolumes = GetCoreNus3BankVolumes();
+            _seriesSongOrderings = new Dictionary<string, List<string>>();
+        }
+
+        public void RegisterSeriesSongOrdering(string uiSeriesId, IReadOnlyList<string> orderedUiBgmIds)
+        {
+            if (string.IsNullOrEmpty(uiSeriesId) || orderedUiBgmIds == null) return;
+            _seriesSongOrderings[uiSeriesId] = new List<string>(orderedUiBgmIds);
         }
 
         #region GET
@@ -536,8 +544,45 @@ namespace Sma5h.Mods.Music.Services
 
             //DbRoot Entries Saving
             //Reordering
+            // Build a per-entry sort key. Default = current TestDispOrder; registered series
+            // orderings redistribute their songs across the series' original vanilla
+            // TestDispOrder range as fractional doubles, so they sort within that range
+            // without colliding with entries from other series.
+            var sortKey = new Dictionary<string, double>();
+            foreach (var entry in _bgmDbRootEntries.Values)
+                sortKey[entry.UiBgmId] = entry.TestDispOrder;
+
+            foreach (var (uiSeriesId, orderedIds) in _seriesSongOrderings)
+            {
+                var vanillaRange = _bgmDbRootEntries.Values
+                    .Where(e => e.Source == EntrySource.Core
+                                && e.TestDispOrder >= 0
+                                && _gameTitleEntries.TryGetValue(e.UiGameTitleId ?? string.Empty, out var gt)
+                                && gt.UiSeriesId == uiSeriesId)
+                    .Select(e => (double)e.TestDispOrder)
+                    .ToList();
+                if (vanillaRange.Count == 0)
+                    continue;
+
+                double rangeMin = vanillaRange.Min();
+                double rangeMax = vanillaRange.Max();
+                double span = Math.Max(rangeMax - rangeMin + 1, 1);
+                int n = orderedIds.Count;
+                for (int i = 0; i < n; i++)
+                {
+                    var id = orderedIds[i];
+                    if (!_bgmDbRootEntries.ContainsKey(id))
+                        continue;
+                    // Distribute positions evenly across the inclusive vanilla range.
+                    double t = n == 1 ? 0.5 : (i / (double)(n - 1));
+                    sortKey[id] = rangeMin + t * (span - 1);
+                }
+            }
+
             short orderIndex = 0;
-            var listBgms = _bgmDbRootEntries.Values.Where(p => p.TestDispOrder >= 0).OrderBy(p => p.TestDispOrder);
+            var listBgms = _bgmDbRootEntries.Values
+                .Where(p => p.TestDispOrder >= 0)
+                .OrderBy(p => sortKey[p.UiBgmId]);
             foreach (var bgmEntry in listBgms)
             {
                 bgmEntry.TestDispOrder = orderIndex;
