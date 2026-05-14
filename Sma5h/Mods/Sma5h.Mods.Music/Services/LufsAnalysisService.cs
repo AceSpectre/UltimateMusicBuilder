@@ -1,6 +1,8 @@
+using CsvHelper;
+using CsvHelper.Configuration;
+using CsvHelper.Configuration.Attributes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music.Interfaces;
@@ -9,7 +11,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Security.Cryptography;
+using System.Linq;
 using System.Text;
 
 namespace Sma5h.Mods.Music.Services
@@ -21,9 +23,13 @@ namespace Sma5h.Mods.Music.Services
         private readonly IOptionsMonitor<Sma5hMusicOptions> _config;
         private readonly IServiceProvider _services; // lazy resolve IAudioDecodeService to avoid DI cycle
         private IAudioDecodeService _decoder;
-        private readonly ConcurrentDictionary<string, LufsMeasurement> _cache = new();
-        private bool _cacheLoaded;
-        private bool _cacheDirty;
+
+        // Per-directory caches keyed by absolute directory path. Each directory's LUFS.csv
+        // is loaded lazily on first access to any file in that directory and rewritten
+        // atomically by SaveCache() at the end of a run.
+        private readonly ConcurrentDictionary<string, DirectoryCache> _dirCaches =
+            new(StringComparer.OrdinalIgnoreCase);
+
         private readonly object _ffmpegResolveLock = new();
         private string _resolvedFfmpegPath;
         private bool _ffmpegResolved;
@@ -77,9 +83,6 @@ namespace Sma5h.Mods.Music.Services
             if (!string.IsNullOrEmpty(configured) && File.Exists(configured))
                 return Path.GetFullPath(configured);
 
-            // Fall back to PATH lookup. On Windows ProcessStartInfo with UseShellExecute=false
-            // resolves bare executable names via PATH, but we want to verify it actually
-            // exists before declaring availability so callers get a clean IsAvailable signal.
             var pathEnv = Environment.GetEnvironmentVariable("PATH");
             if (string.IsNullOrEmpty(pathEnv)) return null;
 
@@ -106,24 +109,54 @@ namespace Sma5h.Mods.Music.Services
                 return InvalidMeasurement();
             }
 
-            EnsureCacheLoaded();
+            var fi = new FileInfo(audioFilePath);
+            var dir = Path.GetFullPath(fi.DirectoryName);
+            var filename = fi.Name;
+            var fileSize = fi.Length;
+            var mtime = new DateTimeOffset(fi.LastWriteTimeUtc).ToUnixTimeSeconds();
 
-            var hash = ComputeFileHash(audioFilePath);
-            if (_cache.TryGetValue(hash, out var cached) && cached.IsValid)
+            var dirCache = _dirCaches.GetOrAdd(dir, d => new DirectoryCache(d, GetCsvFileName()));
+            dirCache.EnsureLoaded(_logger);
+
+            var lufsOpts = _config.CurrentValue.Sma5hMusic?.LufsNormalization;
+            var currentTarget = lufsOpts?.TargetLufs ?? -14f;
+            var maxMult = lufsOpts?.MaxGainMultiplier ?? 4f;
+
+            // Cache hit: size + mtime match.
+            if (dirCache.TryGet(filename, out var entry)
+                && entry.FileSize == fileSize
+                && entry.MtimeUnix == mtime)
             {
-                _logger.LogDebug("LUFS cache hit for {File} (hash {Hash}).", Path.GetFileName(audioFilePath), hash[..Math.Min(12, hash.Length)]);
-                return cached;
+                // Target drift: recompute multiplier from the (still-valid) measured LUFS.
+                // No ffmpeg needed.
+                if (Math.Abs(entry.TargetLufs - currentTarget) > 0.001f)
+                {
+                    var (newMult, _) = ComputeMultiplier(entry.MeasuredLufs, currentTarget, maxMult);
+                    dirCache.UpdateDerived(filename, newMult, currentTarget, _logger);
+                }
+                return new LufsMeasurement
+                {
+                    IntegratedLufs = entry.MeasuredLufs,
+                    IsValid = true
+                };
             }
 
-            if (!IsAvailable)
-                return InvalidMeasurement();
+            // Cache miss: need ffmpeg.
+            if (!IsAvailable) return InvalidMeasurement();
 
             var measurement = RunFfmpegLoudnorm(audioFilePath);
             if (measurement.IsValid)
             {
-                measurement.SourceHash = hash;
-                _cache[hash] = measurement;
-                _cacheDirty = true;
+                var (mult, _) = ComputeMultiplier(measurement.IntegratedLufs, currentTarget, maxMult);
+                dirCache.Upsert(new LufsCacheEntry
+                {
+                    Filename = filename,
+                    MeasuredLufs = measurement.IntegratedLufs,
+                    Multiplier = mult,
+                    TargetLufs = currentTarget,
+                    FileSize = fileSize,
+                    MtimeUnix = mtime
+                }, _logger);
             }
             return measurement;
         }
@@ -132,65 +165,35 @@ namespace Sma5h.Mods.Music.Services
         {
             if (measurement == null || !measurement.IsValid)
                 return new GainResult(1.0f, false);
+            var (mult, clamped) = ComputeMultiplier(measurement.IntegratedLufs, targetLufs, maxMultiplier);
+            return new GainResult(mult, clamped);
+        }
 
-            // LUFS is logarithmic. linear_gain = 10^((target - measured) / 20)
-            var deltaDb = targetLufs - measurement.IntegratedLufs;
+        // linear_gain = 10^((target - measured) / 20), clamped to [0, max].
+        private static (float multiplier, bool wasClamped) ComputeMultiplier(float measuredLufs, float targetLufs, float maxMultiplier)
+        {
+            var deltaDb = targetLufs - measuredLufs;
             var raw = (float)Math.Pow(10.0, deltaDb / 20.0);
             if (raw <= 0 || float.IsNaN(raw) || float.IsInfinity(raw))
-                return new GainResult(1.0f, false);
-
+                return (1.0f, false);
             if (maxMultiplier > 0 && raw > maxMultiplier)
-                return new GainResult(maxMultiplier, true);
-            return new GainResult(raw, false);
+                return (maxMultiplier, true);
+            return (raw, false);
         }
 
         public void SaveCache()
         {
-            if (!_cacheDirty) return;
-            var cachePath = _config.CurrentValue.Sma5hMusic?.LufsNormalization?.MeasurementCacheFile;
-            if (string.IsNullOrEmpty(cachePath)) return;
-
-            try
+            foreach (var kv in _dirCaches.ToArray())
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(cachePath)));
-                var snapshot = new Dictionary<string, LufsMeasurement>(_cache);
-                File.WriteAllText(cachePath, JsonConvert.SerializeObject(snapshot, Formatting.Indented));
-                _cacheDirty = false;
-                _logger.LogDebug("Saved {Count} LUFS measurements to {Path}.", snapshot.Count, cachePath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to save LUFS cache to {Path}.", cachePath);
+                try { kv.Value.SaveIfDirty(_logger); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to save LUFS cache for directory {Dir}.", kv.Key); }
             }
         }
 
-        private void EnsureCacheLoaded()
+        private string GetCsvFileName()
         {
-            if (_cacheLoaded) return;
-            lock (_cache)
-            {
-                if (_cacheLoaded) return;
-                _cacheLoaded = true;
-                var cachePath = _config.CurrentValue.Sma5hMusic?.LufsNormalization?.MeasurementCacheFile;
-                if (string.IsNullOrEmpty(cachePath) || !File.Exists(cachePath))
-                    return;
-                try
-                {
-                    var json = File.ReadAllText(cachePath);
-                    var loaded = JsonConvert.DeserializeObject<Dictionary<string, LufsMeasurement>>(json);
-                    if (loaded != null)
-                    {
-                        foreach (var kv in loaded)
-                            if (!string.IsNullOrEmpty(kv.Key) && kv.Value != null)
-                                _cache[kv.Key] = kv.Value;
-                        _logger.LogDebug("Loaded {Count} LUFS measurements from cache {Path}.", loaded.Count, cachePath);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to load LUFS cache from {Path}; ignoring.", cachePath);
-                }
-            }
+            var name = _config.CurrentValue.Sma5hMusic?.LufsNormalization?.LufsCacheFileName;
+            return string.IsNullOrWhiteSpace(name) ? "LUFS.csv" : name;
         }
 
         private LufsMeasurement RunFfmpegLoudnorm(string audioFilePath)
@@ -224,8 +227,6 @@ namespace Sma5h.Mods.Music.Services
                 analysisFile = tempWav;
             }
 
-            // loudnorm in analysis (single-pass) mode prints a JSON block to stderr.
-            // -hide_banner suppresses FFmpeg's version banner. -nostats suppresses per-frame progress.
             var args = $"-hide_banner -nostats -i \"{analysisFile}\" -af loudnorm=I=-14:print_format=json -f null -";
             var stderr = new StringBuilder();
 
@@ -255,7 +256,6 @@ namespace Sma5h.Mods.Music.Services
 
         private LufsMeasurement ParseLoudnormJson(string ffmpegStderr, string audioFilePath)
         {
-            // Locate the JSON object emitted by loudnorm. It's the last `{` ... `}` block in the stderr.
             var start = ffmpegStderr.LastIndexOf('{');
             var end = ffmpegStderr.LastIndexOf('}');
             if (start < 0 || end <= start)
@@ -300,17 +300,154 @@ namespace Sma5h.Mods.Music.Services
             return float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : float.NaN;
         }
 
-        private static string ComputeFileHash(string path)
+        private static LufsMeasurement InvalidMeasurement() => new() { IsValid = false };
+    }
+
+    // CSV row schema as documented in the plan:
+    //   filename,measured_lufs,multiplier,target_lufs,file_size,mtime_unix
+    public class LufsCacheEntry
+    {
+        public string Filename { get; set; }
+        public float MeasuredLufs { get; set; }
+        public float Multiplier { get; set; }
+        public float TargetLufs { get; set; }
+        public long FileSize { get; set; }
+        public long MtimeUnix { get; set; }
+    }
+
+    internal sealed class LufsCacheEntryMap : ClassMap<LufsCacheEntry>
+    {
+        public LufsCacheEntryMap()
         {
-            // Hash the entire file. nus3audio/idsp/wav files are typically <10MB so this is cheap.
-            using var sha = SHA256.Create();
-            using var stream = File.OpenRead(path);
-            var bytes = sha.ComputeHash(stream);
-            var sb = new StringBuilder(bytes.Length * 2);
-            foreach (var b in bytes) sb.AppendFormat("{0:x2}", b);
-            return sb.ToString();
+            Map(m => m.Filename).Name("filename");
+            Map(m => m.MeasuredLufs).Name("measured_lufs");
+            Map(m => m.Multiplier).Name("multiplier");
+            Map(m => m.TargetLufs).Name("target_lufs");
+            Map(m => m.FileSize).Name("file_size");
+            Map(m => m.MtimeUnix).Name("mtime_unix");
+        }
+    }
+
+    // One per audio-file directory. Holds the parsed LUFS.csv rows for that directory,
+    // tracks dirty state, and writes back atomically. Thread-safe.
+    internal sealed class DirectoryCache
+    {
+        private readonly string _directory;
+        private readonly string _csvFileName;
+        private readonly Dictionary<string, LufsCacheEntry> _entries = new(StringComparer.OrdinalIgnoreCase);
+        private readonly object _lock = new();
+        private bool _loaded;
+        private bool _dirty;
+
+        public DirectoryCache(string directory, string csvFileName)
+        {
+            _directory = directory;
+            _csvFileName = csvFileName;
         }
 
-        private static LufsMeasurement InvalidMeasurement() => new() { IsValid = false };
+        public void EnsureLoaded(ILogger logger)
+        {
+            if (_loaded) return;
+            lock (_lock)
+            {
+                if (_loaded) return;
+                _loaded = true;
+                var csvPath = Path.Combine(_directory, _csvFileName);
+                if (!File.Exists(csvPath)) return;
+                try
+                {
+                    using var reader = new StreamReader(csvPath);
+                    using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
+                    {
+                        HasHeaderRecord = true,
+                        MissingFieldFound = null,
+                        BadDataFound = null,
+                    });
+                    csv.Context.RegisterClassMap<LufsCacheEntryMap>();
+                    foreach (var entry in csv.GetRecords<LufsCacheEntry>())
+                    {
+                        if (entry != null && !string.IsNullOrEmpty(entry.Filename))
+                            _entries[entry.Filename] = entry;
+                    }
+                    logger.LogDebug("Loaded {Count} LUFS entries from {Path}.", _entries.Count, csvPath);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to load LUFS cache at {Path}; treating as empty.", csvPath);
+                }
+            }
+        }
+
+        public bool TryGet(string filename, out LufsCacheEntry entry)
+        {
+            lock (_lock)
+            {
+                return _entries.TryGetValue(filename, out entry);
+            }
+        }
+
+        // Upsert + inline persistence: write the row, then flush LUFS.csv before returning.
+        // Two reasons we save synchronously inside the lock:
+        //   1. Durability — if the build is interrupted mid-pre-warm, measurements so far survive.
+        //   2. Correctness — serializing the save under the lock avoids two threads racing on
+        //      the same .tmp path. CSV writes are tiny (few KB), so the contention is cheap.
+        public void Upsert(LufsCacheEntry entry, ILogger logger)
+        {
+            lock (_lock)
+            {
+                _entries[entry.Filename] = entry;
+                _dirty = true;
+                FlushLocked(logger);
+            }
+        }
+
+        // Update only the derived fields (multiplier, target_lufs) without recomputing measurement.
+        // Used when TargetLufs config changes — the underlying measured_lufs is still valid.
+        public void UpdateDerived(string filename, float newMultiplier, float newTargetLufs, ILogger logger)
+        {
+            lock (_lock)
+            {
+                if (!_entries.TryGetValue(filename, out var existing)) return;
+                existing.Multiplier = newMultiplier;
+                existing.TargetLufs = newTargetLufs;
+                _dirty = true;
+                FlushLocked(logger);
+            }
+        }
+
+        // End-of-run flush; kept for callers (SaveCache) but most writes now happen inline.
+        public void SaveIfDirty(ILogger logger)
+        {
+            lock (_lock) { FlushLocked(logger); }
+        }
+
+        private void FlushLocked(ILogger logger)
+        {
+            if (!_dirty) return;
+            var snapshot = _entries.Values
+                .OrderBy(e => e.Filename, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var csvPath = Path.Combine(_directory, _csvFileName);
+            var tempPath = csvPath + ".tmp";
+            try
+            {
+                Directory.CreateDirectory(_directory);
+                using (var writer = new StreamWriter(tempPath))
+                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+                {
+                    csv.Context.RegisterClassMap<LufsCacheEntryMap>();
+                    csv.WriteRecords(snapshot);
+                }
+                File.Move(tempPath, csvPath, overwrite: true);
+                _dirty = false;
+                logger.LogDebug("Wrote LUFS cache {Path} ({Count} rows).", csvPath, snapshot.Count);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to write LUFS cache {Path}.", csvPath);
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+            }
+        }
     }
 }

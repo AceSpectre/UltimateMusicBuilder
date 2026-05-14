@@ -34,7 +34,9 @@ namespace Sma5h.Mods.Music
             public float TargetLufs { get; set; } = -14.0f;
             public float MaxGainMultiplier { get; set; } = 4.0f;
             public string FfmpegPath { get; set; } = "Tools\\FFmpeg\\ffmpeg.exe";
-            public string MeasurementCacheFile { get; set; } = "Cache\\lufs_measurements.json";
+            // Filename for the per-series cache file. Location is always derived from the
+            // audio file's directory — every series folder gets its own copy alongside tracks.csv.
+            public string LufsCacheFileName { get; set; } = "LUFS.csv";
         }
 
         public enum PlaylistGeneration

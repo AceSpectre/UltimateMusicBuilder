@@ -19,7 +19,6 @@ namespace Sma5h.Mods.Music.Interfaces
         public float IntegratedLufs { get; set; }
         public float TruePeakDb { get; set; }
         public float LoudnessRangeLu { get; set; }
-        public string SourceHash { get; set; }
         public bool IsValid { get; set; }
     }
 

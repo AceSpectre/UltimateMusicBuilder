@@ -7,8 +7,11 @@ using Sma5h.Mods.Music.Models;
 using Sma5h.Mods.Music.Models.PlaylistEntryModels;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sma5h.Mods.Music
 {
@@ -129,6 +132,50 @@ namespace Sma5h.Mods.Music
             var lufsEnabled = lufsOpts != null && lufsOpts.Enabled && _lufsService.IsAvailable;
             if (lufsEnabled)
                 _logger.LogInformation("LUFS normalization enabled. Target: {Target} LUFS, max gain: {Max}x", lufsOpts.TargetLufs, lufsOpts.MaxGainMultiplier);
+
+            // Pre-warm the LUFS cache in parallel before the (serial) main build loop.
+            // First-time measurements dominate build time; running them concurrently turns
+            // a serial N×T into roughly (N×T)/4 wall time. Subsequent runs hit the per-series
+            // LUFS.csv cache and return immediately. Each measurement persists incrementally
+            // to its series' LUFS.csv so interrupting the build doesn't lose completed work.
+            if (lufsEnabled)
+            {
+                var distinctFiles = _audioStateService.GetModBgmPropertyEntries()
+                    .Where(m => !string.IsNullOrEmpty(m.Filename) && File.Exists(m.Filename))
+                    .Select(m => m.Filename)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (distinctFiles.Count > 0)
+                {
+                    var total = distinctFiles.Count;
+                    _logger.LogInformation("LUFS pre-warm: starting analysis of {Total} unique audio file(s) across all mods. This is the slowest first-run step; results cache to per-series LUFS.csv and subsequent builds skip it.", total);
+
+                    var sw = Stopwatch.StartNew();
+                    var done = 0;
+                    // Log roughly 20 progress lines across the pre-warm regardless of size,
+                    // with a floor of every 10 files so small mods still get feedback.
+                    var logEvery = Math.Max(10, total / 20);
+
+                    Parallel.ForEach(distinctFiles,
+                        new ParallelOptions { MaxDegreeOfParallelism = 4 },
+                        fn =>
+                        {
+                            _lufsService.Measure(fn);
+                            var n = Interlocked.Increment(ref done);
+                            if (n % logEvery == 0 || n == total)
+                            {
+                                var elapsed = sw.Elapsed.TotalSeconds;
+                                var rate = n / Math.Max(elapsed, 0.001);
+                                var etaSec = (total - n) / Math.Max(rate, 0.001);
+                                _logger.LogInformation(
+                                    "LUFS pre-warm progress: {Done}/{Total} ({Pct:F0}%) — {Rate:F1} files/s, elapsed {Elapsed:F0}s, ~{Eta:F0}s remaining",
+                                    n, total, 100.0 * n / total, rate, elapsed, etaSec);
+                            }
+                        });
+                    _logger.LogInformation("LUFS pre-warm complete: {Count} file(s) in {Ms} ms", total, sw.ElapsedMilliseconds);
+                }
+            }
 
             foreach (var bgmPropertyEntry in _audioStateService.GetModBgmPropertyEntries())
             {
