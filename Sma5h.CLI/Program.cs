@@ -84,9 +84,12 @@ namespace Sma5h.CLI
                 case "order-tracks":
                     entry.RunOrderTracks();
                     break;
+                case "config-volume":
+                    entry.RunConfigVolume();
+                    break;
                 default:
                     Console.WriteLine($"Unknown command: {action}");
-                    Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|accept-nus3|cleanup|order-series|order-tracks]");
+                    Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|accept-nus3|cleanup|order-series|order-tracks|config-volume]");
                     break;
             }
         }
@@ -103,6 +106,7 @@ namespace Sma5h.CLI
             ["Cleanup        - Remove tracks.csv entries for missing audio files"] = "cleanup",
             ["Order Series   - Reorder custom series display order via drag-and-drop"] = "order-series",
             ["Order Tracks   - Reorder tracks within a series via drag-and-drop"] = "order-tracks",
+            ["Config Volume  - Preview tracks at post-build loudness & override per-track normalization gain"] = "config-volume",
             ["Quit"] = "quit",
         };
 
@@ -157,6 +161,7 @@ namespace Sma5h.CLI
             services.AddScoped<Services.CleanupService>();
             services.AddScoped<Services.SeriesOrderService>();
             services.AddScoped<Services.TrackOrderService>();
+            services.AddScoped<Services.VolumeConfigService>();
             services.AddScoped<Script>();
 
             services.AddLogging();

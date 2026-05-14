@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using System.Collections.Generic;
 
@@ -17,6 +17,7 @@ namespace Sma5h.Mods.Music
             public string DefaultLocale { get; set; }
             public string ModPath { get; set; }
             public string CachePath { get; set; }
+            public LufsNormalizationOptions LufsNormalization { get; set; } = new();
         }
 
         public class Sma5hMusicOptionsAutoPlaylistsSection
@@ -25,6 +26,15 @@ namespace Sma5h.Mods.Music
             public PlaylistGeneration GenerationMode { get; set; }
             public ushort AutoMappingIncidence { get; set; }
             public Dictionary<string, string> AutoMapping { get; set; }
+        }
+
+        public class LufsNormalizationOptions
+        {
+            public bool Enabled { get; set; } = true;
+            public float TargetLufs { get; set; } = -14.0f;
+            public float MaxGainMultiplier { get; set; } = 4.0f;
+            public string FfmpegPath { get; set; } = "Tools\\FFmpeg\\ffmpeg.exe";
+            public string MeasurementCacheFile { get; set; } = "Cache\\lufs_measurements.json";
         }
 
         public enum PlaylistGeneration

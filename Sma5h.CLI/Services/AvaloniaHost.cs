@@ -34,6 +34,7 @@ namespace Sma5h.CLI.Services
                         catch (Exception ex) { tcs.TrySetException(ex); }
                     };
                     window.Show();
+                    ForceForeground(window);
                 }
                 catch (Exception ex)
                 {
@@ -41,6 +42,26 @@ namespace Sma5h.CLI.Services
                 }
             });
             return tcs.Task.GetAwaiter().GetResult();
+        }
+
+        // Windows blocks foreground activation from non-foreground processes (anti focus-stealing),
+        // so a plain Show()/Activate() from this CLI host often leaves the window behind whatever
+        // app the user is currently looking at. Briefly toggling Topmost yanks the window to the
+        // front regardless — a well-known WPF/WinForms trick that also works in Avalonia.
+        private static void ForceForeground(Window window)
+        {
+            try
+            {
+                if (window.WindowState == WindowState.Minimized)
+                    window.WindowState = WindowState.Normal;
+                var wasTopmost = window.Topmost;
+                window.Topmost = true;
+                window.Activate();
+                window.Focus();
+                if (!wasTopmost)
+                    window.Topmost = false;
+            }
+            catch { /* best-effort: focus is nice-to-have */ }
         }
 
         private static void EnsureStarted()

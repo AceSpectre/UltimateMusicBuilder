@@ -59,7 +59,7 @@ namespace Sma5h.CLI.Services
                     bool wasScaffolded = false;
                     if (!File.Exists(tomlPath))
                     {
-                        var tomlContent = $"[series]\nid = \"{folderName}\"\nname = \"{folderName}\"\nplaylist-incidence = 100\n\n[[games]]\nid = \"{folderName}\"\nname = \"{folderName}\"\n\n[[playlists]]\nid = \"bgm_{folderName}\"\nincidence = 100\n\n[default-track-data]\ngame = \"{folderName}\"\nauthor = \"\"\ncopyright = \"\"\nrecord-type = \"original\"\nvolume = 2.7\n";
+                        var tomlContent = $"[series]\nid = \"{folderName}\"\nname = \"{folderName}\"\nplaylist-incidence = 100\n\n[[games]]\nid = \"{folderName}\"\nname = \"{folderName}\"\n\n[[playlists]]\nid = \"bgm_{folderName}\"\nincidence = 100\n\n[default-track-data]\ngame = \"{folderName}\"\nauthor = \"\"\ncopyright = \"\"\nrecord-type = \"original\"\nvolume = 1.0\n";
                         File.WriteAllText(tomlPath, tomlContent);
                         _logger.LogInformation("Created {Path}", tomlPath);
                         wasScaffolded = true;
@@ -132,7 +132,7 @@ namespace Sma5h.CLI.Services
                             Author = defaults?.Author ?? "",
                             Copyright = defaults?.Copyright ?? "",
                             RecordType = defaults?.RecordType ?? "original",
-                            Volume = defaults?.Volume ?? 2.7f
+                            Volume = defaults?.Volume ?? 1.0f
                         });
                     }
 

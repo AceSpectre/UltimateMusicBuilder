@@ -20,7 +20,7 @@ namespace Sma5h.Mods.Music.Models
         {
             NameId = nameId;
             Filename = filename;
-            AudioVolume = 2.7f;
+            AudioVolume = 1.0f;
         }
 
         public void ChangeFilename(string filename)

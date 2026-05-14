@@ -24,8 +24,14 @@ namespace Sma5h
                 {
                     if (data != null && data.Data != null)
                     {
-                        _logger.LogError("Error while running {Executable} with arguments {Arguments} - {Error}", executablePath, arguments, data.Data);
-                        errorRedirect?.Invoke(sender, data);
+                        // When the caller passes errorRedirect they're taking responsibility
+                        // for stderr — don't auto-log every line as an error. Many tools
+                        // (ffmpeg, etc.) use stderr for normal informational output, and
+                        // unconditional LogError makes successful runs look like failures.
+                        if (errorRedirect != null)
+                            errorRedirect.Invoke(sender, data);
+                        else
+                            _logger.LogError("Error while running {Executable} with arguments {Arguments} - {Error}", executablePath, arguments, data.Data);
                     }
                 }
                 void onInfo(object sender, DataReceivedEventArgs data)

@@ -24,6 +24,8 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddSingleton<IAudioMetadataService, VGMStreamAudioMetadataService>();
             services.AddSingleton<IVGMMusicPlayer, VGMMusicPlayer>();
             services.AddSingleton<INus3AudioService, Nus3AudioService>();
+            services.AddSingleton<ILufsAnalysisService, LufsAnalysisService>();
+            services.AddSingleton<IAudioDecodeService, AudioDecodeService>();
             services.AddAutoMapper(cfg => cfg.AddMaps(typeof(MappingDb).Assembly));
             return services;
         }

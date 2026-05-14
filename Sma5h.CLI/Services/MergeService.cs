@@ -289,8 +289,8 @@ namespace Sma5h.CLI.Services
                     Copyright = GetOptionalField(csv, headers, "copyright"),
                     RecordType = GetOptionalField(csv, headers, "record_type", "original"),
                     SpecialCategory = GetOptionalField(csv, headers, "special_category"),
-                    Volume = float.TryParse(GetOptionalField(csv, headers, "volume", "2.7"),
-                        NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 2.7f,
+                    Volume = float.TryParse(GetOptionalField(csv, headers, "volume", "1.0"),
+                        NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 1.0f,
                     Info1 = GetOptionalField(csv, headers, "info1")
                 };
 

@@ -1,0 +1,429 @@
+{
+  "3d2d87ec8bf0770b25d80257dbf624292f045fcc80294abb371b5b644ff39a12": {
+    "IntegratedLufs": -9.86,
+    "TruePeakDb": 0.59,
+    "LoudnessRangeLu": 5.1,
+    "SourceHash": "3d2d87ec8bf0770b25d80257dbf624292f045fcc80294abb371b5b644ff39a12",
+    "IsValid": true
+  },
+  "a0a267e15d49c7413e9c6a5aed640e97ad7ff122ca70471bd2ca54166a77bb7d": {
+    "IntegratedLufs": -10.1,
+    "TruePeakDb": 1.32,
+    "LoudnessRangeLu": 2.1,
+    "SourceHash": "a0a267e15d49c7413e9c6a5aed640e97ad7ff122ca70471bd2ca54166a77bb7d",
+    "IsValid": true
+  },
+  "7c5368dcbe8bc0e2cb863b777a534b1ef69fd6b0464496949ad67fb562b5379f": {
+    "IntegratedLufs": -10.72,
+    "TruePeakDb": 0.11,
+    "LoudnessRangeLu": 2.5,
+    "SourceHash": "7c5368dcbe8bc0e2cb863b777a534b1ef69fd6b0464496949ad67fb562b5379f",
+    "IsValid": true
+  },
+  "d4fdf08eb69cb8df68eea840eb0bf7bfaef87e9e928c37bb89536c599e4fa527": {
+    "IntegratedLufs": -12.34,
+    "TruePeakDb": 0.1,
+    "LoudnessRangeLu": 5.9,
+    "SourceHash": "d4fdf08eb69cb8df68eea840eb0bf7bfaef87e9e928c37bb89536c599e4fa527",
+    "IsValid": true
+  },
+  "7cf1f0e8729cfe01a99deecc67ad5cdf2c2e88245ab526dc456ef51265a55597": {
+    "IntegratedLufs": -14.77,
+    "TruePeakDb": -0.21,
+    "LoudnessRangeLu": 2.8,
+    "SourceHash": "7cf1f0e8729cfe01a99deecc67ad5cdf2c2e88245ab526dc456ef51265a55597",
+    "IsValid": true
+  },
+  "9866406501c35b34737612217ede5e4a7231dfd7aa1f784dd6b44159446cb083": {
+    "IntegratedLufs": -12.45,
+    "TruePeakDb": 0.29,
+    "LoudnessRangeLu": 3.5,
+    "SourceHash": "9866406501c35b34737612217ede5e4a7231dfd7aa1f784dd6b44159446cb083",
+    "IsValid": true
+  },
+  "9dc4133441c7723708ed5fbb826fb3a26459a6a3112e388a5bdb663b30f67123": {
+    "IntegratedLufs": -14.24,
+    "TruePeakDb": -0.17,
+    "LoudnessRangeLu": 1.7,
+    "SourceHash": "9dc4133441c7723708ed5fbb826fb3a26459a6a3112e388a5bdb663b30f67123",
+    "IsValid": true
+  },
+  "ec0f73cf99d66eae54333b7183619ccb84f41941794b94b34bfec9f152172a11": {
+    "IntegratedLufs": -9.16,
+    "TruePeakDb": 1.04,
+    "LoudnessRangeLu": 2.0,
+    "SourceHash": "ec0f73cf99d66eae54333b7183619ccb84f41941794b94b34bfec9f152172a11",
+    "IsValid": true
+  },
+  "38f8782007701c23c53c7f718246546866326199ee2c339aef48dc598fc669a7": {
+    "IntegratedLufs": -9.85,
+    "TruePeakDb": 0.24,
+    "LoudnessRangeLu": 2.6,
+    "SourceHash": "38f8782007701c23c53c7f718246546866326199ee2c339aef48dc598fc669a7",
+    "IsValid": true
+  },
+  "b50f67721d29d9933c8e6dcea27700c1e0e87ffd94137a1f6887d53279ba25cd": {
+    "IntegratedLufs": -14.28,
+    "TruePeakDb": -0.02,
+    "LoudnessRangeLu": 3.7,
+    "SourceHash": "b50f67721d29d9933c8e6dcea27700c1e0e87ffd94137a1f6887d53279ba25cd",
+    "IsValid": true
+  },
+  "46273753486b10e998f456af6dacc1fb9a10b94466c2a4ced95845b19fc3e2c6": {
+    "IntegratedLufs": -11.81,
+    "TruePeakDb": 0.33,
+    "LoudnessRangeLu": 9.5,
+    "SourceHash": "46273753486b10e998f456af6dacc1fb9a10b94466c2a4ced95845b19fc3e2c6",
+    "IsValid": true
+  },
+  "8665925411fc82605eafa172d404fa9cc6ad1ac354218f07d50275947b7d7250": {
+    "IntegratedLufs": -13.06,
+    "TruePeakDb": -0.0,
+    "LoudnessRangeLu": 10.2,
+    "SourceHash": "8665925411fc82605eafa172d404fa9cc6ad1ac354218f07d50275947b7d7250",
+    "IsValid": true
+  },
+  "62e898ccea16db14f33844478101f71509d699fffba33b834e664daff39ebe00": {
+    "IntegratedLufs": -11.98,
+    "TruePeakDb": 0.48,
+    "LoudnessRangeLu": 3.6,
+    "SourceHash": "62e898ccea16db14f33844478101f71509d699fffba33b834e664daff39ebe00",
+    "IsValid": true
+  },
+  "6021e66428699c613a8f67cd5110141b9bb8221dcb16a3f90164ad1d867fe53a": {
+    "IntegratedLufs": -8.66,
+    "TruePeakDb": 1.87,
+    "LoudnessRangeLu": 2.2,
+    "SourceHash": "6021e66428699c613a8f67cd5110141b9bb8221dcb16a3f90164ad1d867fe53a",
+    "IsValid": true
+  },
+  "8024c2e482d6dde8466c8c3d8c1ec3643c642ada212c42a29dd52fe8438b76d0": {
+    "IntegratedLufs": -13.62,
+    "TruePeakDb": 0.09,
+    "LoudnessRangeLu": 8.0,
+    "SourceHash": "8024c2e482d6dde8466c8c3d8c1ec3643c642ada212c42a29dd52fe8438b76d0",
+    "IsValid": true
+  },
+  "3705e8472d7db9d19db7ecacdf383a14c4e003163da40aa62fd24f80a876b1b9": {
+    "IntegratedLufs": -13.0,
+    "TruePeakDb": 0.11,
+    "LoudnessRangeLu": 2.7,
+    "SourceHash": "3705e8472d7db9d19db7ecacdf383a14c4e003163da40aa62fd24f80a876b1b9",
+    "IsValid": true
+  },
+  "9b3e9fd079609fbebf12cb13218436700227d76336f8c7d6be89049380d9c2ac": {
+    "IntegratedLufs": -15.91,
+    "TruePeakDb": 0.12,
+    "LoudnessRangeLu": 5.1,
+    "SourceHash": "9b3e9fd079609fbebf12cb13218436700227d76336f8c7d6be89049380d9c2ac",
+    "IsValid": true
+  },
+  "da7e56b97ce61c6caec7195bdb867cd798a7536967f0633149a5f1d93baf11be": {
+    "IntegratedLufs": -15.53,
+    "TruePeakDb": -0.04,
+    "LoudnessRangeLu": 5.3,
+    "SourceHash": "da7e56b97ce61c6caec7195bdb867cd798a7536967f0633149a5f1d93baf11be",
+    "IsValid": true
+  },
+  "88cabd28a4b3756cc1bf133d452cd5a0966abb33d46a9c9261f7896b3c6a88e1": {
+    "IntegratedLufs": -10.96,
+    "TruePeakDb": 0.33,
+    "LoudnessRangeLu": 5.5,
+    "SourceHash": "88cabd28a4b3756cc1bf133d452cd5a0966abb33d46a9c9261f7896b3c6a88e1",
+    "IsValid": true
+  },
+  "7688457feeebe78f2ce787b26cd0142b88d69cb2781be5c06efafc95f5ed3788": {
+    "IntegratedLufs": -8.01,
+    "TruePeakDb": 0.37,
+    "LoudnessRangeLu": 3.5,
+    "SourceHash": "7688457feeebe78f2ce787b26cd0142b88d69cb2781be5c06efafc95f5ed3788",
+    "IsValid": true
+  },
+  "0274b794fd4c5d18473ee04dc8ccc4185f25fc35b91aaa514ac6f0c8bda9d19a": {
+    "IntegratedLufs": -9.1,
+    "TruePeakDb": 0.54,
+    "LoudnessRangeLu": 3.2,
+    "SourceHash": "0274b794fd4c5d18473ee04dc8ccc4185f25fc35b91aaa514ac6f0c8bda9d19a",
+    "IsValid": true
+  },
+  "b6b996f69e46a8c1c751538f39611172b345cce61a9a1fa03248fced54fdc7de": {
+    "IntegratedLufs": -12.91,
+    "TruePeakDb": 1.5,
+    "LoudnessRangeLu": 4.8,
+    "SourceHash": "b6b996f69e46a8c1c751538f39611172b345cce61a9a1fa03248fced54fdc7de",
+    "IsValid": true
+  },
+  "9f0d43eeb0f9654e3784885dba0e95f679868aee3ca94bcb23ad2eda429adf9a": {
+    "IntegratedLufs": -13.55,
+    "TruePeakDb": 0.02,
+    "LoudnessRangeLu": 6.2,
+    "SourceHash": "9f0d43eeb0f9654e3784885dba0e95f679868aee3ca94bcb23ad2eda429adf9a",
+    "IsValid": true
+  },
+  "c7a1f54d414eec265f8e3496d61eb8577f58fba5c0dd22330e61b15727920b93": {
+    "IntegratedLufs": -14.29,
+    "TruePeakDb": -1.07,
+    "LoudnessRangeLu": 9.6,
+    "SourceHash": "c7a1f54d414eec265f8e3496d61eb8577f58fba5c0dd22330e61b15727920b93",
+    "IsValid": true
+  },
+  "bb4c222d28eef5dd7f40cfa224462b5ada548dceddbfbbca83b713b63d4ae311": {
+    "IntegratedLufs": -11.46,
+    "TruePeakDb": 0.48,
+    "LoudnessRangeLu": 5.9,
+    "SourceHash": "bb4c222d28eef5dd7f40cfa224462b5ada548dceddbfbbca83b713b63d4ae311",
+    "IsValid": true
+  },
+  "cfc876a21c8a11f17196ca100b6fc056ffe7375df2d9a45199dd2366950193b4": {
+    "IntegratedLufs": -8.18,
+    "TruePeakDb": 0.17,
+    "LoudnessRangeLu": 4.7,
+    "SourceHash": "cfc876a21c8a11f17196ca100b6fc056ffe7375df2d9a45199dd2366950193b4",
+    "IsValid": true
+  },
+  "a26bf71f9a19ceee81b2f996adc54b8d4ba236339c8a7ee00e7a70911d1b949e": {
+    "IntegratedLufs": -13.66,
+    "TruePeakDb": 0.08,
+    "LoudnessRangeLu": 5.6,
+    "SourceHash": "a26bf71f9a19ceee81b2f996adc54b8d4ba236339c8a7ee00e7a70911d1b949e",
+    "IsValid": true
+  },
+  "d861e4ba42d24e272ca0763d0b204308c858a3f58e0a7dc6aeabd83d939cbb70": {
+    "IntegratedLufs": -11.41,
+    "TruePeakDb": 0.13,
+    "LoudnessRangeLu": 11.4,
+    "SourceHash": "d861e4ba42d24e272ca0763d0b204308c858a3f58e0a7dc6aeabd83d939cbb70",
+    "IsValid": true
+  },
+  "1a4aa1e13ccabbce2256ca056a773fc768f0fd90535aaa3abb3056d3963e08ef": {
+    "IntegratedLufs": -12.91,
+    "TruePeakDb": 0.01,
+    "LoudnessRangeLu": 4.6,
+    "SourceHash": "1a4aa1e13ccabbce2256ca056a773fc768f0fd90535aaa3abb3056d3963e08ef",
+    "IsValid": true
+  },
+  "9e06cea83c12c319d202058b0a6474727de91aa61f9ccfd27ae0e220b17ac866": {
+    "IntegratedLufs": -9.79,
+    "TruePeakDb": 0.61,
+    "LoudnessRangeLu": 1.8,
+    "SourceHash": "9e06cea83c12c319d202058b0a6474727de91aa61f9ccfd27ae0e220b17ac866",
+    "IsValid": true
+  },
+  "bb80bd1a724f04b2312ed6421e607d3cda22a8c464fb8fb6cbba561ac2286a0d": {
+    "IntegratedLufs": -10.13,
+    "TruePeakDb": 0.87,
+    "LoudnessRangeLu": 4.2,
+    "SourceHash": "bb80bd1a724f04b2312ed6421e607d3cda22a8c464fb8fb6cbba561ac2286a0d",
+    "IsValid": true
+  },
+  "1ba3c92ee5136a8ed562469cfe27d9d1b2239f2d4094333e2452a7b706b2c7ff": {
+    "IntegratedLufs": -8.55,
+    "TruePeakDb": 1.12,
+    "LoudnessRangeLu": 3.9,
+    "SourceHash": "1ba3c92ee5136a8ed562469cfe27d9d1b2239f2d4094333e2452a7b706b2c7ff",
+    "IsValid": true
+  },
+  "e768de3db97792eb62649474076681e8e2efcafacc99d8d02cad0407ce5acffc": {
+    "IntegratedLufs": -11.47,
+    "TruePeakDb": 0.07,
+    "LoudnessRangeLu": 2.9,
+    "SourceHash": "e768de3db97792eb62649474076681e8e2efcafacc99d8d02cad0407ce5acffc",
+    "IsValid": true
+  },
+  "86ca35952de3f2dcb008992f1b7c669192f25184cdaaa6e41c8bf9b20c408d26": {
+    "IntegratedLufs": -11.75,
+    "TruePeakDb": 0.18,
+    "LoudnessRangeLu": 3.1,
+    "SourceHash": "86ca35952de3f2dcb008992f1b7c669192f25184cdaaa6e41c8bf9b20c408d26",
+    "IsValid": true
+  },
+  "610637942d7c854377d8bb96df5b6550984a50c1bccd5c0cf69febb43d9d5774": {
+    "IntegratedLufs": -6.99,
+    "TruePeakDb": 0.65,
+    "LoudnessRangeLu": 4.9,
+    "SourceHash": "610637942d7c854377d8bb96df5b6550984a50c1bccd5c0cf69febb43d9d5774",
+    "IsValid": true
+  },
+  "5a86f726b04d3e201838a7eb753de87dac383981a7d8bcefa54d8c4c1e8b86c4": {
+    "IntegratedLufs": -10.85,
+    "TruePeakDb": 0.11,
+    "LoudnessRangeLu": 2.8,
+    "SourceHash": "5a86f726b04d3e201838a7eb753de87dac383981a7d8bcefa54d8c4c1e8b86c4",
+    "IsValid": true
+  },
+  "65ac1ce02bba81a86403dd930f8aaf5649227f7e569bdd4c139d4fa99d6633ef": {
+    "IntegratedLufs": -9.54,
+    "TruePeakDb": 0.53,
+    "LoudnessRangeLu": 3.2,
+    "SourceHash": "65ac1ce02bba81a86403dd930f8aaf5649227f7e569bdd4c139d4fa99d6633ef",
+    "IsValid": true
+  },
+  "d50a43c1b37bfcc1129543f73e3d189370b5d08a0722d944391ed00775386ca4": {
+    "IntegratedLufs": -12.58,
+    "TruePeakDb": 0.05,
+    "LoudnessRangeLu": 9.1,
+    "SourceHash": "d50a43c1b37bfcc1129543f73e3d189370b5d08a0722d944391ed00775386ca4",
+    "IsValid": true
+  },
+  "43ac5b0d30446bd998d0197af6026a2b7308efc0bbf10e9084e6de353ae0635a": {
+    "IntegratedLufs": -11.31,
+    "TruePeakDb": 0.12,
+    "LoudnessRangeLu": 1.8,
+    "SourceHash": "43ac5b0d30446bd998d0197af6026a2b7308efc0bbf10e9084e6de353ae0635a",
+    "IsValid": true
+  },
+  "75f7e5b69d5c38f9d56aa5ff828672d9d15ee21e1e78454fa4196a68f223d53b": {
+    "IntegratedLufs": -10.41,
+    "TruePeakDb": 0.11,
+    "LoudnessRangeLu": 4.0,
+    "SourceHash": "75f7e5b69d5c38f9d56aa5ff828672d9d15ee21e1e78454fa4196a68f223d53b",
+    "IsValid": true
+  },
+  "b402702491367e4e76cdc1fb852cfe5660301b4859453c5d2c245e2ff01d6326": {
+    "IntegratedLufs": -12.96,
+    "TruePeakDb": -0.16,
+    "LoudnessRangeLu": 4.7,
+    "SourceHash": "b402702491367e4e76cdc1fb852cfe5660301b4859453c5d2c245e2ff01d6326",
+    "IsValid": true
+  },
+  "0e14808d0ee8c9a0bd283412079ab8878f9c8e94b25f2628e80f41d5737ec8b7": {
+    "IntegratedLufs": -11.38,
+    "TruePeakDb": 0.09,
+    "LoudnessRangeLu": 3.6,
+    "SourceHash": "0e14808d0ee8c9a0bd283412079ab8878f9c8e94b25f2628e80f41d5737ec8b7",
+    "IsValid": true
+  },
+  "0517bef73b721729974e28b1eb71bc4b08dfaab328223e8d0f5b33a7eaeb29e8": {
+    "IntegratedLufs": -8.83,
+    "TruePeakDb": 1.75,
+    "LoudnessRangeLu": 5.8,
+    "SourceHash": "0517bef73b721729974e28b1eb71bc4b08dfaab328223e8d0f5b33a7eaeb29e8",
+    "IsValid": true
+  },
+  "7fea9bd07eedb2948604baba9fac7e388806d32a1f272b011d41030dffeb7eaf": {
+    "IntegratedLufs": -6.64,
+    "TruePeakDb": 1.58,
+    "LoudnessRangeLu": 6.0,
+    "SourceHash": "7fea9bd07eedb2948604baba9fac7e388806d32a1f272b011d41030dffeb7eaf",
+    "IsValid": true
+  },
+  "c4cbec462b48d954d2064f28764a7d34d2f5fb31866407a7090ee725ace306ad": {
+    "IntegratedLufs": -8.84,
+    "TruePeakDb": 0.57,
+    "LoudnessRangeLu": 3.6,
+    "SourceHash": "c4cbec462b48d954d2064f28764a7d34d2f5fb31866407a7090ee725ace306ad",
+    "IsValid": true
+  },
+  "805e4b215537ae8749d13a2fd91e5b17ce00d7c0a6d72cf532981c2d8476d763": {
+    "IntegratedLufs": -11.35,
+    "TruePeakDb": 0.1,
+    "LoudnessRangeLu": 2.4,
+    "SourceHash": "805e4b215537ae8749d13a2fd91e5b17ce00d7c0a6d72cf532981c2d8476d763",
+    "IsValid": true
+  },
+  "5af1c7987aed72bd5bee6817e71c12718760154cc39af5beb849a91bc2cb6b51": {
+    "IntegratedLufs": -10.45,
+    "TruePeakDb": 0.09,
+    "LoudnessRangeLu": 7.7,
+    "SourceHash": "5af1c7987aed72bd5bee6817e71c12718760154cc39af5beb849a91bc2cb6b51",
+    "IsValid": true
+  },
+  "9d0c8d7b509561ebe97777877f26c67a6111707c8ef5f87528a8d092d0225bf0": {
+    "IntegratedLufs": -9.1,
+    "TruePeakDb": 2.44,
+    "LoudnessRangeLu": 4.3,
+    "SourceHash": "9d0c8d7b509561ebe97777877f26c67a6111707c8ef5f87528a8d092d0225bf0",
+    "IsValid": true
+  },
+  "0f45983de84dd295fd86faf20d43d5d2478bdeb76062cd11631953c0164fbf24": {
+    "IntegratedLufs": -12.48,
+    "TruePeakDb": 0.03,
+    "LoudnessRangeLu": 8.8,
+    "SourceHash": "0f45983de84dd295fd86faf20d43d5d2478bdeb76062cd11631953c0164fbf24",
+    "IsValid": true
+  },
+  "cf789f32868e3e1d7355e83f664aaa47db7eb98ce8d5411a739bcb1a4c76325f": {
+    "IntegratedLufs": -12.76,
+    "TruePeakDb": -0.84,
+    "LoudnessRangeLu": 2.0,
+    "SourceHash": "cf789f32868e3e1d7355e83f664aaa47db7eb98ce8d5411a739bcb1a4c76325f",
+    "IsValid": true
+  },
+  "92db8baaaca977024c17acd6b26c4a1fedc74b0c02b687b903f30a8f9491c41f": {
+    "IntegratedLufs": -9.55,
+    "TruePeakDb": 1.12,
+    "LoudnessRangeLu": 2.1,
+    "SourceHash": "92db8baaaca977024c17acd6b26c4a1fedc74b0c02b687b903f30a8f9491c41f",
+    "IsValid": true
+  },
+  "889725a35781ead918cedc716eac8517462978e229a91d25741c77fd44d3c826": {
+    "IntegratedLufs": -8.49,
+    "TruePeakDb": 0.98,
+    "LoudnessRangeLu": 4.2,
+    "SourceHash": "889725a35781ead918cedc716eac8517462978e229a91d25741c77fd44d3c826",
+    "IsValid": true
+  },
+  "0f19e579a4a06ddc1176090fd4aa269882e524d69b59fe0f8fadc8096fbf947d": {
+    "IntegratedLufs": -12.28,
+    "TruePeakDb": 0.22,
+    "LoudnessRangeLu": 6.2,
+    "SourceHash": "0f19e579a4a06ddc1176090fd4aa269882e524d69b59fe0f8fadc8096fbf947d",
+    "IsValid": true
+  },
+  "b7ba9ccdb63ec8f58f86a124ed3de50877e9b89821260d66cc0869869fb2e5b4": {
+    "IntegratedLufs": -10.33,
+    "TruePeakDb": 0.5,
+    "LoudnessRangeLu": 3.1,
+    "SourceHash": "b7ba9ccdb63ec8f58f86a124ed3de50877e9b89821260d66cc0869869fb2e5b4",
+    "IsValid": true
+  },
+  "813f56ac1b264f120e5b1b55b61e95c59b6728b38d4b150c0534558edafe4ba1": {
+    "IntegratedLufs": -8.04,
+    "TruePeakDb": 0.46,
+    "LoudnessRangeLu": 1.7,
+    "SourceHash": "813f56ac1b264f120e5b1b55b61e95c59b6728b38d4b150c0534558edafe4ba1",
+    "IsValid": true
+  },
+  "15ca021a94a460ebbbbaa66e6ac40d5cd4c8c96ef38d5c003716752ea86fe362": {
+    "IntegratedLufs": -13.65,
+    "TruePeakDb": 0.1,
+    "LoudnessRangeLu": 6.4,
+    "SourceHash": "15ca021a94a460ebbbbaa66e6ac40d5cd4c8c96ef38d5c003716752ea86fe362",
+    "IsValid": true
+  },
+  "3f374520693a1150f74c52a342e3097c27012029cdee1cab0ca03d26a9840ae1": {
+    "IntegratedLufs": -9.92,
+    "TruePeakDb": 0.3,
+    "LoudnessRangeLu": 4.9,
+    "SourceHash": "3f374520693a1150f74c52a342e3097c27012029cdee1cab0ca03d26a9840ae1",
+    "IsValid": true
+  },
+  "66c5428ba27b946b6fd0b55f7471ee728428f9f26d563a161fc2e329ad23fd1b": {
+    "IntegratedLufs": -12.24,
+    "TruePeakDb": 0.03,
+    "LoudnessRangeLu": 4.5,
+    "SourceHash": "66c5428ba27b946b6fd0b55f7471ee728428f9f26d563a161fc2e329ad23fd1b",
+    "IsValid": true
+  },
+  "aa8ea16916439c0f1f9c9ea371cef8782bf0a2e1f85d16b631e7e413f0200721": {
+    "IntegratedLufs": -13.64,
+    "TruePeakDb": 0.04,
+    "LoudnessRangeLu": 0.9,
+    "SourceHash": "aa8ea16916439c0f1f9c9ea371cef8782bf0a2e1f85d16b631e7e413f0200721",
+    "IsValid": true
+  },
+  "02ba35dc7dde89e8c1d1cacbc8589c0bc72d3338ad951e2c659f8cd72eae1e79": {
+    "IntegratedLufs": -12.26,
+    "TruePeakDb": 0.18,
+    "LoudnessRangeLu": 11.0,
+    "SourceHash": "02ba35dc7dde89e8c1d1cacbc8589c0bc72d3338ad951e2c659f8cd72eae1e79",
+    "IsValid": true
+  },
+  "f16662dc1a7fc1e0860ab116a37c7fd695b358e2c294230e68dc03937a8a6d7d": {
+    "IntegratedLufs": -11.79,
+    "TruePeakDb": 0.14,
+    "LoudnessRangeLu": 3.2,
+    "SourceHash": "f16662dc1a7fc1e0860ab116a37c7fd695b358e2c294230e68dc03937a8a6d7d",
+    "IsValid": true
+  }
+}

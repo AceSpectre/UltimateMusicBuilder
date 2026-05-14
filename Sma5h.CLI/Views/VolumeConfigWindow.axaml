@@ -1,0 +1,106 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Sma5h.CLI.Views.VolumeConfigWindow"
+        Title="Config Volume"
+        Width="900" Height="700"
+        WindowStartupLocation="CenterScreen"
+        CanResize="True">
+
+    <DockPanel Margin="16">
+        <TextBlock DockPanel.Dock="Top"
+                   Text="Per-track loudness preview. Auto-gain shows the multiplier LUFS normalization will apply to hit the target loudness. Override lets you nudge individual tracks up or down on top of that — the final bank volume is auto × override. Press ▶ to hear the track at the exact volume the built mod will produce; adjusting the override while playing updates loudness in real time."
+                   Margin="0,0,0,12"
+                   TextWrapping="Wrap"
+                   FontSize="13" />
+
+        <StackPanel DockPanel.Dock="Bottom"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,12,0,0"
+                    Spacing="8">
+            <Button x:Name="SaveButton" Content="Save Overrides" Click="OnSave" />
+            <Button x:Name="CancelButton" Content="Cancel" Click="OnCancel" />
+        </StackPanel>
+
+        <!-- Column header strip -->
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,110,90,90,100,40" Margin="0,0,0,6">
+            <TextBlock Grid.Column="0" Text="Track" FontWeight="Bold" FontSize="12" />
+            <TextBlock Grid.Column="1" Text="Measured (LUFS)" FontWeight="Bold" FontSize="12" HorizontalAlignment="Right" />
+            <TextBlock Grid.Column="2" Text="Auto gain" FontWeight="Bold" FontSize="12" HorizontalAlignment="Right" />
+            <TextBlock Grid.Column="3" Text="Override" FontWeight="Bold" FontSize="12" HorizontalAlignment="Right" />
+            <TextBlock Grid.Column="4" Text="Final" FontWeight="Bold" FontSize="12" HorizontalAlignment="Right" />
+            <TextBlock Grid.Column="5" Text="" FontSize="12" />
+        </Grid>
+
+        <ScrollViewer>
+            <ItemsControl x:Name="TrackItemsControl">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="Gray"
+                                BorderThickness="1"
+                                CornerRadius="4"
+                                Margin="2,2,2,2"
+                                Padding="8,6">
+                            <Grid ColumnDefinitions="*,110,90,90,100,40" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontSize="14"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding Filename}"
+                                               FontSize="11"
+                                               Foreground="Gray"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding MeasuredDisplay}"
+                                           FontSize="13"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center" />
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="4">
+                                    <TextBlock Text="⚠"
+                                               FontSize="13"
+                                               Foreground="#E0A030"
+                                               VerticalAlignment="Center"
+                                               ToolTip.Tip="Auto-gain hit the safe maximum. Source may be too quiet — consider replacing it."
+                                               IsVisible="{Binding WasClamped}" />
+                                    <TextBlock Text="{Binding AutoGainDisplay}"
+                                               FontSize="13"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
+                                <NumericUpDown Grid.Column="3"
+                                               Value="{Binding UserOverrideDecimal, Mode=TwoWay}"
+                                               Minimum="0"
+                                               Maximum="10"
+                                               Increment="0.1"
+                                               FormatString="0.###"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Width="86" />
+                                <TextBlock Grid.Column="4"
+                                           Text="{Binding EffectiveDisplay}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center" />
+                                <Button Grid.Column="5"
+                                        Content="{Binding PlayButtonText}"
+                                        Click="OnPlayClicked"
+                                        Width="32"
+                                        Height="28"
+                                        Padding="0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

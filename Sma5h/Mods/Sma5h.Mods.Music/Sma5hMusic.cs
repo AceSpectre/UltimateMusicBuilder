@@ -20,6 +20,7 @@ namespace Sma5h.Mods.Music
         private readonly IMusicModManagerService _musicModManagerService;
         private readonly INus3AudioService _nus3AudioService;
         private readonly IProcessService _processService;
+        private readonly ILufsAnalysisService _lufsService;
 
         /// <summary>
         /// When set, defines explicit display ordering for custom series.
@@ -31,13 +32,14 @@ namespace Sma5h.Mods.Music
         public override string ModName => "Sma5hMusic";
 
         public Sma5hMusic(IOptionsMonitor<Sma5hMusicOptions> config, IMusicModManagerService musicModManagerService, IAudioStateService audioStateService,
-            INus3AudioService nus3AudioService, IProcessService processService, IStateManager state, ILogger<Sma5hMusic> logger)
+            INus3AudioService nus3AudioService, IProcessService processService, ILufsAnalysisService lufsService, IStateManager state, ILogger<Sma5hMusic> logger)
             : base(state)
         {
             _logger = logger;
             _audioStateService = audioStateService;
             _nus3AudioService = nus3AudioService;
             _processService = processService;
+            _lufsService = lufsService;
             _musicModManagerService = musicModManagerService;
             _state = state;
             _config = config;
@@ -123,20 +125,45 @@ namespace Sma5h.Mods.Music
                 Directory.CreateDirectory(_config.CurrentValue.Sma5hMusic.CachePath);
 
             //Save NUS3Audio/Nus3Bank
+            var lufsOpts = _config.CurrentValue.Sma5hMusic.LufsNormalization;
+            var lufsEnabled = lufsOpts != null && lufsOpts.Enabled && _lufsService.IsAvailable;
+            if (lufsEnabled)
+                _logger.LogInformation("LUFS normalization enabled. Target: {Target} LUFS, max gain: {Max}x", lufsOpts.TargetLufs, lufsOpts.MaxGainMultiplier);
+
             foreach (var bgmPropertyEntry in _audioStateService.GetModBgmPropertyEntries())
             {
                 var nusBankOutputFile = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3BANK_FILE, bgmPropertyEntry.NameId));
                 var nusAudioOutputFile = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3AUDIO_FILE, bgmPropertyEntry.NameId));
 
+                var finalVolume = bgmPropertyEntry.AudioVolume;
+                if (lufsEnabled && !string.IsNullOrEmpty(bgmPropertyEntry.Filename) && File.Exists(bgmPropertyEntry.Filename))
+                {
+                    var measurement = _lufsService.Measure(bgmPropertyEntry.Filename);
+                    if (measurement.IsValid)
+                    {
+                        var gain = _lufsService.CalculateGain(measurement, lufsOpts.TargetLufs, lufsOpts.MaxGainMultiplier);
+                        finalVolume = gain.Multiplier * bgmPropertyEntry.AudioVolume;
+                        if (gain.WasClamped)
+                            _logger.LogWarning("Song {NameId}: LUFS gain clamped to {Max}x (source measured {Measured:F1} LUFS). Source is too quiet to reach target loudness — consider replacing with a louder master.",
+                                bgmPropertyEntry.NameId, lufsOpts.MaxGainMultiplier, measurement.IntegratedLufs);
+                        else
+                            _logger.LogDebug("Song {NameId}: measured {Measured:F1} LUFS, applying {Gain:F2}x gain (final bank volume {Final:F2}).",
+                                bgmPropertyEntry.NameId, measurement.IntegratedLufs, gain.Multiplier, finalVolume);
+                    }
+                }
+
                 //We always generate a new Nus3Bank as the internal ID might change
                 _logger.LogInformation("Generating Nus3Bank for {NameId}", bgmPropertyEntry.NameId);
-                _nus3AudioService.GenerateNus3Bank(bgmPropertyEntry.NameId, bgmPropertyEntry.AudioVolume, nusBankOutputFile);
+                _nus3AudioService.GenerateNus3Bank(bgmPropertyEntry.NameId, finalVolume, nusBankOutputFile);
 
                 //Test for audio cache
                 _logger.LogInformation("Generating or Copying Nus3Audio for {NameId}", bgmPropertyEntry.NameId);
                 if (!ConvertNus3Audio(useCache, bgmPropertyEntry, nusAudioOutputFile))
                     _logger.LogError("Error! The song with ToneId {NameId}, File {Filename} could not be processed.", bgmPropertyEntry.NameId, bgmPropertyEntry.Filename);
             }
+
+            if (lufsEnabled)
+                _lufsService.SaveCache();
 
             //Convert series icon PNGs to BNTX
             ConvertSeriesIcons();
