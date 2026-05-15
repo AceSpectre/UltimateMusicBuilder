@@ -46,7 +46,11 @@ namespace Sma5h.CLI
 
         public async Task RunBuild() => await _build.Run();
         public void RunScaffold() => _scaffold.Run();
-        public void RunConvert() => _convert.Run();
+        public void RunConvert()
+        {
+            _convert.Run();
+            _scaffold.Run();
+        }
         public void RunMerge() => _merge.Run();
         public void RunExtractIcons() => _extractIcons.Run();
         public void RunNus3Convert() => _nus3Convert.Run();
