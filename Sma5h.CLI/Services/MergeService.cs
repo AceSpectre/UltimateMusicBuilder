@@ -180,7 +180,7 @@ namespace Sma5h.CLI.Services
             // ── Merge series.toml ──
             FolderSeriesFileConfig priorityConfig = null;
             var mergedGames = new List<(string id, string name)>();
-            var mergedPlaylists = new List<(string id, int incidence)>();
+            var mergedPlaylists = new List<(string id, int incidence, object songs)>();
 
             foreach (var srcDir in orderedSourceDirs)
             {
@@ -210,7 +210,7 @@ namespace Sma5h.CLI.Services
                 foreach (var pl in config.Playlists)
                 {
                     if (!mergedPlaylists.Any(p => string.Equals(p.id, pl.Id, StringComparison.OrdinalIgnoreCase)))
-                        mergedPlaylists.Add((pl.Id, pl.Incidence));
+                        mergedPlaylists.Add((pl.Id, pl.Incidence, pl.Songs));
                 }
             }
 
@@ -309,7 +309,7 @@ namespace Sma5h.CLI.Services
         }
 
         private void WriteMergedSeriesToml(string outputDir, FolderSeriesFileConfig priorityConfig,
-            List<(string id, string name)> games, List<(string id, int incidence)> playlists)
+            List<(string id, string name)> games, List<(string id, int incidence, object songs)> playlists)
         {
             var sb = new StringBuilder();
             sb.AppendLine("[series]");
@@ -319,6 +319,8 @@ namespace Sma5h.CLI.Services
                 sb.AppendLine("existing-series = true");
             if (priorityConfig.Series.PlaylistIncidence != 100)
                 sb.AppendLine($"playlist-incidence = {priorityConfig.Series.PlaylistIncidence}");
+            if (!string.IsNullOrWhiteSpace(priorityConfig.Series.SeriesPlaylist))
+                sb.AppendLine($"series-playlist = \"{EscapeToml(priorityConfig.Series.SeriesPlaylist)}\"");
             sb.AppendLine();
 
             foreach (var (id, name) in games)
@@ -329,11 +331,12 @@ namespace Sma5h.CLI.Services
                 sb.AppendLine();
             }
 
-            foreach (var (id, incidence) in playlists)
+            foreach (var (id, incidence, songs) in playlists)
             {
                 sb.AppendLine("[[playlists]]");
                 sb.AppendLine($"id = \"{EscapeToml(id)}\"");
                 sb.AppendLine($"incidence = {incidence}");
+                AppendSongsField(sb, songs);
                 sb.AppendLine();
             }
 
@@ -355,6 +358,30 @@ namespace Sma5h.CLI.Services
             File.WriteAllText(
                 Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE),
                 sb.ToString());
+        }
+
+        private static void AppendSongsField(StringBuilder sb, object songs)
+        {
+            if (songs == null || FolderMusicMod.IsWildcardSongs(songs))
+            {
+                sb.AppendLine("songs = \"*\"");
+                return;
+            }
+
+            var explicitSongs = FolderMusicMod.ExplicitSongs(songs);
+            if (explicitSongs.Count == 0)
+            {
+                sb.AppendLine("songs = \"*\"");
+                return;
+            }
+
+            sb.AppendLine("songs = [");
+            for (int i = 0; i < explicitSongs.Count; i++)
+            {
+                var comma = i < explicitSongs.Count - 1 ? "," : "";
+                sb.AppendLine($"    \"{EscapeToml(explicitSongs[i])}\"{comma}");
+            }
+            sb.AppendLine("]");
         }
 
         private void WriteMergedTracksCsv(string outputDir, List<MergeTrackRow> tracks)

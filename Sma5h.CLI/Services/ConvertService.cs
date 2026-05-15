@@ -335,6 +335,10 @@ namespace Sma5h.CLI.Services
             sb.AppendLine($"name = \"{EscapeTomlString(seriesName)}\"");
             if (isExisting)
                 sb.AppendLine("existing-series = true");
+            // For existing series the scaffold maintenance pass will fill in `series-playlist`
+            // from vanilla data after conversion finishes.
+            if (!isExisting)
+                sb.AppendLine($"series-playlist = \"bgm_{EscapeTomlString(seriesId)}\"");
             sb.AppendLine();
 
             foreach (var (id, name) in games)
@@ -342,14 +346,6 @@ namespace Sma5h.CLI.Services
                 sb.AppendLine("[[games]]");
                 sb.AppendLine($"id = \"{EscapeTomlString(id)}\"");
                 sb.AppendLine($"name = \"{EscapeTomlString(name)}\"");
-                sb.AppendLine();
-            }
-
-            if (!isExisting)
-            {
-                sb.AppendLine("[[playlists]]");
-                sb.AppendLine($"id = \"bgm_{EscapeTomlString(seriesId)}\"");
-                sb.AppendLine("incidence = 100");
                 sb.AppendLine();
             }
 

@@ -22,36 +22,31 @@ namespace Sma5h.CLI
 
             try
             {
+                var outputPath = _config.CurrentValue.OutputPath;
+
                 //Create workspace
-                if (!Directory.Exists(_config.CurrentValue.OutputPath))
+                if (!Directory.Exists(outputPath))
                 {
                     _logger.LogDebug("Creating Working folder...");
-                    Directory.CreateDirectory(_config.CurrentValue.OutputPath);
+                    Directory.CreateDirectory(outputPath);
+                    return true;
                 }
 
-                //Reset
-                var existingFiles = Directory.GetFiles(_config.CurrentValue.OutputPath, "*", SearchOption.AllDirectories);
-                if (existingFiles.Length > 0)
+                //Reset — count any files or directories left from a previous build.
+                var existingFiles = Directory.GetFiles(outputPath, "*", SearchOption.AllDirectories);
+                var existingDirs = Directory.GetDirectories(outputPath, "*", SearchOption.AllDirectories);
+                if (existingFiles.Length == 0 && existingDirs.Length == 0)
+                    return true;
+
+                if (!_config.CurrentValue.SkipOutputPathCleanupConfirmation)
                 {
-                    if (!_config.CurrentValue.SkipOutputPathCleanupConfirmation)
-                    {
-                        _logger.LogWarning("Files found in the workspace folder, delete? Y/N (Default: N)");
-                        var response = Console.ReadKey();
-                        if (response.KeyChar == 'y' || response.KeyChar == 'Y')
-                        {
-                            CleaningWorkspaceFolder(existingFiles);
-                        }
-                        else
-                        {
-                            return false;
-                        }
-                    }
-                    else
-                    {
-                        CleaningWorkspaceFolder(existingFiles);
-                    }
+                    _logger.LogWarning("Files found in the workspace folder, delete? Y/N (Default: N)");
+                    var response = Console.ReadKey();
+                    if (response.KeyChar != 'y' && response.KeyChar != 'Y')
+                        return false;
                 }
 
+                CleaningWorkspaceFolder(outputPath);
                 return true;
             }
             catch (Exception e)
@@ -61,20 +56,48 @@ namespace Sma5h.CLI
             }
         }
 
-        private void CleaningWorkspaceFolder(string[] existingFiles)
+        /// <summary>
+        /// Fully clears the workspace: deletes every file (regardless of extension) and every
+        /// subdirectory under <paramref name="outputPath"/>, leaving the root folder itself in place.
+        /// </summary>
+        private void CleaningWorkspaceFolder(string outputPath)
         {
             _logger.LogInformation("Cleaning up workspace folder");
-            foreach (var fileToDelete in existingFiles)
-            {
-                if (IsWorkspaceFile(fileToDelete))
-                    File.Delete(fileToDelete);
-            }
-        }
 
-        private bool IsWorkspaceFile(string filename)
-        {
-            var file = Path.GetFileName(filename).ToLower();
-            return file.EndsWith("msbt") || file.EndsWith("nus3audio") || file.EndsWith("nus3bank") || file.EndsWith("prc") || file == "bgm_property.bin";
+            int filesDeleted = 0;
+            foreach (var file in Directory.GetFiles(outputPath, "*", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    // Strip the read-only attribute in case anything copied in is flagged.
+                    var attrs = File.GetAttributes(file);
+                    if ((attrs & FileAttributes.ReadOnly) != 0)
+                        File.SetAttributes(file, attrs & ~FileAttributes.ReadOnly);
+                    File.Delete(file);
+                    filesDeleted++;
+                }
+                catch (Exception e)
+                {
+                    _logger.LogWarning(e, "Failed to delete file {File}", file);
+                }
+            }
+
+            int dirsDeleted = 0;
+            foreach (var dir in Directory.GetDirectories(outputPath, "*", SearchOption.TopDirectoryOnly))
+            {
+                try
+                {
+                    Directory.Delete(dir, recursive: true);
+                    dirsDeleted++;
+                }
+                catch (Exception e)
+                {
+                    _logger.LogWarning(e, "Failed to delete directory {Dir}", dir);
+                }
+            }
+
+            _logger.LogInformation("Cleared {Files} file(s) and {Dirs} top-level subfolder(s) from {OutputPath}",
+                filesDeleted, dirsDeleted, outputPath);
         }
     }
 }

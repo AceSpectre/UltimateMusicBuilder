@@ -25,11 +25,13 @@ namespace Sma5h.CLI
         private readonly SeriesOrderService _orderSeries;
         private readonly TrackOrderService _orderTracks;
         private readonly VolumeConfigService _volumeConfig;
+        private readonly DumpStagesService _dumpStages;
 
         public Script(BuildService build, ScaffoldService scaffold, ConvertService convert,
             MergeService merge, ExtractIconsService extractIcons, Nus3ConvertService nus3Convert,
             AcceptNus3Service acceptNus3, CleanupService cleanup, SeriesOrderService orderSeries,
-            TrackOrderService orderTracks, VolumeConfigService volumeConfig)
+            TrackOrderService orderTracks, VolumeConfigService volumeConfig,
+            DumpStagesService dumpStages)
         {
             _build = build;
             _scaffold = scaffold;
@@ -42,6 +44,7 @@ namespace Sma5h.CLI
             _orderSeries = orderSeries;
             _orderTracks = orderTracks;
             _volumeConfig = volumeConfig;
+            _dumpStages = dumpStages;
         }
 
         public async Task RunBuild() => await _build.Run();
@@ -59,6 +62,7 @@ namespace Sma5h.CLI
         public void RunOrderSeries() => _orderSeries.Run();
         public void RunOrderTracks() => _orderTracks.Run();
         public void RunConfigVolume() => _volumeConfig.Run();
+        public void RunDumpStages() => _dumpStages.Run();
 
         // ── Shared helpers used by services ──
 

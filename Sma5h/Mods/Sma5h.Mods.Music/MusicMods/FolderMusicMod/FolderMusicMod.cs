@@ -185,6 +185,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 }
 
                 var playlistTracks = new List<(string uiBgmId, int incidence)>();
+                var filenameByUiBgmId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var filenameToInfoId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var deferredInfo1 = new List<(BgmStreamSetEntry streamSet, string info1Filename)>();
 
@@ -303,6 +304,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     output.BgmPropertyEntries.Add(bgmProp);
 
                     playlistTracks.Add((uiBgmId, seriesFile.Series.PlaylistIncidence));
+                    filenameByUiBgmId[uiBgmId] = row.Filename;
                 }
 
                 // ── Resolve info1 references ─────────────────────────────
@@ -324,20 +326,61 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 }
 
                 // ── Playlist entries ───────────────────────────────────────
-                // Auto-add all series songs to bgm_gametitle_{series_id}
                 if (playlistTracks.Count > 0)
                 {
+                    // Invariant: bgm_gametitle_{series_id} is always populated with every song.
                     var gametitlePlaylistId = "bgm_gametitle_" + seriesFile.Series.Id;
                     output.PlaylistEntries.Add(BuildPlaylistEntry(gametitlePlaylistId, playlistTracks));
                     _logger.LogInformation("Created playlist {PlaylistId} with {TrackCount} track(s).", gametitlePlaylistId, playlistTracks.Count);
 
-                    // Explicit stage playlists from [[playlists]] in series.toml
+                    // Optional additional catch-all (e.g. bgmzelda) — set via `series-playlist`.
+                    var seriesPlaylistId = seriesFile.Series.SeriesPlaylist?.Trim();
+                    if (!string.IsNullOrEmpty(seriesPlaylistId)
+                        && !string.Equals(seriesPlaylistId, gametitlePlaylistId, StringComparison.OrdinalIgnoreCase))
+                    {
+                        output.PlaylistEntries.Add(BuildPlaylistEntry(seriesPlaylistId, playlistTracks));
+                        _logger.LogInformation("Created series playlist {PlaylistId} with {TrackCount} track(s).", seriesPlaylistId, playlistTracks.Count);
+                    }
+
+                    // Explicit stage playlists from [[playlists]] in series.toml — filtered by `songs`.
                     foreach (var playlistOverride in seriesFile.Playlists)
                     {
                         if (string.IsNullOrWhiteSpace(playlistOverride.Id)) continue;
-                        var overrideTracks = playlistTracks
-                            .Select(t => (t.uiBgmId, playlistOverride.Incidence))
-                            .ToList();
+
+                        List<(string uiBgmId, int incidence)> overrideTracks;
+                        if (playlistOverride.Songs == null || IsWildcardSongs(playlistOverride.Songs))
+                        {
+                            overrideTracks = playlistTracks
+                                .Select(t => (t.uiBgmId, playlistOverride.Incidence))
+                                .ToList();
+                        }
+                        else
+                        {
+                            // Match leniently: a `songs` entry of either "Destroyer" or
+                            // "Destroyer.nus3audio" matches a tracks.csv row named "Destroyer.nus3audio".
+                            var wantedByStem = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                            foreach (var raw in ExplicitSongs(playlistOverride.Songs))
+                            {
+                                var stem = Path.GetFileNameWithoutExtension(raw);
+                                // First write wins so we can warn using the user's original form.
+                                if (!wantedByStem.ContainsKey(stem))
+                                    wantedByStem[stem] = raw;
+                            }
+
+                            overrideTracks = new List<(string uiBgmId, int incidence)>();
+                            foreach (var t in playlistTracks)
+                            {
+                                if (!filenameByUiBgmId.TryGetValue(t.uiBgmId, out var fn)) continue;
+                                var fnStem = Path.GetFileNameWithoutExtension(fn);
+                                if (wantedByStem.Remove(fnStem))
+                                    overrideTracks.Add((t.uiBgmId, playlistOverride.Incidence));
+                            }
+                            foreach (var leftover in wantedByStem.Values)
+                                _logger.LogWarning("Playlist {PlaylistId}: song '{Filename}' listed in `songs` was not found in tracks.csv (series {SeriesId}). Run `cleanup` to remove dead references.",
+                                    playlistOverride.Id, leftover, seriesFile.Series.Id);
+                        }
+
+                        if (overrideTracks.Count == 0) continue;
                         output.PlaylistEntries.Add(BuildPlaylistEntry(playlistOverride.Id, overrideTracks));
                         _logger.LogInformation("Created playlist {PlaylistId} with {TrackCount} track(s) (from [[playlists]] override).", playlistOverride.Id, overrideTracks.Count);
                     }
@@ -413,6 +456,28 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             using var csv = new CsvReader(reader, config);
             csv.Context.RegisterClassMap<FolderTrackCsvRowMap>();
             return csv.GetRecords<FolderTrackCsvRow>().ToList();
+        }
+
+        public static bool IsWildcardSongs(object songs)
+        {
+            return songs is string s && s.Trim() == "*";
+        }
+
+        public static IReadOnlyList<string> ExplicitSongs(object songs)
+        {
+            if (songs is null || songs is string) return Array.Empty<string>();
+            if (songs is System.Collections.IEnumerable list)
+            {
+                var result = new List<string>();
+                foreach (var item in list)
+                {
+                    var s = item?.ToString();
+                    if (!string.IsNullOrWhiteSpace(s))
+                        result.Add(s.Trim());
+                }
+                return result;
+            }
+            return Array.Empty<string>();
         }
 
         public static string DeriveToneId(string filename)

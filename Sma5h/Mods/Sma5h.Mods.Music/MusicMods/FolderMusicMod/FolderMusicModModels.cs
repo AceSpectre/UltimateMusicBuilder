@@ -13,6 +13,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public string Name { get; set; }
         public int PlaylistIncidence { get; set; } = 100;
         public bool ExistingSeries { get; set; }
+        public string SeriesPlaylist { get; set; }
     }
 
     public class FolderGameConfig
@@ -25,6 +26,13 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
     {
         public string Id { get; set; }
         public int Incidence { get; set; } = 100;
+
+        /// <summary>
+        /// Either the string "*" (every song in the series, default) or a TOML array
+        /// of filenames matching rows in tracks.csv. Stored as object because Tomlyn
+        /// maps the two shapes to different runtime types.
+        /// </summary>
+        public object Songs { get; set; }
     }
 
     public class FolderDefaultTrackDataConfig

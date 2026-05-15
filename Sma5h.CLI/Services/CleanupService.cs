@@ -5,10 +5,13 @@ using Microsoft.Extensions.Options;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Sma5h.CLI.Services
 {
@@ -44,6 +47,7 @@ namespace Sma5h.CLI.Services
 
             int totalRemoved = 0;
             int totalFiles = 0;
+            int totalDeadSongs = 0;
 
             foreach (var modDir in modDirs)
             {
@@ -81,30 +85,110 @@ namespace Sma5h.CLI.Services
                             removedRows.Add(row);
                     }
 
-                    if (removedRows.Count == 0)
-                        continue;
-
                     var relativeCsv = Path.Combine(Path.GetFileName(modDir), Path.GetFileName(seriesDir), "tracks.csv");
-                    foreach (var row in removedRows)
+                    if (removedRows.Count > 0)
                     {
-                        _logger.LogInformation("Removing '{Filename}' from {CsvPath} (file not found)", row.Filename, relativeCsv);
-                        rows.Remove(row);
-                        totalRemoved++;
+                        foreach (var row in removedRows)
+                        {
+                            _logger.LogInformation("Removing '{Filename}' from {CsvPath} (file not found)", row.Filename, relativeCsv);
+                            rows.Remove(row);
+                            totalRemoved++;
+                        }
+
+                        // Rewrite tracks.csv
+                        using var writer = new StreamWriter(csvPath);
+                        using var csvWriter = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
+                        {
+                            HasHeaderRecord = true
+                        });
+                        csvWriter.Context.RegisterClassMap<FolderTrackCsvRowMap>();
+                        csvWriter.WriteRecords(rows);
                     }
 
-                    // Rewrite tracks.csv
-                    using var writer = new StreamWriter(csvPath);
-                    using var csvWriter = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
+                    // Prune dead filenames from any [[playlists]] songs = [...] arrays in series.toml
+                    var tomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
+                    if (File.Exists(tomlPath))
                     {
-                        HasHeaderRecord = true
-                    });
-                    csvWriter.Context.RegisterClassMap<FolderTrackCsvRowMap>();
-                    csvWriter.WriteRecords(rows);
+                        var validFilenames = new HashSet<string>(
+                            rows.Where(r => !string.IsNullOrWhiteSpace(r.Filename)).Select(r => r.Filename),
+                            StringComparer.OrdinalIgnoreCase);
+                        var validStems = new HashSet<string>(
+                            validFilenames.Select(f => Path.GetFileNameWithoutExtension(f)),
+                            StringComparer.OrdinalIgnoreCase);
+                        var relativeToml = Path.Combine(Path.GetFileName(modDir), Path.GetFileName(seriesDir), "series.toml");
+                        var deadInSeries = PruneDeadSongRefsInToml(tomlPath, validStems, relativeToml);
+                        totalDeadSongs += deadInSeries;
+                    }
                 }
             }
 
             _logger.LogInformation("--------------------");
             _logger.LogInformation("Cleanup complete: removed {Removed} entries from {Files} tracks.csv file(s).", totalRemoved, totalFiles);
+            if (totalDeadSongs > 0)
+                _logger.LogInformation("Pruned {Count} dead song reference(s) from series.toml playlist arrays.", totalDeadSongs);
+        }
+
+        /// <summary>
+        /// Rewrites `songs = [ ... ]` arrays in series.toml, dropping any entries whose stem
+        /// (filename without extension) is not present in <paramref name="validStems"/>.
+        /// Comparison is stem-based so users can list either "Destroyer" or "Destroyer.nus3audio".
+        /// Wildcard (`songs = "*"`) and missing fields are left untouched. Returns the number of dropped entries.
+        /// </summary>
+        private int PruneDeadSongRefsInToml(string tomlPath, HashSet<string> validStems, string relativeToml)
+        {
+            var text = File.ReadAllText(tomlPath);
+            var arrayPattern = new Regex(@"songs\s*=\s*\[(?<body>[^\]]*)\]", RegexOptions.Singleline);
+            var stringEntryPattern = new Regex("\"((?:[^\"\\\\]|\\\\.)*)\"");
+
+            int totalDropped = 0;
+            var rewritten = arrayPattern.Replace(text, match =>
+            {
+                var entries = stringEntryPattern.Matches(match.Groups["body"].Value);
+                var kept = new List<string>();
+                var dropped = new List<string>();
+                foreach (Match e in entries)
+                {
+                    var raw = Regex.Unescape(e.Groups[1].Value);
+                    var stem = Path.GetFileNameWithoutExtension(raw);
+                    if (validStems.Contains(stem))
+                        kept.Add(raw);
+                    else
+                        dropped.Add(raw);
+                }
+
+                if (dropped.Count == 0)
+                    return match.Value;
+
+                foreach (var d in dropped)
+                {
+                    _logger.LogInformation("Removing dead song reference '{Filename}' from {TomlPath}", d, relativeToml);
+                    totalDropped++;
+                }
+
+                if (kept.Count == 0)
+                    return "songs = \"*\"";
+
+                var sb = new StringBuilder();
+                sb.Append("songs = [");
+                sb.AppendLine();
+                for (int i = 0; i < kept.Count; i++)
+                {
+                    var comma = i < kept.Count - 1 ? "," : "";
+                    sb.AppendLine($"    \"{EscapeTomlString(kept[i])}\"{comma}");
+                }
+                sb.Append("]");
+                return sb.ToString();
+            });
+
+            if (totalDropped > 0)
+                File.WriteAllText(tomlPath, rewritten);
+
+            return totalDropped;
+        }
+
+        private static string EscapeTomlString(string value)
+        {
+            return value?.Replace("\\", "\\\\").Replace("\"", "\\\"") ?? "";
         }
     }
 }

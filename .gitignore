@@ -366,3 +366,4 @@ Resources/Game/*
 Mods/*
 .claude
 ArcOutput/*
+stages_dump.csv

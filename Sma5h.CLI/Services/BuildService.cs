@@ -250,8 +250,9 @@ namespace Sma5h.CLI.Services
                     if (!File.Exists(csvPath))
                         continue;
 
-                    // Parse series.toml to get valid game IDs
+                    // Parse series.toml to get valid game IDs and playlist song refs
                     var validGameIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var playlistSongRefs = new List<(string playlistId, string songRef)>();
                     if (File.Exists(tomlPath))
                     {
                         try
@@ -263,6 +264,13 @@ namespace Sma5h.CLI.Services
                             {
                                 if (!string.IsNullOrWhiteSpace(game.Id))
                                     validGameIds.Add(game.Id);
+                            }
+                            foreach (var pl in seriesConfig.Playlists ?? new List<FolderPlaylistOverrideConfig>())
+                            {
+                                if (string.IsNullOrWhiteSpace(pl.Id)) continue;
+                                if (pl.Songs == null || FolderMusicMod.IsWildcardSongs(pl.Songs)) continue;
+                                foreach (var s in FolderMusicMod.ExplicitSongs(pl.Songs))
+                                    playlistSongRefs.Add((pl.Id, s));
                             }
                         }
                         catch (Exception ex)
@@ -338,6 +346,21 @@ namespace Sma5h.CLI.Services
 
                     foreach (var file in orphanedNus3)
                         warnings.Add($"  {prefix}: {file} is not listed in tracks.csv");
+
+                    // Check: [[playlists]] songs[] references that don't match a track in tracks.csv.
+                    // Matches by stem so "Destroyer" and "Destroyer.nus3audio" are both accepted.
+                    if (playlistSongRefs.Count > 0)
+                    {
+                        var csvStems = new HashSet<string>(
+                            csvFilenames.Select(f => Path.GetFileNameWithoutExtension(f)),
+                            StringComparer.OrdinalIgnoreCase);
+                        foreach (var (playlistId, songRef) in playlistSongRefs)
+                        {
+                            var stem = Path.GetFileNameWithoutExtension(songRef);
+                            if (!csvStems.Contains(stem))
+                                warnings.Add($"  {prefix}: [[playlists]] \"{playlistId}\" lists song \"{songRef}\" which doesn't match any track in tracks.csv");
+                        }
+                    }
                 }
             }
 

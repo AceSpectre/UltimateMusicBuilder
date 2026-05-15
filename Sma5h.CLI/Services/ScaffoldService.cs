@@ -94,6 +94,13 @@ namespace Sma5h.CLI.Services
                         totalDefaultsAdded++;
                     }
 
+                    // ── Step 2a: Ensure series-playlist field and songs = "*" on each [[playlists]] block ──
+                    if (EnsureSeriesPlaylistField(tomlPath))
+                        _logger.LogInformation("Added series-playlist field to {Path}", tomlPath);
+                    var addedSongs = EnsureSongsOnPlaylistBlocks(tomlPath);
+                    if (addedSongs > 0)
+                        _logger.LogInformation("Added songs = \"*\" to {Count} [[playlists]] block(s) in {Path}", addedSongs, tomlPath);
+
                     // ── Step 3: Populate tracks.csv with any new music files ──
                     var tomlText = File.ReadAllText(tomlPath);
                     var tomlOptions = new TomlModelOptions { ConvertPropertyName = ToKebabCase };
@@ -201,14 +208,11 @@ namespace Sma5h.CLI.Services
             sb.AppendLine($"id = \"{EscapeTomlString(folderName)}\"");
             sb.AppendLine($"name = \"{EscapeTomlString(folderName)}\"");
             sb.AppendLine("playlist-incidence = 100");
+            sb.AppendLine($"series-playlist = \"bgm_{EscapeTomlString(folderName)}\"");
             sb.AppendLine();
             sb.AppendLine("[[games]]");
             sb.AppendLine($"id = \"{EscapeTomlString(folderName)}\"");
             sb.AppendLine($"name = \"{EscapeTomlString(folderName)}\"");
-            sb.AppendLine();
-            sb.AppendLine("[[playlists]]");
-            sb.AppendLine($"id = \"bgm_{EscapeTomlString(folderName)}\"");
-            sb.AppendLine("incidence = 100");
             sb.AppendLine();
             AppendDefaultTrackData(sb, folderName);
             return sb.ToString();
@@ -225,12 +229,22 @@ namespace Sma5h.CLI.Services
 
             _logger.LogInformation("Series '{Folder}' matches existing in-game series {SeriesId} — populating from vanilla data.", folderName, uiSeriesId);
 
+            string seriesPlaylistId = null;
+            if (_vanillaPlaylistBySeriesId != null
+                && _vanillaPlaylistBySeriesId.TryGetValue(uiSeriesId, out var vanillaPlaylistId)
+                && !string.IsNullOrWhiteSpace(vanillaPlaylistId))
+            {
+                seriesPlaylistId = vanillaPlaylistId;
+            }
+
             var sb = new StringBuilder();
             sb.AppendLine("[series]");
             sb.AppendLine($"id = \"{EscapeTomlString(seriesId)}\"");
             sb.AppendLine($"name = \"{EscapeTomlString(seriesName)}\"");
             sb.AppendLine("existing-series = true");
             sb.AppendLine("playlist-incidence = 100");
+            if (!string.IsNullOrEmpty(seriesPlaylistId))
+                sb.AppendLine($"series-playlist = \"{EscapeTomlString(seriesPlaylistId)}\"");
             sb.AppendLine();
 
             if (games.Count == 0)
@@ -252,16 +266,6 @@ namespace Sma5h.CLI.Services
                     sb.AppendLine($"name = \"{EscapeTomlString(gameName)}\"");
                     sb.AppendLine();
                 }
-            }
-
-            if (_vanillaPlaylistBySeriesId != null
-                && _vanillaPlaylistBySeriesId.TryGetValue(uiSeriesId, out var defaultPlaylistId)
-                && !string.IsNullOrWhiteSpace(defaultPlaylistId))
-            {
-                sb.AppendLine("[[playlists]]");
-                sb.AppendLine($"id = \"{EscapeTomlString(defaultPlaylistId)}\"");
-                sb.AppendLine("incidence = 100");
-                sb.AppendLine();
             }
 
             var defaultGameId = games.Count > 0 ? (games[0].NameId ?? games[0].UiGameTitleId) : seriesId;
@@ -314,6 +318,121 @@ namespace Sma5h.CLI.Services
 
             File.AppendAllText(tomlPath, sb.ToString());
             return true;
+        }
+
+        /// <summary>
+        /// Inserts `series-playlist = "..."` into the [series] block if absent. Returns true if changed.
+        /// Default value: vanilla stage-playlist id for existing series, else `bgm_{series.id}`.
+        /// </summary>
+        private bool EnsureSeriesPlaylistField(string tomlPath)
+        {
+            var text = File.ReadAllText(tomlPath);
+
+            // Already has it?
+            if (Regex.IsMatch(text, @"^\s*series-playlist\s*=", RegexOptions.Multiline))
+                return false;
+
+            // Locate the [series] block.
+            var seriesHeader = Regex.Match(text, @"^\s*\[series\]\s*$", RegexOptions.Multiline);
+            if (!seriesHeader.Success)
+                return false;
+
+            FolderSeriesFileConfig parsed;
+            try
+            {
+                parsed = Toml.ToModel<FolderSeriesFileConfig>(text, options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
+            }
+            catch
+            {
+                return false;
+            }
+
+            var seriesId = parsed.Series?.Id;
+            if (string.IsNullOrWhiteSpace(seriesId))
+                return false;
+
+            string playlistId = null;
+            if (parsed.Series.ExistingSeries)
+            {
+                EnsureVanillaDataLoaded();
+                var uiSeriesId = MusicConstants.InternalIds.SERIES_ID_PREFIX + seriesId;
+                if (_vanillaPlaylistBySeriesId != null
+                    && _vanillaPlaylistBySeriesId.TryGetValue(uiSeriesId, out var vanillaPlaylistId)
+                    && !string.IsNullOrWhiteSpace(vanillaPlaylistId))
+                {
+                    playlistId = vanillaPlaylistId;
+                }
+            }
+            else
+            {
+                playlistId = "bgm_" + seriesId;
+            }
+
+            if (string.IsNullOrWhiteSpace(playlistId))
+                return false;
+
+            // Find the end of the [series] block — either the next [section] header or EOF.
+            int afterHeader = seriesHeader.Index + seriesHeader.Length;
+            var nextSection = Regex.Match(text.Substring(afterHeader), @"^\s*\[", RegexOptions.Multiline);
+            int blockEnd = nextSection.Success ? afterHeader + nextSection.Index : text.Length;
+
+            // Insert the new line just before blockEnd. Trim trailing whitespace so the
+            // inserted line sits on its own line above the gap to the next section.
+            var before = text.Substring(0, blockEnd).TrimEnd('\r', '\n', ' ', '\t');
+            var after = text.Substring(blockEnd);
+            var inserted = before
+                + Environment.NewLine
+                + $"series-playlist = \"{EscapeTomlString(playlistId)}\""
+                + Environment.NewLine
+                + Environment.NewLine
+                + after.TrimStart('\r', '\n');
+
+            File.WriteAllText(tomlPath, inserted);
+            return true;
+        }
+
+        /// <summary>
+        /// For each [[playlists]] block lacking a `songs =` line, appends `songs = "*"` at the
+        /// end of the block. Returns the number of blocks modified.
+        /// </summary>
+        private static int EnsureSongsOnPlaylistBlocks(string tomlPath)
+        {
+            var text = File.ReadAllText(tomlPath);
+            var headers = Regex.Matches(text, @"^\s*\[\[playlists\]\]\s*$", RegexOptions.Multiline);
+            if (headers.Count == 0)
+                return 0;
+
+            // Walk blocks back-to-front so insertions don't shift earlier indices.
+            int added = 0;
+            for (int i = headers.Count - 1; i >= 0; i--)
+            {
+                var header = headers[i];
+                int blockStart = header.Index + header.Length;
+                int blockEnd;
+                if (i + 1 < headers.Count)
+                    blockEnd = headers[i + 1].Index;
+                else
+                {
+                    var nextSection = Regex.Match(text.Substring(blockStart), @"^\s*\[", RegexOptions.Multiline);
+                    blockEnd = nextSection.Success ? blockStart + nextSection.Index : text.Length;
+                }
+
+                var body = text.Substring(blockStart, blockEnd - blockStart);
+                if (Regex.IsMatch(body, @"^\s*songs\s*=", RegexOptions.Multiline))
+                    continue;
+
+                // Insert just before blockEnd, after any trailing whitespace/newlines that
+                // belong to the block body.
+                var bodyTrimmed = body.TrimEnd('\r', '\n', ' ', '\t');
+                var trailing = body.Substring(bodyTrimmed.Length);
+                var insertion = Environment.NewLine + "songs = \"*\"";
+                text = text.Substring(0, blockStart) + bodyTrimmed + insertion + trailing + text.Substring(blockEnd);
+                added++;
+            }
+
+            if (added > 0)
+                File.WriteAllText(tomlPath, text);
+            return added;
         }
 
         // ── Vanilla data lookup ──────────────────────────────────────────────

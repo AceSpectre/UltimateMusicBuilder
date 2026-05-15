@@ -87,9 +87,12 @@ namespace Sma5h.CLI
                 case "config-volume":
                     entry.RunConfigVolume();
                     break;
+                case "dump-stages":
+                    entry.RunDumpStages();
+                    break;
                 default:
                     Console.WriteLine($"Unknown command: {action}");
-                    Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|accept-nus3|cleanup|order-series|order-tracks|config-volume]");
+                    Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|accept-nus3|cleanup|order-series|order-tracks|config-volume|dump-stages]");
                     break;
             }
         }
@@ -107,6 +110,7 @@ namespace Sma5h.CLI
             ["Order Series   - Reorder custom series display order via drag-and-drop"] = "order-series",
             ["Order Tracks   - Reorder tracks within a series via drag-and-drop"] = "order-tracks",
             ["Config Volume  - Preview tracks at post-build loudness & override per-track normalization gain"] = "config-volume",
+            ["Dump Stages    - Print every stage's BgmSetId mapping (diagnostic)"] = "dump-stages",
             ["Quit"] = "quit",
         };
 
@@ -162,6 +166,7 @@ namespace Sma5h.CLI
             services.AddScoped<Services.SeriesOrderService>();
             services.AddScoped<Services.TrackOrderService>();
             services.AddScoped<Services.VolumeConfigService>();
+            services.AddScoped<Services.DumpStagesService>();
             services.AddScoped<Script>();
 
             services.AddLogging();
