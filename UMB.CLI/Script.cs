@@ -113,6 +113,7 @@ namespace UMB.CLI
             {
                 var modChoice = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
+                        .WrapAround()
                         .Title("Select a mod:")
                         .HighlightStyle(new Style(Color.Cyan1))
                         .AddChoices(modDirs.Select(d => Path.GetFileName(d))));
@@ -140,6 +141,7 @@ namespace UMB.CLI
             {
                 var seriesChoice = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
+                        .WrapAround()
                         .Title("Select a series:")
                         .HighlightStyle(new Style(Color.Cyan1))
                         .AddChoices(seriesDirs.Select(d => Path.GetFileName(d))));

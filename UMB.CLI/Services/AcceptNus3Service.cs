@@ -60,6 +60,7 @@ namespace UMB.CLI.Services
 
             var deleteSources = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
+                    .WrapAround()
                     .Title("Delete original source audio files after accepting?")
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices("Yes - delete source files", "No - keep source files"));

@@ -70,6 +70,7 @@ namespace UMB.CLI.Services
 
                 var choice = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
+                        .WrapAround()
                         .Title("Select a mod to build:")
                         .HighlightStyle(new Style(Color.Cyan1))
                         .AddChoices(choices));
@@ -99,6 +100,7 @@ namespace UMB.CLI.Services
                 {
                     var buildScope = AnsiConsole.Prompt(
                         new SelectionPrompt<string>()
+                            .WrapAround()
                             .Title($"Build scope for [cyan]{Markup.Escape(Path.GetFileName(modDir))}[/]:")
                             .HighlightStyle(new Style(Color.Cyan1))
                             .AddChoices("Compile all series", "Select series to compile"));
@@ -109,6 +111,7 @@ namespace UMB.CLI.Services
 
                         var selectedSeries = AnsiConsole.Prompt(
                             new MultiSelectionPrompt<string>()
+                                .WrapAround()
                                 .Title("Select series to compile:")
                                 .HighlightStyle(new Style(Color.Cyan1))
                                 .InstructionsText("(Press [cyan]space[/] to toggle, [green]enter[/] to confirm)")
@@ -168,6 +171,7 @@ namespace UMB.CLI.Services
 
                 var proceed = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
+                        .WrapAround()
                         .Title("[yellow]Validation warnings found. Proceed with build?[/]")
                         .HighlightStyle(new Style(Color.Cyan1))
                         .AddChoices("Yes - build anyway", "No - cancel build"));

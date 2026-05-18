@@ -55,6 +55,7 @@ namespace UMB.CLI.Services
             {
                 var choice = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
+                        .WrapAround()
                         .Title("Select a mod:")
                         .HighlightStyle(new Style(Color.Cyan1))
                         .AddChoices(modDirs.Select(d => Path.GetFileName(d))));

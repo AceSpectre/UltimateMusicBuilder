@@ -66,6 +66,7 @@ namespace UMB.CLI.Services
 
             var chosenModName = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
+                    .WrapAround()
                     .Title("Select the UMB mod to extract icons into:")
                     .PageSize(20)
                     .AddChoices(umbMods.Select(Path.GetFileName)));

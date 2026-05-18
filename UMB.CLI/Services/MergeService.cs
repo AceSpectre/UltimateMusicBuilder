@@ -50,6 +50,7 @@ namespace UMB.CLI.Services
             var modNames = modDirs.Select(Path.GetFileName).ToList();
             var selectedNames = AnsiConsole.Prompt(
                 new MultiSelectionPrompt<string>()
+                    .WrapAround()
                     .Title("Select mods to merge (space to toggle, enter to confirm):")
                     .Required()
                     .HighlightStyle(new Style(Color.Cyan1))
@@ -115,6 +116,7 @@ namespace UMB.CLI.Services
 
                 priorityMod = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
+                        .WrapAround()
                         .Title("Which mod should take priority for conflicts?")
                         .HighlightStyle(new Style(Color.Cyan1))
                         .AddChoices(selectedNames));

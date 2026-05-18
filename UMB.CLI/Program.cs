@@ -123,7 +123,7 @@ namespace UMB.CLI
             ["Cleanup        - Remove tracks.csv entries for missing audio files"] = "cleanup",
             ["Order Series   - Reorder custom series display order via drag-and-drop"] = "order-series",
             ["Order Tracks   - Reorder tracks within a series via drag-and-drop"] = "order-tracks",
-            ["Config Volume  - Preview tracks at post-build loudness & override per-track normalization gain"] = "config-volume",
+            ["Config Volume  - Preview tracks at post-build loudness, override per-track gain"] = "config-volume",
             ["Dump Stages    - Print every stage's BgmSetId mapping (diagnostic)"] = "dump-stages",
             ["Quit"] = "quit",
         };
@@ -135,6 +135,7 @@ namespace UMB.CLI
 
             var choice = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
+                    .WrapAround()
                     .Title("Select an action:")
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(MenuOptions.Keys));

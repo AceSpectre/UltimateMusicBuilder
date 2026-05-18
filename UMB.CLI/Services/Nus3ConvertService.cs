@@ -163,6 +163,7 @@ namespace UMB.CLI.Services
 
                         var selection = AnsiConsole.Prompt(
                             new SelectionPrompt<string>()
+                                .WrapAround()
                                 .Title("Select a loop or preview:")
                                 .HighlightStyle(new Style(Color.Cyan1))
                                 .AddChoices(choices));

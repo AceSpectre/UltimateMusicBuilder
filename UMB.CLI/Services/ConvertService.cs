@@ -56,6 +56,7 @@ namespace UMB.CLI.Services
             var choices = candidates.Select(Path.GetFileName).ToList();
             var selected = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
+                    .WrapAround()
                     .Title("Select an old Sma5h mod to convert:")
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(choices));
