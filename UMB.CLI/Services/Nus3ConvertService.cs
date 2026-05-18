@@ -68,7 +68,7 @@ namespace UMB.CLI.Services
 
             var previewLength = (double)AnsiConsole.Prompt(
                 new TextPrompt<float>("Loop preview length in seconds (total, split evenly before/after loop point):")
-                    .DefaultValue(10f));
+                    .DefaultValue(5f));
 
             var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
             Directory.CreateDirectory(validateDir);
@@ -96,6 +96,19 @@ namespace UMB.CLI.Services
                 {
                     _logger.LogInformation("Skipping '{Basename}': already exists in songs-to-validate.", basename);
                     continue;
+                }
+
+                var siblingNus3 = Path.Combine(seriesDir, basename + ".nus3audio");
+                if (File.Exists(siblingNus3))
+                {
+                    var skipExisting = AnsiConsole.Confirm(
+                        $"'[cyan]{Markup.Escape(basename)}[/]' already has a .nus3audio in the series folder. Skip conversion?",
+                        defaultValue: true);
+                    if (skipExisting)
+                    {
+                        _logger.LogInformation("Skipping '{Basename}': sibling .nus3audio exists in series folder.", basename);
+                        continue;
+                    }
                 }
 
                 _logger.LogInformation("Processing '{Basename}'...", basename);
