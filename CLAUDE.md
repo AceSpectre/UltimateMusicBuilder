@@ -5,11 +5,11 @@ Ideally we should need to make only minimal changes to the original code of this
 
 ## Build & Run
 ```bash
-cd Sma5h.CLI
+cd UMB.CLI
 dotnet build
 dotnet run
 ```
-Configuration is in `Sma5h.CLI/bin/Debug/net8.0/appsettings.json`.
+Configuration is in `UMB.CLI/bin/Debug/net8.0/appsettings.json`.
 
 ## Project Structure
 - `Sma5h/Core/Sma5h.Core/` — Core framework (StateManager, interfaces, resource providers)
@@ -18,12 +18,12 @@ Configuration is in `Sma5h.CLI/bin/Debug/net8.0/appsettings.json`.
   - `MusicMods/MusicModConfig/` — Original JSON-based mod format
   - `Services/` — AudioStateService, Nus3AudioService, metadata services
   - `Helpers/MusicConstants.cs` — All ID prefixes, file constants, valid extensions
-- `Sma5h.CLI/` — Console entry point
+- `UMB.CLI/` — Console entry point
 - `Mods/MusicMods/` — Actual mod data (test mods live here)
 - `Resources/` — ParamLabels.csv and other reference data
 
 ## Key Concepts
-- Mod output goes to `Sma5h.CLI/bin/Debug/net8.0/ArcOutput/`
+- Mod output goes to `UMB.CLI/bin/Debug/net8.0/ArcOutput/`
 - `EnableBgmSelectorOnAllStages()` in Sma5hMusic.cs sets `bgm_selector=true` on all stages during build, enabling My Music/album selection on every stage.
 
 ## Existing Series Fix (2026-03-25)

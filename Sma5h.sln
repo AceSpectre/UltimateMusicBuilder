@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.30621.155
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Sma5h.CLI", "Sma5h.CLI\Sma5h.CLI.csproj", "{F03BD663-4B3C-4EE8-90F3-CEE211C0FE1C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "UMB.CLI", "UMB.CLI\UMB.CLI.csproj", "{F03BD663-4B3C-4EE8-90F3-CEE211C0FE1C}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MsbtEditor", "Sma5h\Core\Helpers\MsbtEditor\MsbtEditor.csproj", "{AFCCF52E-A8A6-4F50-BE89-9581F42BDBE1}"
 EndProject

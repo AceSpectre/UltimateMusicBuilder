@@ -18,12 +18,12 @@ UMB is a fork of [Sma5hMusic](https://github.com/Deinonychus71/Sma5hMusic) for a
 ## Build & Run
 
 ```bash
-cd Sma5h.CLI
+cd UMB.CLI
 dotnet build
 dotnet run
 ```
 
-Configuration lives in `Sma5h.CLI/bin/Debug/net8.0/appsettings.json`. Mods to build live in `Mods/MusicMods/`. Output goes to `ArcOutput/`, which UMB fully clears at the start of every build (after a Y/N confirmation, unless `SkipOutputPathCleanupConfirmation = true`).
+Configuration lives in `UMB.CLI/bin/Debug/net8.0/appsettings.json`. Mods to build live in `Mods/MusicMods/`. Output goes to `ArcOutput/`, which UMB fully clears at the start of every build (after a Y/N confirmation, unless `SkipOutputPathCleanupConfirmation = true`).
 
 ---
 

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Sma5h.Helpers;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
@@ -71,10 +72,10 @@ namespace Sma5h.Mods.Music.Services
 
         private bool DecodeNus3Audio(string inputFile, string outputWav)
         {
-            var nus3AudioExe = Path.Combine(_config.CurrentValue.ToolsPath, MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
-            if (!File.Exists(nus3AudioExe))
+            var nus3AudioExe = ToolPathResolver.Resolve(_config.CurrentValue.ToolsPath, MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
+            if (nus3AudioExe == null)
             {
-                _logger.LogWarning("nus3audio.exe not found at {Path}; cannot extract {File}.", nus3AudioExe, inputFile);
+                _logger.LogWarning("nus3audio binary not found under Tools/{Rel}; cannot extract {File}.", MusicConstants.Resources.NUS3AUDIO_EXE_FILE, inputFile);
                 return false;
             }
 

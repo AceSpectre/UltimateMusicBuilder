@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sma5h.Attributes;
+using Sma5h.Helpers;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Data.Sound.Config;
 using Sma5h.Mods.Data.Sound.Config.BgmPropertyStructs;
@@ -28,7 +29,8 @@ namespace Sma5h.ResourceProviders
             _logger = logger;
             _ymlHelper = new YmlHelper();
             _processService = processService;
-            _bgmPropertyExeFile = Path.Combine(config.CurrentValue.ToolsPath, BgmPropertyFileConstants.BGM_PROPERTY_EXE_FILE);
+            _bgmPropertyExeFile = ToolPathResolver.Resolve(config.CurrentValue.ToolsPath, BgmPropertyFileConstants.BGM_PROPERTY_EXE_FILE)
+                                  ?? Path.Combine(config.CurrentValue.ToolsPath, BgmPropertyFileConstants.BGM_PROPERTY_EXE_FILE);
             _bgmPropertyHashFile = Path.Combine(config.CurrentValue.ToolsPath, BgmPropertyFileConstants.BGM_PROPERTY_HASH_FILE);
         }
 
@@ -113,7 +115,7 @@ namespace Sma5h.ResourceProviders
         private void EnsureRequiredFilesAreFound()
         {
             if (!File.Exists(_bgmPropertyExeFile))
-                throw new Exception($"bgm-property.exe: {_bgmPropertyExeFile} could not be found.");
+                throw new Exception($"bgm-property binary not found at {_bgmPropertyExeFile}. Run scripts/fetch-tools to install.");
 
             if (!File.Exists(_bgmPropertyHashFile))
                 throw new Exception($"bgm_hashes.txt: {_bgmPropertyHashFile} could not be found.");

@@ -4,6 +4,7 @@ using CsvHelper.Configuration.Attributes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
+using Sma5h.Helpers;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music.Interfaces;
 using System;
@@ -64,8 +65,7 @@ namespace Sma5h.Mods.Music.Services
                     _ffmpegResolved = true;
                     if (_resolvedFfmpegPath == null && !_ffmpegMissingLogged)
                     {
-                        var configured = _config.CurrentValue.Sma5hMusic?.LufsNormalization?.FfmpegPath;
-                        _logger.LogWarning("FFmpeg not found (looked at {Path} and on PATH). LUFS normalization will be skipped. Install FFmpeg system-wide or place ffmpeg.exe at the configured path.", configured);
+                        _logger.LogWarning("FFmpeg not found on PATH. LUFS normalization will be skipped. Install via: choco install ffmpeg (Windows) / brew install ffmpeg (macOS) / apt install ffmpeg (Linux).");
                         _ffmpegMissingLogged = true;
                     }
                     else if (_resolvedFfmpegPath != null)
@@ -79,26 +79,11 @@ namespace Sma5h.Mods.Music.Services
 
         private string ResolveFfmpeg()
         {
-            var configured = _config.CurrentValue.Sma5hMusic?.LufsNormalization?.FfmpegPath;
-            if (!string.IsNullOrEmpty(configured) && File.Exists(configured))
-                return Path.GetFullPath(configured);
-
-            var pathEnv = Environment.GetEnvironmentVariable("PATH");
-            if (string.IsNullOrEmpty(pathEnv)) return null;
-
-            var exeName = OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg";
-            foreach (var dir in pathEnv.Split(Path.PathSeparator))
-            {
-                if (string.IsNullOrWhiteSpace(dir)) continue;
-                try
-                {
-                    var candidate = Path.Combine(dir, exeName);
-                    if (File.Exists(candidate))
-                        return candidate;
-                }
-                catch { /* malformed PATH entry — skip */ }
-            }
-            return null;
+            // ffmpeg must be on the system PATH. Install via:
+            //   choco install ffmpeg   (Windows)
+            //   brew install ffmpeg    (macOS)
+            //   apt install ffmpeg     (Debian/Ubuntu)
+            return ToolPathResolver.Resolve(null, null, "ffmpeg");
         }
 
         public LufsMeasurement Measure(string audioFilePath)

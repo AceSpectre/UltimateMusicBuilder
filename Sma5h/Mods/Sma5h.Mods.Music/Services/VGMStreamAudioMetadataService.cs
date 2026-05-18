@@ -1,4 +1,8 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Newtonsoft.Json.Linq;
+using Sma5h.Helpers;
+using Sma5h.Interfaces;
 using Sma5h.Mods.Music.Interfaces;
 using Sma5h.Mods.Music.Models;
 using System;
@@ -6,63 +10,129 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using VGAudio.Cli;
-using VGMMusic;
 
 namespace Sma5h.Mods.Music.Services
 {
     public class VGMStreamAudioMetadataService : IAudioMetadataService
     {
-        private readonly ILogger _logger;
-        private readonly IVGMMusicPlayer _vgmMusicPlayer;
+        // Cross-platform: shells out to the official `vgmstream-cli` binary
+        // (https://github.com/vgmstream/vgmstream/releases) and parses its JSON
+        // metadata output (-I flag). Previously this called into libvgmstream
+        // via P/Invoke through VGMMusicPlayer, which required a chain of native
+        // Windows DLLs and had no equivalent prebuilt on Linux/macOS.
 
-        public VGMStreamAudioMetadataService(ILogger<IAudioMetadataService> logger, IVGMMusicPlayer vgmMusicPlayer)
+        private const string VgmStreamCliRelative = "vgmstream-cli/vgmstream-cli";
+
+        private readonly ILogger _logger;
+        private readonly IProcessService _processService;
+        private readonly IOptionsMonitor<Sma5hOptions> _config;
+
+        public VGMStreamAudioMetadataService(IOptionsMonitor<Sma5hOptions> config, IProcessService processService, ILogger<IAudioMetadataService> logger)
         {
+            _config = config;
+            _processService = processService;
             _logger = logger;
-            _vgmMusicPlayer = vgmMusicPlayer;
         }
 
-        public async Task<AudioCuePoints> GetCuePoints(string inputFile)
+        public Task<AudioCuePoints> GetCuePoints(string inputFile)
         {
             _logger.LogDebug("Retrieving audio metadata for {FilePath}...", inputFile);
 
-            VGMAudioCuePoints audioCuePoints = null;
+            var cuePoints = ReadCuePointsViaCli(inputFile);
+
+            _logger.LogDebug("VGMStream metadata for {FilePath}: TotalSamples: {TotalSamples}, LoopStartSample: {LoopStartSample}, LoopEndSample: {LoopEndSample}, LoopStartMs: {LoopStartMs}, LoopEndMs: {LoopEndMs}",
+                inputFile, cuePoints.TotalSamples, cuePoints.LoopStartSample, cuePoints.LoopEndSample, cuePoints.LoopStartMs, cuePoints.LoopEndMs);
+
+            if (cuePoints.TotalSamples == 0 || cuePoints.LoopEndSample == 0)
+            {
+                _logger.LogWarning("VGMStream metadata for {FilePath}: total samples and/or loop end sample was 0. Use song_cue_points_override in the payload to override these values.", inputFile);
+            }
+
+            return Task.FromResult(cuePoints);
+        }
+
+        private AudioCuePoints ReadCuePointsViaCli(string inputFile)
+        {
+            var empty = new AudioCuePoints();
+
+            var vgmstreamCli = ToolPathResolver.Resolve(_config.CurrentValue.ToolsPath, VgmStreamCliRelative, "vgmstream-cli");
+            if (vgmstreamCli == null)
+            {
+                _logger.LogWarning("vgmstream-cli not found under Tools/{Rel} or on PATH. Cue points will be zero for {File}; use song_cue_points_override to set them manually, or run scripts/fetch-tools to install vgmstream-cli.",
+                    VgmStreamCliRelative, inputFile);
+                return empty;
+            }
+
+            var stdout = new StringBuilder();
+            var stderr = new StringBuilder();
+
             try
             {
-                audioCuePoints = await _vgmMusicPlayer.GetAudioCuePoints(inputFile);
+                _processService.RunProcess(
+                    vgmstreamCli,
+                    $"-m -I \"{inputFile}\"",
+                    standardRedirect: (_, data) => { if (data?.Data != null) stdout.AppendLine(data.Data); },
+                    errorRedirect: (_, data) => { if (data?.Data != null) stderr.AppendLine(data.Data); });
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                _logger.LogError(e.Message);
-            }
-
-            _logger.LogDebug("VGMAudio Metadata for {FilePath}: TotalSamples: {TotalSamples}, LoopStartSample: {LoopStartSample}, LoopEndSample: {LoopEndSample}, LoopStartMs: {LoopStartMs}, LoopEndMs: {LoopEndMs}",
-                inputFile, audioCuePoints.TotalSamples, audioCuePoints.LoopStartSample, audioCuePoints.LoopEndSample, audioCuePoints.LoopStartMs, audioCuePoints.LoopEndMs);
-
-            if (audioCuePoints.TotalSamples == 0 || audioCuePoints.LoopEndSample == 0)
-            {
-                _logger.LogWarning("VGMAudio Metadata for {FilePath}: Total Samples, Frequency or/and loop end sample was 0! Check the logs for more information. Use song_cue_points_override property in the payload to override these values.", inputFile);
+                _logger.LogWarning(ex, "vgmstream-cli invocation failed for {File}.", inputFile);
+                return empty;
             }
 
-            if (audioCuePoints.TotalSamples < 0 || audioCuePoints.LoopStartSample < 0 || audioCuePoints.LoopEndSample < 0
-                || audioCuePoints.TotalTimeMs < 0 || audioCuePoints.LoopStartMs < 0)
+            var raw = stdout.ToString();
+            var jsonStart = raw.IndexOf('{');
+            var jsonEnd = raw.LastIndexOf('}');
+            if (jsonStart < 0 || jsonEnd <= jsonStart)
             {
-                _logger.LogWarning("VGMAudio Metadata for {FilePath}: Some cue values are negative. This is shouldn't happen.", inputFile);
+                _logger.LogWarning("vgmstream-cli produced no JSON for {File}. stderr: {Stderr}", inputFile, stderr.ToString().Trim());
+                return empty;
             }
 
-            return new AudioCuePoints()
+            JObject root;
+            try
             {
-                TotalSamples = (uint)audioCuePoints.TotalSamples,
-                LoopStartSample = (uint)audioCuePoints.LoopStartSample,
-                LoopEndSample = (uint)audioCuePoints.LoopEndSample,
-                TotalTimeMs = (uint)audioCuePoints.TotalTimeMs,
-                LoopStartMs = (uint)audioCuePoints.LoopStartMs,
-                LoopEndMs = (uint)audioCuePoints.LoopEndMs
+                root = JObject.Parse(raw.Substring(jsonStart, jsonEnd - jsonStart + 1));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse vgmstream-cli JSON for {File}. Raw output:\n{Raw}", inputFile, raw);
+                return empty;
+            }
+
+            var sampleRate = (int?)root["sampleRate"] ?? 0;
+            var totalSamples = (long?)root["numberOfSamples"] ?? 0;
+            long loopStart = 0;
+            long loopEnd = 0;
+
+            var loopingInfo = root["loopingInfo"];
+            if (loopingInfo != null && loopingInfo.Type == JTokenType.Object)
+            {
+                loopStart = (long?)loopingInfo["start"] ?? 0;
+                loopEnd = (long?)loopingInfo["end"] ?? 0;
+            }
+
+            if (sampleRate <= 0 || totalSamples <= 0)
+            {
+                _logger.LogWarning("vgmstream-cli returned invalid sampleRate ({Rate}) or numberOfSamples ({Samples}) for {File}.",
+                    sampleRate, totalSamples, inputFile);
+                return empty;
+            }
+
+            return new AudioCuePoints
+            {
+                TotalSamples = (uint)totalSamples,
+                LoopStartSample = (uint)loopStart,
+                LoopEndSample = (uint)loopEnd,
+                TotalTimeMs = (uint)(totalSamples * 1000 / sampleRate),
+                LoopStartMs = (uint)(loopStart * 1000 / sampleRate),
+                LoopEndMs = (uint)(loopEnd * 1000 / sampleRate)
             };
         }
 
         public bool ConvertAudio(string inputMediaFile, string outputMediaFile)
         {
-            _logger.LogDebug("Convert BRSTM from {AudioMediaFile} to {AudioOutputFile}", inputMediaFile, outputMediaFile);
+            _logger.LogDebug("Convert from {AudioMediaFile} to {AudioOutputFile}", inputMediaFile, outputMediaFile);
 
             if (!File.Exists(inputMediaFile))
             {
@@ -104,48 +174,6 @@ namespace Sma5h.Mods.Music.Services
                 return false;
             }
             return true;
-        }
-
-        private ulong ReadValueUInt64Safe(string searchString, string parsingStartIndex, string parsingEndIndex = " ")
-        {
-            var output = searchString.Split(parsingStartIndex);
-            if (output.Length > 1)
-            {
-                var foundValue = output[1].Split(parsingEndIndex)[0];
-                if (ulong.TryParse(foundValue, out ulong result))
-                {
-                    return result;
-                }
-            }
-            return 0;
-        }
-
-        private uint ReadValueUInt32Safe(string searchString, string parsingStartIndex, string parsingEndIndex = " ")
-        {
-            var output = searchString.Split(parsingStartIndex);
-            if (output.Length > 1)
-            {
-                var foundValue = output[1].Split(parsingEndIndex)[0];
-                if (uint.TryParse(foundValue, out uint result))
-                {
-                    return result;
-                }
-            }
-            return 0;
-        }
-
-        private ushort ReadValueUInt16Safe(string searchString, string parsingStartIndex, string parsingEndIndex = " ")
-        {
-            var output = searchString.Split(parsingStartIndex);
-            if (output.Length > 1)
-            {
-                var foundValue = output[1].Split(parsingEndIndex)[0];
-                if (ushort.TryParse(foundValue, out ushort result))
-                {
-                    return result;
-                }
-            }
-            return 0;
         }
     }
 }

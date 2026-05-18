@@ -25,7 +25,7 @@ namespace Sma5h.Mods.Music.Helpers
 
         public class Resources
         {
-            public const string NUS3AUDIO_EXE_FILE = "Nus3Audio/nus3audio.exe";
+            public const string NUS3AUDIO_EXE_FILE = "Nus3Audio/nus3audio";
             public const string NUS3BANK_TEMPLATE_FILE = "template.nus3bank";
             public const string NUS3BANK_IDS_FILE = "nusbank_ids.csv";
             public const string NUS3AUDIO_TEMP_FILE = "temp.{0}";

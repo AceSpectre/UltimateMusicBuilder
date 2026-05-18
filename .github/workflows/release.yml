@@ -1,0 +1,152 @@
+name: Release
+
+# Builds self-contained UMB archives for Windows x64, Linux x64, and macOS arm64.
+# Triggered by:
+#   - pushing a tag matching v* (creates a GitHub Release with the archives attached)
+#   - workflow_dispatch (manual run from the Actions tab; uploads artifacts only)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write  # needed to create/update GitHub Releases when tagged
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            archive_ext: zip
+          - os: ubuntu-latest
+            rid: linux-x64
+            archive_ext: tar.gz
+          - os: macos-14
+            rid: osx-arm64
+            archive_ext: tar.gz
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.rid }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache cargo registry & build artifacts (Unix)
+        if: runner.os != 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo-install-target
+          key: cargo-${{ matrix.rid }}-bgm-property-v1.2
+
+      - name: Fetch tools (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/fetch-tools.ps1
+
+      - name: Fetch tools (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x scripts/fetch-tools.sh
+          ./scripts/fetch-tools.sh
+
+      - name: Publish (self-contained, single-file)
+        # PublishSingleFile bundles managed DLLs into the host exe to keep the
+        # archive root clean (just the exe + Tools/ + Resources/ + appsettings.json,
+        # plus 3 Avalonia/Skia native DLLs that can't be self-extracted without
+        # breaking our Tools/ Content includes).
+        run: >
+          dotnet publish UMB.CLI
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained
+          -p:PublishSingleFile=true
+          -p:DebugType=embedded
+          -o publish
+
+      - name: Strip leftover .pdb files
+        shell: bash
+        run: rm -f publish/*.pdb
+
+      - name: Write RELEASE_README.txt
+        shell: bash
+        run: |
+          cat > publish/RELEASE_README.txt <<EOF
+          UltimateMusicBuilder ${GITHUB_REF_NAME:-dev} for ${{ matrix.rid }}
+
+          To run:
+            Windows:   UMB.CLI.exe
+            macOS:     ./UMB.CLI
+            Linux:     ./UMB.CLI
+
+          System prerequisites (not bundled — install once):
+
+            ffmpeg (required for LUFS normalization and loop-preview playback):
+              Windows:  choco install ffmpeg
+                        (or:  winget install --id=Gyan.FFmpeg -e)
+              macOS:    brew install ffmpeg
+              Linux:    sudo apt install ffmpeg
+                        (or: sudo dnf install ffmpeg / sudo pacman -S ffmpeg)
+
+            pymusiclooper (only needed for the "Convert Nus3" loop-detection flow):
+              All:      pipx install pymusiclooper
+
+          macOS Gatekeeper:
+            After unzipping on macOS, you may need to clear the quarantine
+            attribute before the binary will run:
+              xattr -dr com.apple.quarantine .
+
+          Repo:    https://github.com/${GITHUB_REPOSITORY:-anthropic/UltimateMusicBuilder}
+          EOF
+
+      - name: Mark binaries executable (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          # Self-contained host binary
+          chmod +x publish/UMB.CLI 2>/dev/null || true
+          # Native tool binaries dropped into Tools/<tool>/ by fetch-tools.sh
+          find publish/Tools -type f \( \
+            -name 'nus3audio' -o -name 'nus3audio_mac' \
+            -o -name 'ultimate_tex_cli' \
+            -o -name 'bgm-property' \
+            -o -name 'vgmstream-cli' \
+          \) -exec chmod +x {} +
+
+      - name: Archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $name = "UltimateMusicBuilder-${{ matrix.rid }}.zip"
+          Compress-Archive -Path publish\* -DestinationPath $name -Force
+          Write-Host "Created $name ($((Get-Item $name).Length / 1MB | ForEach-Object { '{0:N1}' -f $_ }) MB)"
+
+      - name: Archive (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          name="UltimateMusicBuilder-${{ matrix.rid }}.tar.gz"
+          tar -czf "$name" -C publish .
+          echo "Created $name ($(du -h "$name" | cut -f1))"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UltimateMusicBuilder-${{ matrix.rid }}
+          path: UltimateMusicBuilder-${{ matrix.rid }}.${{ matrix.archive_ext }}
+          if-no-files-found: error
+
+      - name: Upload to GitHub Release (tagged builds only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: UltimateMusicBuilder-${{ matrix.rid }}.${{ matrix.archive_ext }}
+          generate_release_notes: true

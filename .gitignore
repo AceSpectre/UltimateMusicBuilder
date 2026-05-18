@@ -350,6 +350,7 @@ MigrationBackup/
 .ionide/
 
 Temp/
+Cache/
 *.msbt
 *.bin
 *.prc
@@ -360,6 +361,7 @@ Temp/
 *.lopus
 
 Resources/Game/*
+!Resources/Game/README.txt
 
 *.nus3bank
 *.nus3audio
@@ -367,3 +369,4 @@ Mods/*
 .claude
 ArcOutput/*
 stages_dump.csv
+*.csproj.lscache

@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Sma5h.Helpers;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
@@ -251,10 +252,10 @@ namespace Sma5h.Mods.Music
 
         private void ConvertSeriesIcons()
         {
-            var ultimateTexCli = Path.Combine(_config.CurrentValue.ToolsPath, "Windows", "ultimate_tex_cli.exe");
-            if (!File.Exists(ultimateTexCli))
+            var ultimateTexCli = ToolPathResolver.Resolve(_config.CurrentValue.ToolsPath, "UltimateTexCli/ultimate_tex_cli");
+            if (ultimateTexCli == null)
             {
-                _logger.LogWarning("ultimate_tex_cli.exe not found at {Path}. Skipping series icon conversion.", ultimateTexCli);
+                _logger.LogWarning("ultimate_tex_cli binary not found under Tools/UltimateTexCli. Skipping series icon conversion.");
                 return;
             }
 
