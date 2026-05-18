@@ -52,48 +52,62 @@ namespace UMB.CLI
 
         private static async Task RunAction(string action, Script entry)
         {
-            switch (action)
+            try
             {
-                case "build":
-                    await entry.RunBuild();
-                    break;
-                case "scaffold":
-                    entry.RunScaffold();
-                    break;
-                case "convert":
-                    entry.RunConvert();
-                    break;
-                case "merge":
-                    entry.RunMerge();
-                    break;
-                case "extract-icons":
-                    entry.RunExtractIcons();
-                    break;
-                case "nus3-convert":
-                    entry.RunNus3Convert();
-                    break;
-                case "accept-nus3":
-                    entry.RunAcceptValidatedNus3();
-                    break;
-                case "cleanup":
-                    entry.RunCleanup();
-                    break;
-                case "order-series":
-                    entry.RunOrderSeries();
-                    break;
-                case "order-tracks":
-                    entry.RunOrderTracks();
-                    break;
-                case "config-volume":
-                    entry.RunConfigVolume();
-                    break;
-                case "dump-stages":
-                    entry.RunDumpStages();
-                    break;
-                default:
-                    Console.WriteLine($"Unknown command: {action}");
-                    Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|accept-nus3|cleanup|order-series|order-tracks|config-volume|dump-stages]");
-                    break;
+                switch (action)
+                {
+                    case "build":
+                        await entry.RunBuild();
+                        break;
+                    case "scaffold":
+                        entry.RunScaffold();
+                        break;
+                    case "convert":
+                        entry.RunConvert();
+                        break;
+                    case "merge":
+                        entry.RunMerge();
+                        break;
+                    case "extract-icons":
+                        entry.RunExtractIcons();
+                        break;
+                    case "nus3-convert":
+                        entry.RunNus3Convert();
+                        break;
+                    case "accept-nus3":
+                        entry.RunAcceptValidatedNus3();
+                        break;
+                    case "cleanup":
+                        entry.RunCleanup();
+                        break;
+                    case "order-series":
+                        entry.RunOrderSeries();
+                        break;
+                    case "order-tracks":
+                        entry.RunOrderTracks();
+                        break;
+                    case "config-volume":
+                        entry.RunConfigVolume();
+                        break;
+                    case "dump-stages":
+                        entry.RunDumpStages();
+                        break;
+                    default:
+                        Console.WriteLine($"Unknown command: {action}");
+                        Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|accept-nus3|cleanup|order-series|order-tracks|config-volume|dump-stages]");
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Write the full stack trace to the rolling log file so the cause is recoverable,
+                // and print a concise, color-coded message to the console so the user sees
+                // exactly what's missing without scrolling past a wall of stack frames.
+                entry.Logger.LogError(ex, "'{Action}' failed.", action);
+                AnsiConsole.WriteLine();
+                AnsiConsole.MarkupLine($"[red]✗ '{action}' failed:[/] {ex.Message.EscapeMarkup()}");
+                AnsiConsole.MarkupLine("[dim]Full stack trace written to Log/log_*.txt[/]");
+                AnsiConsole.WriteLine();
             }
         }
 

@@ -8,22 +8,19 @@ UMB is a fork of [Sma5hMusic](https://github.com/Deinonychus71/Sma5hMusic) for a
 
 ---
 
-## Dependencies
+## Dependencies and Setup
 
-1. **FFmpeg.** - UMB uses it for LUFS-based loudness normalization at build time and audio playback in the Config Volume preview window. Install ffmpeg system-wide and update `appsettings.json → Sma5hMusic.LufsNormalization.FfmpegPath` to point at the local install OR drop a build into `Tools/FFmpeg/ffmpeg.exe` (the path UMB checks first via ).
-2. **Windows-only, today.** Every helper in `Tools/` is a Windows `.exe` or DLL: `nus3audio.exe`, `bgm-property.exe`, `VGAudioCli.exe`, `vgmstream` DLLs, `ultimate_tex_cli.exe`, `paracobNET.dll`. UMB itself is .NET 8 cross-platform code, so in principle a Linux/macOS port is straightforward - swap each binary for one compiled for that platform.
+1. **FFmpeg** - For LUFS volume normalisation, use `appsettings.json → Sma5hMusic.LufsNormalization.FfmpegPath` to point to local install
+   - Just install via commandline `winget/choco/apt-install/pacman/brew` for easiest setup
+2. **pymusiclooper** - For detecting loop points during standard audio -> `nus3audio` conversion
+   - Global install via `pip`
+3. A partial dump of Smash Ultimate assets from `data.arc` (identical to Sma5h) in `Resources/Game`
+   - [Video guide to dump](https://youtu.be/CXe_Su-Yo2c?si=8iFYrD_xxfrzwhog)
+   - [Guide to setup resources](https://github.com/Deinonychus71/Sma5hMusic/wiki/Setup) 
 
----
+Download the release for your OS from releases, note that the Linux/MacOS builds haven't been as extensively tested as the Windows build. 
 
-## Build & Run
-
-```bash
-cd UMB.CLI
-dotnet build
-dotnet run
-```
-
-Configuration lives in `UMB.CLI/bin/Debug/net8.0/appsettings.json`. Mods to build live in `Mods/MusicMods/`. Output goes to `ArcOutput/`, which UMB fully clears at the start of every build (after a Y/N confirmation, unless `SkipOutputPathCleanupConfirmation = true`).
+Mods live in `Mods/MusicMods` and the built mod is output into `ArcOutput`
 
 ---
 
@@ -141,13 +138,23 @@ After acceptance, the series folder is ready for `Build`.
 
 ---
 
-## Existing series fix (2026-03-25)
+## Build & Run for developers
 
-Adding songs to existing series (Final Fantasy, Persona, etc.) required two fixes:
+```bash
+cd UMB.CLI
+dotnet build
+dotnet run
+```
 
-1. **`GameTitleEntry` creation** (`FolderMusicMod.cs`) - previously skipped when `existing-series = true`. Custom sub-games still need entries so the game-title → series lookup resolves; UMB now always creates them and `AudioStateService.AddGameTitleEntry()` dedupes against vanilla.
-2. **Stage playlist assignment** (`Sma5hMusic.cs`) - `AddModSongsToAllPlaylists()` only added mod songs to `bgmsmashbtl` (Battlefield). It now maps each song's game-title → series → stage `BgmSetId` so songs land on the correct series playlists.
-3. **Playlist merging** (`AudioStateService.cs`) - `AddPlaylistEntry()` silently dropped tracks when a playlist id already existed. It now merges new tracks into the existing playlist.
+---
+
+## Compiling release builds
+
+Use the following command:
+
+```bash
+dotnet publish UMB.CLI -c Release -r win-x64 --self-contained -p:PublishSingleFile=true -p:DebugType=embedded
+```
 
 ---
 

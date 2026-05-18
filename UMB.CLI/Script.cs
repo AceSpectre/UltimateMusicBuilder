@@ -27,12 +27,17 @@ namespace UMB.CLI
         private readonly TrackOrderService _orderTracks;
         private readonly VolumeConfigService _volumeConfig;
         private readonly DumpStagesService _dumpStages;
+        private readonly ILogger<Script> _logger;
+
+        // Exposed so Program.RunAction can log unhandled exceptions to the same
+        // log file the build pipeline writes to.
+        public ILogger Logger => _logger;
 
         public Script(BuildService build, ScaffoldService scaffold, ConvertService convert,
             MergeService merge, ExtractIconsService extractIcons, Nus3ConvertService nus3Convert,
             AcceptNus3Service acceptNus3, CleanupService cleanup, SeriesOrderService orderSeries,
             TrackOrderService orderTracks, VolumeConfigService volumeConfig,
-            DumpStagesService dumpStages)
+            DumpStagesService dumpStages, ILogger<Script> logger)
         {
             _build = build;
             _scaffold = scaffold;
@@ -46,6 +51,7 @@ namespace UMB.CLI
             _orderTracks = orderTracks;
             _volumeConfig = volumeConfig;
             _dumpStages = dumpStages;
+            _logger = logger;
         }
 
         public async Task RunBuild() => await _build.Run();
