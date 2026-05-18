@@ -16,6 +16,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Tomlyn;
+using Tomlyn.Model;
 
 namespace UMB.CLI.Services
 {
@@ -57,6 +58,7 @@ namespace UMB.CLI.Services
             int totalScaffolded = 0;
             int totalAdded = 0;
             int totalDefaultsAdded = 0;
+            int totalSeriesOrderAdded = 0;
 
             foreach (var modDir in modDirs)
             {
@@ -177,6 +179,9 @@ namespace UMB.CLI.Services
                     _logger.LogInformation("Added {Count} track(s) to {Path}", newFiles.Count, csvPath);
                     totalAdded += newFiles.Count;
                 }
+
+                // ── Step 4: Append any new custom series to series-order.toml ──
+                totalSeriesOrderAdded += SyncSeriesOrderToml(modDir);
             }
 
             if (totalScaffolded > 0)
@@ -185,8 +190,93 @@ namespace UMB.CLI.Services
                 _logger.LogInformation("Added [default-track-data] to {Count} series.toml file(s).", totalDefaultsAdded);
             if (totalAdded > 0)
                 _logger.LogInformation("Populated {Count} new track(s) total.", totalAdded);
-            if (totalScaffolded == 0 && totalAdded == 0 && totalDefaultsAdded == 0)
+            if (totalSeriesOrderAdded > 0)
+                _logger.LogInformation("Appended {Count} custom series to series-order.toml file(s).", totalSeriesOrderAdded);
+            if (totalScaffolded == 0 && totalAdded == 0 && totalDefaultsAdded == 0 && totalSeriesOrderAdded == 0)
                 _logger.LogInformation("All series folders are up to date.");
+        }
+
+        /// <summary>
+        /// Scans the mod's series folders for custom (non-existing, non-etc) series and appends any
+        /// not already present in series-order.toml to the end of the order. Existing entries keep
+        /// their relative position. Returns the number of newly appended IDs.
+        /// </summary>
+        private int SyncSeriesOrderToml(string modDir)
+        {
+            var customSeriesIds = new List<string>();
+            foreach (var seriesDir in Directory.GetDirectories(modDir))
+            {
+                if (Path.GetFileName(seriesDir).StartsWith("."))
+                    continue;
+
+                var tomlPath = Path.Combine(seriesDir,
+                    MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
+                if (!File.Exists(tomlPath))
+                    continue;
+
+                FolderSeriesFileConfig config;
+                try
+                {
+                    var tomlText = File.ReadAllText(tomlPath);
+                    config = Toml.ToModel<FolderSeriesFileConfig>(tomlText,
+                        options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (config.Series == null) continue;
+                if (config.Series.ExistingSeries) continue;
+                if (string.IsNullOrWhiteSpace(config.Series.Id)) continue;
+                if (string.Equals(config.Series.Id, "etc", StringComparison.OrdinalIgnoreCase)) continue;
+
+                customSeriesIds.Add(config.Series.Id);
+            }
+
+            var orderPath = Path.Combine(modDir,
+                MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE);
+
+            var existingOrder = new List<string>();
+            if (File.Exists(orderPath))
+            {
+                try
+                {
+                    var toml = File.ReadAllText(orderPath);
+                    var model = Toml.ToModel(toml);
+                    if (model.TryGetValue("order", out var val) && val is TomlArray arr)
+                        existingOrder = arr.OfType<string>().ToList();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse {Path}, will rewrite.", orderPath);
+                }
+            }
+
+            var existingSet = new HashSet<string>(existingOrder, StringComparer.OrdinalIgnoreCase);
+            var newEntries = customSeriesIds
+                .Where(id => !existingSet.Contains(id))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (newEntries.Count == 0)
+                return 0;
+
+            var finalOrder = existingOrder.Concat(newEntries).ToList();
+
+            var sb = new StringBuilder();
+            sb.AppendLine("# Custom series display order");
+            sb.AppendLine("# Listed series appear after official series, before \"Other\"");
+            sb.AppendLine("# Unlisted custom series will be placed after these");
+            sb.AppendLine("order = [");
+            foreach (var id in finalOrder)
+                sb.AppendLine($"    \"{id}\",");
+            sb.AppendLine("]");
+            File.WriteAllText(orderPath, sb.ToString());
+
+            _logger.LogInformation("Appended {Count} series to {Path}: {Names}",
+                newEntries.Count, orderPath, string.Join(", ", newEntries));
+            return newEntries.Count;
         }
 
         // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ series.toml generation ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬

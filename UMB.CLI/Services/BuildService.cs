@@ -241,6 +241,27 @@ namespace UMB.CLI.Services
 
                 var modName = Path.GetFileName(modDir);
 
+                // Load this mod's series-order.toml so we can warn about custom series
+                // that have no explicit position (their in-game order is otherwise unpredictable).
+                var modOrderedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var modOrderPath = Path.Combine(modDir,
+                    MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE);
+                if (File.Exists(modOrderPath))
+                {
+                    try
+                    {
+                        var orderTomlText = File.ReadAllText(modOrderPath);
+                        var orderModel = Toml.ToModel(orderTomlText);
+                        if (orderModel.TryGetValue("order", out var orderVal) && orderVal is TomlArray arr)
+                            foreach (var id in arr.OfType<string>())
+                                modOrderedIds.Add(id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to parse {Path} for validation.", modOrderPath);
+                    }
+                }
+
                 foreach (var seriesDir in seriesDirs)
                 {
                     var seriesName = Path.GetFileName(seriesDir);
@@ -254,12 +275,13 @@ namespace UMB.CLI.Services
                     // Parse series.toml to get valid game IDs and playlist song refs
                     var validGameIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     var playlistSongRefs = new List<(string playlistId, string songRef)>();
+                    FolderSeriesFileConfig seriesConfig = null;
                     if (File.Exists(tomlPath))
                     {
                         try
                         {
                             var tomlText = File.ReadAllText(tomlPath);
-                            var seriesConfig = Toml.ToModel<FolderSeriesFileConfig>(tomlText,
+                            seriesConfig = Toml.ToModel<FolderSeriesFileConfig>(tomlText,
                                 options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
                             foreach (var game in seriesConfig.Games ?? new List<FolderGameConfig>())
                             {
@@ -278,6 +300,16 @@ namespace UMB.CLI.Services
                         {
                             _logger.LogWarning(ex, "Failed to parse {Path} for validation.", tomlPath);
                         }
+                    }
+
+                    // Check: custom series should be listed in series-order.toml
+                    if (seriesConfig?.Series != null
+                        && !seriesConfig.Series.ExistingSeries
+                        && !string.IsNullOrWhiteSpace(seriesConfig.Series.Id)
+                        && !string.Equals(seriesConfig.Series.Id, "etc", StringComparison.OrdinalIgnoreCase)
+                        && !modOrderedIds.Contains(seriesConfig.Series.Id))
+                    {
+                        warnings.Add($"  {prefix}: custom series \"{seriesConfig.Series.Id}\" is not listed in series-order.toml. Its in-game position will be unpredictable. Run 'Scaffold' to append it, or use 'Order Series' to place it manually.");
                     }
 
                     // Read tracks.csv with all columns (including order)
