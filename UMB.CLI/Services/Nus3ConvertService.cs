@@ -275,8 +275,9 @@ namespace UMB.CLI.Services
                     _logger.LogInformation("  ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ {OutputPath}", outputNus3);
                     converted++;
 
-                    // Generate loop preview clip if a loop was selected (skipped in auto mode)
-                    if (!isFullSongLoop && !autoMode)
+                    // Generate loop preview clip if a loop was selected.
+                    // Always emit in both modes so users can review the whole batch after auto-convert.
+                    if (!isFullSongLoop)
                     {
                         var loopsDir = Path.Combine(validateDir, "loops");
                         Directory.CreateDirectory(loopsDir);
