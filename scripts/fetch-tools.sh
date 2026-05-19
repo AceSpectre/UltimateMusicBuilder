@@ -22,6 +22,7 @@ ULTIMATE_TEX_TAG="0.3.1"
 VGMSTREAM_TAG="r2083"
 BGM_PROPERTY_REPO="https://github.com/jam1garner/smash-bgm-property"
 BGM_PROPERTY_BIN="bgm_property_yaml"   # upstream binary name; we rename to bgm-property
+BGM_PROPERTY_TAG="v1.2.0"              # pin to match Windows release binary; master has incompatible CLI
 
 # ─── Options ────────────────────────────────────────────────────────────────
 FORCE=0
@@ -187,7 +188,7 @@ EOF
     fi
 
     # cargo install drops binaries in --root/bin; we point that at our dir and rename.
-    cargo install --git "$BGM_PROPERTY_REPO" --bin "$BGM_PROPERTY_BIN" --root "$dir" --quiet
+    cargo install --git "$BGM_PROPERTY_REPO" --tag "$BGM_PROPERTY_TAG" --bin "$BGM_PROPERTY_BIN" --root "$dir" --quiet
     local built="$dir/bin/$BGM_PROPERTY_BIN"
     if [[ ! -f "$built" ]]; then
         echo "   ! cargo install did not produce $built"
