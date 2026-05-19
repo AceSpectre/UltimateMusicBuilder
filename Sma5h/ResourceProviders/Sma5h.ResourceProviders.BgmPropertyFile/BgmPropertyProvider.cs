@@ -8,7 +8,6 @@ using Sma5h.Mods.Data.Sound.Config.BgmPropertyStructs;
 using Sma5h.ResourceProviders.BgmPropertyFile.Helpers;
 using Sma5h.ResourceProviders.Constants;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -53,14 +52,15 @@ namespace Sma5h.ResourceProviders
             //Retrieve YML from Bgm Property
             try
             {
-                _processService.RunProcess(_bgmPropertyExeFile, $"-l \"{_bgmPropertyHashFile}\" \"{inputFile}\" \"{tempFile}\"");
+                _processService.RunProcess(_bgmPropertyExeFile, $"\"{inputFile}\" \"{tempFile}\" \"{_bgmPropertyHashFile}\"");
             }
             catch (Exception e)
             {
                 throw new Exception("Error while generating bgm_property.yml file.", e);
             }
 
-            var output = _ymlHelper.ReadYmlFile<List<BgmPropertyEntry>>(tempFile);
+            var wrapper = _ymlHelper.ReadYmlFile<BgmPropertyFileYaml>(tempFile);
+            var output = wrapper.Entries;
 
             if (output.Count == 0)
             {
@@ -90,8 +90,9 @@ namespace Sma5h.ResourceProviders
             Directory.CreateDirectory(_config.CurrentValue.TempPath);
             var tempFile = Path.Combine(_config.CurrentValue.TempPath, BgmPropertyFileConstants.BGM_PROPERTY_TEMP_FILE);
 
-            //Serialize
-            _ymlHelper.WriteYmlFile(tempFile, ((BinBgmProperty)(object)inputObj).Entries.Values);
+            //Serialize (v1.2.0 expects { entries: [...] })
+            var wrapper = new BgmPropertyFileYaml { Entries = ((BinBgmProperty)(object)inputObj).Entries.Values.ToList() };
+            _ymlHelper.WriteYmlFile(tempFile, wrapper);
 
             //Build Bgm Property
             try

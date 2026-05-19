@@ -13,7 +13,7 @@ namespace Sma5h.Mods.Data.Sound.Config
     {
         public class BgmPropertyEntry
         {
-            [YamlMember(Alias = "name_id")]
+            [YamlMember(Alias = "stream_name")]
             public string NameId { get; set; }
 
             [YamlMember(Alias = "loop_start_ms")]
@@ -28,16 +28,22 @@ namespace Sma5h.Mods.Data.Sound.Config
             [YamlMember(Alias = "loop_end_sample")]
             public ulong LoopEndSample { get; set; }
 
-            [YamlMember(Alias = "total_time_ms")]
+            [YamlMember(Alias = "duration_ms")]
             public ulong TotalTimeMs { get; set; }
 
-            [YamlMember(Alias = "total_samples")]
+            [YamlMember(Alias = "duration_sample")]
             public ulong TotalSamples { get; set; }
 
             public override string ToString()
             {
                 return NameId;
             }
+        }
+
+        public class BgmPropertyFileYaml
+        {
+            [YamlMember(Alias = "entries")]
+            public System.Collections.Generic.List<BgmPropertyEntry> Entries { get; set; } = new System.Collections.Generic.List<BgmPropertyEntry>();
         }
     }
 }
