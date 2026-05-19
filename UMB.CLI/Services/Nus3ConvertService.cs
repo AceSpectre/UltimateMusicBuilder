@@ -62,11 +62,15 @@ namespace UMB.CLI.Services
                 return;
             }
 
+            var autoMode = AnsiConsole.Confirm(
+                "Auto-convert without previewing/selecting loops? (uses highest-ranked loop above threshold, falls back to full-song loop)",
+                defaultValue: false);
+
             var loopScoreThreshold = (double)AnsiConsole.Prompt(
                 new TextPrompt<float>("Minimum loop score (only increase if subpar loops are being accepted):")
                     .DefaultValue(94.5f)) / 100.0;
 
-            var previewLength = (double)AnsiConsole.Prompt(
+            var previewLength = autoMode ? 5.0 : (double)AnsiConsole.Prompt(
                 new TextPrompt<float>("Loop preview length in seconds (total, split evenly before/after loop point):")
                     .DefaultValue(5f));
 
@@ -121,70 +125,15 @@ namespace UMB.CLI.Services
 
                 if (loopCandidates.Count > 0 && loopCandidates.Any(c => c.score >= loopScoreThreshold))
                 {
-                    // Build table display and interleaved select/preview choices
-                    var choices = new List<string>();
-                    for (int i = 0; i < loopCandidates.Count; i++)
+                    int selectedCandidateIndex;
+                    if (autoMode)
                     {
-                        var c = loopCandidates[i];
-                        var startTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopStart / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
-                        var endTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopEnd / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
-                        choices.Add($"#{i + 1}  {c.score:P1}  {startTime} ({c.loopStart})  {endTime} ({c.loopEnd})  {c.noteDistance:F4}  {c.loudnessDiff:F4} dB");
-                        choices.Add($"#{i + 1}  Preview loop");
+                        // Auto-pick the highest-ranked candidate above threshold (list is sorted by score desc)
+                        selectedCandidateIndex = loopCandidates.FindIndex(c => c.score >= loopScoreThreshold);
                     }
-                    choices.Add("Reject all (use full-song loop)");
-
-                    int selectedCandidateIndex = -1;
-                    while (selectedCandidateIndex < 0)
+                    else
                     {
-                        // Render the table
-                        var table = new Table()
-                            .Border(TableBorder.Rounded)
-                            .Title($"Loop candidates for [cyan]{Markup.Escape(basename)}[/]")
-                            .AddColumn("#")
-                            .AddColumn("Score")
-                            .AddColumn("Start")
-                            .AddColumn("End")
-                            .AddColumn("Note Dist")
-                            .AddColumn("Loudness Diff");
-                        for (int i = 0; i < loopCandidates.Count; i++)
-                        {
-                            var c = loopCandidates[i];
-                            var startTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopStart / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
-                            var endTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopEnd / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
-                            table.AddRow(
-                                (i + 1).ToString(),
-                                $"{c.score:P1}",
-                                $"{startTime} ({c.loopStart})",
-                                $"{endTime} ({c.loopEnd})",
-                                $"{c.noteDistance:F4}",
-                                $"{c.loudnessDiff:F4} dB");
-                        }
-                        AnsiConsole.Write(table);
-
-                        var selection = AnsiConsole.Prompt(
-                            new SelectionPrompt<string>()
-                                .WrapAround()
-                                .Title("Select a loop or preview:")
-                                .HighlightStyle(new Style(Color.Cyan1))
-                                .AddChoices(choices));
-
-                        if (selection.Contains("Preview loop"))
-                        {
-                            // Extract the candidate index from the choice prefix "#N"
-                            var previewIdx = int.Parse(selection.Substring(1, selection.IndexOf(' ') - 1)) - 1;
-                            var pc = loopCandidates[previewIdx];
-                            PlayLoopPreview(sourceFile, pc.loopStart, pc.loopEnd, previewLength / 2);
-                            // Loop back to show table and prompt again
-                        }
-                        else if (selection.StartsWith("#"))
-                        {
-                            selectedCandidateIndex = int.Parse(selection.Substring(1, selection.IndexOf(' ') - 1)) - 1;
-                        }
-                        else
-                        {
-                            // "Reject all"
-                            break;
-                        }
+                        selectedCandidateIndex = PromptForLoopCandidate(basename, loopCandidates, sourceSampleRate, sourceFile, previewLength);
                     }
 
                     if (selectedCandidateIndex >= 0)
@@ -213,7 +162,7 @@ namespace UMB.CLI.Services
                 }
                 else
                 {
-                    // No candidates above threshold ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â auto-reject
+                    // No candidates above threshold — auto-reject
                     loopStart = 0;
                     loopEnd = 0; // will be set from WAV after conversion
                     isFullSongLoop = true;
@@ -326,8 +275,8 @@ namespace UMB.CLI.Services
                     _logger.LogInformation("  ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ {OutputPath}", outputNus3);
                     converted++;
 
-                    // Generate loop preview clip if a loop was selected
-                    if (!isFullSongLoop)
+                    // Generate loop preview clip if a loop was selected (skipped in auto mode)
+                    if (!isFullSongLoop && !autoMode)
                     {
                         var loopsDir = Path.Combine(validateDir, "loops");
                         Directory.CreateDirectory(loopsDir);
@@ -356,6 +305,74 @@ namespace UMB.CLI.Services
             _logger.LogInformation("Output: {ValidateDir}", validateDir);
             _logger.LogInformation("Listen to the files in foobar2000 (with vgmstream) to verify loop points.");
             _logger.LogInformation("Delete any files you don't like, then run 'Accept Validated Nus3'.");
+        }
+
+        private int PromptForLoopCandidate(
+            string basename,
+            List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)> loopCandidates,
+            int sourceSampleRate,
+            string sourceFile,
+            double previewLength)
+        {
+            var choices = new List<string>();
+            for (int i = 0; i < loopCandidates.Count; i++)
+            {
+                var c = loopCandidates[i];
+                var startTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopStart / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
+                var endTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopEnd / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
+                choices.Add($"#{i + 1}  {c.score:P1}  {startTime} ({c.loopStart})  {endTime} ({c.loopEnd})  {c.noteDistance:F4}  {c.loudnessDiff:F4} dB");
+                choices.Add($"#{i + 1}  Preview loop");
+            }
+            choices.Add("Reject all (use full-song loop)");
+
+            while (true)
+            {
+                var table = new Table()
+                    .Border(TableBorder.Rounded)
+                    .Title($"Loop candidates for [cyan]{Markup.Escape(basename)}[/]")
+                    .AddColumn("#")
+                    .AddColumn("Score")
+                    .AddColumn("Start")
+                    .AddColumn("End")
+                    .AddColumn("Note Dist")
+                    .AddColumn("Loudness Diff");
+                for (int i = 0; i < loopCandidates.Count; i++)
+                {
+                    var c = loopCandidates[i];
+                    var startTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopStart / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
+                    var endTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopEnd / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
+                    table.AddRow(
+                        (i + 1).ToString(),
+                        $"{c.score:P1}",
+                        $"{startTime} ({c.loopStart})",
+                        $"{endTime} ({c.loopEnd})",
+                        $"{c.noteDistance:F4}",
+                        $"{c.loudnessDiff:F4} dB");
+                }
+                AnsiConsole.Write(table);
+
+                var selection = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .WrapAround()
+                        .Title("Select a loop or preview:")
+                        .HighlightStyle(new Style(Color.Cyan1))
+                        .AddChoices(choices));
+
+                if (selection.Contains("Preview loop"))
+                {
+                    var previewIdx = int.Parse(selection.Substring(1, selection.IndexOf(' ') - 1)) - 1;
+                    var pc = loopCandidates[previewIdx];
+                    PlayLoopPreview(sourceFile, pc.loopStart, pc.loopEnd, previewLength / 2);
+                }
+                else if (selection.StartsWith("#"))
+                {
+                    return int.Parse(selection.Substring(1, selection.IndexOf(' ') - 1)) - 1;
+                }
+                else
+                {
+                    return -1;
+                }
+            }
         }
 
         private List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)> RunPymusiclooper(string filePath)

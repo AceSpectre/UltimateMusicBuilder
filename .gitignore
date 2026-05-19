@@ -370,3 +370,4 @@ Mods/*
 ArcOutput/*
 stages_dump.csv
 *.csproj.lscache
+*.zip

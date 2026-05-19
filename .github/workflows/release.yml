@@ -78,10 +78,10 @@ jobs:
         shell: bash
         run: rm -f publish/*.pdb
 
-      - name: Write RELEASE_README.txt
+      - name: Write RELEASE_README.md
         shell: bash
         run: |
-          cat > publish/RELEASE_README.txt <<EOF
+          cat > publish/RELEASE_README.md <<EOF
           UltimateMusicBuilder ${GITHUB_REF_NAME:-dev} for ${{ matrix.rid }}
 
           To run:
