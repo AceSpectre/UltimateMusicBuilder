@@ -70,6 +70,7 @@ namespace UMB.CLI.Services
                 return;
             }
 
+            var globalMult = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
             var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization;
             var target = lufsOpts?.TargetLufs ?? -14.0f;
             var maxMult = lufsOpts?.MaxGainMultiplier ?? 4.0f;
@@ -100,6 +101,7 @@ namespace UMB.CLI.Services
                             Filename = filename,
                             SourcePath = sourcePath,
                             UserOverride = userOverride,
+                            GlobalVolumeMultiplier = globalMult,
                             TargetLufs = target,
                             MaxMultiplier = maxMult,
                         };

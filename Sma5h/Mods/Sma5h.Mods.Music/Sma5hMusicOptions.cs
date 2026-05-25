@@ -17,6 +17,7 @@ namespace Sma5h.Mods.Music
             public string DefaultLocale { get; set; }
             public string ModPath { get; set; }
             public string CachePath { get; set; }
+            public float GlobalVolumeMultiplier { get; set; } = 1.5f;
             public LufsNormalizationOptions LufsNormalization { get; set; } = new();
         }
 

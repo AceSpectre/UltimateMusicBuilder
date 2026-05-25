@@ -85,7 +85,7 @@ namespace UMB.CLI.Views
 
             if (string.IsNullOrEmpty(wavPath))
             {
-                vm.PlayButtonText = "âœ•";
+                vm.PlayButtonText = "✕";
                 return;
             }
 
@@ -98,24 +98,24 @@ namespace UMB.CLI.Views
                 _player.Init(_volumeProvider);
                 _player.Play();
                 _playingRow = vm;
-                vm.PlayButtonText = "â¸";
+                vm.PlayButtonText = "⏸";
             }
             catch (Exception)
             {
                 DisposePlayback();
                 _playingRow = null;
-                vm.PlayButtonText = "âœ•";
+                vm.PlayButtonText = "✕";
             }
         }
 
-        // Natural end-of-track. Only fires here â€” manual stops via StopAndReset()
+        // Natural end-of-track. Only fires here — manual stops via StopAndReset()
         // unsubscribe first so this can't run when we're switching tracks.
         private void OnPlaybackStopped(object sender, StoppedEventArgs e)
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 if (_playingRow != null)
-                    _playingRow.PlayButtonText = "â–¶";
+                    _playingRow.PlayButtonText = "▶";
                 DisposePlayback();
                 _playingRow = null;
             });
@@ -134,7 +134,7 @@ namespace UMB.CLI.Views
                 catch { /* fall through to dispose */ }
             }
             if (_playingRow != null)
-                _playingRow.PlayButtonText = "â–¶";
+                _playingRow.PlayButtonText = "▶";
             DisposePlayback();
             _playingRow = null;
         }
@@ -180,6 +180,7 @@ namespace UMB.CLI.Views
 
         public bool HasMeasurement { get; set; }
         public float MeasuredLufs { get; set; }
+        public float GlobalVolumeMultiplier { get; set; } = 1.5f;
         public float AutoGain { get; set; } = 1.0f;
         public bool WasClamped { get; set; }
 
@@ -198,26 +199,26 @@ namespace UMB.CLI.Views
             }
         }
 
-        // Avalonia's NumericUpDown binds to decimal? â€” bridge to/from float here.
+        // Avalonia's NumericUpDown binds to decimal? — bridge to/from float here.
         public decimal? UserOverrideDecimal
         {
             get => (decimal)_userOverride;
             set => UserOverride = value.HasValue ? (float)value.Value : 1.0f;
         }
 
-        public float EffectiveBankVolume => AutoGain * UserOverride;
+        public float EffectiveBankVolume => GlobalVolumeMultiplier * AutoGain * UserOverride;
 
         public string MeasuredDisplay => HasMeasurement
             ? MeasuredLufs.ToString("0.0", CultureInfo.InvariantCulture) + " LUFS"
-            : "â€”";
+            : "—";
 
         public string AutoGainDisplay => HasMeasurement
             ? AutoGain.ToString("0.00", CultureInfo.InvariantCulture) + "×"
-            : "â€”";
+            : "—";
 
         public string EffectiveDisplay => EffectiveBankVolume.ToString("0.00", CultureInfo.InvariantCulture) + "×";
 
-        private string _playButtonText = "â–¶";
+        private string _playButtonText = "▶";
         public string PlayButtonText
         {
             get => _playButtonText;

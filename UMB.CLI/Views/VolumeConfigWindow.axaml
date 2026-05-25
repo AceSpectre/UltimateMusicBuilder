@@ -8,7 +8,7 @@
 
     <DockPanel Margin="16">
         <TextBlock DockPanel.Dock="Top"
-                   Text="Per-track loudness preview. Auto-gain shows the multiplier LUFS normalization will apply to hit the target loudness. Override lets you nudge individual tracks up or down on top of that — the final bank volume is auto × override. Press ▶ to hear the track at the exact volume the built mod will produce; adjusting the override while playing updates loudness in real time."
+                   Text="Per-track loudness preview. Auto-gain shows the multiplier LUFS normalization will apply to hit the target loudness. Override lets you nudge individual tracks up or down on top of that — the final bank volume is global × auto × override. Press ▶ to hear the track at the exact volume the built mod will produce; adjusting the override while playing updates loudness in real time."
                    Margin="0,0,0,12"
                    TextWrapping="Wrap"
                    FontSize="13" />
