@@ -1,4 +1,4 @@
-﻿using CsvHelper;
+using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -170,14 +170,14 @@ namespace UMB.CLI.Services
                         var testDispOrder = dbRoot?["test_disp_order"]?.Value<int>() ?? 0;
                         var specialCategory = bgm["stream_set"]?["special_category"]?.ToString();
 
-                        // Resolve info1 to a filename (strip "info_" prefix ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ tone_id ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ find matching filename)
+                        // Resolve info1 to a filename (strip "info_" prefix → tone_id → find matching filename)
                         var info1Raw = bgm["stream_set"]?["info1"]?.ToString();
                         string info1Filename = null;
                         if (!string.IsNullOrEmpty(info1Raw))
                         {
                             var info1ToneId = info1Raw.StartsWith("info_") ? info1Raw.Substring(5) : info1Raw;
                             // Will resolve after all tracks are collected
-                            info1Filename = info1ToneId; // placeholder ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â resolved below
+                            info1Filename = info1ToneId; // placeholder — resolved below
                         }
 
                         trackRows.Add(new ConvertTrackRow
@@ -191,7 +191,8 @@ namespace UMB.CLI.Services
                             SpecialCategory = specialCategory,
                             Volume = volume,
                             OriginalOrder = testDispOrder,
-                            Info1 = info1Filename
+                            Info1 = info1Filename,
+                            InSoundtest = testDispOrder >= 0
                         });
 
                         // Copy audio file
@@ -236,7 +237,7 @@ namespace UMB.CLI.Services
                     }
                     else if (baseGameToneIds.Contains(t.Info1))
                     {
-                        // Reference to a base game song ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â store as info_ ID for direct use
+                        // Reference to a base game song — store as info_ ID for direct use
                         t.Info1 = "info_" + t.Info1;
                     }
                     else
@@ -280,7 +281,7 @@ namespace UMB.CLI.Services
             }
 
             _logger.LogInformation("--------------------");
-            _logger.LogInformation("Conversion complete: {SeriesCount} series, {TrackCount} tracks ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ {OutputDir}",
+            _logger.LogInformation("Conversion complete: {SeriesCount} series, {TrackCount} tracks → {OutputDir}",
                 totalSeries, totalTracks, outputModDir);
         }
 
@@ -374,6 +375,7 @@ namespace UMB.CLI.Services
             csv.WriteField("special_category");
             csv.WriteField("volume");
             csv.WriteField("info1");
+            csv.WriteField("in_soundtest");
             csv.WriteField("order");
             csv.NextRecord();
 
@@ -390,6 +392,7 @@ namespace UMB.CLI.Services
                 csv.WriteField(t.SpecialCategory ?? "");
                 csv.WriteField(t.Volume);
                 csv.WriteField(t.Info1 ?? "");
+                csv.WriteField(t.InSoundtest);
                 csv.WriteField(i);
                 csv.NextRecord();
             }
@@ -425,6 +428,7 @@ namespace UMB.CLI.Services
             public float Volume { get; set; }
             public int OriginalOrder { get; set; }
             public string Info1 { get; set; }
+            public bool InSoundtest { get; set; } = true;
         }
     }
 }

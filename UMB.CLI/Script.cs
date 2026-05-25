@@ -71,7 +71,7 @@ namespace UMB.CLI
         public void RunConfigVolume() => _volumeConfig.Run();
         public void RunDumpStages() => _dumpStages.Run();
 
-        // Ã¢â€â‚¬Ã¢â€â‚¬ Shared helpers used by services Ã¢â€â‚¬Ã¢â€â‚¬
+        // ── Shared helpers used by services ──
 
         public static void PrintBanner(ILogger logger)
         {

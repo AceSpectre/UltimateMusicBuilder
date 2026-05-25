@@ -212,10 +212,10 @@ namespace UMB.CLI.Views
             : "â€”";
 
         public string AutoGainDisplay => HasMeasurement
-            ? AutoGain.ToString("0.00", CultureInfo.InvariantCulture) + "Ã—"
+            ? AutoGain.ToString("0.00", CultureInfo.InvariantCulture) + "×"
             : "â€”";
 
-        public string EffectiveDisplay => EffectiveBankVolume.ToString("0.00", CultureInfo.InvariantCulture) + "Ã—";
+        public string EffectiveDisplay => EffectiveBankVolume.ToString("0.00", CultureInfo.InvariantCulture) + "×";
 
         private string _playButtonText = "â–¶";
         public string PlayButtonText

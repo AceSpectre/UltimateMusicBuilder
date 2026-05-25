@@ -239,6 +239,8 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                         StreamSetId  = setId,
                         RecordType   = NormalizeRecordType(row.RecordType)
                     };
+                    if (!row.InSoundtest)
+                        dbRoot.TestDispOrder = -1;
                     dbRoot.Title["en_us"] = row.Title;
                     if (!string.IsNullOrEmpty(row.Author))    dbRoot.Author["en_us"]    = row.Author;
                     if (!string.IsNullOrEmpty(row.Copyright)) dbRoot.Copyright["en_us"] = row.Copyright;

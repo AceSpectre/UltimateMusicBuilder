@@ -1,4 +1,4 @@
-﻿using CsvHelper;
+using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -134,7 +134,7 @@ namespace UMB.CLI.Services
 
                 if (sources.Count == 1)
                 {
-                    // No conflict ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â just copy
+                    // No conflict — just copy
                     CopySeriesFolder(sources[0].seriesDir, outputSeriesDir);
                     var trackCount = CountTracksInCsv(
                         Path.Combine(outputSeriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE));
@@ -144,7 +144,7 @@ namespace UMB.CLI.Services
                 }
                 else
                 {
-                    // Conflict ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â merge with priority mod first
+                    // Conflict — merge with priority mod first
                     var orderedSources = sources
                         .OrderByDescending(s => Path.GetFileName(s.modDir) == priorityMod)
                         .Select(s => s.seriesDir)
@@ -163,7 +163,7 @@ namespace UMB.CLI.Services
             MergeSeriesOrderToml(selectedDirs, priorityMod, outputModDir);
 
             _logger.LogInformation("--------------------");
-            _logger.LogInformation("Merge complete: {SeriesCount} series, {TrackCount} tracks ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ {OutputDir}",
+            _logger.LogInformation("Merge complete: {SeriesCount} series, {TrackCount} tracks → {OutputDir}",
                 totalSeries, totalTracks, outputModDir);
         }
 
@@ -180,7 +180,7 @@ namespace UMB.CLI.Services
             // orderedSourceDirs[0] is the priority mod's series dir
             var tomlOptions = new TomlModelOptions { ConvertPropertyName = ToKebabCase };
 
-            // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Merge series.toml ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+            // ── Merge series.toml ──
             FolderSeriesFileConfig priorityConfig = null;
             var mergedGames = new List<(string id, string name)>();
             var mergedPlaylists = new List<(string id, int incidence, object songs)>();
@@ -225,7 +225,7 @@ namespace UMB.CLI.Services
 
             WriteMergedSeriesToml(outputDir, priorityConfig, mergedGames, mergedPlaylists);
 
-            // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Merge tracks.csv ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+            // ── Merge tracks.csv ──
             var allTracks = new List<MergeTrackRow>();
             var seenFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -244,7 +244,7 @@ namespace UMB.CLI.Services
 
             WriteMergedTracksCsv(outputDir, allTracks);
 
-            // ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ Copy audio and other files (priority first so it wins on duplicates) ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬ÃƒÂ¢Ã¢â‚¬ÂÃ¢â€šÂ¬
+            // ── Copy audio and other files (priority first so it wins on duplicates) ──
             var copiedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var srcDir in orderedSourceDirs)
             {
@@ -294,7 +294,8 @@ namespace UMB.CLI.Services
                     SpecialCategory = GetOptionalField(csv, headers, "special_category"),
                     Volume = float.TryParse(GetOptionalField(csv, headers, "volume", "1.0"),
                         NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 1.0f,
-                    Info1 = GetOptionalField(csv, headers, "info1")
+                    Info1 = GetOptionalField(csv, headers, "info1"),
+                    InSoundtest = !string.Equals(GetOptionalField(csv, headers, "in_soundtest", "True"), "False", StringComparison.OrdinalIgnoreCase)
                 };
 
                 if (!string.IsNullOrWhiteSpace(row.Filename))
@@ -405,6 +406,7 @@ namespace UMB.CLI.Services
             csv.WriteField("special_category");
             csv.WriteField("volume");
             csv.WriteField("info1");
+            csv.WriteField("in_soundtest");
             csv.WriteField("order");
             csv.NextRecord();
 
@@ -420,6 +422,7 @@ namespace UMB.CLI.Services
                 csv.WriteField(t.SpecialCategory);
                 csv.WriteField(t.Volume);
                 csv.WriteField(t.Info1);
+                csv.WriteField(t.InSoundtest);
                 csv.WriteField(i);
                 csv.NextRecord();
             }
@@ -522,6 +525,7 @@ namespace UMB.CLI.Services
             public string SpecialCategory { get; set; }
             public float Volume { get; set; }
             public string Info1 { get; set; }
+            public bool InSoundtest { get; set; } = true;
         }
     }
 }

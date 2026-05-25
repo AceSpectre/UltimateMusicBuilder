@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sma5h;
 using Sma5h.Helpers;
@@ -118,7 +118,7 @@ namespace UMB.CLI.Services
                         $"umb_ext_{Guid.NewGuid():N}_{Path.GetFileName(bntxFile)}");
                     File.WriteAllBytes(tempBntx, patchedBytes);
                     toolInput = tempBntx;
-                    _logger.LogInformation("Patched BNTX mipmap count {Old}ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢{New} for '{SeriesId}' (header inconsistent with dimensions).",
+                    _logger.LogInformation("Patched BNTX mipmap count {Old}→{New} for '{SeriesId}' (header inconsistent with dimensions).",
                         oldMip, newMip, seriesId);
                 }
 
@@ -143,7 +143,7 @@ namespace UMB.CLI.Services
 
                     if (process.ExitCode == 0 && File.Exists(outputPng))
                     {
-                        _logger.LogInformation("Extracted icon for '{SeriesId}' ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ {OutputPath}", seriesId, outputPng);
+                        _logger.LogInformation("Extracted icon for '{SeriesId}' → {OutputPath}", seriesId, outputPng);
                         totalExtracted++;
                     }
                     else
@@ -174,7 +174,7 @@ namespace UMB.CLI.Services
                 _logger.LogInformation("No icons extracted.");
         }
 
-        // BNTX ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ BRTI block: MipCount(u16) at +0x16, Width(i32) at +0x24, Height(i32) at +0x28.
+        // BNTX → BRTI block: MipCount(u16) at +0x16, Width(i32) at +0x24, Height(i32) at +0x28.
         // Returns true if the first BRTI's mipmap_count exceeds floor(log2(max(w,h)))+1
         // (which is what image_dds enforces). The clamped bytes are returned via out; the
         // source file is never modified.

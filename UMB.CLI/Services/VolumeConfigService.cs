@@ -1,4 +1,4 @@
-﻿using CsvHelper;
+using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -76,7 +76,7 @@ namespace UMB.CLI.Services
 
             if (!_lufsService.IsAvailable)
             {
-                _logger.LogWarning("FFmpeg is not available ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â auto-gain values cannot be calculated. You can still edit per-song overrides, but they will not be informed by measurement.");
+                _logger.LogWarning("FFmpeg is not available — auto-gain values cannot be calculated. You can still edit per-song overrides, but they will not be informed by measurement.");
             }
 
             // Build view models with LUFS analysis (parallelized with progress bar)
@@ -141,7 +141,7 @@ namespace UMB.CLI.Services
                 result = AvaloniaHost.ShowWindow(
                     () => new VolumeConfigWindow(viewModels.ToList(), new AudioPreviewDecoder(_decodeService, tempDir, _logger))
                     {
-                        Title = $"Config Volume ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â {Path.GetFileName(seriesDir)}"
+                        Title = $"Config Volume — {Path.GetFileName(seriesDir)}"
                     },
                     w => w.Result);
             }

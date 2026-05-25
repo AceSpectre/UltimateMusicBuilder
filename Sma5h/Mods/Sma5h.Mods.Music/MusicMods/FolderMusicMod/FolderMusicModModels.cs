@@ -66,6 +66,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public string SpecialCategory { get; set; }
         public float Volume { get; set; } = 1.0f;
         public string Info1 { get; set; }
+        public bool InSoundtest { get; set; } = true;
     }
 
     public class FolderTrackCsvRowMap : ClassMap<FolderTrackCsvRow>
@@ -81,6 +82,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             Map(m => m.SpecialCategory).Name("special_category").Optional();
             Map(m => m.Volume).Name("volume").Optional().Default(1.0f);
             Map(m => m.Info1).Name("info1").Optional().Default("");
+            Map(m => m.InSoundtest).Name("in_soundtest").Optional().Default(true);
         }
     }
 

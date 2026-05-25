@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sma5h;
 using Sma5h.Helpers;
@@ -35,7 +35,7 @@ namespace UMB.CLI.Services
         }
 
         // ffmpeg/ffprobe/ffplay and pymusiclooper are expected on the system PATH
-        // (install via choco/brew/apt/pipx ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â see scripts/fetch-tools for hints).
+        // (install via choco/brew/apt/pipx — see scripts/fetch-tools for hints).
         private string ResolveFfTool(string name) =>
             ToolPathResolver.Resolve(null, null, name) ?? name;
 
@@ -199,7 +199,7 @@ namespace UMB.CLI.Services
                     _logger.LogInformation("  Full-song loop: 0-{End}", loopEnd);
                 }
 
-                // Step 3: Convert WAV ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ lopus via VGAudioCli library
+                // Step 3: Convert WAV → lopus via VGAudioCli library
                 var lopusFile = Path.Combine(tempDir, basename + ".lopus");
                 try
                 {
@@ -230,7 +230,7 @@ namespace UMB.CLI.Services
                     continue;
                 }
 
-                // Step 4: Wrap lopus ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ nus3audio
+                // Step 4: Wrap lopus → nus3audio
                 var toneId = DeriveToneId(basename);
                 try
                 {
@@ -272,7 +272,7 @@ namespace UMB.CLI.Services
 
                 if (File.Exists(outputNus3) && new FileInfo(outputNus3).Length > 0)
                 {
-                    _logger.LogInformation("  ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ {OutputPath}", outputNus3);
+                    _logger.LogInformation("  → {OutputPath}", outputNus3);
                     converted++;
 
                     // Generate loop preview clip if a loop was selected.
@@ -502,7 +502,7 @@ namespace UMB.CLI.Services
                 double startSec = (double)loopStart / sampleRate;
                 double endSec = (double)loopEnd / sampleRate;
 
-                // Preview: N seconds before loop end ÃƒÂ¢Ã¢â‚¬Â Ã¢â‚¬â„¢ N seconds after loop start (simulates the loop transition)
+                // Preview: N seconds before loop end → N seconds after loop start (simulates the loop transition)
                 double seg1Start = Math.Max(0, endSec - previewHalfLength);
                 double seg1End = endSec;
                 double seg2Start = startSec;
