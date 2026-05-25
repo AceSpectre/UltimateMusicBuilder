@@ -24,6 +24,12 @@ namespace UMB.CLI.Services
     {
         private const string DefaultLocale = "en_us";
 
+        private static readonly string[] ExpectedCsvColumns =
+        {
+            "filename", "game", "title", "author", "copyright",
+            "record_type", "special_category", "volume", "info1", "in_soundtest"
+        };
+
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
         private readonly IAudioStateService _audioStateService;
@@ -58,6 +64,7 @@ namespace UMB.CLI.Services
             int totalScaffolded = 0;
             int totalAdded = 0;
             int totalDefaultsAdded = 0;
+            int totalColumnsUpdated = 0;
             int totalSeriesOrderAdded = 0;
 
             foreach (var modDir in modDirs)
@@ -128,11 +135,13 @@ namespace UMB.CLI.Services
                         MissingFieldFound = null
                     };
                     List<FolderTrackCsvRow> existingRows;
+                    string[] existingHeaders;
                     using (var reader = new StreamReader(csvPath))
                     using (var csv = new CsvReader(reader, csvConfig))
                     {
                         csv.Context.RegisterClassMap<FolderTrackCsvRowMap>();
                         existingRows = csv.GetRecords<FolderTrackCsvRow>().ToList();
+                        existingHeaders = csv.HeaderRecord;
                     }
 
                     var existingFilenames = new HashSet<string>(
@@ -147,7 +156,10 @@ namespace UMB.CLI.Services
                         .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                         .ToList();
 
-                    if (newFiles.Count == 0)
+                    var currentHeaderSet = new HashSet<string>(existingHeaders ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+                    bool needsColumnUpdate = ExpectedCsvColumns.Any(h => !currentHeaderSet.Contains(h));
+
+                    if (newFiles.Count == 0 && !needsColumnUpdate)
                         continue;
 
                     // Add new rows
@@ -165,7 +177,7 @@ namespace UMB.CLI.Services
                         });
                     }
 
-                    // Rewrite CSV with all rows
+                    // Rewrite CSV with all rows (also adds any missing columns)
                     using (var writer = new StreamWriter(csvPath))
                     using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
                     {
@@ -176,8 +188,17 @@ namespace UMB.CLI.Services
                         csv.WriteRecords(existingRows);
                     }
 
-                    _logger.LogInformation("Added {Count} track(s) to {Path}", newFiles.Count, csvPath);
-                    totalAdded += newFiles.Count;
+                    if (needsColumnUpdate)
+                    {
+                        var addedColumns = ExpectedCsvColumns.Where(h => !currentHeaderSet.Contains(h)).ToList();
+                        _logger.LogInformation("Added column(s) {Columns} to {Path}", string.Join(", ", addedColumns), csvPath);
+                        totalColumnsUpdated++;
+                    }
+                    if (newFiles.Count > 0)
+                    {
+                        _logger.LogInformation("Added {Count} track(s) to {Path}", newFiles.Count, csvPath);
+                        totalAdded += newFiles.Count;
+                    }
                 }
 
                 // ── Step 4: Append any new custom series to series-order.toml ──
@@ -190,9 +211,11 @@ namespace UMB.CLI.Services
                 _logger.LogInformation("Added [default-track-data] to {Count} series.toml file(s).", totalDefaultsAdded);
             if (totalAdded > 0)
                 _logger.LogInformation("Populated {Count} new track(s) total.", totalAdded);
+            if (totalColumnsUpdated > 0)
+                _logger.LogInformation("Updated {Count} CSV file(s) with new columns.", totalColumnsUpdated);
             if (totalSeriesOrderAdded > 0)
                 _logger.LogInformation("Appended {Count} custom series to series-order.toml file(s).", totalSeriesOrderAdded);
-            if (totalScaffolded == 0 && totalAdded == 0 && totalDefaultsAdded == 0 && totalSeriesOrderAdded == 0)
+            if (totalScaffolded == 0 && totalAdded == 0 && totalDefaultsAdded == 0 && totalColumnsUpdated == 0 && totalSeriesOrderAdded == 0)
                 _logger.LogInformation("All series folders are up to date.");
         }
 
