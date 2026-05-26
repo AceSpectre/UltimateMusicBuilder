@@ -84,6 +84,11 @@ namespace Tests.Helpers
             RequireFile(missing, Path.Combine(tools, "paracobNET.dll"));
             RequireDir(missing, Path.Combine(tools, "vgmstream-cli"));
 
+            // ── External tools on PATH (needed by nus3-convert) ────────────
+            RequireOnPath(missing, "pymusiclooper");
+            RequireOnPath(missing, "ffmpeg");
+            RequireOnPath(missing, "ffprobe");
+
             // ── Bundled test audio (real FLAC files) ───────────────────────
             string testAudio = Path.Combine(AppContext.BaseDirectory, "TestData", "configured-mod");
             RequireNonEmpty(missing,
@@ -128,6 +133,28 @@ namespace Tests.Helpers
         private static void RequireDir(List<string> missing, string path)
         {
             if (!Directory.Exists(path)) missing.Add($"DIR  missing: {path}");
+        }
+
+        private static void RequireOnPath(List<string> missing, string command)
+        {
+            var pathEnv = Environment.GetEnvironmentVariable("PATH") ?? "";
+            var pathExt = (Environment.GetEnvironmentVariable("PATHEXT") ?? ".EXE;.BAT;.CMD")
+                .Split(';', StringSplitOptions.RemoveEmptyEntries);
+            var dirs = pathEnv.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var dir in dirs)
+            {
+                try
+                {
+                    if (File.Exists(Path.Combine(dir, command))) return;
+                    foreach (var ext in pathExt)
+                    {
+                        if (File.Exists(Path.Combine(dir, command + ext))) return;
+                    }
+                }
+                catch { /* skip unreadable PATH entries */ }
+            }
+            missing.Add($"PATH missing: {command} (install and add to PATH)");
         }
 
         private static void RequireNonEmpty(List<string> missing, string path)

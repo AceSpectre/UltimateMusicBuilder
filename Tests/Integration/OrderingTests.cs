@@ -1,3 +1,8 @@
+using Microsoft.Extensions.DependencyInjection;
+using Sma5h.Interfaces;
+using Sma5h.Mods.Music;
+using Sma5h.Mods.Music.Interfaces;
+using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using Tests.Helpers;
 using Tomlyn;
 using Tomlyn.Model;
@@ -10,6 +15,7 @@ namespace Tests.Integration
     /// (SeriesOrderService, TrackOrderService) requires Avalonia windows,
     /// so we test the data reading/writing that those services operate on.
     /// </summary>
+    [Collection("CwdSensitive")]
     public class OrderingTests : IDisposable
     {
         private readonly TestEnvironment _env;
@@ -17,9 +23,16 @@ namespace Tests.Integration
         public OrderingTests()
         {
             _env = new TestEnvironment();
+            FolderMusicMod.SeriesFilterByMod = null;
+            Sma5hMusic.ExplicitSeriesOrder = null;
         }
 
-        public void Dispose() => _env.Dispose();
+        public void Dispose()
+        {
+            FolderMusicMod.SeriesFilterByMod = null;
+            Sma5hMusic.ExplicitSeriesOrder = null;
+            _env.Dispose();
+        }
 
         // ── Series ordering ────────────────────────────────────────────────
 
@@ -176,6 +189,85 @@ namespace Tests.Integration
             var entries = mod.GetMusicModEntries();
             var first = entries.BgmPropertyEntries.First();
             Assert.Equal(0.5f, first.AudioVolume);
+        }
+
+        // ── In-memory ordering reflected after Init/Build ──────────────────
+
+        [Fact]
+        public void SeriesOrder_AppliedToInMemoryState_GammaBeforeDev()
+        {
+            // series-order.toml sets ["gamma", "dev"]. Build assigns each
+            // custom series a DispOrderSound from ExplicitSeriesOrder, so gamma
+            // must end up with the smaller DispOrderSound on its SeriesEntry.
+            BaselineGenerator.SetupSeriesOrdered(_env);
+
+            using var sp = _env.CreateFullServiceProvider();
+            var audioState = sp.GetRequiredService<IAudioStateService>();
+            var stateManager = sp.GetRequiredService<IStateManager>();
+            var sma5hMod = sp.GetRequiredService<ISma5hMod>();
+
+            BaselineGenerator.ApplyExplicitSeriesOrder(_env);
+            stateManager.Init();
+            sma5hMod.Init();
+            sma5hMod.Build(useCache: false);
+
+            var gammaSeries = audioState.GetSeriesEntries()
+                .FirstOrDefault(s => s.UiSeriesId == "ui_series_gamma");
+            var devSeries = audioState.GetSeriesEntries()
+                .FirstOrDefault(s => s.UiSeriesId == "ui_series_dev");
+
+            Assert.NotNull(gammaSeries);
+            Assert.NotNull(devSeries);
+            Assert.True(gammaSeries.DispOrderSound < devSeries.DispOrderSound,
+                $"gamma DispOrderSound ({gammaSeries.DispOrderSound}) should be lower than " +
+                $"dev DispOrderSound ({devSeries.DispOrderSound})");
+        }
+
+        [Fact]
+        public void TrackOrder_CustomSeriesRespectsCsvOrderColumn()
+        {
+            BaselineGenerator.SetupTrackOrdered(_env);
+
+            using var sp = _env.CreateFullServiceProvider();
+            var audioState = sp.GetRequiredService<IAudioStateService>();
+            var stateManager = sp.GetRequiredService<IStateManager>();
+            var sma5hMod = sp.GetRequiredService<ISma5hMod>();
+
+            stateManager.Init();
+            sma5hMod.Init();
+            sma5hMod.Build(useCache: false);
+
+            var devTracks = audioState.GetBgmDbRootEntries()
+                .Where(e => e.UiGameTitleId == "ui_gametitle_somewhat_good_karts")
+                .OrderBy(e => e.TestDispOrder)
+                .ToList();
+
+            Assert.Equal(13, devTracks.Count);
+            // Reversed order column means track 13 (Time Trials) should now have
+            // the lowest TestDispOrder among dev tracks, track 01 (KARTS!) the highest.
+            Assert.Contains("Time Trials", devTracks[0].Title["en_us"]);
+            Assert.Contains("KARTS!", devTracks[^1].Title["en_us"]);
+        }
+
+        [Fact]
+        public void TrackOrder_ExistingSeriesRespectsSongOrderToml()
+        {
+            BaselineGenerator.SetupTrackOrdered(_env);
+            var modDir = Path.Combine(_env.ModPath, "test-mod");
+
+            var mod = new FolderMusicMod(
+                TestEnvironment.CreateLogger<IMusicMod>(),
+                TestEnvironment.CreateMockAudioMetadata().Object,
+                modDir);
+            var entries = mod.GetMusicModEntries();
+
+            Assert.True(entries.SeriesSongOrderings.ContainsKey("ui_series_mario"),
+                "song_order.toml in mario/ should produce a SeriesSongOrderings entry for ui_series_mario");
+            var order = entries.SeriesSongOrderings["ui_series_mario"];
+            Assert.Equal(7, order.Count);
+            Assert.Contains("ui_bgm_ps01", order); // interleaved vanilla reference survives
+            // First modded track in the configured order is 03 brain empty
+            Assert.Equal("ui_bgm_flowerhead___somewhat_good__lofi___03_brain_empty", order[0]);
         }
     }
 }

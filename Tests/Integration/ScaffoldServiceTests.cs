@@ -223,6 +223,82 @@ namespace Tests.Integration
             Assert.Equal(csvBefore, csvAfter);
         }
 
+        // ── Column-migration / data-preservation ───────────────────────────
+
+        [Fact]
+        public void Scaffold_AddsMissingColumnsToOldCsv()
+        {
+            _env.CreateUnconfiguredMod();
+            var seriesDir = Path.Combine(_env.ModPath, "scaffold-mod", "dev");
+
+            // Pre-create a series.toml so scaffold proceeds to CSV migration
+            File.WriteAllText(Path.Combine(seriesDir, "series.toml"),
+                "[series]\nid = \"dev\"\nname = \"Dev\"\nplaylist-incidence = 100\nseries-playlist = \"bgm_dev\"\n\n[[games]]\nid = \"dev\"\nname = \"Dev\"\n\n[default-track-data]\ngame = \"dev\"\n");
+
+            // Legacy CSV with only 3 columns and one real row
+            var trackName = TestEnvironment.DevTrackFiles[0].Replace(".flac", ".nus3audio");
+            var csvPath = Path.Combine(seriesDir, "tracks.csv");
+            File.WriteAllText(csvPath,
+                "filename,game,title\n" +
+                $"{trackName},dev,Legacy Title\n");
+
+            CreateService().Run();
+
+            var lines = File.ReadAllLines(csvPath);
+            var header = lines[0];
+            foreach (var col in new[] { "filename", "game", "title", "author", "copyright",
+                "record_type", "special_category", "volume", "info1", "in_soundtest" })
+            {
+                Assert.Contains(col, header);
+            }
+
+            // Original row's first three fields are preserved verbatim
+            Assert.Contains(trackName, lines[1]);
+            Assert.Contains("Legacy Title", lines[1]);
+        }
+
+        [Fact]
+        public void Scaffold_PreservesNonDefaultValuesInExistingRows()
+        {
+            _env.CreateUnconfiguredMod();
+            var seriesDir = Path.Combine(_env.ModPath, "scaffold-mod", "dev");
+
+            File.WriteAllText(Path.Combine(seriesDir, "series.toml"),
+                "[series]\nid = \"dev\"\nname = \"Dev\"\nplaylist-incidence = 100\nseries-playlist = \"bgm_dev\"\n\n[[games]]\nid = \"dev\"\nname = \"Dev\"\n\n[default-track-data]\ngame = \"dev\"\n");
+
+            var trackName = TestEnvironment.DevTrackFiles[0].Replace(".flac", ".nus3audio");
+            var csvPath = Path.Combine(seriesDir, "tracks.csv");
+            File.WriteAllText(csvPath,
+                "filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\n" +
+                $"{trackName},dev,My Custom Title,CustomAuthor,CustomCopyright,arrangement,,0.5,,True\n");
+
+            CreateService().Run();
+
+            var content = File.ReadAllText(csvPath);
+            Assert.Contains("My Custom Title", content);
+            Assert.Contains("CustomAuthor", content);
+            Assert.Contains("CustomCopyright", content);
+            Assert.Contains("arrangement", content);
+            Assert.Contains("0.5", content);
+        }
+
+        [Fact]
+        public void Scaffold_DoesNotDeleteRowsForExistingTracks()
+        {
+            _env.CreateUnconfiguredMod();
+
+            // Initial scaffold creates 13 dev rows
+            CreateService().Run();
+            var csvPath = Path.Combine(_env.ModPath, "scaffold-mod", "dev", "tracks.csv");
+            var before = File.ReadAllLines(csvPath);
+            Assert.Equal(14, before.Length); // header + 13
+
+            // Second scaffold run with all files still present must not drop any
+            CreateService().Run();
+            var after = File.ReadAllLines(csvPath);
+            Assert.Equal(14, after.Length);
+        }
+
         [Fact]
         public void Scaffold_AddsNewTracksToExistingCsv()
         {

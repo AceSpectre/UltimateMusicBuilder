@@ -255,16 +255,38 @@ namespace Tests.Helpers
             return mock;
         }
 
+        // Deterministic 64-byte stub written by the mock for every nus3 file so
+        // the build pipeline emits real on-disk artefacts (the baseline manifest
+        // records filename + size — those stay deterministic across runs).
+        private static readonly byte[] _nus3Stub = Enumerable.Range(0, 64)
+            .Select(i => (byte)(i & 0xFF)).ToArray();
+
         public static Mock<INus3AudioService> CreateMockNus3AudioService()
         {
             var mock = new Mock<INus3AudioService>();
             mock.Setup(m => m.GenerateNus3Bank(
                 It.IsAny<string>(), It.IsAny<float>(), It.IsAny<string>()))
-                .Returns(true);
+                .Returns((string _, float _, string outputMediaFile) =>
+                {
+                    WriteStub(outputMediaFile);
+                    return true;
+                });
             mock.Setup(m => m.GenerateNus3Audio(
                 It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-                .Returns(true);
+                .Returns((string _, string _, string outputMediaFile) =>
+                {
+                    WriteStub(outputMediaFile);
+                    return true;
+                });
             return mock;
+        }
+
+        private static void WriteStub(string outputMediaFile)
+        {
+            if (string.IsNullOrEmpty(outputMediaFile)) return;
+            var dir = Path.GetDirectoryName(outputMediaFile);
+            if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+            File.WriteAllBytes(outputMediaFile, _nus3Stub);
         }
 
         public static Mock<IAudioStateService> CreateMockAudioStateService()

@@ -1,24 +1,19 @@
 using Microsoft.Extensions.DependencyInjection;
-using Newtonsoft.Json;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music;
-using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
-using System.Security.Cryptography;
 using Tests.Helpers;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Tests.Integration
 {
+    [Collection("CwdSensitive")]
     public class BuildPipelineTests : IDisposable
     {
         private readonly TestEnvironment _env;
         private readonly ITestOutputHelper _output;
-
-        private static readonly string GoldenChecksumsPath = Path.Combine(
-            AppContext.BaseDirectory, "TestData", "golden-checksums.json");
 
         public BuildPipelineTests(ITestOutputHelper output)
         {
@@ -160,73 +155,50 @@ namespace Tests.Integration
                 _output.WriteLine($"  {Path.GetRelativePath(outputPath, f)}");
         }
 
-        // ── Checksum regression test ───────────────────────────────────────
+        // ── Baseline regression tests ──────────────────────────────────────
+
+        private string BaselineDir(string scenario)
+            => Path.Combine(BaselineGenerator.BaselineRoot(_env.RepoRoot), scenario);
 
         [Fact]
-        public void Build_OutputChecksumsMatchGolden()
+        public void Build_OutputMatchesDefaultBaseline()
         {
             _env.CreateConfiguredMod();
+            RunBuild();
 
-            using var sp = _env.CreateFullServiceProvider();
-            var sma5hMod = sp.GetRequiredService<ISma5hMod>();
-            var stateManager = sp.GetRequiredService<IStateManager>();
-
-            stateManager.Init();
-            sma5hMod.Init();
-            sma5hMod.Build(useCache: false);
-            stateManager.WriteChanges();
-
-            var outputPath = Path.Combine(_env.TempDir, "ArcOutput");
-            var checksums = ComputeOutputChecksums(outputPath);
-
-            if (!File.Exists(GoldenChecksumsPath))
-            {
-                SaveGoldenChecksums(checksums);
-                _output.WriteLine($"Golden checksums generated with {checksums.Count} file(s). " +
-                    "Run tests again to verify against golden baseline.");
-                _output.WriteLine($"Golden file: {GoldenChecksumsPath}");
-                return;
-            }
-
-            var golden = LoadGoldenChecksums();
-            var mismatches = new List<string>();
-            var missing = new List<string>();
-            var extra = new List<string>();
-
-            foreach (var (path, hash) in golden)
-            {
-                if (!checksums.TryGetValue(path, out var actual))
-                    missing.Add(path);
-                else if (actual != hash)
-                    mismatches.Add($"{path}: expected {hash[..12]}... got {actual[..12]}...");
-            }
-
-            foreach (var path in checksums.Keys)
-            {
-                if (!golden.ContainsKey(path))
-                    extra.Add(path);
-            }
-
-            if (mismatches.Count > 0 || missing.Count > 0)
-            {
-                var msg = "Build output does not match golden checksums.\n";
-                if (mismatches.Count > 0)
-                    msg += $"\nMISMATCHED ({mismatches.Count}):\n  " + string.Join("\n  ", mismatches);
-                if (missing.Count > 0)
-                    msg += $"\nMISSING ({missing.Count}):\n  " + string.Join("\n  ", missing);
-                if (extra.Count > 0)
-                    msg += $"\nEXTRA ({extra.Count}):\n  " + string.Join("\n  ", extra);
-                msg += "\n\nTo update golden checksums after intentional changes, " +
-                    $"delete {GoldenChecksumsPath} and re-run.";
-                Assert.Fail(msg);
-            }
-
-            if (extra.Count > 0)
-                _output.WriteLine($"Note: {extra.Count} extra file(s) in output not in golden: " +
-                    string.Join(", ", extra.Take(5)));
-
-            _output.WriteLine($"All {golden.Count} output files match golden checksums.");
+            var report = BaselineComparer.Compare(
+                Path.Combine(_env.TempDir, "ArcOutput"),
+                BaselineDir("default-build"));
+            report.AssertMatches(_output);
         }
+
+        [Fact]
+        public void Build_SeriesOrderReflectedInArcOutput()
+        {
+            // Builds with an additional "gamma" custom series ordered ahead of "dev"
+            // via series-order.toml — same setup BaselineGenerator.SetupSeriesOrdered uses.
+            BaselineGenerator.SetupSeriesOrdered(_env);
+            BaselineGenerator.RunBuild(_env);
+
+            var report = BaselineComparer.Compare(
+                Path.Combine(_env.TempDir, "ArcOutput"),
+                BaselineDir("series-ordered"));
+            report.AssertMatches(_output);
+        }
+
+        [Fact]
+        public void Build_TrackOrderReflectedInArcOutput()
+        {
+            BaselineGenerator.SetupTrackOrdered(_env);
+            BaselineGenerator.RunBuild(_env);
+
+            var report = BaselineComparer.Compare(
+                Path.Combine(_env.TempDir, "ArcOutput"),
+                BaselineDir("track-ordered"));
+            report.AssertMatches(_output);
+        }
+
+        private void RunBuild() => BaselineGenerator.RunBuild(_env);
 
         // ── Entry count regression test ────────────────────────────────────
 
@@ -252,49 +224,6 @@ namespace Tests.Integration
             Assert.True(vanillaSeriesCount > 0, "Should load vanilla series from game resources");
         }
 
-        // ── Checksum helpers ───────────────────────────────────────────────
-
-        private static Dictionary<string, string> ComputeOutputChecksums(string outputPath)
-        {
-            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            if (!Directory.Exists(outputPath))
-                return result;
-
-            // Only checksum database/message files (deterministic output).
-            // Skip nus3audio/nus3bank (generated by mocked service, may be empty).
-            var relevantExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                { ".prc", ".msbt", ".bin" };
-
-            foreach (var file in Directory.GetFiles(outputPath, "*", SearchOption.AllDirectories))
-            {
-                var ext = Path.GetExtension(file);
-                if (!relevantExtensions.Contains(ext))
-                    continue;
-
-                var relativePath = Path.GetRelativePath(outputPath, file)
-                    .Replace('\\', '/');
-                using var stream = File.OpenRead(file);
-                var hash = SHA256.HashData(stream);
-                result[relativePath] = Convert.ToHexString(hash).ToLowerInvariant();
-            }
-
-            return result;
-        }
-
-        private static void SaveGoldenChecksums(Dictionary<string, string> checksums)
-        {
-            var dir = Path.GetDirectoryName(GoldenChecksumsPath);
-            if (dir != null) Directory.CreateDirectory(dir);
-            var json = JsonConvert.SerializeObject(checksums, Formatting.Indented);
-            File.WriteAllText(GoldenChecksumsPath, json);
-        }
-
-        private static Dictionary<string, string> LoadGoldenChecksums()
-        {
-            var json = File.ReadAllText(GoldenChecksumsPath);
-            return JsonConvert.DeserializeObject<Dictionary<string, string>>(json)
-                ?? new Dictionary<string, string>();
-        }
     }
 
 }
