@@ -166,10 +166,12 @@ namespace Tests.Integration
             _env.CreateConfiguredMod();
             RunBuild();
 
-            var report = BaselineComparer.Compare(
+            BuildBaselineFallback.AssertMatches(
+                "default-build",
                 Path.Combine(_env.TempDir, "ArcOutput"),
-                BaselineDir("default-build"));
-            report.AssertMatches(_output);
+                BaselineDir("default-build"),
+                _env.RepoRoot,
+                _output);
         }
 
         [Fact]
@@ -180,10 +182,12 @@ namespace Tests.Integration
             BaselineGenerator.SetupSeriesOrdered(_env);
             BaselineGenerator.RunBuild(_env);
 
-            var report = BaselineComparer.Compare(
+            BuildBaselineFallback.AssertMatches(
+                "series-ordered",
                 Path.Combine(_env.TempDir, "ArcOutput"),
-                BaselineDir("series-ordered"));
-            report.AssertMatches(_output);
+                BaselineDir("series-ordered"),
+                _env.RepoRoot,
+                _output);
         }
 
         [Fact]
@@ -192,10 +196,12 @@ namespace Tests.Integration
             BaselineGenerator.SetupTrackOrdered(_env);
             BaselineGenerator.RunBuild(_env);
 
-            var report = BaselineComparer.Compare(
+            BuildBaselineFallback.AssertMatches(
+                "track-ordered",
                 Path.Combine(_env.TempDir, "ArcOutput"),
-                BaselineDir("track-ordered"));
-            report.AssertMatches(_output);
+                BaselineDir("track-ordered"),
+                _env.RepoRoot,
+                _output);
         }
 
         private void RunBuild() => BaselineGenerator.RunBuild(_env);

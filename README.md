@@ -167,6 +167,8 @@ Uses AutoMapper 14.0.0 which has a [known high-severity DoS vulnerability](https
 
 UMB is a fork of [Sma5hMusic](https://github.com/Deinonychus71/Sma5hMusic) by Deinonychus71. Most of the heavy lifting was done there.
 
+Music used in the test suite is from flowerhead's [somewhatgood](https://somewhatgood.bandcamp.com/) music collection, specifically the Karts and Lofi albums. 
+
 Tools and contributors:
 
 1. Research: soneek

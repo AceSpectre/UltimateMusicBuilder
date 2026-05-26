@@ -71,6 +71,48 @@ namespace Tests.Generators
         }
 
         [Fact]
+        public void Regen_BaselineChecksums()
+        {
+            if (!ShouldRegen()) return;
+
+            var checksums = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            // default-build
+            {
+                using var env = new TestEnvironment();
+                BaselineGenerator.SetupDefaultBuild(env);
+                BaselineGenerator.RunBuild(env);
+                checksums["default-build"] = BuildBaselineFallback.ComputeCombinedChecksum(
+                    Path.Combine(env.TempDir, "ArcOutput"));
+            }
+
+            // series-ordered
+            {
+                using var env = new TestEnvironment();
+                BaselineGenerator.SetupSeriesOrdered(env);
+                BaselineGenerator.RunBuild(env);
+                checksums["series-ordered"] = BuildBaselineFallback.ComputeCombinedChecksum(
+                    Path.Combine(env.TempDir, "ArcOutput"));
+            }
+
+            // track-ordered
+            {
+                using var env = new TestEnvironment();
+                BaselineGenerator.SetupTrackOrdered(env);
+                BaselineGenerator.RunBuild(env);
+                checksums["track-ordered"] = BuildBaselineFallback.ComputeCombinedChecksum(
+                    Path.Combine(env.TempDir, "ArcOutput"));
+            }
+
+            var path = BuildBaselineFallback.ChecksumsPath(_env.RepoRoot);
+            BuildBaselineFallback.SaveChecksums(path, checksums);
+            _output.WriteLine($"Wrote baseline-checksums.json → {path}");
+            foreach (var (scenario, hash) in checksums)
+                _output.WriteLine($"  {scenario}: {hash}");
+            Assert.True(File.Exists(path));
+        }
+
+        [Fact]
         public void Regen_ExtractIconsSource()
         {
             if (!ShouldRegen()) return;
