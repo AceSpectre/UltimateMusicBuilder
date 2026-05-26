@@ -1,0 +1,17 @@
+[series]
+id = "mario"
+name = "Mario"
+existing-series = true
+playlist-incidence = 100
+series-playlist = "bgmmario"
+
+[[games]]
+id = "somewhat_good_lofi"
+name = "Somewhat Good: Lofi"
+
+[default-track-data]
+game = "somewhat_good_lofi"
+author = "Flowerhead"
+copyright = "© CC BY 4.0 Flowerhead"
+record-type = "original"
+volume = 1.0

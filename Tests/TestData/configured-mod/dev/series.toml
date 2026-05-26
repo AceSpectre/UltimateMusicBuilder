@@ -1,0 +1,16 @@
+[series]
+id = "dev"
+name = "Somewhat Good: Karts"
+playlist-incidence = 100
+series-playlist = "bgm_dev"
+
+[[games]]
+id = "somewhat_good_karts"
+name = "Somewhat Good: Karts"
+
+[default-track-data]
+game = "somewhat_good_karts"
+author = "Flowerhead"
+copyright = "© CC BY 4.0 Flowerhead"
+record-type = "original"
+volume = 1.0
