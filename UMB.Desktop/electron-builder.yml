@@ -1,0 +1,21 @@
+appId: com.umb.desktop
+productName: UltimateMusicBuilder
+directories:
+  output: out
+  buildResources: static
+files:
+  - dist/**/*
+extraResources:
+  - from: ../publish/
+    to: cli/
+    filter:
+      - "**/*"
+      - "!**/*.pdb"
+win:
+  target:
+    - nsis
+    - zip
+  icon: static/icons/icon.ico
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

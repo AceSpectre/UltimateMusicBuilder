@@ -371,3 +371,7 @@ ArcOutput/*
 stages_dump.csv
 *.csproj.lscache
 *.zip
+
+# UMB.Desktop (Electron)
+UMB.Desktop/dist/
+UMB.Desktop/out/
