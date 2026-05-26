@@ -1,0 +1,122 @@
+{
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___01_karts.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___01_karts.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___02_choose_y.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___02_choose_y.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___03_flowey_s.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___03_flowey_s.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___04_palmtree.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___04_palmtree.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___05_bouncing.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___05_bouncing.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___06_retro_ro.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___06_retro_ro.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___07_stadium_.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___07_stadium_.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___08_highway_.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___08_highway_.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___09_rainbow_.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___09_rainbow_.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___10_you_won.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___10_you_won.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___11_you_lost.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___11_you_lost.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___12_race_res.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___12_race_res.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___13_time_tri.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__karts___13_time_tri.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___01_summer.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___01_summer.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___02_rainy_day.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___02_rainy_day.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___03_brain_emp.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___03_brain_emp.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___04_bird_s_so.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___04_bird_s_so.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___05_stars___c.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___05_stars___c.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___06_7pm.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_flowerhead___somewhat_good__lofi___06_7pm.nus3bank": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_gamma_track_01.nus3audio": {
+    "Size": 64
+  },
+  "stream;/sound/bgm/bgm_gamma_track_01.nus3bank": {
+    "Size": 64
+  }
+}

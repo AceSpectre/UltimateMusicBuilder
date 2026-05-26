@@ -1,0 +1,6 @@
+# Custom series display order
+# Listed series appear after official series, before "Other"
+# Unlisted custom series will be placed after these
+order = [
+    "dev",
+]

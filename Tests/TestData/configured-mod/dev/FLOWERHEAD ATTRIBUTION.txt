@@ -1,0 +1,5 @@
+All songs in test-data produced by Flowerhead https://somewhatgood.bandcamp.com/
+
+Licensed under CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
+
+No changes were made to the tracks outside of encoding conversion
