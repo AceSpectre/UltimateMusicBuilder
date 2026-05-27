@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join, resolve } from 'path'
-import { listMods } from './mods'
+import { listModSeries, listMods } from './mods'
+import { loadTrackOrderData, saveTrackOrderData } from './order-tracks'
 import { spawnCliAction, cancelCurrentAction } from './cli'
 import { IPC } from '../shared/ipc-channels'
 
@@ -24,7 +25,8 @@ function createWindow(): void {
     backgroundColor: '#09090b',
     show: false,
     webPreferences: {
-      preload: join(__dirname, '..', 'preload', 'index.js'),
+      preload: join(__dirname, '..', 'preload', 'index.mjs'),
+      sandbox: false,
       contextIsolation: true,
       nodeIntegration: false
     }
@@ -50,8 +52,15 @@ function registerIpcHandlers(): void {
   const workspace = getWorkspacePath()
 
   ipcMain.handle(IPC.GET_WORKSPACE, () => workspace)
+  ipcMain.handle(IPC.DEBUG_PING, () => ({ ok: true, workspace }))
 
   ipcMain.handle(IPC.LIST_MODS, () => listMods(workspace))
+
+  ipcMain.handle(IPC.LIST_MOD_SERIES, (_event, modPath: string) => listModSeries(workspace, modPath))
+
+  ipcMain.handle(IPC.LOAD_TRACK_ORDER, (_event, seriesPath: string) => loadTrackOrderData(workspace, seriesPath))
+
+  ipcMain.handle(IPC.SAVE_TRACK_ORDER, (_event, seriesPath: string, orderedIds: string[]) => saveTrackOrderData(workspace, seriesPath, orderedIds))
 
   ipcMain.handle(IPC.RUN_ACTION, (_event, action: string, args?: string[]) => {
     if (!mainWindow) return
@@ -64,15 +73,24 @@ function registerIpcHandlers(): void {
     cancelCurrentAction()
   })
 
-  ipcMain.on('window:minimize', () => mainWindow?.minimize())
-  ipcMain.on('window:maximize', () => {
-    if (mainWindow?.isMaximized()) {
-      mainWindow.unmaximize()
-    } else {
-      mainWindow?.maximize()
-    }
+  ipcMain.handle(IPC.WINDOW_MINIMIZE, () => {
+    mainWindow?.minimize()
+    return { ok: true, action: 'minimize' }
   })
-  ipcMain.on('window:close', () => mainWindow?.close())
+
+  ipcMain.handle(IPC.WINDOW_FULLSCREEN, () => {
+    if (!mainWindow) {
+      return { ok: false, action: 'fullscreen' }
+    }
+
+    mainWindow.setFullScreen(!mainWindow.isFullScreen())
+    return { ok: true, action: 'fullscreen', fullScreen: mainWindow.isFullScreen() }
+  })
+
+  ipcMain.handle(IPC.WINDOW_CLOSE, () => {
+    mainWindow?.close()
+    return { ok: true, action: 'close' }
+  })
 }
 
 app.whenReady().then(() => {

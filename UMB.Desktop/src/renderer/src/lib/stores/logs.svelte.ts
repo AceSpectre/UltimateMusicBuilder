@@ -1,35 +1,30 @@
 import type { LogLine } from '$lib/types/electron'
 
-let entries = $state<LogLine[]>([])
-let drawerOpen = $state(localStorage.getItem('umb-log-open') !== 'false')
-let filter = $state<'all' | 'info' | 'warn' | 'error'>('all')
-
-export const logStore = {
-  get entries() { return entries },
-  get lineCount() { return entries.length },
-
-  get filtered() {
-    if (filter === 'all') return entries
-    return entries.filter(e => e.level === filter)
+export const logStore = $state({
+  entries: [] as LogLine[],
+  drawerOpen: localStorage.getItem('umb-log-open') !== 'false',
+  filter: 'all' as 'all' | 'info' | 'warn' | 'error',
+  get lineCount() {
+    return logStore.entries.length
   },
-
-  get drawerOpen() { return drawerOpen },
-  get filter() { return filter },
-
+  get filtered() {
+    if (logStore.filter === 'all') return logStore.entries
+    return logStore.entries.filter((entry) => entry.level === logStore.filter)
+  },
   setFilter(f: 'all' | 'info' | 'warn' | 'error') {
-    filter = f
+    logStore.filter = f
   },
 
   toggleDrawer() {
-    drawerOpen = !drawerOpen
-    localStorage.setItem('umb-log-open', String(drawerOpen))
+    logStore.drawerOpen = !logStore.drawerOpen
+    localStorage.setItem('umb-log-open', String(logStore.drawerOpen))
   },
 
   push(entry: LogLine) {
-    entries = [...entries, entry]
+    logStore.entries = [...logStore.entries, entry]
   },
 
   clear() {
-    entries = []
+    logStore.entries = []
   }
-}
+})

@@ -2,16 +2,94 @@
   import { onMount } from 'svelte'
   import AppBar from '$lib/components/app-bar.svelte'
   import Sidebar from '$lib/components/sidebar.svelte'
-  import LogDrawer from '$lib/components/log-drawer.svelte'
+  import BottomPanel from '$lib/components/bottom-panel.svelte'
   import CommandPalette from '$lib/components/command-palette.svelte'
+  import OrderTracksView from '$lib/components/actions/order-tracks-view.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
-  import { modsStore } from '$lib/stores/mods.svelte'
-  import { sidebarStore } from '$lib/stores/sidebar.svelte'
+  import type { ModInfo, WindowActionResult } from '$lib/types/electron'
 
   let commandPaletteOpen = $state(false)
+  let mods = $state<ModInfo[]>([])
+  let activeMod = $state<ModInfo | null>(null)
+  let modsLoading = $state(false)
+  let activeTab = $state('build')
+  let diagnostics = $state({
+    bridgeStatus: 'checking',
+    workspace: 'pending',
+    modsStatus: 'idle',
+    actionClicks: 0,
+    lastAction: 'none',
+    modSelections: 0,
+    lastMod: 'none',
+    windowClicks: 0,
+    lastWindowRequest: 'none',
+    lastWindowAck: 'none',
+    lastError: 'none'
+  })
+
+  async function runBridgePing() {
+    diagnostics.bridgeStatus = 'pinging'
+    try {
+      const result = await window.electron.umb.debugPing()
+      diagnostics.bridgeStatus = result.ok ? 'ok' : 'not-ok'
+      diagnostics.workspace = result.workspace
+    } catch (error) {
+      diagnostics.bridgeStatus = 'error'
+      diagnostics.lastError = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  async function loadMods() {
+    diagnostics.modsStatus = 'loading'
+    modsLoading = true
+    try {
+      mods = await window.electron.umb.listMods()
+      if (!mods.some((mod) => mod.path === activeMod?.path)) {
+        activeMod = mods[0] ?? null
+      }
+      diagnostics.modsStatus = `loaded:${mods.length}`
+    } finally {
+      modsLoading = false
+    }
+  }
+
+  function selectMod(mod: ModInfo) {
+    activeMod = mod
+    diagnostics.modSelections += 1
+    diagnostics.lastMod = mod.name
+  }
+
+  function selectAction(id: string) {
+    activeTab = id
+    diagnostics.actionClicks += 1
+    diagnostics.lastAction = id
+  }
+
+  async function handleWindowControl(action: 'minimize' | 'fullscreen' | 'close') {
+    diagnostics.windowClicks += 1
+    diagnostics.lastWindowRequest = action
+    try {
+      let result: WindowActionResult
+      if (action === 'minimize') {
+        result = await window.electron.umb.windowMinimize()
+      } else if (action === 'fullscreen') {
+        result = await window.electron.umb.windowFullscreen()
+      } else {
+        result = await window.electron.umb.windowClose()
+      }
+
+      diagnostics.lastWindowAck = result.ok
+        ? `${result.action}${typeof result.fullScreen === 'boolean' ? `:${result.fullScreen}` : ''}`
+        : `failed:${result.action}`
+    } catch (error) {
+      diagnostics.lastWindowAck = 'error'
+      diagnostics.lastError = error instanceof Error ? error.message : String(error)
+    }
+  }
 
   onMount(() => {
-    modsStore.load()
+    void runBridgePing()
+    void loadMods()
 
     const unsubLogs = window.electron.umb.subscribeLogs((line) => {
       logStore.push(line)
@@ -24,7 +102,7 @@
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
         e.preventDefault()
-        sidebarStore.toggle()
+        // Sidebar collapse is handled inside the sidebar component for now.
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
         e.preventDefault()
@@ -43,38 +121,49 @@
 
 <div class="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground">
   <AppBar
-    onOpenSearch={() => commandPaletteOpen = true}
-    onOpenModPicker={() => {}}
+    mods={mods}
+    activeMod={activeMod}
+    loading={modsLoading}
+    onSelectMod={selectMod}
+    onWindowControlAttempt={handleWindowControl}
   />
 
   <div class="flex flex-1 overflow-hidden">
-    <Sidebar />
+    <Sidebar activeTab={activeTab} onSelectAction={selectAction} />
 
-    <!-- Main content area (placeholder) -->
     <main class="flex-1 flex flex-col overflow-hidden bg-background">
-      <div class="flex-1 grid place-items-center p-8">
-        <div class="flex flex-col items-center gap-3 max-w-[420px] text-center">
-          <div
-            class="w-14 h-14 rounded-[14px] flex items-center justify-center border border-border"
-            style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .15), hsl(var(--gradient-to) / .15)); color: hsl(var(--gradient-from));"
-          >
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <path d="M3 14h18"/>
-            </svg>
+      {#if activeTab === 'order-tracks'}
+        <OrderTracksView activeMod={activeMod} />
+      {:else}
+        <div class="flex-1 grid place-items-center p-8">
+          <div class="flex flex-col items-center gap-3 max-w-[420px] text-center">
+            <div
+              class="w-14 h-14 rounded-[14px] flex items-center justify-center border border-border"
+              style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .15), hsl(var(--gradient-to) / .15)); color: hsl(var(--gradient-from));"
+            >
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <path d="M3 14h18"/>
+              </svg>
+            </div>
+            <h2 class="text-base font-semibold">{diagnostics.lastAction === 'none' ? 'Select an action' : diagnostics.lastAction}</h2>
+            <p class="text-[13.5px] text-muted-foreground">
+              Action selection now changes the desktop view without auto-running the CLI. This avoids non-interactive prompt failures and overlapping `dotnet run` locks while the desktop UI is being built out.
+            </p>
           </div>
-          <h2 class="text-base font-semibold">Select an action</h2>
-          <p class="text-[13.5px] text-muted-foreground">
-            Pick a tab in the sidebar to run that action, or press
-            <kbd class="inline-flex items-center px-1.5 py-0.5 mx-0.5 rounded border border-border bg-muted font-mono text-[11px]">Ctrl+K</kbd>
-            to search.
-          </p>
         </div>
-      </div>
+      {/if}
     </main>
   </div>
 
-  <LogDrawer />
+  <BottomPanel diagnostics={diagnostics} onPingBridge={runBridgePing} />
 </div>
 
-<CommandPalette bind:open={commandPaletteOpen} />
+<CommandPalette
+  bind:open={commandPaletteOpen}
+  activeTab={activeTab}
+  mods={mods}
+  activeMod={activeMod}
+  onSelectAction={selectAction}
+  onSelectMod={selectMod}
+/>

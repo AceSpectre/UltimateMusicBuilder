@@ -13,20 +13,19 @@ function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle('dark', isDark)
 }
 
-let current = $state<Theme>(getInitialTheme())
-applyTheme(current)
+const initialTheme = getInitialTheme()
+applyTheme(initialTheme)
 
-export const themeStore = {
-  get current() { return current },
-
+export const themeStore = $state({
+  current: initialTheme as Theme,
   set(theme: Theme) {
-    current = theme
+    themeStore.current = theme
     localStorage.setItem('umb-theme', theme)
     applyTheme(theme)
   },
 
   toggle() {
-    const next = current === 'dark' ? 'light' : 'dark'
+    const next = themeStore.current === 'dark' ? 'light' : 'dark'
     themeStore.set(next)
   }
-}
+})

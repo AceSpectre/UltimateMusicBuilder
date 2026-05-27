@@ -1,16 +1,12 @@
-let collapsed = $state(localStorage.getItem('umb-sidebar-collapsed') === 'true')
-let activeTab = $state<string>('build')
-
-export const sidebarStore = {
-  get collapsed() { return collapsed },
-  get activeTab() { return activeTab },
-
+export const sidebarStore = $state({
+  collapsed: localStorage.getItem('umb-sidebar-collapsed') === 'true',
+  activeTab: 'build',
   toggle() {
-    collapsed = !collapsed
-    localStorage.setItem('umb-sidebar-collapsed', String(collapsed))
+    sidebarStore.collapsed = !sidebarStore.collapsed
+    localStorage.setItem('umb-sidebar-collapsed', String(sidebarStore.collapsed))
   },
 
   setActive(tab: string) {
-    activeTab = tab
+    sidebarStore.activeTab = tab
   }
-}
+})

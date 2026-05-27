@@ -30,8 +30,12 @@ export function spawnCliAction(
   onLine: (line: LogLine) => void
 ): void {
   if (currentProcess) {
-    currentProcess.kill()
-    currentProcess = null
+    onLine({
+      timestamp: new Date().toLocaleTimeString('en-GB', { hour12: false }),
+      level: 'warn',
+      message: 'Another CLI action is already running. Cancel it before starting a new one.'
+    })
+    return
   }
 
   let command: string
@@ -42,7 +46,7 @@ export function spawnCliAction(
     spawnArgs = [action, ...args]
   } else {
     command = 'dotnet'
-    spawnArgs = ['run', '--project', join(workspace, 'UMB.CLI'), '--', action, ...args]
+    spawnArgs = ['run', '--project', join(workspace, 'UMB.CLI'), '--no-launch-profile', '--', action, ...args]
   }
 
   const proc = spawn(command, spawnArgs, {
@@ -74,13 +78,15 @@ export function spawnCliAction(
     }
   })
 
-  proc.on('close', (code) => {
+  proc.on('close', (code, signal) => {
     if (stdoutBuffer.trim()) onLine(parseLogLine(stdoutBuffer))
     if (stderrBuffer.trim()) onLine({ ...parseLogLine(stderrBuffer), level: 'error' })
     onLine({
       timestamp: new Date().toLocaleTimeString('en-GB', { hour12: false }),
-      level: code === 0 ? 'info' : 'error',
-      message: `Process exited with code ${code}`
+      level: code === 0 ? 'info' : code === null ? 'warn' : 'error',
+      message: code === null
+        ? `Process exited before completion (${signal ?? 'terminated'})`
+        : `Process exited with code ${code}`
     })
     currentProcess = null
   })

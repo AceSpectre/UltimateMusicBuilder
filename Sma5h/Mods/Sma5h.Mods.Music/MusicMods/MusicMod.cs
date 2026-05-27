@@ -480,7 +480,7 @@ namespace Sma5h.Mods.Music.MusicMods
             //Check if disabled
             if (Path.GetFileName(ModPath).StartsWith("."))
             {
-                _logger.LogDebug("{MusicModFile} is disabled.");
+                _logger.LogDebug("{MusicModFile} is disabled.", ModPath);
                 return false;
             }
 

@@ -12,9 +12,46 @@ export interface ModInfo {
   path: string
 }
 
+export interface ModSeriesInfo {
+  name: string
+  path: string
+}
+
+export interface TrackOrderItem {
+  id: string
+  title: string
+  subtitle: string
+  bgmId: string
+  isLocked: boolean
+  originalIndex: number | null
+}
+
+export interface TrackOrderData {
+  seriesName: string
+  seriesPath: string
+  isExistingSeries: boolean
+  hasSongOrder: boolean
+  items: TrackOrderItem[]
+}
+
+export interface DebugPingResult {
+  ok: boolean
+  workspace: string
+}
+
+export interface WindowActionResult {
+  ok: boolean
+  action: 'minimize' | 'fullscreen' | 'close'
+  fullScreen?: boolean
+}
+
 const api = {
   getWorkspace: (): Promise<string> => ipcRenderer.invoke(IPC.GET_WORKSPACE),
+  debugPing: (): Promise<DebugPingResult> => ipcRenderer.invoke(IPC.DEBUG_PING),
   listMods: (): Promise<ModInfo[]> => ipcRenderer.invoke(IPC.LIST_MODS),
+  listModSeries: (modPath: string): Promise<ModSeriesInfo[]> => ipcRenderer.invoke(IPC.LIST_MOD_SERIES, modPath),
+  loadTrackOrder: (seriesPath: string): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.LOAD_TRACK_ORDER, seriesPath),
+  saveTrackOrder: (seriesPath: string, orderedIds: string[]): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.SAVE_TRACK_ORDER, seriesPath, orderedIds),
   runAction: (action: string, args?: string[]) =>
     ipcRenderer.invoke(IPC.RUN_ACTION, action, args) as Promise<void>,
   cancelAction: () => { ipcRenderer.send(IPC.CANCEL_ACTION) },
@@ -23,9 +60,9 @@ const api = {
     ipcRenderer.on(IPC.LOG_STREAM, handler)
     return () => { ipcRenderer.removeListener(IPC.LOG_STREAM, handler) }
   },
-  windowMinimize: (): void => ipcRenderer.send('window:minimize'),
-  windowMaximize: (): void => ipcRenderer.send('window:maximize'),
-  windowClose: (): void => ipcRenderer.send('window:close')
+  windowMinimize: (): Promise<WindowActionResult> => ipcRenderer.invoke(IPC.WINDOW_MINIMIZE),
+  windowFullscreen: (): Promise<WindowActionResult> => ipcRenderer.invoke(IPC.WINDOW_FULLSCREEN),
+  windowClose: (): Promise<WindowActionResult> => ipcRenderer.invoke(IPC.WINDOW_CLOSE)
 }
 
 contextBridge.exposeInMainWorld('electron', { umb: api })
