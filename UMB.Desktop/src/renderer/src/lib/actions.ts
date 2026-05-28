@@ -13,12 +13,14 @@ export interface NavItem {
 }
 
 export interface NavGroup {
+  id: string
   label: string
   items: NavItem[]
 }
 
 export const navGroups: NavGroup[] = [
   {
+    id: 'build',
     label: 'BUILD',
     items: [
       { id: 'build', label: 'Build', icon: Hammer },
@@ -26,6 +28,7 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
+    id: 'audio',
     label: 'AUDIO',
     items: [
       { id: 'nus3-convert', label: 'Nus3 Convert', icon: AudioWaveform },
@@ -34,6 +37,7 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
+    id: 'organize',
     label: 'ORGANIZE',
     items: [
       { id: 'order-series', label: 'Order Series', icon: ListOrdered },
@@ -42,6 +46,7 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
+    id: 'transfer',
     label: 'TRANSFER',
     items: [
       { id: 'convert', label: 'Import', icon: ArrowLeftRight },
@@ -50,6 +55,7 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
+    id: 'diagnostic',
     label: 'DIAGNOSTIC',
     items: [
       { id: 'dump-stages', label: 'Dump Stages', icon: Database }

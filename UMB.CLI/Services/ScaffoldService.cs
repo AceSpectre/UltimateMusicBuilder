@@ -37,6 +37,7 @@ namespace UMB.CLI.Services
         private bool _vanillaLoadAttempted;
         private Dictionary<string, SeriesEntry> _vanillaSeriesById;
         private ILookup<string, GameTitleEntry> _vanillaGamesBySeriesId;
+        private List<BgmDbRootEntry> _vanillaBgmEntries;
         private Dictionary<string, string> _vanillaPlaylistBySeriesId;
 
         public ScaffoldService(IOptionsMonitor<Sma5hMusicOptions> musicConfig, IAudioStateService audioStateService, ILogger<ScaffoldService> logger)
@@ -65,6 +66,7 @@ namespace UMB.CLI.Services
             int totalAdded = 0;
             int totalDefaultsAdded = 0;
             int totalColumnsUpdated = 0;
+            int totalSongOrdersCreated = 0;
             int totalSeriesOrderAdded = 0;
 
             foreach (var modDir in modDirs)
@@ -159,9 +161,6 @@ namespace UMB.CLI.Services
                     var currentHeaderSet = new HashSet<string>(existingHeaders ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
                     bool needsColumnUpdate = ExpectedCsvColumns.Any(h => !currentHeaderSet.Contains(h));
 
-                    if (newFiles.Count == 0 && !needsColumnUpdate)
-                        continue;
-
                     // Add new rows
                     foreach (var filename in newFiles)
                     {
@@ -176,6 +175,16 @@ namespace UMB.CLI.Services
                             Volume = defaults?.Volume ?? 1.0f
                         });
                     }
+
+                    if (EnsureExistingSeriesSongOrderToml(seriesDir, seriesFile, existingRows))
+                    {
+                        _logger.LogInformation("Created {Path}",
+                            Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SONG_ORDER_TOML_FILE));
+                        totalSongOrdersCreated++;
+                    }
+
+                    if (newFiles.Count == 0 && !needsColumnUpdate)
+                        continue;
 
                     // Rewrite CSV with all rows (also adds any missing columns)
                     using (var writer = new StreamWriter(csvPath))
@@ -213,9 +222,11 @@ namespace UMB.CLI.Services
                 _logger.LogInformation("Populated {Count} new track(s) total.", totalAdded);
             if (totalColumnsUpdated > 0)
                 _logger.LogInformation("Updated {Count} CSV file(s) with new columns.", totalColumnsUpdated);
+            if (totalSongOrdersCreated > 0)
+                _logger.LogInformation("Created {Count} song_order.toml file(s) for existing series.", totalSongOrdersCreated);
             if (totalSeriesOrderAdded > 0)
                 _logger.LogInformation("Appended {Count} custom series to series-order.toml file(s).", totalSeriesOrderAdded);
-            if (totalScaffolded == 0 && totalAdded == 0 && totalDefaultsAdded == 0 && totalColumnsUpdated == 0 && totalSeriesOrderAdded == 0)
+            if (totalScaffolded == 0 && totalAdded == 0 && totalDefaultsAdded == 0 && totalColumnsUpdated == 0 && totalSongOrdersCreated == 0 && totalSeriesOrderAdded == 0)
                 _logger.LogInformation("All series folders are up to date.");
         }
 
@@ -300,6 +311,90 @@ namespace UMB.CLI.Services
             _logger.LogInformation("Appended {Count} series to {Path}: {Names}",
                 newEntries.Count, orderPath, string.Join(", ", newEntries));
             return newEntries.Count;
+        }
+
+        private bool EnsureExistingSeriesSongOrderToml(
+            string seriesDir,
+            FolderSeriesFileConfig seriesFile,
+            IReadOnlyList<FolderTrackCsvRow> trackRows)
+        {
+            if (seriesFile?.Series == null || !seriesFile.Series.ExistingSeries)
+                return false;
+            if (string.IsNullOrWhiteSpace(seriesFile.Series.Id))
+                return false;
+
+            var songOrderPath = Path.Combine(seriesDir,
+                MusicConstants.MusicModFiles.FOLDER_MOD_SONG_ORDER_TOML_FILE);
+            if (File.Exists(songOrderPath))
+                return false;
+
+            EnsureVanillaDataLoaded();
+
+            var uiSeriesId = MusicConstants.InternalIds.SERIES_ID_PREFIX + seriesFile.Series.Id;
+            var gameIdsInSeries = new HashSet<string>(
+                (_vanillaGamesBySeriesId?[uiSeriesId] ?? Enumerable.Empty<GameTitleEntry>())
+                    .Select(g => g.UiGameTitleId)
+                    .Where(id => !string.IsNullOrWhiteSpace(id)),
+                StringComparer.OrdinalIgnoreCase);
+
+            var vanillaSongIds = (_vanillaBgmEntries ?? new List<BgmDbRootEntry>())
+                .Where(b => b.TestDispOrder >= 0
+                    && !string.IsNullOrWhiteSpace(b.UiBgmId)
+                    && !string.IsNullOrWhiteSpace(b.UiGameTitleId)
+                    && gameIdsInSeries.Contains(b.UiGameTitleId))
+                .OrderBy(b => b.TestDispOrder)
+                .Select(b => b.UiBgmId)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (vanillaSongIds.Count == 0)
+            {
+                _logger.LogWarning(
+                    "Skipping {Path}: existing series {SeriesId} has no vanilla songs to seed ordering.",
+                    songOrderPath,
+                    seriesFile.Series.Id);
+                return false;
+            }
+
+            var orderedIds = new List<string>(vanillaSongIds);
+            var vanillaIdSet = new HashSet<string>(vanillaSongIds, StringComparer.OrdinalIgnoreCase);
+            var seen = new HashSet<string>(vanillaSongIds, StringComparer.OrdinalIgnoreCase);
+            foreach (var row in trackRows)
+            {
+                if (string.IsNullOrWhiteSpace(row?.Filename))
+                    continue;
+
+                var toneId = FolderMusicMod.DeriveToneId(row.Filename);
+                if (string.IsNullOrWhiteSpace(toneId))
+                    continue;
+
+                var uiBgmId = MusicConstants.InternalIds.UI_BGM_ID_PREFIX + toneId;
+                if (seen.Add(uiBgmId))
+                    orderedIds.Add(uiBgmId);
+            }
+
+            WriteSongOrderToml(songOrderPath, orderedIds, vanillaIdSet);
+            return true;
+        }
+
+        private static void WriteSongOrderToml(
+            string tomlPath,
+            IReadOnlyList<string> orderedIds,
+            ISet<string> vanillaIds)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("# Generated by UltimateMusicBuilder scaffold for an existing-series mod.");
+            sb.AppendLine("# Vanilla songs keep their in-game order; mod songs are appended after them.");
+            sb.AppendLine("song_order = [");
+            for (int i = 0; i < orderedIds.Count; i++)
+            {
+                var uiBgmId = orderedIds[i];
+                var tag = vanillaIds.Contains(uiBgmId) ? "vanilla" : "mod";
+                var comma = i < orderedIds.Count - 1 ? "," : "";
+                sb.AppendLine($"  \"{EscapeTomlString(uiBgmId)}\"{comma} # {tag}");
+            }
+            sb.AppendLine("]");
+            File.WriteAllText(tomlPath, sb.ToString());
         }
 
         // ── series.toml generation ───────────────────────────────────────────
@@ -559,16 +654,19 @@ namespace UMB.CLI.Services
             try
             {
                 _audioStateService.InitBgmEntriesFromStateManager();
-                _vanillaSeriesById = _audioStateService.GetSeriesEntries()
+                _vanillaSeriesById = (_audioStateService.GetSeriesEntries() ?? Enumerable.Empty<SeriesEntry>())
                     .Where(s => s.Source == EntrySource.Core && !string.IsNullOrEmpty(s.UiSeriesId))
                     .GroupBy(s => s.UiSeriesId)
                     .ToDictionary(g => g.Key, g => g.First());
-                _vanillaGamesBySeriesId = _audioStateService.GetGameTitleEntries()
+                _vanillaGamesBySeriesId = (_audioStateService.GetGameTitleEntries() ?? Enumerable.Empty<GameTitleEntry>())
                     .Where(g => g.Source == EntrySource.Core && !string.IsNullOrEmpty(g.UiSeriesId))
                     .ToLookup(g => g.UiSeriesId);
+                _vanillaBgmEntries = (_audioStateService.GetBgmDbRootEntries() ?? Enumerable.Empty<BgmDbRootEntry>())
+                    .Where(b => b.Source == EntrySource.Core && !string.IsNullOrEmpty(b.UiBgmId))
+                    .ToList();
 
                 var playlistsBySeriesId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var stage in _audioStateService.GetStagesEntries())
+                foreach (var stage in _audioStateService.GetStagesEntries() ?? Enumerable.Empty<StageEntry>())
                 {
                     if (string.IsNullOrEmpty(stage.UiSeriesId) || string.IsNullOrEmpty(stage.BgmSetId))
                         continue;
@@ -582,6 +680,7 @@ namespace UMB.CLI.Services
                 _logger.LogWarning(ex, "Failed to load vanilla game data; existing-series detection disabled for this run.");
                 _vanillaSeriesById = new Dictionary<string, SeriesEntry>();
                 _vanillaGamesBySeriesId = Array.Empty<GameTitleEntry>().ToLookup(g => g.UiSeriesId ?? "");
+                _vanillaBgmEntries = new List<BgmDbRootEntry>();
                 _vanillaPlaylistBySeriesId = new Dictionary<string, string>();
             }
         }

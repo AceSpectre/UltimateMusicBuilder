@@ -2,8 +2,12 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
+using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using Sma5h.Mods.Music.Models;
+using System.Linq;
 using Tests.Helpers;
+using Tomlyn;
+using Tomlyn.Model;
 using UMB.CLI.Services;
 using Xunit;
 
@@ -27,6 +31,50 @@ namespace Tests.Integration
                 _env.CreateMusicOptions(),
                 audioState.Object,
                 TestEnvironment.CreateLogger<ScaffoldService>());
+        }
+
+        private static Mock<IAudioStateService> CreateMarioExistingSeriesAudioState(
+            params (string BgmId, short TestDispOrder)[] vanillaSongs)
+        {
+            var audioState = TestEnvironment.CreateMockAudioStateService();
+
+            var marioSeries = new SeriesEntry("ui_series_mario", EntrySource.Core)
+            {
+                NameId = "mario"
+            };
+            marioSeries.MSBTTitle["en_us"] = "Mario";
+            audioState.Setup(s => s.GetSeriesEntries()).Returns(new[] { marioSeries });
+
+            var marioGame = new GameTitleEntry("ui_gametitle_mario", EntrySource.Core)
+            {
+                NameId = "mario",
+                UiSeriesId = "ui_series_mario"
+            };
+            marioGame.MSBTTitle["en_us"] = "Mario";
+            audioState.Setup(s => s.GetGameTitleEntries()).Returns(new[] { marioGame });
+
+            audioState.Setup(s => s.GetStagesEntries()).Returns(new[]
+            {
+                new StageEntry
+                {
+                    UiSeriesId = "ui_series_mario",
+                    BgmSetId = "bgmmario"
+                }
+            });
+
+            var bgmEntries = vanillaSongs.Select(song =>
+            {
+                var entry = new BgmDbRootEntry(song.BgmId)
+                {
+                    UiGameTitleId = "ui_gametitle_mario",
+                    TestDispOrder = song.TestDispOrder
+                };
+                entry.Title["en_us"] = song.BgmId;
+                return entry;
+            }).ToArray();
+            audioState.Setup(s => s.GetBgmDbRootEntries()).Returns(bgmEntries);
+
+            return audioState;
         }
 
         // ── New series scaffold ────────────────────────────────────────────
@@ -126,28 +174,7 @@ namespace Tests.Integration
         {
             _env.CreateUnconfiguredMod();
 
-            var audioState = TestEnvironment.CreateMockAudioStateService();
-            var marioSeries = new SeriesEntry("ui_series_mario", EntrySource.Core)
-            {
-                NameId = "mario"
-            };
-            marioSeries.MSBTTitle["en_us"] = "Mario";
-            audioState.Setup(s => s.GetSeriesEntries()).Returns(new[] { marioSeries });
-
-            var marioGame = new GameTitleEntry("ui_gametitle_mario", EntrySource.Core)
-            {
-                NameId = "mario",
-                UiSeriesId = "ui_series_mario"
-            };
-            marioGame.MSBTTitle["en_us"] = "Mario";
-            audioState.Setup(s => s.GetGameTitleEntries()).Returns(new[] { marioGame });
-
-            var marioStage = new StageEntry
-            {
-                UiSeriesId = "ui_series_mario",
-                BgmSetId = "bgmmario"
-            };
-            audioState.Setup(s => s.GetStagesEntries()).Returns(new[] { marioStage });
+            var audioState = CreateMarioExistingSeriesAudioState();
 
             var service = CreateService(audioState);
             service.Run();
@@ -168,6 +195,51 @@ namespace Tests.Integration
             var csvPath = Path.Combine(_env.ModPath, "scaffold-mod", "mario", "tracks.csv");
             var lines = File.ReadAllLines(csvPath);
             Assert.Equal(7, lines.Length); // header + 6 tracks
+        }
+
+        [Fact]
+        public void Scaffold_CreatesSongOrderTomlForExistingSeries_WhenMissing()
+        {
+            _env.CreateUnconfiguredMod();
+            var audioState = CreateMarioExistingSeriesAudioState(
+                ("ui_bgm_vanilla_ps01", 10),
+                ("ui_bgm_vanilla_ps02", 20));
+
+            CreateService(audioState).Run();
+
+            var songOrderPath = Path.Combine(_env.ModPath, "scaffold-mod", "mario", "song_order.toml");
+            Assert.True(File.Exists(songOrderPath));
+
+            var model = Toml.ToModel(File.ReadAllText(songOrderPath));
+            var order = (model["song_order"] as TomlArray).OfType<string>().ToList();
+
+            var expectedModIds = TestEnvironment.MarioTrackFiles
+                .Select(name => Path.ChangeExtension(name, ".nus3audio"))
+                .Select(name => MusicConstants.InternalIds.UI_BGM_ID_PREFIX + FolderMusicMod.DeriveToneId(name))
+                .ToList();
+
+            Assert.Equal(2 + expectedModIds.Count, order.Count);
+            Assert.Equal("ui_bgm_vanilla_ps01", order[0]);
+            Assert.Equal("ui_bgm_vanilla_ps02", order[1]);
+            Assert.Equal(expectedModIds, order.Skip(2).ToList());
+        }
+
+        [Fact]
+        public void Scaffold_DoesNotOverwriteExistingSongOrderTomlForExistingSeries()
+        {
+            _env.CreateUnconfiguredMod();
+            var marioDir = Path.Combine(_env.ModPath, "scaffold-mod", "mario");
+            var songOrderPath = Path.Combine(marioDir, "song_order.toml");
+            var original = "song_order = [\n  \"ui_bgm_custom_existing\"\n]\n";
+            File.WriteAllText(songOrderPath, original);
+
+            var audioState = CreateMarioExistingSeriesAudioState(
+                ("ui_bgm_vanilla_ps01", 10),
+                ("ui_bgm_vanilla_ps02", 20));
+
+            CreateService(audioState).Run();
+
+            Assert.Equal(original, File.ReadAllText(songOrderPath));
         }
 
         // ── Series order ───────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { _ } from 'svelte-i18n'
   import { Check, Minus, Square, X, Settings, FolderTree, ChevronDown, Folder } from '@lucide/svelte'
   import { themeStore } from '$lib/stores/theme.svelte'
   import type { ModInfo } from '$lib/types/electron'
@@ -77,8 +78,8 @@
         U
       </div>
       <div class="flex flex-col leading-tight">
-        <span class="font-bold text-sm tracking-[.02em]">Ultimate Music Builder</span>
-        <span class="font-mono text-[10.5px] text-muted-foreground">v0.8.2 · electron</span>
+        <span class="font-bold text-sm tracking-[.02em]">{$_('appBar.brand')}</span>
+        <span class="font-mono text-[10.5px] text-muted-foreground">{$_('appBar.version')}</span>
       </div>
     </div>
 
@@ -91,11 +92,11 @@
       >
         <Folder size={14} class="text-muted-foreground shrink-0" />
         <div class="flex flex-col items-start leading-tight flex-1 min-w-0">
-          <span class="font-mono text-[10.5px] text-muted-foreground">Mods/MusicMods/</span>
+          <span class="font-mono text-[10.5px] text-muted-foreground">{$_('appBar.modsRoot')}</span>
           <span class="text-[13px] font-semibold truncate w-full text-left">
             {loading
-              ? 'Loading mods...'
-              : activeMod?.name ?? 'No mod selected'}
+              ? $_('appBar.loadingMods')
+              : activeMod?.name ?? $_('appBar.noModSelected')}
           </span>
         </div>
         <ChevronDown size={14} class="text-muted-foreground shrink-0 transition-transform {pickerOpen ? 'rotate-180' : ''}" />
@@ -104,7 +105,7 @@
       {#if pickerOpen}
         <div class="absolute left-0 right-0 top-[calc(100%+8px)] z-40 overflow-hidden rounded-xl border border-border bg-popover shadow-2xl">
           <div class="border-b border-border px-3 py-2.5">
-            <div class="text-[10.5px] font-semibold uppercase tracking-[.12em] text-muted-foreground">Select Mod</div>
+            <div class="text-[10.5px] font-semibold uppercase tracking-[.12em] text-muted-foreground">{$_('appBar.selectMod')}</div>
           </div>
 
           <div class="max-h-[320px] overflow-y-auto p-2">
@@ -121,7 +122,7 @@
                 </div>
                 <div class="min-w-0 flex-1">
                   <div class="truncate text-[13px] font-semibold">{mod.name}</div>
-                  <div class="truncate text-[11px] text-muted-foreground">Mods/MusicMods/{mod.name}</div>
+                  <div class="truncate text-[11px] text-muted-foreground">{$_('appBar.modPath', { values: { name: mod.name } })}</div>
                 </div>
                 {#if activeMod?.path === mod.path}
                   <Check size={14} class="shrink-0 text-[hsl(var(--gradient-from))]" />
@@ -139,10 +140,10 @@
     <div class="no-drag flex items-center gap-1.5">
       <span class="inline-flex items-center gap-1 px-2 h-[22px] rounded-full border border-border bg-muted text-[11px] font-medium text-muted-foreground tracking-[.02em]">
         <FolderTree size={11} />
-        {activeMod ? '—' : '0'} series
+        {$_('appBar.seriesCount', { values: { value: activeMod ? '—' : '0' } })}
       </span>
       <span class="inline-flex items-center gap-1 px-2 h-[22px] rounded-full border border-border bg-muted text-[11px] font-medium text-muted-foreground tracking-[.02em]">
-        — tracks
+        {$_('appBar.tracksCount', { values: { value: '—' } })}
       </span>
     </div>
 
@@ -159,21 +160,21 @@
       <button
         onclick={() => onWindowControlAttempt('minimize')}
         class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
-        aria-label="Minimize window"
+        aria-label={$_('appBar.minimize')}
       >
         <Minus size={14} class="text-muted-foreground" />
       </button>
       <button
         onclick={() => onWindowControlAttempt('fullscreen')}
         class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
-        aria-label="Toggle fullscreen"
+        aria-label={$_('appBar.fullscreen')}
       >
         <Square size={12} class="text-muted-foreground" />
       </button>
       <button
         onclick={() => onWindowControlAttempt('close')}
         class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
-        aria-label="Close window"
+        aria-label={$_('appBar.close')}
       >
         <X size={14} class="text-muted-foreground" />
       </button>

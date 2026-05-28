@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Search } from '@lucide/svelte'
+  import { _ } from 'svelte-i18n'
   import { actions, shouldRunCliAction } from '$lib/actions'
   import type { ModInfo } from '$lib/types/electron'
 
@@ -24,7 +25,7 @@
   const filtered = $derived(() => {
     if (!query.trim()) return actions
     const q = query.toLowerCase()
-    return actions.filter(a => a.label.toLowerCase().includes(q))
+    return actions.filter(a => $_('nav.items.' + a.id).toLowerCase().includes(q))
   })
 
   function selectAction(id: string) {
@@ -66,7 +67,7 @@
         <input
           bind:this={inputEl}
           bind:value={query}
-          placeholder="Search actions..."
+          placeholder={$_('commandPalette.searchPlaceholder')}
           class="flex-1 h-12 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         />
       </div>
@@ -74,10 +75,10 @@
       <!-- Results -->
       <div class="max-h-[300px] overflow-y-auto p-2">
         {#if filtered().length === 0}
-          <div class="px-3 py-6 text-center text-sm text-muted-foreground">No results found.</div>
+          <div class="px-3 py-6 text-center text-sm text-muted-foreground">{$_('commandPalette.noResults')}</div>
         {:else}
           <div class="px-2 py-1.5 text-[10.5px] font-semibold tracking-[.12em] uppercase text-muted-foreground">
-            Actions
+            {$_('commandPalette.actions')}
           </div>
           {#each filtered() as action}
             <button
@@ -85,14 +86,14 @@
               class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left hover:bg-accent transition-colors
                 {activeTab === action.id ? 'bg-accent font-medium' : ''}"
             >
-              {action.label}
+              {$_('nav.items.' + action.id)}
             </button>
           {/each}
         {/if}
 
         {#if mods.length > 0 && !query.trim()}
           <div class="mt-2 px-2 py-1.5 text-[10.5px] font-semibold tracking-[.12em] uppercase text-muted-foreground">
-            Mods
+            {$_('commandPalette.mods')}
           </div>
           {#each mods as mod}
             <button

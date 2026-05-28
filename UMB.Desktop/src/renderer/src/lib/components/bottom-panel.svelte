@@ -1,6 +1,7 @@
 <script lang="ts">
   import { PanelBottomClose, PanelBottomOpen, RefreshCw, X, ChevronLeft, ChevronRight } from '@lucide/svelte'
   import { tick } from 'svelte'
+  import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
 
   interface DiagnosticsState {
@@ -111,28 +112,28 @@
   <div
     class="h-2 cursor-row-resize border-b border-border bg-background/60 hover:bg-accent/50"
     role="separator"
-    aria-label="Resize bottom panel"
+    aria-label={$_('bottomPanel.resizePanel')}
     aria-orientation="horizontal"
     onpointerdown={startHeightResize}
   ></div>
 
   {#if !logStore.drawerOpen}
     <div class="flex h-[26px] items-center justify-between px-3.5">
-      <span class="font-mono text-xs text-muted-foreground">bottom panel</span>
+      <span class="font-mono text-xs text-muted-foreground">{$_('bottomPanel.collapsedLabel')}</span>
       <button
         onclick={() => logStore.toggleDrawer()}
         class="flex items-center gap-1.5 rounded-[7px] px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         <PanelBottomOpen size={13} />
-        Show panel
+        {$_('bottomPanel.show')}
       </button>
     </div>
   {:else}
     <div class="flex h-[calc(100%-8px)] min-h-0 flex-col">
       <div class="flex items-center justify-between border-b border-border px-3.5 py-2">
         <div class="flex items-center gap-2">
-          <span class="text-[12.5px] font-semibold">Bottom Panel</span>
-          <span class="font-mono text-xs text-muted-foreground">{logStore.lineCount} log lines</span>
+          <span class="text-[12.5px] font-semibold">{$_('bottomPanel.title')}</span>
+          <span class="font-mono text-xs text-muted-foreground">{$_('bottomPanel.logLines', { values: { count: logStore.lineCount } })}</span>
         </div>
         <button
           onclick={() => logStore.toggleDrawer()}
@@ -158,7 +159,7 @@
                   {/if}
                 </button>
                 {#if !consoleCollapsed}
-                  <span class="text-[12px] font-semibold">Console</span>
+                  <span class="text-[12px] font-semibold">{$_('bottomPanel.console')}</span>
                 {/if}
               </div>
 
@@ -169,7 +170,7 @@
                       onclick={() => logStore.setFilter(filterName)}
                       class="rounded-[7px] px-2 py-1 text-[11px] font-medium capitalize transition-colors {logStore.filter === filterName ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}"
                     >
-                      {filterName}
+                      {$_('bottomPanel.filters.' + filterName)}
                     </button>
                   {/each}
                   <button
@@ -185,7 +186,7 @@
             {#if !consoleCollapsed}
               <div bind:this={scrollContainer} onscroll={handleScroll} class="min-h-0 flex-1 overflow-y-auto px-3.5 py-2">
                 {#if logStore.filtered.length === 0}
-                  <div class="py-2 font-mono text-xs text-muted-foreground">No log entries yet.</div>
+                  <div class="py-2 font-mono text-xs text-muted-foreground">{$_('bottomPanel.noLogs')}</div>
                 {:else}
                   {#each logStore.filtered as line}
                     <div class="flex items-baseline gap-3 font-mono text-[11.5px] leading-[1.65]">
@@ -206,7 +207,7 @@
           <div
             class="w-2 shrink-0 cursor-col-resize bg-background/60 hover:bg-accent/50"
             role="separator"
-            aria-label="Resize bottom panel sections"
+            aria-label={$_('bottomPanel.resizeSections')}
             aria-orientation="vertical"
             onpointerdown={startSplitResize}
           ></div>
@@ -227,7 +228,7 @@
                   {/if}
                 </button>
                 {#if !debugCollapsed}
-                  <span class="text-[12px] font-semibold">Runtime Debug</span>
+                  <span class="text-[12px] font-semibold">{$_('bottomPanel.runtimeDebug')}</span>
                 {/if}
               </div>
 
@@ -237,22 +238,22 @@
                   class="flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted"
                 >
                   <RefreshCw size={12} />
-                  Ping
+                  {$_('bottomPanel.ping')}
                 </button>
               {/if}
             </div>
 
             {#if !debugCollapsed}
               <div class="min-h-0 flex-1 overflow-y-auto px-3.5 py-2 font-mono text-[11px] leading-5 text-muted-foreground">
-                <div>bridge: <span class="text-foreground">{diagnostics.bridgeStatus}</span></div>
-                <div>workspace: <span class="break-all text-foreground">{diagnostics.workspace}</span></div>
-                <div>mods: <span class="text-foreground">{diagnostics.modsStatus}</span></div>
-                <div>active tab: <span class="text-foreground">{diagnostics.lastAction}</span></div>
-                <div>mod selections: <span class="text-foreground">{diagnostics.modSelections}</span> / {diagnostics.lastMod}</div>
-                <div>action clicks: <span class="text-foreground">{diagnostics.actionClicks}</span></div>
-                <div>window clicks: <span class="text-foreground">{diagnostics.windowClicks}</span> / {diagnostics.lastWindowRequest}</div>
-                <div>window ack: <span class="text-foreground">{diagnostics.lastWindowAck}</span></div>
-                <div>last error: <span class="break-all text-foreground">{diagnostics.lastError}</span></div>
+                <div>{$_('bottomPanel.debug.bridge')} <span class="text-foreground">{diagnostics.bridgeStatus}</span></div>
+                <div>{$_('bottomPanel.debug.workspace')} <span class="break-all text-foreground">{diagnostics.workspace}</span></div>
+                <div>{$_('bottomPanel.debug.mods')} <span class="text-foreground">{diagnostics.modsStatus}</span></div>
+                <div>{$_('bottomPanel.debug.activeTab')} <span class="text-foreground">{diagnostics.lastAction}</span></div>
+                <div>{$_('bottomPanel.debug.modSelections')} <span class="text-foreground">{diagnostics.modSelections}</span> / {diagnostics.lastMod}</div>
+                <div>{$_('bottomPanel.debug.actionClicks')} <span class="text-foreground">{diagnostics.actionClicks}</span></div>
+                <div>{$_('bottomPanel.debug.windowClicks')} <span class="text-foreground">{diagnostics.windowClicks}</span> / {diagnostics.lastWindowRequest}</div>
+                <div>{$_('bottomPanel.debug.windowAck')} <span class="text-foreground">{diagnostics.lastWindowAck}</span></div>
+                <div>{$_('bottomPanel.debug.lastError')} <span class="break-all text-foreground">{diagnostics.lastError}</span></div>
               </div>
             {/if}
           </div>

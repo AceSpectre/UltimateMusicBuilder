@@ -40,4 +40,7 @@ Adding songs to existing series (Final Fantasy, Persona, etc.) required two fixe
 - Vanilla Persona has 11 songs (ps01–ps11): Mass Destruction, Battle Hymn of the Soul, Reach Out to the Truth, I'll Face Myself, Time to Make History, Wake Up Get Up Get Out There, Last Surprise, Rivers in the Desert, Our Beginning, Aria of the Soul, Beneath the Mask.
 
 ## Testing
-Test on Nintendo Switch by copying ArcOutput to the SD card mod folder. No automated test suite exists.
+Test on Nintendo Switch by copying ArcOutput to the SD card mod folder.
+
+## Desktop app
+Ensure all static text is localised.

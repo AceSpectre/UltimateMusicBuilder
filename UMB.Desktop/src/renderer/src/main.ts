@@ -1,4 +1,5 @@
 import './app.css'
+import './locale'
 import App from './App.svelte'
 import { mount } from 'svelte'
 

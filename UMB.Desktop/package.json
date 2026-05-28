@@ -18,6 +18,8 @@
     "clsx": "^2.1.1",
     "csv-parse": "^6.2.1",
     "csv-stringify": "^6.7.0",
+    "svelte-dnd-action": "^0.9.69",
+    "svelte-i18n": "^4.0.1",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

@@ -3,6 +3,7 @@ import type { ModInfo } from '$lib/types/electron'
 export const modsStore = $state({
   mods: [] as ModInfo[],
   activeMod: null as ModInfo | null,
+  activeSeriesPath: null as string | null,
   loading: false,
   async load() {
     modsStore.loading = true

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { _ } from 'svelte-i18n'
   import { navGroups } from '$lib/actions'
   let {
     activeTab,
@@ -24,7 +25,7 @@
       <div class="py-1">
         {#if !collapsed}
           <div class="px-3.5 pt-2.5 pb-1 text-[10.5px] font-semibold tracking-[.12em] uppercase text-muted-foreground">
-            {group.label}
+            {$_('nav.groups.' + group.id)}
           </div>
         {/if}
 
@@ -39,7 +40,7 @@
             style={isActive
               ? 'background: linear-gradient(135deg, hsl(var(--gradient-from) / .14), hsl(var(--gradient-to) / .14));'
               : ''}
-            title={collapsed ? item.label : undefined}
+            title={collapsed ? $_('nav.items.' + item.id) : undefined}
           >
             {#if isActive}
               <div
@@ -49,7 +50,7 @@
             <item.icon size={16} class="shrink-0 {isActive ? 'opacity-100' : 'opacity-85'}" />
 
             {#if !collapsed}
-              <span class="text-[13.5px] truncate">{item.label}</span>
+              <span class="text-[13.5px] truncate">{$_('nav.items.' + item.id)}</span>
             {/if}
           </button>
         {/each}

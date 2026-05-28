@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { _ } from 'svelte-i18n'
   import AppBar from '$lib/components/app-bar.svelte'
   import Sidebar from '$lib/components/sidebar.svelte'
   import BottomPanel from '$lib/components/bottom-panel.svelte'
@@ -146,9 +147,9 @@
                 <path d="M3 14h18"/>
               </svg>
             </div>
-            <h2 class="text-base font-semibold">{diagnostics.lastAction === 'none' ? 'Select an action' : diagnostics.lastAction}</h2>
+            <h2 class="text-base font-semibold">{diagnostics.lastAction === 'none' ? $_('app.selectAction') : diagnostics.lastAction}</h2>
             <p class="text-[13.5px] text-muted-foreground">
-              Action selection now changes the desktop view without auto-running the CLI. This avoids non-interactive prompt failures and overlapping `dotnet run` locks while the desktop UI is being built out.
+              {$_('app.viewModeNotice')}
             </p>
           </div>
         </div>
