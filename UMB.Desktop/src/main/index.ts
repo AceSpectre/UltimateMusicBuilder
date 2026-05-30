@@ -8,6 +8,9 @@ import { IPC } from '../shared/ipc-channels'
 let mainWindow: BrowserWindow | null = null
 
 function getWorkspacePath(): string {
+  if (process.env['UMB_WORKSPACE']) {
+    return resolve(process.env['UMB_WORKSPACE'])
+  }
   if (app.isPackaged) {
     return resolve(process.resourcesPath, '..')
   }
