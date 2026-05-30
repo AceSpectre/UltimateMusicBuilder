@@ -31,6 +31,21 @@ export interface TrackOrderData {
   items: TrackOrderItem[]
 }
 
+export interface SeriesOrderItem {
+  id: string
+  name: string
+  seriesId: string
+  iconDataUrl: string | null
+  originalIndex: number
+}
+
+export interface SeriesOrderData {
+  modName: string
+  modPath: string
+  hasSeriesOrder: boolean
+  items: SeriesOrderItem[]
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string
@@ -49,6 +64,8 @@ export interface UmbApi {
   listModSeries(modPath: string): Promise<ModSeriesInfo[]>
   loadTrackOrder(seriesPath: string): Promise<TrackOrderData>
   saveTrackOrder(seriesPath: string, orderedIds: string[]): Promise<TrackOrderData>
+  loadSeriesOrder(modPath: string): Promise<SeriesOrderData>
+  saveSeriesOrder(modPath: string, orderedIds: string[]): Promise<SeriesOrderData>
   runAction(action: string, args?: string[]): Promise<void>
   cancelAction(): void
   subscribeLogs(cb: (line: LogLine) => void): () => void

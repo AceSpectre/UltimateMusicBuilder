@@ -55,6 +55,6 @@ test('app bar displays brand text', async () => {
 
 test('sidebar renders action labels', async () => {
   const page = await firstWindow(app)
-  await expect(page.getByText('Build', { exact: true })).toBeVisible()
+  await expect(page.getByRole('navigation').getByText('Build', { exact: true })).toBeVisible()
   await expect(page.getByText('Order Tracks')).toBeVisible()
 })

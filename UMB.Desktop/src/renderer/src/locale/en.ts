@@ -1,4 +1,14 @@
 export default {
+  build: {
+    title: 'Build',
+    subtitle: 'Build and scaffold mod output for your Nintendo Switch.',
+    buildButton: 'Build',
+    buildDescription: 'Compile all mods into ArcOutput for the Switch.',
+    buildDisabled: 'Build is not yet available in the desktop app.',
+    scaffoldButton: 'Scaffold',
+    scaffoldDescription: 'Generate folder structure and series order for existing mods.',
+    running: 'Running...'
+  },
   app: {
     selectAction: 'Select an action',
     viewModeNotice:
@@ -28,7 +38,6 @@ export default {
     },
     items: {
       build: 'Build',
-      scaffold: 'Scaffold',
       'nus3-convert': 'Nus3 Convert',
       'accept-nus3': 'Accept Nus3',
       'config-volume': 'Config Volume',
@@ -75,6 +84,21 @@ export default {
       windowAck: 'window ack:',
       lastError: 'last error:'
     }
+  },
+  orderSeries: {
+    title: 'Order Series',
+    dragHint: 'Drag series to reorder. Custom series appear after official series, before Other.',
+    chooseMod: 'Choose a mod',
+    chooseModBody: 'Select a mod from the app bar to view and reorder its custom series.',
+    noCustomSeries: 'No custom series found in this mod.',
+    loading: 'Loading series...',
+    reload: 'Reload series',
+    save: 'Save Order',
+    saving: 'Saving...',
+    saved: 'Saved',
+    dragAria: 'Drag to reorder',
+    emptyTitle: 'No custom series',
+    emptyBody: 'This mod has no custom series to reorder. Only non-existing series (not built into the game) can be reordered here.'
   },
   orderTracks: {
     title: 'Order Tracks',

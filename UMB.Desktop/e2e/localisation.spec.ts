@@ -33,16 +33,17 @@ test('sidebar labels match locale strings', async () => {
   const page = await firstWindow(app)
 
   const expectedLabels = [
-    'Build', 'Scaffold',
+    'Build',
     'Nus3 Convert', 'Accept Nus3', 'Config Volume',
     'Order Series', 'Order Tracks', 'Cleanup',
     'Import', 'Merge', 'Extract Icons',
     'Dump Stages'
   ]
 
+  const sidebar = page.getByRole('navigation')
   for (const label of expectedLabels) {
     await expect(
-      page.getByText(label, { exact: true }),
+      sidebar.getByText(label, { exact: true }),
       `Expected sidebar label "${label}" to be visible`
     ).toBeVisible()
   }

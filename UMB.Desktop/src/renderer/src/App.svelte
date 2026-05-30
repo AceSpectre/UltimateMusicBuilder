@@ -5,7 +5,9 @@
   import Sidebar from '$lib/components/sidebar.svelte'
   import BottomPanel from '$lib/components/bottom-panel.svelte'
   import CommandPalette from '$lib/components/command-palette.svelte'
+  import BuildView from '$lib/components/actions/build-view.svelte'
   import OrderTracksView from '$lib/components/actions/order-tracks-view.svelte'
+  import OrderSeriesView from '$lib/components/actions/order-series-view.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
   import type { ModInfo, WindowActionResult } from '$lib/types/electron'
 
@@ -133,7 +135,11 @@
     <Sidebar activeTab={activeTab} onSelectAction={selectAction} />
 
     <main class="flex-1 flex flex-col overflow-hidden bg-background">
-      {#if activeTab === 'order-tracks'}
+      {#if activeTab === 'build'}
+        <BuildView />
+      {:else if activeTab === 'order-series'}
+        <OrderSeriesView activeMod={activeMod} />
+      {:else if activeTab === 'order-tracks'}
         <OrderTracksView activeMod={activeMod} />
       {:else}
         <div class="flex-1 grid place-items-center p-8">

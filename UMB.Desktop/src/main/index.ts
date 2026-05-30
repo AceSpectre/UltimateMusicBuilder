@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron'
 import { join, resolve } from 'path'
 import { listModSeries, listMods } from './mods'
 import { loadTrackOrderData, saveTrackOrderData } from './order-tracks'
+import { loadSeriesOrderData, saveSeriesOrderData } from './order-series'
 import { spawnCliAction, cancelCurrentAction } from './cli'
 import { IPC } from '../shared/ipc-channels'
 
@@ -64,6 +65,10 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.LOAD_TRACK_ORDER, (_event, seriesPath: string) => loadTrackOrderData(workspace, seriesPath))
 
   ipcMain.handle(IPC.SAVE_TRACK_ORDER, (_event, seriesPath: string, orderedIds: string[]) => saveTrackOrderData(workspace, seriesPath, orderedIds))
+
+  ipcMain.handle(IPC.LOAD_SERIES_ORDER, (_event, modPath: string) => loadSeriesOrderData(workspace, modPath))
+
+  ipcMain.handle(IPC.SAVE_SERIES_ORDER, (_event, modPath: string, orderedIds: string[]) => saveSeriesOrderData(workspace, modPath, orderedIds))
 
   ipcMain.handle(IPC.RUN_ACTION, (_event, action: string, args?: string[]) => {
     if (!mainWindow) return

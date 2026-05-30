@@ -1,5 +1,5 @@
 import {
-  Hammer, FolderTree, AudioWaveform, CheckCircle, Volume2,
+  Hammer, AudioWaveform, CheckCircle, Volume2,
   ListOrdered, ArrowUpDown, Wand2, ArrowLeftRight, GitMerge,
   Image, Database
 } from '@lucide/svelte'
@@ -23,8 +23,7 @@ export const navGroups: NavGroup[] = [
     id: 'build',
     label: 'BUILD',
     items: [
-      { id: 'build', label: 'Build', icon: Hammer },
-      { id: 'scaffold', label: 'Scaffold', icon: FolderTree }
+      { id: 'build', label: 'Build', icon: Hammer, mode: 'view' }
     ]
   },
   {
@@ -40,7 +39,7 @@ export const navGroups: NavGroup[] = [
     id: 'organize',
     label: 'ORGANIZE',
     items: [
-      { id: 'order-series', label: 'Order Series', icon: ListOrdered },
+      { id: 'order-series', label: 'Order Series', icon: ListOrdered, mode: 'view' },
       { id: 'order-tracks', label: 'Order Tracks', icon: ArrowUpDown, mode: 'view' },
       { id: 'cleanup', label: 'Cleanup', icon: Wand2 }
     ]
