@@ -28,16 +28,17 @@ export function spawnCliAction(
   action: string,
   args: string[],
   onLine: (line: LogLine) => void
-): void {
+): Promise<number> {
   if (currentProcess) {
     onLine({
       timestamp: new Date().toLocaleTimeString('en-GB', { hour12: false }),
       level: 'warn',
       message: 'Another CLI action is already running. Cancel it before starting a new one.'
     })
-    return
+    return Promise.resolve(-1)
   }
 
+  return new Promise<number>((resolveExit) => {
   let command: string
   let spawnArgs: string[]
 
@@ -89,6 +90,8 @@ export function spawnCliAction(
         : `Process exited with code ${code}`
     })
     currentProcess = null
+    resolveExit(code ?? -1)
+  })
   })
 }
 

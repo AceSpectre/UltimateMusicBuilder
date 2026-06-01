@@ -29,7 +29,7 @@ namespace UMB.CLI
             {
                 using var scope = serviceProvider.CreateScope();
                 var entry = scope.ServiceProvider.GetService<Script>();
-                await RunAction(args[0].ToLowerInvariant(), entry);
+                await RunAction(args[0].ToLowerInvariant(), entry, args.Length > 1 ? args[1..] : null);
                 return;
             }
 
@@ -50,7 +50,7 @@ namespace UMB.CLI
             }
         }
 
-        private static async Task RunAction(string action, Script entry)
+        private static async Task RunAction(string action, Script entry, string[] extraArgs = null)
         {
             try
             {
@@ -74,8 +74,14 @@ namespace UMB.CLI
                     case "nus3-convert":
                         entry.RunNus3Convert();
                         break;
+                    case "nus3-convert-batch":
+                        entry.RunNus3ConvertBatch(extraArgs?.Length > 0 ? extraArgs[0] : null);
+                        break;
                     case "accept-nus3":
                         entry.RunAcceptValidatedNus3();
+                        break;
+                    case "accept-nus3-batch":
+                        entry.RunAcceptValidatedNus3Batch(extraArgs?.Length > 0 ? extraArgs[0] : null);
                         break;
                     case "cleanup":
                         entry.RunCleanup();
@@ -94,7 +100,7 @@ namespace UMB.CLI
                         break;
                     default:
                         Console.WriteLine($"Unknown command: {action}");
-                        Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|accept-nus3|cleanup|order-series|order-tracks|config-volume|dump-stages]");
+                        Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|nus3-convert-batch|accept-nus3|accept-nus3-batch|cleanup|order-series|order-tracks|config-volume|dump-stages]");
                         break;
                 }
             }
@@ -116,7 +122,6 @@ namespace UMB.CLI
             ["Build          - Build mods and generate ArcOutput"] = "build",
             ["Scaffold       - Create series.toml/tracks.csv and populate new music files"] = "scaffold",
             ["Nus3 Convert   - Convert audio files to nus3audio with loop points"] = "nus3-convert",
-            ["Accept Nus3    - Accept validated nus3audio files into series"] = "accept-nus3",
             ["Convert        - Import a Sma5h mod to UMB folder format"] = "convert",
             ["Merge          - Merge two or more UMB mods into one"] = "merge",
             ["Extract Icons  - Extract series icons from a built Sma5h mod"] = "extract-icons",

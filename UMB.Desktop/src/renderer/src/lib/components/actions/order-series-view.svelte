@@ -153,7 +153,7 @@
                     <img
                       src={item.iconDataUrl}
                       alt={item.name}
-                      class="w-full h-full object-contain"
+                      class="w-full h-full object-contain invert dark:invert-0"
                       draggable="false"
                     />
                   {:else}

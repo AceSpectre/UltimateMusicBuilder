@@ -57,8 +57,8 @@ function loadSeriesOrder(orderPath: string): string[] {
   return Array.from(text.matchAll(/"([^"]+)"/g), (match) => match[1].trim()).filter(Boolean)
 }
 
-function scanCustomSeries(modPath: string): Array<{ dirName: string; id: string; name: string; iconPath: string | null }> {
-  const results: Array<{ dirName: string; id: string; name: string; iconPath: string | null }> = []
+function scanCustomSeries(modPath: string): Array<{ dirName: string; id: string; name: string; iconDataUrl: string | null }> {
+  const results: Array<{ dirName: string; id: string; name: string; iconDataUrl: string | null }> = []
 
   let entries: string[]
   try {

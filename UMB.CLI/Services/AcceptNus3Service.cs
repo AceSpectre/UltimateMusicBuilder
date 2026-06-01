@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using Spectre.Console;
 
 namespace UMB.CLI.Services
@@ -36,6 +37,12 @@ namespace UMB.CLI.Services
             _scaffold = scaffold;
         }
 
+        public class AcceptBatchInput
+        {
+            public string SeriesPath { get; set; }
+            public bool DeleteSources { get; set; }
+        }
+
         public void Run()
         {
             Script.PrintBanner(_logger);
@@ -51,8 +58,7 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            var nus3Files = Directory.GetFiles(validateDir, "*.nus3audio").ToList();
-            if (nus3Files.Count == 0)
+            if (Directory.GetFiles(validateDir, "*.nus3audio").Length == 0)
             {
                 _logger.LogWarning("No .nus3audio files found in {Dir}.", validateDir);
                 return;
@@ -64,7 +70,54 @@ namespace UMB.CLI.Services
                     .Title("Delete original source audio files after accepting?")
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices("Yes - delete source files", "No - keep source files"));
-            bool shouldDeleteSources = deleteSources.StartsWith("Yes");
+
+            AcceptCore(seriesDir, deleteSources.StartsWith("Yes"));
+        }
+
+        /// <summary>
+        /// Non-interactive entry point used by the desktop app. Reads a JSON file
+        /// of the form { "seriesPath": "...", "deleteSources": true } and accepts
+        /// every validated nus3audio in that series' songs-to-validate folder.
+        /// </summary>
+        public void RunBatch(string jsonPath)
+        {
+            if (string.IsNullOrWhiteSpace(jsonPath) || !File.Exists(jsonPath))
+            {
+                _logger.LogError("Usage: dotnet run accept-nus3-batch <input.json>");
+                return;
+            }
+
+            var input = JsonSerializer.Deserialize<AcceptBatchInput>(
+                File.ReadAllText(jsonPath),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (input == null || string.IsNullOrWhiteSpace(input.SeriesPath))
+            {
+                _logger.LogError("No seriesPath found in {Path}.", jsonPath);
+                return;
+            }
+
+            var seriesDir = input.SeriesPath;
+            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
+            if (!Directory.Exists(validateDir))
+            {
+                _logger.LogWarning("No songs-to-validate folder found in {Dir}.", seriesDir);
+                return;
+            }
+
+            if (Directory.GetFiles(validateDir, "*.nus3audio").Length == 0)
+            {
+                _logger.LogWarning("No .nus3audio files found in {Dir}.", validateDir);
+                return;
+            }
+
+            AcceptCore(seriesDir, input.DeleteSources);
+        }
+
+        private void AcceptCore(string seriesDir, bool shouldDeleteSources)
+        {
+            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
+            var nus3Files = Directory.GetFiles(validateDir, "*.nus3audio").ToList();
 
             int accepted = 0;
             int sourcesRemoved = 0;

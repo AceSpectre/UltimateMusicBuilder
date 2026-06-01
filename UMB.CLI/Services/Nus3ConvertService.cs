@@ -12,10 +12,25 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using VGAudio.Cli;
 
 namespace UMB.CLI.Services
 {
+    public class Nus3BatchInput
+    {
+        public string SeriesPath { get; set; }
+        public List<Nus3BatchDecision> Decisions { get; set; }
+    }
+
+    public class Nus3BatchDecision
+    {
+        public string Filename { get; set; }
+        public string Mode { get; set; }
+        public long LoopStartSamples { get; set; }
+        public long LoopEndSamples { get; set; }
+    }
+
     public class Nus3ConvertService
     {
         private readonly ILogger _logger;
@@ -306,6 +321,205 @@ namespace UMB.CLI.Services
             _logger.LogInformation("Output: {ValidateDir}", validateDir);
             _logger.LogInformation("Listen to the files in foobar2000 (with vgmstream) to verify loop points.");
             _logger.LogInformation("Delete any files you don't like, then run 'Accept Validated Nus3'.");
+        }
+
+        public void RunBatch(string jsonPath)
+        {
+            if (string.IsNullOrWhiteSpace(jsonPath))
+            {
+                _logger.LogError("Usage: dotnet run nus3-convert-batch <decisions.json>");
+                return;
+            }
+
+            if (!File.Exists(jsonPath))
+            {
+                _logger.LogError("JSON file not found: {Path}", jsonPath);
+                return;
+            }
+
+            var jsonText = File.ReadAllText(jsonPath);
+            var input = JsonSerializer.Deserialize<Nus3BatchInput>(jsonText,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (input == null || input.Decisions == null || input.Decisions.Count == 0)
+            {
+                _logger.LogError("No decisions found in {Path}.", jsonPath);
+                return;
+            }
+
+            var seriesDir = input.SeriesPath;
+            if (!Directory.Exists(seriesDir))
+            {
+                _logger.LogError("Series path does not exist: {Path}", seriesDir);
+                return;
+            }
+
+            var nus3AudioExe = ToolPathResolver.Resolve(_musicConfig.CurrentValue.ToolsPath, MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
+            if (nus3AudioExe == null)
+            {
+                _logger.LogError("nus3audio binary not found under Tools/{Rel}. Run scripts/fetch-tools to install.", MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
+                return;
+            }
+
+            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
+            Directory.CreateDirectory(validateDir);
+
+            var tempDir = Path.Combine(_musicConfig.CurrentValue.TempPath, "nus3convert");
+            Directory.CreateDirectory(tempDir);
+
+            int converted = 0;
+
+            foreach (var decision in input.Decisions)
+            {
+                var sourceFile = Path.Combine(seriesDir, decision.Filename);
+                var basename = Path.GetFileNameWithoutExtension(decision.Filename);
+                var outputNus3 = Path.Combine(validateDir, basename + ".nus3audio");
+
+                if (File.Exists(outputNus3))
+                {
+                    _logger.LogInformation("Skipping '{Basename}': already exists in songs-to-validate.", basename);
+                    continue;
+                }
+
+                if (!File.Exists(sourceFile))
+                {
+                    _logger.LogError("Source file not found: {Path}", sourceFile);
+                    continue;
+                }
+
+                _logger.LogInformation("Processing '{Basename}' (mode: {Mode})...", basename, decision.Mode);
+
+                // Step 2: Convert to WAV at 48kHz if needed
+                var wavFile = sourceFile;
+                bool tempWav = false;
+                if (!sourceFile.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                {
+                    wavFile = Path.Combine(tempDir, basename + ".wav");
+                    if (!RunFfmpeg(sourceFile, wavFile))
+                    {
+                        _logger.LogError("  ffmpeg conversion failed for '{Basename}', skipping.", basename);
+                        continue;
+                    }
+                    tempWav = true;
+                }
+
+                long loopStart, loopEnd;
+                if (string.Equals(decision.Mode, "loop", StringComparison.OrdinalIgnoreCase))
+                {
+                    loopStart = decision.LoopStartSamples;
+                    loopEnd = decision.LoopEndSamples;
+                    _logger.LogInformation("  Loop points: {Start}-{End}", loopStart, loopEnd);
+                }
+                else
+                {
+                    // end-to-end
+                    loopStart = 0;
+                    var wavSamples = GetWavSampleCount(wavFile);
+                    if (wavSamples <= 0)
+                    {
+                        _logger.LogError("  Could not determine sample count for '{Basename}', skipping.", basename);
+                        if (tempWav && File.Exists(wavFile)) File.Delete(wavFile);
+                        continue;
+                    }
+                    loopEnd = wavSamples - 1;
+                    _logger.LogInformation("  Full-song loop: 0-{End}", loopEnd);
+                }
+
+                // Step 3: Convert WAV -> lopus via VGAudioCli library
+                var lopusFile = Path.Combine(tempDir, basename + ".lopus");
+                try
+                {
+                    var oldOut = Console.Out;
+                    using (var writer = new StringWriter())
+                    {
+                        Console.SetOut(writer);
+                        Converter.RunConverterCli(new string[]
+                        {
+                            "-i", wavFile,
+                            "-o", lopusFile,
+                            "--opusheader", "Namco",
+                            "--cbr",
+                            "-l", $"{loopStart}-{loopEnd}"
+                        });
+                    }
+                    Console.SetOut(oldOut);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "  VGAudioCli conversion failed for '{Basename}'.", basename);
+                    continue;
+                }
+
+                if (!File.Exists(lopusFile) || new FileInfo(lopusFile).Length == 0)
+                {
+                    _logger.LogError("  VGAudioCli produced no output for '{Basename}', skipping.", basename);
+                    continue;
+                }
+
+                // Step 4: Wrap lopus -> nus3audio
+                var toneId = DeriveToneId(basename);
+                try
+                {
+                    var process = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = nus3AudioExe,
+                            Arguments = $"-n -w \"{outputNus3}\"",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        }
+                    };
+                    process.Start();
+                    process.WaitForExit();
+
+                    process = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = nus3AudioExe,
+                            Arguments = $"-A {toneId} \"{lopusFile}\" -w \"{outputNus3}\"",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        }
+                    };
+                    process.Start();
+                    process.WaitForExit();
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "  nus3audio wrapping failed for '{Basename}'.", basename);
+                    continue;
+                }
+
+                if (File.Exists(outputNus3) && new FileInfo(outputNus3).Length > 0)
+                {
+                    _logger.LogInformation("  -> {OutputPath}", outputNus3);
+                    converted++;
+                }
+                else
+                {
+                    _logger.LogError("  nus3audio output was empty for '{Basename}'.", basename);
+                }
+
+                // Clean up temp files
+                if (tempWav && File.Exists(wavFile))
+                    File.Delete(wavFile);
+                if (File.Exists(lopusFile))
+                    File.Delete(lopusFile);
+            }
+
+            // Clean up temp dir
+            try { Directory.Delete(tempDir, recursive: false); } catch { }
+
+            _logger.LogInformation("--------------------");
+            _logger.LogInformation("Batch nus3 conversion complete: {Converted}/{Total} file(s) converted.",
+                converted, input.Decisions.Count);
+            _logger.LogInformation("Output: {ValidateDir}", validateDir);
         }
 
         private int PromptForLoopCandidate(

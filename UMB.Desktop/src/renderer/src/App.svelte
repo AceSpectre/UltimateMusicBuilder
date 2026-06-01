@@ -8,6 +8,7 @@
   import BuildView from '$lib/components/actions/build-view.svelte'
   import OrderTracksView from '$lib/components/actions/order-tracks-view.svelte'
   import OrderSeriesView from '$lib/components/actions/order-series-view.svelte'
+  import Nus3ConvertView from '$lib/components/actions/nus3-convert-view.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
   import type { ModInfo, WindowActionResult } from '$lib/types/electron'
 
@@ -139,6 +140,8 @@
         <BuildView />
       {:else if activeTab === 'order-series'}
         <OrderSeriesView activeMod={activeMod} />
+      {:else if activeTab === 'nus3-convert'}
+        <Nus3ConvertView activeMod={activeMod} />
       {:else if activeTab === 'order-tracks'}
         <OrderTracksView activeMod={activeMod} />
       {:else}

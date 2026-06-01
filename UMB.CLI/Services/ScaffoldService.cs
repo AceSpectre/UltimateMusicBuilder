@@ -129,25 +129,13 @@ namespace UMB.CLI.Services
 
                     var defaults = seriesFile.DefaultTrackData;
 
-                    // Read existing CSV rows
-                    var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
-                    {
-                        HasHeaderRecord = true,
-                        TrimOptions = TrimOptions.Trim,
-                        MissingFieldFound = null
-                    };
-                    List<FolderTrackCsvRow> existingRows;
-                    string[] existingHeaders;
-                    using (var reader = new StreamReader(csvPath))
-                    using (var csv = new CsvReader(reader, csvConfig))
-                    {
-                        csv.Context.RegisterClassMap<FolderTrackCsvRowMap>();
-                        existingRows = csv.GetRecords<FolderTrackCsvRow>().ToList();
-                        existingHeaders = csv.HeaderRecord;
-                    }
+                    // Read existing CSV rows (dynamic — preserves all columns including "order")
+                    var (existingRows, existingHeaders) = ReadCsvRows(csvPath);
 
                     var existingFilenames = new HashSet<string>(
-                        existingRows.Where(r => !string.IsNullOrWhiteSpace(r.Filename)).Select(r => r.Filename),
+                        existingRows
+                            .Where(r => r.TryGetValue("filename", out var f) && !string.IsNullOrWhiteSpace(f))
+                            .Select(r => r["filename"]),
                         StringComparer.OrdinalIgnoreCase);
 
                     // Find music files not already in CSV, sorted alphabetically
@@ -158,22 +146,27 @@ namespace UMB.CLI.Services
                         .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                         .ToList();
 
-                    var currentHeaderSet = new HashSet<string>(existingHeaders ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+                    var currentHeaderSet = new HashSet<string>(existingHeaders, StringComparer.OrdinalIgnoreCase);
                     bool needsColumnUpdate = ExpectedCsvColumns.Any(h => !currentHeaderSet.Contains(h));
+                    if (needsColumnUpdate)
+                        existingHeaders = existingHeaders
+                            .Concat(ExpectedCsvColumns.Where(h => !currentHeaderSet.Contains(h)))
+                            .ToArray();
 
                     // Add new rows
                     foreach (var filename in newFiles)
                     {
-                        existingRows.Add(new FolderTrackCsvRow
-                        {
-                            Filename = filename,
-                            Game = defaults?.Game ?? folderName,
-                            Title = Path.GetFileNameWithoutExtension(filename),
-                            Author = defaults?.Author ?? "",
-                            Copyright = defaults?.Copyright ?? "",
-                            RecordType = defaults?.RecordType ?? "original",
-                            Volume = defaults?.Volume ?? 1.0f
-                        });
+                        var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var h in existingHeaders)
+                            row[h] = "";
+                        row["filename"] = filename;
+                        row["game"] = defaults?.Game ?? folderName;
+                        row["title"] = Path.GetFileNameWithoutExtension(filename);
+                        row["author"] = defaults?.Author ?? "";
+                        row["copyright"] = defaults?.Copyright ?? "";
+                        row["record_type"] = defaults?.RecordType ?? "original";
+                        row["volume"] = (defaults?.Volume ?? 1.0f).ToString(CultureInfo.InvariantCulture);
+                        existingRows.Add(row);
                     }
 
                     if (EnsureExistingSeriesSongOrderToml(seriesDir, seriesFile, existingRows))
@@ -186,16 +179,8 @@ namespace UMB.CLI.Services
                     if (newFiles.Count == 0 && !needsColumnUpdate)
                         continue;
 
-                    // Rewrite CSV with all rows (also adds any missing columns)
-                    using (var writer = new StreamWriter(csvPath))
-                    using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
-                    {
-                        HasHeaderRecord = true
-                    }))
-                    {
-                        csv.Context.RegisterClassMap<FolderTrackCsvRowMap>();
-                        csv.WriteRecords(existingRows);
-                    }
+                    // Rewrite CSV with all rows (preserves every column)
+                    WriteCsvRows(csvPath, existingRows, existingHeaders);
 
                     if (needsColumnUpdate)
                     {
@@ -316,7 +301,7 @@ namespace UMB.CLI.Services
         private bool EnsureExistingSeriesSongOrderToml(
             string seriesDir,
             FolderSeriesFileConfig seriesFile,
-            IReadOnlyList<FolderTrackCsvRow> trackRows)
+            IReadOnlyList<Dictionary<string, string>> trackRows)
         {
             if (seriesFile?.Series == null || !seriesFile.Series.ExistingSeries)
                 return false;
@@ -361,10 +346,11 @@ namespace UMB.CLI.Services
             var seen = new HashSet<string>(vanillaSongIds, StringComparer.OrdinalIgnoreCase);
             foreach (var row in trackRows)
             {
-                if (string.IsNullOrWhiteSpace(row?.Filename))
+                var filename = row?.GetValueOrDefault("filename", "");
+                if (string.IsNullOrWhiteSpace(filename))
                     continue;
 
-                var toneId = FolderMusicMod.DeriveToneId(row.Filename);
+                var toneId = FolderMusicMod.DeriveToneId(filename);
                 if (string.IsNullOrWhiteSpace(toneId))
                     continue;
 
@@ -698,6 +684,56 @@ namespace UMB.CLI.Services
                 }
             }
             return fallback;
+        }
+
+        private static (List<Dictionary<string, string>> rows, string[] headers) ReadCsvRows(string csvPath)
+        {
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = true,
+                TrimOptions = TrimOptions.Trim,
+                MissingFieldFound = null,
+                BadDataFound = null,
+            };
+
+            using var reader = new StreamReader(csvPath);
+            using var csv = new CsvReader(reader, config);
+            csv.Read();
+            csv.ReadHeader();
+            var headers = csv.HeaderRecord;
+
+            var rows = new List<Dictionary<string, string>>();
+            while (csv.Read())
+            {
+                var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var h in headers)
+                    dict[h] = csv.GetField(h) ?? "";
+                rows.Add(dict);
+            }
+
+            return (rows, headers);
+        }
+
+        private static void WriteCsvRows(string csvPath, List<Dictionary<string, string>> rows, string[] headers)
+        {
+            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                HasHeaderRecord = true,
+            };
+
+            using var writer = new StreamWriter(csvPath);
+            using var csv = new CsvWriter(writer, config);
+
+            foreach (var h in headers)
+                csv.WriteField(h);
+            csv.NextRecord();
+
+            foreach (var row in rows)
+            {
+                foreach (var h in headers)
+                    csv.WriteField(row.GetValueOrDefault(h, ""));
+                csv.NextRecord();
+            }
         }
 
         private static string EscapeTomlString(string value)

@@ -1,5 +1,5 @@
 import {
-  Hammer, AudioWaveform, CheckCircle, Volume2,
+  Hammer, AudioWaveform, Volume2,
   ListOrdered, ArrowUpDown, Wand2, ArrowLeftRight, GitMerge,
   Image, Database
 } from '@lucide/svelte'
@@ -30,8 +30,7 @@ export const navGroups: NavGroup[] = [
     id: 'audio',
     label: 'AUDIO',
     items: [
-      { id: 'nus3-convert', label: 'Nus3 Convert', icon: AudioWaveform },
-      { id: 'accept-nus3', label: 'Accept Nus3', icon: CheckCircle },
+      { id: 'nus3-convert', label: 'Nus3 Convert', icon: AudioWaveform, mode: 'view' },
       { id: 'config-volume', label: 'Config Volume', icon: Volume2 }
     ]
   },

@@ -64,7 +64,9 @@ namespace UMB.CLI
         public void RunMerge() => _merge.Run();
         public void RunExtractIcons() => _extractIcons.Run();
         public void RunNus3Convert() => _nus3Convert.Run();
+        public void RunNus3ConvertBatch(string jsonPath) => _nus3Convert.RunBatch(jsonPath);
         public void RunAcceptValidatedNus3() => _acceptNus3.Run();
+        public void RunAcceptValidatedNus3Batch(string jsonPath) => _acceptNus3.RunBatch(jsonPath);
         public void RunCleanup() => _cleanup.Run();
         public void RunOrderSeries() => _orderSeries.Run();
         public void RunOrderTracks() => _orderTracks.Run();

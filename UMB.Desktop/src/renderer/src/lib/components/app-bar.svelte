@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { _ } from 'svelte-i18n'
-  import { Check, Minus, Square, X, Settings, FolderTree, ChevronDown, Folder } from '@lucide/svelte'
+  import { Check, Minus, Square, X, FolderTree, ChevronDown, Folder, Sun, Moon } from '@lucide/svelte'
   import { themeStore } from '$lib/stores/theme.svelte'
   import type { ModInfo } from '$lib/types/electron'
 
@@ -21,6 +21,19 @@
 
   let pickerOpen = $state(false)
   let pickerEl: HTMLDivElement | undefined = $state()
+  let stats = $state<{ seriesCount: number; trackCount: number } | null>(null)
+
+  // Refresh series/track counts whenever the active mod changes.
+  $effect(() => {
+    const path = activeMod?.path ?? null
+    stats = null
+    if (!path) return
+    let cancelled = false
+    void window.electron.umb.getModStats(path).then((s) => {
+      if (!cancelled) stats = s
+    })
+    return () => { cancelled = true }
+  })
 
   function togglePicker() {
     if (mods.length === 0) {
@@ -140,10 +153,10 @@
     <div class="no-drag flex items-center gap-1.5">
       <span class="inline-flex items-center gap-1 px-2 h-[22px] rounded-full border border-border bg-muted text-[11px] font-medium text-muted-foreground tracking-[.02em]">
         <FolderTree size={11} />
-        {$_('appBar.seriesCount', { values: { value: activeMod ? '—' : '0' } })}
+        {$_('appBar.seriesCount', { values: { value: activeMod ? (stats?.seriesCount ?? '—') : '0' } })}
       </span>
       <span class="inline-flex items-center gap-1 px-2 h-[22px] rounded-full border border-border bg-muted text-[11px] font-medium text-muted-foreground tracking-[.02em]">
-        {$_('appBar.tracksCount', { values: { value: '—' } })}
+        {$_('appBar.tracksCount', { values: { value: activeMod ? (stats?.trackCount ?? '—') : '0' } })}
       </span>
     </div>
 
@@ -151,8 +164,13 @@
     <button
       onclick={() => themeStore.toggle()}
       class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
+      title={themeStore.current === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
     >
-      <Settings size={15} class="text-muted-foreground" />
+      {#if themeStore.current === 'dark'}
+        <Sun size={15} class="text-muted-foreground" />
+      {:else}
+        <Moon size={15} class="text-muted-foreground" />
+      {/if}
     </button>
 
     <!-- Window controls -->
