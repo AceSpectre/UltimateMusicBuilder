@@ -71,6 +71,9 @@ namespace UMB.CLI
         public void RunOrderSeries() => _orderSeries.Run();
         public void RunOrderTracks() => _orderTracks.Run();
         public void RunConfigVolume() => _volumeConfig.Run();
+        public void RunConfigVolumeAnalyze(string jsonPath) => _volumeConfig.RunAnalyzeBatch(jsonPath);
+        public void RunConfigVolumeSave(string jsonPath) => _volumeConfig.RunSaveBatch(jsonPath);
+        public void RunConfigVolumePreview(string jsonPath) => _volumeConfig.RunPreviewBatch(jsonPath);
         public void RunDumpStages() => _dumpStages.Run();
 
         // ── Shared helpers used by services ──

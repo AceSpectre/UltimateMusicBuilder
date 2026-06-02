@@ -1,6 +1,6 @@
 import {
   Hammer, AudioWaveform, Volume2,
-  ListOrdered, ArrowUpDown, Wand2, ArrowLeftRight, GitMerge,
+  ListOrdered, ArrowUpDown, ArrowLeftRight, GitMerge,
   Image, Database
 } from '@lucide/svelte'
 import type { Component } from 'svelte'
@@ -31,7 +31,7 @@ export const navGroups: NavGroup[] = [
     label: 'AUDIO',
     items: [
       { id: 'nus3-convert', label: 'Nus3 Convert', icon: AudioWaveform, mode: 'view' },
-      { id: 'config-volume', label: 'Config Volume', icon: Volume2 }
+      { id: 'config-volume', label: 'Config Volume', icon: Volume2, mode: 'view' }
     ]
   },
   {
@@ -39,8 +39,7 @@ export const navGroups: NavGroup[] = [
     label: 'ORGANIZE',
     items: [
       { id: 'order-series', label: 'Order Series', icon: ListOrdered, mode: 'view' },
-      { id: 'order-tracks', label: 'Order Tracks', icon: ArrowUpDown, mode: 'view' },
-      { id: 'cleanup', label: 'Cleanup', icon: Wand2 }
+      { id: 'order-tracks', label: 'Order Tracks', icon: ArrowUpDown, mode: 'view' }
     ]
   },
   {

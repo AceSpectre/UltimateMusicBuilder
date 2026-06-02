@@ -100,6 +100,39 @@ export interface Nus3AnalysisResult {
   candidates: LoopCandidate[]
 }
 
+export interface LoopAnalysisOptions {
+  minLoopDuration?: number
+  minDurationMultiplier?: number
+  disablePruning?: boolean
+  force?: boolean
+}
+
+export interface VolumeRowItem {
+  originalIndex: number
+  title: string
+  filename: string
+  hasMeasurement: boolean
+  measuredLufs: number
+  autoGain: number
+  wasClamped: boolean
+  userOverride: number
+}
+
+export interface VolumeConfigData {
+  seriesName: string
+  seriesPath: string
+  globalVolumeMultiplier: number
+  targetLufs: number
+  maxMultiplier: number
+  ffmpegAvailable: boolean
+  items: VolumeRowItem[]
+}
+
+export interface VolumeOverride {
+  originalIndex: number
+  volume: number
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string
@@ -122,12 +155,16 @@ const api = {
   loadSeriesOrder: (modPath: string): Promise<SeriesOrderData> => ipcRenderer.invoke(IPC.LOAD_SERIES_ORDER, modPath),
   saveSeriesOrder: (modPath: string, orderedIds: string[]): Promise<SeriesOrderData> => ipcRenderer.invoke(IPC.SAVE_SERIES_ORDER, modPath, orderedIds),
   listNus3Sources: (seriesPath: string): Promise<Nus3SourceTrack[]> => ipcRenderer.invoke(IPC.LIST_NUS3_SOURCES, seriesPath),
-  analyzeLoopPoints: (seriesPath: string, filename: string): Promise<Nus3AnalysisResult> => ipcRenderer.invoke(IPC.ANALYZE_LOOP_POINTS, seriesPath, filename),
+  analyzeLoopPoints: (seriesPath: string, filename: string, options?: LoopAnalysisOptions): Promise<Nus3AnalysisResult> => ipcRenderer.invoke(IPC.ANALYZE_LOOP_POINTS, seriesPath, filename, options),
   loadNus3Conversions: (seriesPath: string): Promise<Record<string, Nus3ConversionMeta>> => ipcRenderer.invoke(IPC.LOAD_NUS3_CONVERSIONS, seriesPath),
   convertNus3Track: (seriesPath: string, decision: Nus3TrackDecision): Promise<boolean> => ipcRenderer.invoke(IPC.CONVERT_NUS3_TRACK, seriesPath, decision),
   rejectNus3Track: (seriesPath: string, trackId: string): Promise<void> => ipcRenderer.invoke(IPC.REJECT_NUS3_TRACK, seriesPath, trackId),
   acceptNus3Files: (seriesPath: string, deleteSources: boolean): Promise<number> => ipcRenderer.invoke(IPC.ACCEPT_NUS3_FILES, seriesPath, deleteSources),
+  loadVolumeConfig: (seriesPath: string): Promise<VolumeConfigData> => ipcRenderer.invoke(IPC.LOAD_VOLUME_CONFIG, seriesPath),
+  saveVolumeConfig: (seriesPath: string, overrides: VolumeOverride[]): Promise<void> => ipcRenderer.invoke(IPC.SAVE_VOLUME_CONFIG, seriesPath, overrides),
+  decodeTrackPreview: (seriesPath: string, filename: string): Promise<string | null> => ipcRenderer.invoke(IPC.DECODE_TRACK_PREVIEW, seriesPath, filename),
   extractWaveform: (seriesPath: string, filename: string, bars?: number): Promise<number[]> => ipcRenderer.invoke(IPC.EXTRACT_WAVEFORM, seriesPath, filename, bars),
+  getTrackDuration: (seriesPath: string, filename: string): Promise<number> => ipcRenderer.invoke(IPC.GET_TRACK_DURATION, seriesPath, filename),
   generateLoopPreview: (seriesPath: string, filename: string, loopStartSec: number, loopEndSec: number, previewLength: number): Promise<string | null> => ipcRenderer.invoke(IPC.GENERATE_LOOP_PREVIEW, seriesPath, filename, loopStartSec, loopEndSec, previewLength),
   runAction: (action: string, args?: string[]) =>
     ipcRenderer.invoke(IPC.RUN_ACTION, action, args) as Promise<void>,

@@ -97,6 +97,39 @@ export interface Nus3AnalysisResult {
   candidates: LoopCandidate[]
 }
 
+export interface LoopAnalysisOptions {
+  minLoopDuration?: number
+  minDurationMultiplier?: number
+  disablePruning?: boolean
+  force?: boolean
+}
+
+export interface VolumeRowItem {
+  originalIndex: number
+  title: string
+  filename: string
+  hasMeasurement: boolean
+  measuredLufs: number
+  autoGain: number
+  wasClamped: boolean
+  userOverride: number
+}
+
+export interface VolumeConfigData {
+  seriesName: string
+  seriesPath: string
+  globalVolumeMultiplier: number
+  targetLufs: number
+  maxMultiplier: number
+  ffmpegAvailable: boolean
+  items: VolumeRowItem[]
+}
+
+export interface VolumeOverride {
+  originalIndex: number
+  volume: number
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string
@@ -119,12 +152,16 @@ export interface UmbApi {
   loadSeriesOrder(modPath: string): Promise<SeriesOrderData>
   saveSeriesOrder(modPath: string, orderedIds: string[]): Promise<SeriesOrderData>
   listNus3Sources(seriesPath: string): Promise<Nus3SourceTrack[]>
-  analyzeLoopPoints(seriesPath: string, filename: string): Promise<Nus3AnalysisResult>
+  analyzeLoopPoints(seriesPath: string, filename: string, options?: LoopAnalysisOptions): Promise<Nus3AnalysisResult>
   loadNus3Conversions(seriesPath: string): Promise<Record<string, Nus3ConversionMeta>>
   convertNus3Track(seriesPath: string, decision: Nus3TrackDecision): Promise<boolean>
   rejectNus3Track(seriesPath: string, trackId: string): Promise<void>
   acceptNus3Files(seriesPath: string, deleteSources: boolean): Promise<number>
+  loadVolumeConfig(seriesPath: string): Promise<VolumeConfigData>
+  saveVolumeConfig(seriesPath: string, overrides: VolumeOverride[]): Promise<void>
+  decodeTrackPreview(seriesPath: string, filename: string): Promise<string | null>
   extractWaveform(seriesPath: string, filename: string, bars?: number): Promise<number[]>
+  getTrackDuration(seriesPath: string, filename: string): Promise<number>
   generateLoopPreview(seriesPath: string, filename: string, loopStartSec: number, loopEndSec: number, previewLength: number): Promise<string | null>
   runAction(action: string, args?: string[]): Promise<void>
   cancelAction(): void

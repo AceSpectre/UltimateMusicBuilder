@@ -95,12 +95,21 @@ namespace UMB.CLI
                     case "config-volume":
                         entry.RunConfigVolume();
                         break;
+                    case "config-volume-analyze":
+                        entry.RunConfigVolumeAnalyze(extraArgs?.Length > 0 ? extraArgs[0] : null);
+                        break;
+                    case "config-volume-save":
+                        entry.RunConfigVolumeSave(extraArgs?.Length > 0 ? extraArgs[0] : null);
+                        break;
+                    case "config-volume-preview":
+                        entry.RunConfigVolumePreview(extraArgs?.Length > 0 ? extraArgs[0] : null);
+                        break;
                     case "dump-stages":
                         entry.RunDumpStages();
                         break;
                     default:
                         Console.WriteLine($"Unknown command: {action}");
-                        Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|nus3-convert-batch|accept-nus3|accept-nus3-batch|cleanup|order-series|order-tracks|config-volume|dump-stages]");
+                        Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|nus3-convert-batch|accept-nus3|accept-nus3-batch|cleanup|order-series|order-tracks|config-volume|config-volume-analyze|config-volume-save|config-volume-preview|dump-stages]");
                         break;
                 }
             }

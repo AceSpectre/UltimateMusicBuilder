@@ -45,6 +45,28 @@ export interface Nus3AnalysisResult {
   candidates: LoopCandidate[]
 }
 
+/** pymusiclooper tuning passed from the convert view's settings panel. */
+export interface LoopAnalysisOptions {
+  /** --min-loop-duration (seconds). Overrides the duration multiplier when > 0. */
+  minLoopDuration?: number
+  /** --min-duration-multiplier (0<x<1). pymusiclooper default is 0.35. */
+  minDurationMultiplier?: number
+  /** --disable-pruning: keep loop points the initial pass would discard. */
+  disablePruning?: boolean
+  /** Bypass the analysis cache and re-run pymusiclooper. */
+  force?: boolean
+}
+
+/**
+ * Relaxed fallback used automatically when the default pass finds nothing:
+ * a short minimum loop and no pruning surfaces short loops (e.g. boss themes)
+ * that the default 0.35 duration multiplier rejects.
+ */
+const RELAXED_OPTIONS: LoopAnalysisOptions = {
+  minLoopDuration: 2,
+  disablePruning: true
+}
+
 export interface Nus3TrackDecision {
   trackId: string
   mode: 'loop' | 'end-to-end'
@@ -242,22 +264,31 @@ export function listNus3Sources(_workspace: string, seriesPath: string): Nus3Sou
 
 // ── pymusiclooper analysis (cached) ──
 
-export async function analyzeLoopPoints(_workspace: string, filePath: string): Promise<Nus3AnalysisResult> {
+export async function analyzeLoopPoints(
+  _workspace: string,
+  filePath: string,
+  options: LoopAnalysisOptions = {}
+): Promise<Nus3AnalysisResult> {
   const seriesPath = dirname(filePath)
   const filename = basename(filePath)
 
-  const cached = getCacheEntry(seriesPath, filename)
-  if (cached && cached.candidates) {
-    return {
-      track: {
-        id: filename,
-        name: prettifyName(filename),
-        src: filename,
-        duration: cached.duration,
-        durationSeconds: cached.durationSeconds,
-        converted: existsSync(nus3PathFor(seriesPath, filename))
-      },
-      candidates: cached.candidates
+  // Use the cache only for non-forced runs, and only when it holds actual loop
+  // points — an empty cached result is retried so the relaxed fallback (or new
+  // settings) gets a chance to find loops.
+  if (!options.force) {
+    const cached = getCacheEntry(seriesPath, filename)
+    if (cached && cached.candidates && cached.candidates.length > 0) {
+      return {
+        track: {
+          id: filename,
+          name: prettifyName(filename),
+          src: filename,
+          duration: cached.duration,
+          durationSeconds: cached.durationSeconds,
+          converted: existsSync(nus3PathFor(seriesPath, filename))
+        },
+        candidates: cached.candidates
+      }
     }
   }
 
@@ -272,7 +303,17 @@ export async function analyzeLoopPoints(_workspace: string, filePath: string): P
     converted: existsSync(nus3PathFor(seriesPath, filename))
   }
 
-  const candidates = await runPymusiclooper(filePath, probe.sampleRate, probe.duration)
+  let candidates = await runPymusiclooper(filePath, probe.sampleRate, options)
+
+  // Auto-fallback: when the default pass finds nothing and the caller didn't
+  // already supply explicit loop options, retry once with relaxed settings.
+  const explicit =
+    options.minLoopDuration != null ||
+    options.minDurationMultiplier != null ||
+    options.disablePruning != null
+  if (candidates.length === 0 && !explicit) {
+    candidates = await runPymusiclooper(filePath, probe.sampleRate, RELAXED_OPTIONS)
+  }
 
   updateCacheEntry(seriesPath, filename, {
     duration: track.duration,
@@ -286,16 +327,26 @@ export async function analyzeLoopPoints(_workspace: string, filePath: string): P
 async function runPymusiclooper(
   filePath: string,
   sampleRate: number,
-  _durationSeconds: number
+  options: LoopAnalysisOptions = {}
 ): Promise<LoopCandidate[]> {
   try {
-    const { stdout } = await execFileAsync('pymusiclooper', [
+    const args = [
       'export-points',
       '--path', filePath,
       '--alt-export-top', '10',
       '--fmt', 'samples',
       '--export-to', 'stdout'
-    ], { timeout: 120000 })
+    ]
+    if (options.minLoopDuration != null && options.minLoopDuration > 0) {
+      args.push('--min-loop-duration', String(options.minLoopDuration))
+    } else if (options.minDurationMultiplier != null) {
+      args.push('--min-duration-multiplier', String(options.minDurationMultiplier))
+    }
+    if (options.disablePruning) {
+      args.push('--disable-pruning')
+    }
+
+    const { stdout } = await execFileAsync('pymusiclooper', args, { timeout: 120000 })
 
     const candidates: LoopCandidate[] = []
     const lines = stdout.split('\n').filter((l) => l.trim().length > 0)
@@ -355,6 +406,26 @@ async function runPymusiclooper(
 }
 
 const previewDir = join(tmpdir(), 'umb-previews')
+
+// ── duration probe (cached, no pymusiclooper) ──
+
+/** Track duration in seconds from the analysis cache, or a cheap ffprobe. */
+export async function getTrackDuration(filePath: string): Promise<number> {
+  const seriesPath = dirname(filePath)
+  const filename = basename(filePath)
+
+  const cached = getCacheEntry(seriesPath, filename)
+  if (cached && cached.durationSeconds > 0) return cached.durationSeconds
+
+  const probe = await ffprobe(filePath)
+  if (probe.duration > 0) {
+    updateCacheEntry(seriesPath, filename, {
+      duration: formatDuration(probe.duration),
+      durationSeconds: probe.duration
+    })
+  }
+  return probe.duration
+}
 
 // ── waveform peaks (cached) ──
 

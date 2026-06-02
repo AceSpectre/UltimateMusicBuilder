@@ -14,10 +14,60 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace UMB.CLI.Services
 {
+    // ── Desktop batch I/O contracts (mirrors the Avalonia VolumeConfigWindow, headless) ──
+
+    public class VolumeAnalyzeBatchInput
+    {
+        public string SeriesPath { get; set; }
+        public string OutputPath { get; set; }
+    }
+
+    public class VolumeSaveBatchInput
+    {
+        public string SeriesPath { get; set; }
+        public List<VolumeOverride> Overrides { get; set; }
+    }
+
+    public class VolumeOverride
+    {
+        public int OriginalIndex { get; set; }
+        public float Volume { get; set; }
+    }
+
+    public class VolumePreviewBatchInput
+    {
+        public string SeriesPath { get; set; }
+        public string Filename { get; set; }
+        public string OutputPath { get; set; }
+    }
+
+    public class VolumeRowDto
+    {
+        public int OriginalIndex { get; set; }
+        public string Title { get; set; }
+        public string Filename { get; set; }
+        public bool HasMeasurement { get; set; }
+        public float MeasuredLufs { get; set; }
+        public float AutoGain { get; set; }
+        public bool WasClamped { get; set; }
+        public float UserOverride { get; set; }
+    }
+
+    public class VolumeAnalyzeResultDto
+    {
+        public string SeriesName { get; set; }
+        public float GlobalVolumeMultiplier { get; set; }
+        public float TargetLufs { get; set; }
+        public float MaxMultiplier { get; set; }
+        public bool FfmpegAvailable { get; set; }
+        public List<VolumeRowDto> Items { get; set; } = new();
+    }
+
     public class VolumeConfigService
     {
         private readonly ILogger _logger;
@@ -171,6 +221,182 @@ namespace UMB.CLI.Services
 
             WriteCsvRows(csvPath, rows, headers);
             _logger.LogInformation("Volume overrides saved to {Path}.", csvPath);
+        }
+
+        /// <summary>
+        /// Non-interactive analysis for the desktop app. Reads
+        /// { "seriesPath": "...", "outputPath": "..." }, measures every track's
+        /// loudness + auto-gain (same as the interactive window) and writes a
+        /// VolumeAnalyzeResultDto JSON to outputPath for the renderer to render.
+        /// </summary>
+        public void RunAnalyzeBatch(string jsonPath)
+        {
+            var input = ReadBatchInput<VolumeAnalyzeBatchInput>(jsonPath, "config-volume-analyze");
+            if (input == null || string.IsNullOrWhiteSpace(input.SeriesPath) || string.IsNullOrWhiteSpace(input.OutputPath))
+            {
+                _logger.LogError("Invalid input: seriesPath and outputPath are required.");
+                return;
+            }
+
+            var seriesDir = input.SeriesPath;
+            var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
+            if (!File.Exists(csvPath))
+            {
+                _logger.LogWarning("No tracks.csv found in {SeriesDir}.", seriesDir);
+                WriteAnalyzeResult(input.OutputPath, new VolumeAnalyzeResultDto { SeriesName = Path.GetFileName(seriesDir) });
+                return;
+            }
+
+            var (rows, _) = ReadCsvRows(csvPath);
+
+            var globalMult = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
+            var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization;
+            var target = lufsOpts?.TargetLufs ?? -14.0f;
+            var maxMult = lufsOpts?.MaxGainMultiplier ?? 4.0f;
+
+            if (!_lufsService.IsAvailable)
+                _logger.LogWarning("FFmpeg is not available — auto-gain values cannot be calculated. Overrides can still be edited.");
+
+            var dtos = new VolumeRowDto[rows.Count];
+            Parallel.For(0, rows.Count, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
+            {
+                var row = rows[i];
+                var filename = row.GetValueOrDefault("filename", "");
+                var title = row.GetValueOrDefault("title", filename);
+                var sourcePath = string.IsNullOrEmpty(filename) ? "" : Path.Combine(seriesDir, filename);
+
+                var dto = new VolumeRowDto
+                {
+                    OriginalIndex = i,
+                    Title = title,
+                    Filename = filename,
+                    UserOverride = ParseVolume(row.GetValueOrDefault("volume", "1.0")),
+                    AutoGain = 1.0f,
+                };
+
+                if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
+                {
+                    var measurement = _lufsService.Measure(sourcePath);
+                    if (measurement.IsValid)
+                    {
+                        var gain = _lufsService.CalculateGain(measurement, target, maxMult);
+                        dto.MeasuredLufs = measurement.IntegratedLufs;
+                        dto.AutoGain = gain.Multiplier;
+                        dto.WasClamped = gain.WasClamped;
+                        dto.HasMeasurement = true;
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Source file missing for row {Index}: {Path}", i, sourcePath);
+                }
+
+                dtos[i] = dto;
+            });
+
+            _lufsService.SaveCache();
+
+            WriteAnalyzeResult(input.OutputPath, new VolumeAnalyzeResultDto
+            {
+                SeriesName = Path.GetFileName(seriesDir),
+                GlobalVolumeMultiplier = globalMult,
+                TargetLufs = target,
+                MaxMultiplier = maxMult,
+                FfmpegAvailable = _lufsService.IsAvailable,
+                Items = dtos.ToList(),
+            });
+            _logger.LogInformation("Volume analysis written for {Count} track(s).", dtos.Length);
+        }
+
+        /// <summary>
+        /// Non-interactive save for the desktop app. Reads
+        /// { "seriesPath": "...", "overrides": [{ "originalIndex": 0, "volume": 1.2 }] }
+        /// and persists each override into the tracks.csv `volume` column.
+        /// </summary>
+        public void RunSaveBatch(string jsonPath)
+        {
+            var input = ReadBatchInput<VolumeSaveBatchInput>(jsonPath, "config-volume-save");
+            if (input == null || string.IsNullOrWhiteSpace(input.SeriesPath))
+            {
+                _logger.LogError("Invalid input: seriesPath is required.");
+                return;
+            }
+
+            var csvPath = Path.Combine(input.SeriesPath, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
+            if (!File.Exists(csvPath))
+            {
+                _logger.LogWarning("No tracks.csv found in {SeriesDir}.", input.SeriesPath);
+                return;
+            }
+
+            var (rows, headers) = ReadCsvRows(csvPath);
+            if (!headers.Contains("volume"))
+                headers = headers.Append("volume").ToArray();
+
+            foreach (var ov in input.Overrides ?? new List<VolumeOverride>())
+            {
+                if (ov.OriginalIndex < 0 || ov.OriginalIndex >= rows.Count) continue;
+                rows[ov.OriginalIndex]["volume"] = ov.Volume.ToString("0.###", CultureInfo.InvariantCulture);
+            }
+
+            WriteCsvRows(csvPath, rows, headers);
+            _logger.LogInformation("Volume overrides saved to {Path}.", csvPath);
+        }
+
+        /// <summary>
+        /// Decodes a single track to a PCM WAV at the requested path so the desktop
+        /// renderer can preview it (through a Web Audio gain node) at the exact
+        /// post-build loudness. Reads { "seriesPath", "filename", "outputPath" }.
+        /// </summary>
+        public void RunPreviewBatch(string jsonPath)
+        {
+            var input = ReadBatchInput<VolumePreviewBatchInput>(jsonPath, "config-volume-preview");
+            if (input == null || string.IsNullOrWhiteSpace(input.SeriesPath)
+                || string.IsNullOrWhiteSpace(input.Filename) || string.IsNullOrWhiteSpace(input.OutputPath))
+            {
+                _logger.LogError("Invalid input: seriesPath, filename and outputPath are required.");
+                return;
+            }
+
+            var sourcePath = Path.Combine(input.SeriesPath, input.Filename);
+            if (!File.Exists(sourcePath))
+            {
+                _logger.LogError("Source file not found: {Path}", sourcePath);
+                return;
+            }
+
+            if (_decodeService.DecodeToWav(sourcePath, input.OutputPath))
+                _logger.LogInformation("Decoded preview: {Path}", input.OutputPath);
+            else
+                _logger.LogError("Failed to decode '{File}' for preview.", input.Filename);
+        }
+
+        private T ReadBatchInput<T>(string jsonPath, string command) where T : class
+        {
+            if (string.IsNullOrWhiteSpace(jsonPath) || !File.Exists(jsonPath))
+            {
+                _logger.LogError("Usage: dotnet run {Command} <input.json>", command);
+                return null;
+            }
+
+            try
+            {
+                return JsonSerializer.Deserialize<T>(
+                    File.ReadAllText(jsonPath),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to parse {Path}.", jsonPath);
+                return null;
+            }
+        }
+
+        private void WriteAnalyzeResult(string outputPath, VolumeAnalyzeResultDto result)
+        {
+            var json = JsonSerializer.Serialize(result,
+                new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+            File.WriteAllText(outputPath, json);
         }
 
         private static float ParseVolume(string raw)

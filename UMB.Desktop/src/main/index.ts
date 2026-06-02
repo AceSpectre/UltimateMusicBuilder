@@ -5,10 +5,11 @@ import { loadTrackOrderData, saveTrackOrderData } from './order-tracks'
 import { loadSeriesOrderData, saveSeriesOrderData } from './order-series'
 import { spawnCliAction, cancelCurrentAction } from './cli'
 import {
-  listNus3Sources, analyzeLoopPoints, extractWaveformPeaks, generateLoopPreview,
+  listNus3Sources, analyzeLoopPoints, extractWaveformPeaks, getTrackDuration, generateLoopPreview,
   loadConversions, convertNus3Track, rejectNus3Track, acceptNus3Files
 } from './nus3-convert'
-import type { Nus3TrackDecision } from './nus3-convert'
+import type { Nus3TrackDecision, LoopAnalysisOptions } from './nus3-convert'
+import { loadVolumeConfig, saveVolumeConfig, decodeTrackPreview, type VolumeOverride } from './config-volume'
 import { IPC } from '../shared/ipc-channels'
 
 let mainWindow: BrowserWindow | null = null
@@ -79,12 +80,16 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.LIST_NUS3_SOURCES, (_event, seriesPath: string) => listNus3Sources(workspace, seriesPath))
 
-  ipcMain.handle(IPC.ANALYZE_LOOP_POINTS, (_event, seriesPath: string, filename: string) =>
-    analyzeLoopPoints(workspace, join(seriesPath, filename))
+  ipcMain.handle(IPC.ANALYZE_LOOP_POINTS, (_event, seriesPath: string, filename: string, options?: LoopAnalysisOptions) =>
+    analyzeLoopPoints(workspace, join(seriesPath, filename), options)
   )
 
   ipcMain.handle(IPC.EXTRACT_WAVEFORM, (_event, seriesPath: string, filename: string, bars?: number) =>
     extractWaveformPeaks(join(seriesPath, filename), bars)
+  )
+
+  ipcMain.handle(IPC.GET_TRACK_DURATION, (_event, seriesPath: string, filename: string) =>
+    getTrackDuration(join(seriesPath, filename))
   )
 
   ipcMain.handle(IPC.GENERATE_LOOP_PREVIEW, (_event, seriesPath: string, filename: string, loopStartSec: number, loopEndSec: number, previewLength: number) =>
@@ -105,6 +110,24 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.ACCEPT_NUS3_FILES, (_event, seriesPath: string, deleteSources: boolean) =>
     acceptNus3Files(workspace, seriesPath, deleteSources, (line) => {
+      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
+    })
+  )
+
+  ipcMain.handle(IPC.LOAD_VOLUME_CONFIG, (_event, seriesPath: string) =>
+    loadVolumeConfig(workspace, seriesPath, (line) => {
+      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
+    })
+  )
+
+  ipcMain.handle(IPC.SAVE_VOLUME_CONFIG, (_event, seriesPath: string, overrides: VolumeOverride[]) =>
+    saveVolumeConfig(workspace, seriesPath, overrides, (line) => {
+      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
+    })
+  )
+
+  ipcMain.handle(IPC.DECODE_TRACK_PREVIEW, (_event, seriesPath: string, filename: string) =>
+    decodeTrackPreview(workspace, seriesPath, filename, (line) => {
       mainWindow?.webContents.send(IPC.LOG_STREAM, line)
     })
   )

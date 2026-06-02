@@ -9,6 +9,7 @@
   import OrderTracksView from '$lib/components/actions/order-tracks-view.svelte'
   import OrderSeriesView from '$lib/components/actions/order-series-view.svelte'
   import Nus3ConvertView from '$lib/components/actions/nus3-convert-view.svelte'
+  import ConfigVolumeView from '$lib/components/actions/config-volume-view.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
   import type { ModInfo, WindowActionResult } from '$lib/types/electron'
 
@@ -142,6 +143,8 @@
         <OrderSeriesView activeMod={activeMod} />
       {:else if activeTab === 'nus3-convert'}
         <Nus3ConvertView activeMod={activeMod} />
+      {:else if activeTab === 'config-volume'}
+        <ConfigVolumeView activeMod={activeMod} />
       {:else if activeTab === 'order-tracks'}
         <OrderTracksView activeMod={activeMod} />
       {:else}

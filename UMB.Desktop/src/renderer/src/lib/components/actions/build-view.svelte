@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { Hammer, FolderTree } from '@lucide/svelte'
+  import { Hammer, FolderTree, Wand2 } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
 
   let scaffoldRunning = $state(false)
+  let cleanupRunning = $state(false)
 
   async function handleScaffold() {
     if (scaffoldRunning) return
@@ -18,6 +19,22 @@
       await window.electron.umb.runAction('scaffold')
     } finally {
       scaffoldRunning = false
+    }
+  }
+
+  async function handleCleanup() {
+    if (cleanupRunning) return
+
+    cleanupRunning = true
+    logStore.clear()
+    if (!logStore.drawerOpen) {
+      logStore.toggleDrawer()
+    }
+
+    try {
+      await window.electron.umb.runAction('cleanup')
+    } finally {
+      cleanupRunning = false
     }
   }
 </script>
@@ -82,6 +99,30 @@
               >
                 <FolderTree size={14} />
                 {scaffoldRunning ? $_('build.running') : $_('build.scaffoldButton')}
+              </button>
+            </div>
+          </div>
+
+          <!-- Cleanup button (active) -->
+          <div class="rounded-xl border border-border bg-background/75 p-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border"
+                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .10), hsl(var(--gradient-to) / .14)); color: hsl(var(--gradient-from));"
+              >
+                <Wand2 size={18} />
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-[13.5px] font-semibold">{$_('build.cleanupButton')}</h3>
+                <p class="text-[12px] text-muted-foreground">{$_('build.cleanupDescription')}</p>
+              </div>
+              <button
+                onclick={handleCleanup}
+                disabled={cleanupRunning}
+                class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Wand2 size={14} />
+                {cleanupRunning ? $_('build.running') : $_('build.cleanupButton')}
               </button>
             </div>
           </div>

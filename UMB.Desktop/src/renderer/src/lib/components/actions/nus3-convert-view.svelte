@@ -9,7 +9,8 @@
   import { logStore } from '$lib/stores/logs.svelte'
   import type {
     ModInfo, ModSeriesInfo,
-    LoopCandidate, Nus3SourceTrack, Nus3TrackDecision, Nus3ConversionMeta
+    LoopCandidate, Nus3SourceTrack, Nus3TrackDecision, Nus3ConversionMeta,
+    LoopAnalysisOptions
   } from '$lib/types/electron'
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
@@ -23,14 +24,20 @@
   let currentIndex = $state(0)
   let selectedRank = $state(1)
   let analyzing = $state(false)
+  let reanalyzing = $state(false)
   let converting = $state(false)
   let writing = $state(false)
   let acceptModalOpen = $state(false)
   let settingsOpen = $state(false)
   let minScoreThreshold = $state(94.5)
   let previewLength = $state(5)
+  // pymusiclooper tuning (applied via the settings panel, used by manual recalc).
+  let minLoopDuration = $state(0) // seconds; 0 = pymusiclooper default multiplier
+  let disablePruning = $state(false)
   let settingsMinScore = $state(94.5)
   let settingsPreviewLen = $state(5)
+  let settingsMinLoopDuration = $state(0)
+  let settingsDisablePruning = $state(false)
   let loadToken = 0
   let analysisToken = 0
   let waveformPeaks = $state<Map<string, number[]>>(new Map())
@@ -58,8 +65,11 @@
   const doneCount = $derived(convertedTracks.length)
   const totalCount = $derived(sourcesTracks.length)
 
+  // Loop points are analyzed lazily per song: a pending track with no result yet
+  // (or one being recalculated) shows the spinner until its candidates land.
   const currentTrackAnalyzing = $derived(
-    analyzing && currentTrack != null && !analysisResults.has(currentTrack.id)
+    (currentTrack != null && !currentTrack.converted && !analysisResults.has(currentTrack.id)) ||
+    reanalyzing
   )
   const currentPeaks = $derived(
     currentTrack ? (waveformPeaks.get(currentTrack.id) ?? []) : []
@@ -113,6 +123,9 @@
     tab = 'convert'
     currentIndex = 0
     selectedRank = 1
+    sourcesTracks = []
+    analysisResults = new Map()
+    waveformPeaks = new Map()
 
     try {
       log('info', `Scanning series folder for audio files...`)
@@ -122,8 +135,6 @@
       sourcesTracks = tracks
       conversions = await window.electron.umb.loadNus3Conversions(path)
       if (token !== analysisToken) return
-      analysisResults = new Map()
-      waveformPeaks = new Map()
 
       if (tracks.length === 0) {
         log('warn', 'No source audio files found in series folder.')
@@ -133,76 +144,101 @@
       const pending = tracks.filter((t) => !t.converted)
       const already = tracks.length - pending.length
       if (already > 0) {
-        log('info', `${already} song(s) already converted — skipping loop analysis for those.`)
+        log('info', `${already} song(s) already converted.`)
         // Converted songs go straight to Review & Save.
         if (pending.length === 0) tab = 'review'
       }
 
-      log('info', `Analyzing ${pending.length} unconverted file(s) with pymusiclooper...`)
-
-      for (let i = 0; i < tracks.length; i++) {
-        if (token !== analysisToken) return
-
-        const track = tracks[i]
-
-        // Waveform peaks for every track (cached; cheap on subsequent opens).
-        const peaks = await window.electron.umb.extractWaveform(path, track.src, 140)
-        if (token !== analysisToken) return
-        if (peaks.length > 0) {
-          waveformPeaks.set(track.id, peaks)
-          waveformPeaks = new Map(waveformPeaks)
-        }
-
-        // Loop points only for unconverted songs (cached across restarts).
-        if (track.converted) continue
-
-        log('info', `Analyzing "${track.name}"...`)
-        const result = await window.electron.umb.analyzeLoopPoints(path, track.src)
-        if (token !== analysisToken) return
-
-        if (result.track.durationSeconds > 0) {
-          sourcesTracks[i] = { ...sourcesTracks[i], duration: result.track.duration, durationSeconds: result.track.durationSeconds }
-          sourcesTracks = [...sourcesTracks]
-        }
-
-        analysisResults.set(track.id, result.candidates)
-        analysisResults = new Map(analysisResults)
-        const above = result.candidates.filter((c) => c.score >= minScoreThreshold).length
-        log('info', `"${track.name}" (${result.track.duration}): ${result.candidates.length} candidates (${above} above threshold)`)
-      }
-
-      log('info', `Analysis complete.`)
+      log('info', `${pending.length} song(s) to convert. Loop points are calculated per song as you open them.`)
     } catch (err) {
       if (token !== analysisToken) return
-      log('error', `Analysis failed: ${err instanceof Error ? err.message : String(err)}`)
+      log('error', `Scan failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       if (token === analysisToken) analyzing = false
     }
-
-    selectedRank = 1
   }
 
-  // Lazily analyze a single track (used when a converted song is rejected back
-  // into the convert queue and was never analyzed this session).
+  // Lazily analyze a single track's loop points + waveform. Used both by the
+  // per-song effect (as the current track changes) and when a converted song is
+  // rejected back into the convert queue. Always records a result (even empty)
+  // so the spinner clears.
   async function ensureAnalysis(track: Nus3SourceTrack) {
-    if (!seriesPath || analysisResults.has(track.id)) return
-    analyzing = true
+    const path = seriesPath
+    if (!path || analysisResults.has(track.id)) return
     try {
-      const result = await window.electron.umb.analyzeLoopPoints(seriesPath, track.src)
+      const result = await window.electron.umb.analyzeLoopPoints(path, track.src)
       sourcesTracks = sourcesTracks.map((t) =>
         t.id === track.id ? { ...t, duration: result.track.duration, durationSeconds: result.track.durationSeconds } : t
       )
       analysisResults.set(track.id, result.candidates)
       analysisResults = new Map(analysisResults)
+      log('info', `"${track.name}" (${result.track.duration}): ${result.candidates.length} loop point(s) found.`)
       if (!waveformPeaks.has(track.id)) {
-        const peaks = await window.electron.umb.extractWaveform(seriesPath, track.src, 140)
+        const peaks = await window.electron.umb.extractWaveform(path, track.src, 140)
         if (peaks.length > 0) {
           waveformPeaks.set(track.id, peaks)
           waveformPeaks = new Map(waveformPeaks)
         }
       }
+    } catch (err) {
+      analysisResults.set(track.id, [])
+      analysisResults = new Map(analysisResults)
+      log('error', `Analysis failed for "${track.name}": ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  // Force a fresh analysis of the current track using the settings-panel tuning.
+  // With default settings (min loop 0, pruning on) this re-runs the default pass
+  // plus the automatic relaxed fallback; otherwise it honours the chosen params.
+  async function reanalyzeCurrent() {
+    const track = currentTrack
+    const path = seriesPath
+    if (!track || !path || reanalyzing) return
+
+    reanalyzing = true
+    stopPreview()
+    try {
+      const options: LoopAnalysisOptions = { force: true }
+      if (minLoopDuration > 0) options.minLoopDuration = minLoopDuration
+      if (disablePruning) options.disablePruning = true
+
+      const result = await window.electron.umb.analyzeLoopPoints(path, track.src, options)
+      sourcesTracks = sourcesTracks.map((t) =>
+        t.id === track.id ? { ...t, duration: result.track.duration, durationSeconds: result.track.durationSeconds } : t
+      )
+      analysisResults.set(track.id, result.candidates)
+      analysisResults = new Map(analysisResults)
+      selectedRank = 1
+      log('info', `Recalculated "${track.name}": ${result.candidates.length} loop point(s) found.`)
+    } catch (err) {
+      log('error', `Recalculate failed for "${track.name}": ${err instanceof Error ? err.message : String(err)}`)
     } finally {
-      analyzing = false
+      reanalyzing = false
+    }
+  }
+
+  // Load real waveform peaks + duration for converted tracks shown on the Review
+  // tab. With per-song lazy analysis, tracks converted in a previous session have
+  // neither loaded yet, so the cards would otherwise use synthetic placeholders.
+  async function ensureReviewData() {
+    const path = seriesPath
+    if (!path) return
+    for (const track of convertedTracks) {
+      if (!waveformPeaks.has(track.id)) {
+        const peaks = await window.electron.umb.extractWaveform(path, track.src, 140)
+        if (peaks.length > 0) {
+          waveformPeaks.set(track.id, peaks)
+          waveformPeaks = new Map(waveformPeaks)
+        }
+      }
+      if (!track.durationSeconds || track.durationSeconds <= 0) {
+        const dur = await window.electron.umb.getTrackDuration(path, track.src)
+        if (dur > 0) {
+          sourcesTracks = sourcesTracks.map((t) =>
+            t.id === track.id ? { ...t, durationSeconds: dur } : t
+          )
+        }
+      }
     }
   }
 
@@ -363,10 +399,6 @@
       t.id === track.id ? { ...t, converted: false } : t
     )
     await ensureAnalysis(track)
-    // Jump to the freshly-rejected song in the convert tab.
-    const idx = pendingTracks.findIndex((t) => t.id === track.id)
-    if (idx >= 0) currentIndex = idx
-    tab = 'convert'
   }
 
   function openAcceptModal() {
@@ -393,12 +425,16 @@
   function openSettings() {
     settingsMinScore = minScoreThreshold
     settingsPreviewLen = previewLength
+    settingsMinLoopDuration = minLoopDuration
+    settingsDisablePruning = disablePruning
     settingsOpen = true
   }
 
   function applySettings() {
     minScoreThreshold = settingsMinScore
     previewLength = settingsPreviewLen
+    minLoopDuration = settingsMinLoopDuration
+    disablePruning = settingsDisablePruning
     settingsOpen = false
   }
 
@@ -413,6 +449,23 @@
       resetState()
       void loadSeries(modPath)
     })
+  })
+
+  // Lazily analyze the current track's loop points as the user opens each song,
+  // rather than batch-analyzing the whole queue up front.
+  $effect(() => {
+    const track = currentTrack
+    const path = seriesPath
+    if (!track || !path || track.converted || analysisResults.has(track.id)) return
+    untrack(() => { void ensureAnalysis(track) })
+  })
+
+  // Load real waveforms + durations for converted tracks when the Review tab is open.
+  $effect(() => {
+    if (tab !== 'review' || !seriesPath) return
+    // Re-run when the set of converted tracks changes (convert/reject).
+    void convertedTracks.length
+    untrack(() => { void ensureReviewData() })
   })
 
   function downsamplePeaks(peaks: number[], targetCount: number): number[] {
@@ -620,12 +673,12 @@
         {:else}
         <!-- Page header -->
         <div class="shrink-0 border-b border-border bg-card px-5 py-3">
-          <div class="flex items-center gap-4">
-            <div class="flex min-w-0 flex-1 flex-col gap-1">
-              <span class="gradient-text text-[11px] font-semibold uppercase tracking-wide">
-                {$_('nus3Convert.kicker1')}
-              </span>
-              <h1 class="text-lg font-semibold tracking-tight">
+          <div class="flex flex-col gap-2">
+            <span class="gradient-text text-[11px] font-semibold uppercase tracking-wide">
+              {$_('nus3Convert.kicker1')}
+            </span>
+            <div class="flex items-center gap-4">
+              <h1 class="min-w-0 flex-1 text-lg font-semibold tracking-tight">
                 {currentTrack?.name ?? ''}
                 {#if currentTrackAnalyzing}
                   <span class="ml-2 text-[12px] font-normal text-muted-foreground">{$_('nus3Convert.loading')}</span>
@@ -633,8 +686,16 @@
                   <span class="ml-2 text-[12px] font-normal text-muted-foreground">{$_('nus3Convert.convertingTrack', { values: { name: currentTrack?.name ?? '' } })}</span>
                 {/if}
               </h1>
-            </div>
-            <div class="flex shrink-0 items-center gap-2">
+              <div class="flex shrink-0 items-center gap-2">
+              <button
+                onclick={reanalyzeCurrent}
+                disabled={reanalyzing || converting}
+                title={$_('nus3Convert.reanalyzeHint')}
+                class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:opacity-60"
+              >
+                <RefreshCw size={14} class={reanalyzing ? 'animate-spin' : ''} />
+                {reanalyzing ? $_('nus3Convert.reanalyzing') : $_('nus3Convert.reanalyze')}
+              </button>
               <button
                 onclick={rejectCurrent}
                 disabled={converting}
@@ -656,6 +717,7 @@
                 {/if}
                 {$_('nus3Convert.convertAccept', { values: { rank: selectedRank } })}
               </button>
+              </div>
             </div>
           </div>
         </div>
@@ -676,9 +738,10 @@
                 style="width: {totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%"
               ></div>
             </div>
-            <div class="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+            <div class="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
               {#each pendingTracks as track, i}
                 {@const isCurrent = i === clampedIndex}
+                {@const trackNo = sourcesTracks.findIndex((t) => t.id === track.id) + 1}
                 <button
                   onclick={() => goToPending(i)}
                   class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap transition-colors"
@@ -686,7 +749,7 @@
                     ? 'background: linear-gradient(135deg, hsl(var(--gradient-from) / .14), hsl(var(--gradient-to) / .14)); border-color: hsl(var(--gradient-from) / .4); font-weight: 700;'
                     : 'background: transparent; border-color: hsl(var(--border)); color: hsl(var(--muted-foreground));'}
                 >
-                  <span class="font-mono text-[10px]">{String(i + 1).padStart(2, '0')}</span>
+                  <span class="font-mono text-[10px]">{String(trackNo).padStart(2, '0')}</span>
                   <span class="max-w-[110px] overflow-hidden text-ellipsis">{track.name}</span>
                 </button>
               {/each}
@@ -829,6 +892,47 @@
                 </button>
                 <div class="flex-1"></div>
                 <span class="font-mono text-xs text-muted-foreground">{c.loopLengthStr}</span>
+              </div>
+            </div>
+          {:else}
+            <!-- No loop points found: only end-to-end is available -->
+            <div class="grid min-h-[260px] flex-1 place-items-center rounded-xl border border-border bg-card p-6">
+              <div class="flex max-w-[620px] flex-col items-center gap-4 text-center">
+                <div
+                  class="flex h-12 w-12 items-center justify-center rounded-2xl border border-border"
+                  style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
+                >
+                  <AudioWaveform size={20} />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <p class="text-sm font-semibold">{$_('nus3Convert.noLoopTitle')}</p>
+                  <p class="text-[13px] text-muted-foreground">{$_('nus3Convert.noLoopHint')}</p>
+                </div>
+                <div class="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                  <button
+                    onclick={openSettings}
+                    class="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-input bg-background px-4 text-[13px] font-medium transition-colors hover:bg-muted"
+                  >
+                    <Settings size={15} />
+                    {$_('nus3Convert.settingsTitle')}
+                  </button>
+                  <button
+                    onclick={reanalyzeCurrent}
+                    disabled={reanalyzing || converting}
+                    class="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-input bg-background px-4 text-[13px] font-medium transition-colors hover:bg-muted disabled:opacity-60"
+                  >
+                    <RefreshCw size={15} class={reanalyzing ? 'animate-spin' : ''} />
+                    {reanalyzing ? $_('nus3Convert.reanalyzing') : $_('nus3Convert.reanalyze')}
+                  </button>
+                  <button
+                    onclick={rejectCurrent}
+                    disabled={converting}
+                    class="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border-0 px-4 text-[13px] font-medium text-white transition-colors disabled:opacity-60"
+                    style="background: hsl(271 76% 53%);"
+                  >
+                    {$_('nus3Convert.rejectAll')}
+                  </button>
+                </div>
               </div>
             </div>
           {/if}
@@ -1036,14 +1140,6 @@
                   </div>
                 {/if}
 
-                <!-- Status badge -->
-                <span
-                  class="inline-flex h-[22px] shrink-0 items-center rounded-full px-2 text-[11px] font-medium"
-                  style="background: hsl(160 84% 39% / .12); color: hsl(160 84% 30%); border: 1px solid hsl(160 84% 39% / .3);"
-                >
-                  {$_('nus3Convert.willWrite')}
-                </span>
-
                 <!-- Reject (delete nus3, convert again) -->
                 <button
                   onclick={() => rejectFromReview(track)}
@@ -1114,6 +1210,31 @@
           />
           <p class="text-[11px] text-muted-foreground">{$_('nus3Convert.settingsPreviewLengthHint')}</p>
         </div>
+        <div class="flex flex-col gap-1.5">
+          <label for="nus3-min-loop" class="text-[13px] font-medium">
+            {$_('nus3Convert.settingsMinLoopDuration')}
+          </label>
+          <input
+            id="nus3-min-loop"
+            type="number"
+            step="0.5"
+            min="0"
+            bind:value={settingsMinLoopDuration}
+            class="h-9 rounded-lg border border-input bg-background px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
+          />
+          <p class="text-[11px] text-muted-foreground">{$_('nus3Convert.settingsMinLoopDurationHint')}</p>
+        </div>
+        <label class="flex items-start gap-2.5">
+          <input
+            type="checkbox"
+            bind:checked={settingsDisablePruning}
+            class="mt-0.5 h-4 w-4 shrink-0 rounded border-input"
+          />
+          <span class="flex flex-col gap-0.5">
+            <span class="text-[13px] font-medium">{$_('nus3Convert.settingsDisablePruning')}</span>
+            <span class="text-[11px] text-muted-foreground">{$_('nus3Convert.settingsDisablePruningHint')}</span>
+          </span>
+        </label>
       </div>
       <div class="flex justify-end gap-2 border-t border-border px-5 py-3">
         <button
