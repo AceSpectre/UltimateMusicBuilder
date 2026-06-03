@@ -3,7 +3,7 @@ import { join, resolve } from 'path'
 import { listModSeries, listMods, getModStats } from './mods'
 import { loadTrackOrderData, saveTrackOrderData } from './order-tracks'
 import { loadSeriesOrderData, saveSeriesOrderData } from './order-series'
-import { spawnCliAction, cancelCurrentAction } from './cli'
+import { spawnCliAction, cancelCurrentAction, shutdownDaemon } from './cli'
 import {
   listNus3Sources, analyzeLoopPoints, extractWaveformPeaks, getTrackDuration, generateLoopPreview,
   loadConversions, convertNus3Track, rejectNus3Track, acceptNus3Files
@@ -114,8 +114,8 @@ function registerIpcHandlers(): void {
     })
   )
 
-  ipcMain.handle(IPC.LOAD_VOLUME_CONFIG, (_event, seriesPath: string) =>
-    loadVolumeConfig(workspace, seriesPath, (line) => {
+  ipcMain.handle(IPC.LOAD_VOLUME_CONFIG, (_event, seriesPath: string, analyze: boolean) =>
+    loadVolumeConfig(workspace, seriesPath, analyze, (line) => {
       mainWindow?.webContents.send(IPC.LOG_STREAM, line)
     })
   )
@@ -170,4 +170,8 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   app.quit()
+})
+
+app.on('before-quit', () => {
+  shutdownDaemon()
 })

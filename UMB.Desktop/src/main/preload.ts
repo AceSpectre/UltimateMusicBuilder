@@ -160,7 +160,7 @@ const api = {
   convertNus3Track: (seriesPath: string, decision: Nus3TrackDecision): Promise<boolean> => ipcRenderer.invoke(IPC.CONVERT_NUS3_TRACK, seriesPath, decision),
   rejectNus3Track: (seriesPath: string, trackId: string): Promise<void> => ipcRenderer.invoke(IPC.REJECT_NUS3_TRACK, seriesPath, trackId),
   acceptNus3Files: (seriesPath: string, deleteSources: boolean): Promise<number> => ipcRenderer.invoke(IPC.ACCEPT_NUS3_FILES, seriesPath, deleteSources),
-  loadVolumeConfig: (seriesPath: string): Promise<VolumeConfigData> => ipcRenderer.invoke(IPC.LOAD_VOLUME_CONFIG, seriesPath),
+  loadVolumeConfig: (seriesPath: string, analyze = false): Promise<VolumeConfigData> => ipcRenderer.invoke(IPC.LOAD_VOLUME_CONFIG, seriesPath, analyze),
   saveVolumeConfig: (seriesPath: string, overrides: VolumeOverride[]): Promise<void> => ipcRenderer.invoke(IPC.SAVE_VOLUME_CONFIG, seriesPath, overrides),
   decodeTrackPreview: (seriesPath: string, filename: string): Promise<string | null> => ipcRenderer.invoke(IPC.DECODE_TRACK_PREVIEW, seriesPath, filename),
   extractWaveform: (seriesPath: string, filename: string, bars?: number): Promise<number[]> => ipcRenderer.invoke(IPC.EXTRACT_WAVEFORM, seriesPath, filename, bars),

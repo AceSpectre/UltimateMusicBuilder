@@ -3,6 +3,12 @@ namespace Sma5h.Mods.Music.Interfaces
     public interface ILufsAnalysisService
     {
         LufsMeasurement Measure(string audioFilePath);
+        /// <summary>
+        /// Returns a cached measurement (matching size + mtime) without ever invoking FFmpeg.
+        /// On a cache miss returns an invalid measurement. Used for read-only loads where the
+        /// caller wants existing LUFS data but must not trigger (potentially long) analysis.
+        /// </summary>
+        LufsMeasurement MeasureCached(string audioFilePath);
         GainResult CalculateGain(LufsMeasurement measurement, float targetLufs, float maxMultiplier);
         bool IsAvailable { get; }
         /// <summary>

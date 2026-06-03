@@ -615,9 +615,17 @@
               <AudioWaveform size={20} />
             </div>
             <div>
-              <h3 class="text-sm font-semibold">{analyzing ? $_('nus3Convert.loading') : $_('nus3Convert.chooseSeries')}</h3>
+              <h3 class="text-sm font-semibold">
+                {analyzing
+                  ? $_('nus3Convert.loading')
+                  : selectedSeries
+                    ? $_('nus3Convert.noConvertableTitle')
+                    : $_('nus3Convert.chooseSeries')}
+              </h3>
               {#if analyzing}
                 <p class="pt-1 text-[13px] text-muted-foreground">{$_('nus3Convert.loading')}</p>
+              {:else if selectedSeries}
+                <p class="pt-1 text-[13px] text-muted-foreground">{$_('nus3Convert.noConvertableHint')}</p>
               {/if}
             </div>
           </div>

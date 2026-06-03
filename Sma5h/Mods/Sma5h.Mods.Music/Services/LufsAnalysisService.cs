@@ -86,7 +86,11 @@ namespace Sma5h.Mods.Music.Services
             return ToolPathResolver.Resolve(null, null, "ffmpeg");
         }
 
-        public LufsMeasurement Measure(string audioFilePath)
+        public LufsMeasurement Measure(string audioFilePath) => MeasureInternal(audioFilePath, allowFfmpeg: true);
+
+        public LufsMeasurement MeasureCached(string audioFilePath) => MeasureInternal(audioFilePath, allowFfmpeg: false);
+
+        private LufsMeasurement MeasureInternal(string audioFilePath, bool allowFfmpeg)
         {
             if (!File.Exists(audioFilePath))
             {
@@ -125,6 +129,9 @@ namespace Sma5h.Mods.Music.Services
                     IsValid = true
                 };
             }
+
+            // Cache miss: caller may have opted out of FFmpeg (read-only load).
+            if (!allowFfmpeg) return InvalidMeasurement();
 
             // Cache miss: need ffmpeg.
             if (!IsAvailable) return InvalidMeasurement();

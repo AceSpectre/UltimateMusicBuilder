@@ -25,6 +25,12 @@ namespace UMB.CLI.Services
     {
         public string SeriesPath { get; set; }
         public string OutputPath { get; set; }
+        /// <summary>
+        /// When true, run FFmpeg LUFS analysis for any track not already cached.
+        /// When false (default), load existing cached measurements only and never
+        /// invoke FFmpeg — a fast, interruption-free read used when the view opens.
+        /// </summary>
+        public bool Analyze { get; set; }
     }
 
     public class VolumeSaveBatchInput
@@ -65,6 +71,8 @@ namespace UMB.CLI.Services
         public float TargetLufs { get; set; }
         public float MaxMultiplier { get; set; }
         public bool FfmpegAvailable { get; set; }
+        /// <summary>True if a LUFS cache file already exists for the series directory.</summary>
+        public bool LufsCacheExists { get; set; }
         public List<VolumeRowDto> Items { get; set; } = new();
     }
 
@@ -253,8 +261,10 @@ namespace UMB.CLI.Services
             var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization;
             var target = lufsOpts?.TargetLufs ?? -14.0f;
             var maxMult = lufsOpts?.MaxGainMultiplier ?? 4.0f;
+            var lufsCacheName = string.IsNullOrWhiteSpace(lufsOpts?.LufsCacheFileName) ? "LUFS.csv" : lufsOpts.LufsCacheFileName;
+            var lufsCacheExists = File.Exists(Path.Combine(seriesDir, lufsCacheName));
 
-            if (!_lufsService.IsAvailable)
+            if (input.Analyze && !_lufsService.IsAvailable)
                 _logger.LogWarning("FFmpeg is not available — auto-gain values cannot be calculated. Overrides can still be edited.");
 
             var dtos = new VolumeRowDto[rows.Count];
@@ -276,7 +286,11 @@ namespace UMB.CLI.Services
 
                 if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
                 {
-                    var measurement = _lufsService.Measure(sourcePath);
+                    // Analyze=true runs FFmpeg on cache misses; Analyze=false is a read-only
+                    // load that returns only already-cached measurements (no FFmpeg, no blocking).
+                    var measurement = input.Analyze
+                        ? _lufsService.Measure(sourcePath)
+                        : _lufsService.MeasureCached(sourcePath);
                     if (measurement.IsValid)
                     {
                         var gain = _lufsService.CalculateGain(measurement, target, maxMult);
@@ -294,7 +308,12 @@ namespace UMB.CLI.Services
                 dtos[i] = dto;
             });
 
-            _lufsService.SaveCache();
+            // Only the analysis path can mutate the cache; a read-only load writes nothing.
+            if (input.Analyze)
+            {
+                _lufsService.SaveCache();
+                lufsCacheExists = File.Exists(Path.Combine(seriesDir, lufsCacheName));
+            }
 
             WriteAnalyzeResult(input.OutputPath, new VolumeAnalyzeResultDto
             {
@@ -303,6 +322,7 @@ namespace UMB.CLI.Services
                 TargetLufs = target,
                 MaxMultiplier = maxMult,
                 FfmpegAvailable = _lufsService.IsAvailable,
+                LufsCacheExists = lufsCacheExists,
                 Items = dtos.ToList(),
             });
             _logger.LogInformation("Volume analysis written for {Count} track(s).", dtos.Length);

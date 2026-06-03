@@ -1,16 +1,20 @@
 <script lang="ts">
-  import { Volume2, Folder, RefreshCw, Save, Play, Square, AlertTriangle } from '@lucide/svelte'
+  import { Volume2, Folder, RefreshCw, Save, Play, Square, AlertTriangle, Activity } from '@lucide/svelte'
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
-  import { modsStore } from '$lib/stores/mods.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
   import type { ModInfo, ModSeriesInfo, VolumeConfigData, VolumeRowItem } from '$lib/types/electron'
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
 
   let loading = $state(false)
+  // `loadingConfig` = fast cache-only read; `analyzing` = FFmpeg LUFS analysis (slow, user-triggered).
+  let loadingConfig = $state(false)
   let analyzing = $state(false)
   let series = $state<ModSeriesInfo[]>([])
+  // No series is selected by default — the user must pick one, and LUFS analysis only
+  // runs when they press "Calculate loudness". Selection is local to this view.
+  let selectedPath = $state<string | null>(null)
   let data = $state<VolumeConfigData | null>(null)
   let rows = $state<VolumeRowItem[]>([])
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
@@ -25,9 +29,13 @@
   let previewLoadingIndex = $state<number | null>(null)
   const bufferCache = new Map<string, AudioBuffer>()
 
-  const seriesPath = $derived(modsStore.activeSeriesPath)
-  const selectedSeries = $derived(series.find((e) => e.path === modsStore.activeSeriesPath) ?? null)
+  const seriesPath = $derived(selectedPath)
+  const selectedSeries = $derived(series.find((e) => e.path === selectedPath) ?? null)
   const isDirty = $derived(rows.some((r) => Math.abs((baseline.get(r.originalIndex) ?? r.userOverride) - r.userOverride) > 0.0001))
+  // Show the analyze button once a series is loaded and FFmpeg is present. Highlighted when no
+  // cache exists yet (the primary "run analysis" case); otherwise offered as a re-measure.
+  const canAnalyze = $derived(!!data && !!selectedPath && data.ffmpegAvailable && !analyzing && !loadingConfig)
+  const needsAnalysis = $derived(!!data && !data.lufsCacheExists)
 
   function effective(row: VolumeRowItem): number {
     const global = data?.globalVolumeMultiplier ?? 1
@@ -44,7 +52,7 @@
 
     if (!modPath) {
       series = []
-      modsStore.activeSeriesPath = null
+      selectedPath = null
       return
     }
 
@@ -53,15 +61,17 @@
       const next = await window.electron.umb.listModSeries(modPath)
       if (token !== loadToken) return
       series = next
-      if (!next.some((e) => e.path === modsStore.activeSeriesPath)) {
-        modsStore.activeSeriesPath = next[0]?.path ?? null
+      // Deliberately do NOT auto-select a series — the user must pick one.
+      if (selectedPath && !next.some((e) => e.path === selectedPath)) {
+        selectedPath = null
       }
     } finally {
       if (token === loadToken) loading = false
     }
   }
 
-  async function loadConfig(path: string | null) {
+  // `analyze` true runs FFmpeg LUFS analysis; false is a fast cache-only read.
+  async function loadConfig(path: string | null, analyze = false) {
     stopPreview()
     bufferCache.clear()
     if (!path) {
@@ -70,11 +80,12 @@
       return
     }
 
-    analyzing = true
+    if (analyze) analyzing = true
+    else loadingConfig = true
     saveState = 'idle'
     try {
-      const result = await window.electron.umb.loadVolumeConfig(path)
-      if (path !== modsStore.activeSeriesPath) return
+      const result = await window.electron.umb.loadVolumeConfig(path, analyze)
+      if (path !== selectedPath) return
       data = result
       rows = result.items.map((item) => ({ ...item }))
       baseline = new Map(result.items.map((item) => [item.originalIndex, item.userOverride]))
@@ -84,13 +95,19 @@
       rows = []
     } finally {
       analyzing = false
+      loadingConfig = false
     }
   }
 
   function selectSeries(path: string) {
-    if (path === modsStore.activeSeriesPath) return
-    modsStore.activeSeriesPath = path
+    if (path === selectedPath) return
+    selectedPath = path
     void loadConfig(path)
+  }
+
+  function handleAnalyze() {
+    if (!selectedPath) return
+    void loadConfig(selectedPath, true)
   }
 
   function handleReload() {
@@ -194,12 +211,11 @@
     untrack(() => {
       stopPreview()
       bufferCache.clear()
+      // Reset to "no series selected" whenever the active mod changes.
+      selectedPath = null
       data = null
       rows = []
-      void (async () => {
-        await loadSeries(modPath)
-        if (modsStore.activeSeriesPath) await loadConfig(modsStore.activeSeriesPath)
-      })()
+      void loadSeries(modPath)
     })
   })
 
@@ -238,7 +254,7 @@
             class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-input bg-background transition-colors hover:bg-muted"
             title={$_('configVolume.reload')}
           >
-            <RefreshCw size={14} class={loading || analyzing ? 'animate-spin' : ''} />
+            <RefreshCw size={14} class={loading || analyzing || loadingConfig ? 'animate-spin' : ''} />
           </button>
         </div>
       </div>
@@ -259,7 +275,7 @@
         {:else}
           <div class="grid gap-1.5">
             {#each series as item}
-              {@const isActive = modsStore.activeSeriesPath === item.path}
+              {@const isActive = selectedPath === item.path}
               <button
                 onclick={() => selectSeries(item.path)}
                 class="w-full rounded-lg border px-2 py-1.5 text-left transition-colors {isActive ? 'border-transparent' : 'border-border bg-background/70 hover:bg-muted'}"
@@ -302,6 +318,21 @@
             <span class="shrink-0 inline-flex h-[22px] items-center rounded-full border border-border bg-muted px-2 text-[11px] font-medium text-muted-foreground">
               {$_('configVolume.targetLabel', { values: { value: data.targetLufs.toFixed(1) } })}
             </span>
+          {/if}
+          {#if canAnalyze}
+            <button
+              onclick={handleAnalyze}
+              title={data?.ffmpegAvailable ? $_('configVolume.analyzeHint') : $_('configVolume.ffmpegWarning')}
+              class="shrink-0 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12.5px] font-medium transition-colors {needsAnalysis
+                ? 'border-0 text-white'
+                : 'border border-input bg-background hover:bg-muted'}"
+              style={needsAnalysis
+                ? 'background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 4px 14px -2px hsl(var(--gradient-from) / .35);'
+                : ''}
+            >
+              <Activity size={14} />
+              {needsAnalysis ? $_('configVolume.analyze') : $_('configVolume.reanalyze')}
+            </button>
           {/if}
           <button
             onclick={handleSave}
@@ -346,6 +377,11 @@
             <div class="mb-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px]" style="border-color: hsl(38 92% 50% / .4); background: hsl(38 92% 50% / .1); color: hsl(38 92% 35%);">
               <AlertTriangle size={15} class="mt-0.5 shrink-0" />
               <span>{$_('configVolume.ffmpegWarning')}</span>
+            </div>
+          {:else if needsAnalysis}
+            <div class="mb-3 flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">
+              <Activity size={15} class="mt-0.5 shrink-0" />
+              <span>{$_('configVolume.notAnalyzed')}</span>
             </div>
           {/if}
 

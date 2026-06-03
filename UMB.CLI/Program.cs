@@ -6,6 +6,7 @@ using Spectre.Console;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace UMB.CLI
@@ -23,6 +24,15 @@ namespace UMB.CLI
             var services = new ServiceCollection();
             ConfigureServices(services, args);
             var serviceProvider = services.BuildServiceProvider();
+
+            // Persistent daemon mode: keep one process alive and service headless
+            // batch requests over stdin. Avoids paying process-spawn + DI bootstrap
+            // on every desktop call (e.g. switching series in Config Volume).
+            if (args.Length > 0 && args[0].Equals("serve", StringComparison.OrdinalIgnoreCase))
+            {
+                await RunDaemon(serviceProvider);
+                return;
+            }
 
             // If args provided, run once and exit
             if (args.Length > 0)
@@ -47,6 +57,50 @@ namespace UMB.CLI
                 }
 
                 AnsiConsole.WriteLine();
+            }
+        }
+
+        private static readonly JsonSerializerOptions _daemonJsonOpts = new() { PropertyNameCaseInsensitive = true };
+
+        private class DaemonRequest
+        {
+            public int Id { get; set; }
+            public string Action { get; set; }
+            public string[] Args { get; set; }
+        }
+
+        /// <summary>
+        /// Reads newline-delimited JSON requests from stdin, runs each action against
+        /// a fresh DI scope (reusing the already-built service provider — and the
+        /// singleton LUFS cache stays warm across requests), then prints a sentinel
+        /// "__DONE__\t&lt;id&gt;\t&lt;code&gt;" line so the caller knows the result
+        /// artifacts (output files) are fully written. Requests are processed serially.
+        /// </summary>
+        private static async Task RunDaemon(IServiceProvider serviceProvider)
+        {
+            string line;
+            while ((line = Console.ReadLine()) != null)
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                DaemonRequest req;
+                try { req = JsonSerializer.Deserialize<DaemonRequest>(line, _daemonJsonOpts); }
+                catch { continue; }
+                if (req == null) continue;
+
+                if (string.Equals(req.Action, "__shutdown__", StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                // RunAction catches and logs handler exceptions (same as one-shot mode,
+                // which also exits 0 on a caught failure), so we always report code 0.
+                using (var scope = serviceProvider.CreateScope())
+                {
+                    var entry = scope.ServiceProvider.GetService<Script>();
+                    await RunAction(req.Action?.ToLowerInvariant() ?? "", entry, req.Args);
+                }
+
+                Console.Out.WriteLine($"__DONE__\t{req.Id}\t0");
+                Console.Out.Flush();
             }
         }
 

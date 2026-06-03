@@ -122,6 +122,7 @@ export interface VolumeConfigData {
   targetLufs: number
   maxMultiplier: number
   ffmpegAvailable: boolean
+  lufsCacheExists: boolean
   items: VolumeRowItem[]
 }
 
@@ -157,7 +158,7 @@ export interface UmbApi {
   convertNus3Track(seriesPath: string, decision: Nus3TrackDecision): Promise<boolean>
   rejectNus3Track(seriesPath: string, trackId: string): Promise<void>
   acceptNus3Files(seriesPath: string, deleteSources: boolean): Promise<number>
-  loadVolumeConfig(seriesPath: string): Promise<VolumeConfigData>
+  loadVolumeConfig(seriesPath: string, analyze?: boolean): Promise<VolumeConfigData>
   saveVolumeConfig(seriesPath: string, overrides: VolumeOverride[]): Promise<void>
   decodeTrackPreview(seriesPath: string, filename: string): Promise<string | null>
   extractWaveform(seriesPath: string, filename: string, bars?: number): Promise<number[]>

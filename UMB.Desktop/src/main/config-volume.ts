@@ -22,6 +22,7 @@ export interface VolumeConfigData {
   targetLufs: number
   maxMultiplier: number
   ffmpegAvailable: boolean
+  lufsCacheExists: boolean
   items: VolumeRowItem[]
 }
 
@@ -37,6 +38,7 @@ interface VolumeAnalyzeResult {
   targetLufs: number
   maxMultiplier: number
   ffmpegAvailable: boolean
+  lufsCacheExists: boolean
   items: VolumeRowItem[]
 }
 
@@ -53,11 +55,12 @@ function tempPath(prefix: string, ext: string): string {
 export async function loadVolumeConfig(
   workspace: string,
   seriesPath: string,
+  analyze: boolean,
   onLine: (line: LogLine) => void
 ): Promise<VolumeConfigData> {
   const outputPath = tempPath('umb-volume-analyze', 'json')
   const inputPath = tempPath('umb-volume-analyze-in', 'json')
-  writeFileSync(inputPath, JSON.stringify({ seriesPath, outputPath }, null, 2), 'utf-8')
+  writeFileSync(inputPath, JSON.stringify({ seriesPath, outputPath, analyze }, null, 2), 'utf-8')
 
   try {
     await spawnCliAction(workspace, 'config-volume-analyze', [inputPath], onLine)
@@ -70,6 +73,7 @@ export async function loadVolumeConfig(
         targetLufs: -14,
         maxMultiplier: 4,
         ffmpegAvailable: false,
+        lufsCacheExists: false,
         items: []
       }
     }
@@ -82,6 +86,7 @@ export async function loadVolumeConfig(
       targetLufs: result.targetLufs,
       maxMultiplier: result.maxMultiplier,
       ffmpegAvailable: result.ffmpegAvailable,
+      lufsCacheExists: result.lufsCacheExists ?? false,
       items: result.items ?? []
     }
   } finally {
