@@ -13,7 +13,7 @@
   }
 
   $effect(() => {
-    logStore.filtered
+    logStore.displayed
     if (autoScroll && scrollContainer) {
       tick().then(() => {
         scrollContainer!.scrollTop = scrollContainer!.scrollHeight
@@ -82,10 +82,10 @@
       onscroll={handleScroll}
       class="px-3.5 py-2 max-h-[200px] overflow-y-auto"
     >
-      {#if logStore.filtered.length === 0}
+      {#if logStore.displayed.length === 0}
         <div class="text-xs text-muted-foreground font-mono py-2">No log entries yet. Run an action to see output here.</div>
       {:else}
-        {#each logStore.filtered as line}
+        {#each logStore.displayed as line}
           <div class="flex items-baseline gap-3 font-mono text-[11.5px] leading-[1.65]">
             <span class="text-muted-foreground shrink-0">{line.timestamp}</span>
             <span

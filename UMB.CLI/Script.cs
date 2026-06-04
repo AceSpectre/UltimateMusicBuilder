@@ -54,11 +54,11 @@ namespace UMB.CLI
             _logger = logger;
         }
 
-        public async Task RunBuild() => await _build.Run();
+        public async Task RunBuild(string selectedMod = null) => await _build.Run(selectedMod);
         public void RunScaffold() => _scaffold.Run();
-        public void RunConvert()
+        public void RunConvert(string sourcePath = null, string outputName = null)
         {
-            _convert.Run();
+            _convert.Run(sourcePath, outputName);
             _scaffold.Run();
         }
         public void RunMerge() => _merge.Run();

@@ -1,10 +1,38 @@
 <script lang="ts">
-  import { Hammer, FolderTree, Wand2 } from '@lucide/svelte'
+  import { Hammer, FolderTree, Wand2, ArrowLeftRight, Folder } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
+  import type { ModInfo } from '$lib/types/electron'
 
+  let { activeMod }: { activeMod: ModInfo | null } = $props()
+
+  let buildRunning = $state(false)
   let scaffoldRunning = $state(false)
   let cleanupRunning = $state(false)
+  let importRunning = $state(false)
+
+  let importModalOpen = $state(false)
+  let importSource = $state('')
+  let importName = $state('')
+
+  const canImport = $derived(importSource.trim() !== '' && importName.trim() !== '' && !importRunning)
+
+  async function handleBuild() {
+    if (buildRunning) return
+
+    buildRunning = true
+    logStore.clear()
+    if (!logStore.drawerOpen) {
+      logStore.toggleDrawer()
+    }
+
+    try {
+      const mod = activeMod?.name
+      await window.electron.umb.runAction('build', mod ? [mod] : [])
+    } finally {
+      buildRunning = false
+    }
+  }
 
   async function handleScaffold() {
     if (scaffoldRunning) return
@@ -37,6 +65,39 @@
       cleanupRunning = false
     }
   }
+
+  function openImportModal() {
+    importSource = ''
+    importName = ''
+    importModalOpen = true
+  }
+
+  function closeImportModal() {
+    if (importRunning) return
+    importModalOpen = false
+  }
+
+  async function pickImportSource() {
+    const folder = await window.electron.umb.selectFolder()
+    if (folder) importSource = folder
+  }
+
+  async function handleImport() {
+    if (!canImport) return
+
+    importRunning = true
+    logStore.clear()
+    if (!logStore.drawerOpen) {
+      logStore.toggleDrawer()
+    }
+
+    try {
+      await window.electron.umb.runAction('convert', [importSource.trim(), importName.trim()])
+      importModalOpen = false
+    } finally {
+      importRunning = false
+    }
+  }
 </script>
 
 <div class="flex-1 overflow-hidden">
@@ -58,25 +119,28 @@
 
       <div class="min-h-0 flex-1 overflow-auto p-6">
         <div class="flex flex-col gap-4 max-w-[520px]">
-          <!-- Build button (disabled) -->
-          <div class="rounded-xl border border-border bg-background/75 p-4 opacity-50">
+          <!-- Build button (active) -->
+          <div class="rounded-xl border border-border bg-background/75 p-4">
             <div class="flex items-center gap-3">
-              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/50">
-                <Hammer size={18} class="text-muted-foreground" />
+              <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border"
+                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .10), hsl(var(--gradient-to) / .14)); color: hsl(var(--gradient-from));"
+              >
+                <Hammer size={18} />
               </div>
               <div class="flex-1 min-w-0">
                 <h3 class="text-[13.5px] font-semibold">{$_('build.buildButton')}</h3>
                 <p class="text-[12px] text-muted-foreground">{$_('build.buildDescription')}</p>
               </div>
               <button
-                disabled
-                class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium cursor-not-allowed opacity-60"
+                onclick={handleBuild}
+                disabled={buildRunning}
+                class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Hammer size={14} />
-                {$_('build.buildButton')}
+                {buildRunning ? $_('build.running') : $_('build.buildButton')}
               </button>
             </div>
-            <p class="mt-2 text-[11.5px] text-muted-foreground italic">{$_('build.buildDisabled')}</p>
           </div>
 
           <!-- Scaffold button (active) -->
@@ -126,8 +190,118 @@
               </button>
             </div>
           </div>
+
+          <!-- Import button (active) -->
+          <div class="rounded-xl border border-border bg-background/75 p-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border"
+                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .10), hsl(var(--gradient-to) / .14)); color: hsl(var(--gradient-from));"
+              >
+                <ArrowLeftRight size={18} />
+              </div>
+              <div class="flex-1 min-w-0">
+                <h3 class="text-[13.5px] font-semibold">{$_('build.importButton')}</h3>
+                <p class="text-[12px] text-muted-foreground">{$_('build.importDescription')}</p>
+              </div>
+              <button
+                onclick={openImportModal}
+                disabled={importRunning}
+                class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <ArrowLeftRight size={14} />
+                {importRunning ? $_('build.running') : $_('build.importButton')}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </section>
   </div>
 </div>
+
+{#if importModalOpen}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    onclick={closeImportModal}
+    onkeydown={(e) => { if (e.key === 'Escape') closeImportModal() }}
+  >
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="w-full max-w-[480px] rounded-xl border border-border bg-popover shadow-2xl overflow-hidden"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+    >
+      <div class="gradient-strip h-[3px] shrink-0"></div>
+      <div class="border-b border-border px-5 py-4 flex items-center gap-3">
+        <div
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
+          style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
+        >
+          <ArrowLeftRight size={18} />
+        </div>
+        <div class="min-w-0">
+          <h2 class="truncate text-sm font-semibold">{$_('build.importModal.title')}</h2>
+          <p class="truncate text-[12.5px] text-muted-foreground">{$_('build.importModal.subtitle')}</p>
+        </div>
+      </div>
+
+      <div class="px-5 py-5 flex flex-col gap-4">
+        <!-- Sma5h mod location -->
+        <div class="flex flex-col gap-1.5">
+          <label for="import-source" class="text-[12.5px] font-medium">{$_('build.importModal.sourceLabel')}</label>
+          <div class="flex items-center gap-2">
+            <input
+              id="import-source"
+              type="text"
+              readonly
+              value={importSource}
+              placeholder={$_('build.importModal.sourcePlaceholder')}
+              class="flex-1 min-w-0 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] text-muted-foreground outline-none"
+            />
+            <button
+              onclick={pickImportSource}
+              disabled={importRunning}
+              class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Folder size={14} />
+              {$_('build.importModal.browse')}
+            </button>
+          </div>
+        </div>
+
+        <!-- New UMB mod name -->
+        <div class="flex flex-col gap-1.5">
+          <label for="import-name" class="text-[12.5px] font-medium">{$_('build.importModal.nameLabel')}</label>
+          <input
+            id="import-name"
+            type="text"
+            bind:value={importName}
+            placeholder={$_('build.importModal.namePlaceholder')}
+            disabled={importRunning}
+            class="rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] outline-none focus:border-ring disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </div>
+      </div>
+
+      <div class="border-t border-border px-5 py-4 flex items-center justify-end gap-2">
+        <button
+          onclick={closeImportModal}
+          disabled={importRunning}
+          class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {$_('build.importModal.close')}
+        </button>
+        <button
+          onclick={handleImport}
+          disabled={!canImport}
+          class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <ArrowLeftRight size={14} />
+          {importRunning ? $_('build.running') : $_('build.importModal.import')}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}

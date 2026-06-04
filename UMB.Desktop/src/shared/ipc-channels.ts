@@ -19,6 +19,7 @@ export const IPC = {
   GET_TRACK_DURATION: 'umb:get-track-duration',
   GENERATE_LOOP_PREVIEW: 'umb:generate-loop-preview',
   RUN_ACTION: 'umb:run-action',
+  SELECT_FOLDER: 'umb:select-folder',
   LOG_STREAM: 'umb:log-stream',
   GET_WORKSPACE: 'umb:get-workspace',
   CANCEL_ACTION: 'umb:cancel-action',

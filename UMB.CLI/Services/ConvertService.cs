@@ -27,41 +27,63 @@ namespace UMB.CLI.Services
             _logger = logger;
         }
 
-        public void Run()
+        // sourcePath / outputName are supplied by the desktop app for a non-interactive run.
+        // When null, falls back to the interactive OldMods picker + name prompt.
+        public void Run(string sourcePath = null, string outputName = null)
         {
             Script.PrintBanner(_logger);
 
-            // Look for old mods in Mods/OldMods (sibling of the MusicMods folder)
             var modPath = _musicConfig.CurrentValue.Sma5hMusic.ModPath;
-            var oldModsRoot = Path.Combine(Path.GetDirectoryName(modPath), "OldMods");
 
-            if (!Directory.Exists(oldModsRoot))
+            string oldModPath;
+            if (!string.IsNullOrWhiteSpace(sourcePath))
             {
-                _logger.LogError("OldMods directory not found at {Path}. Create it and place old Sma5h mod folders inside.", oldModsRoot);
-                return;
+                oldModPath = sourcePath;
+                if (!Directory.Exists(oldModPath))
+                {
+                    _logger.LogError("Source mod folder not found: {Path}", oldModPath);
+                    return;
+                }
+                if (!File.Exists(Path.Combine(oldModPath, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE)))
+                {
+                    _logger.LogError("Source folder does not contain a {File}: {Path}",
+                        MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE, oldModPath);
+                    return;
+                }
             }
-
-            var candidates = Directory.GetDirectories(oldModsRoot)
-                .Where(d => File.Exists(Path.Combine(d, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE)))
-                .OrderBy(d => Path.GetFileName(d), StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (candidates.Count == 0)
+            else
             {
-                _logger.LogError("No valid mods found in {Path}. Each subfolder must contain a {File}.",
-                    oldModsRoot, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE);
-                return;
+                // Look for old mods in Mods/OldMods (sibling of the MusicMods folder)
+                var oldModsRoot = Path.Combine(Path.GetDirectoryName(modPath), "OldMods");
+
+                if (!Directory.Exists(oldModsRoot))
+                {
+                    _logger.LogError("OldMods directory not found at {Path}. Create it and place old Sma5h mod folders inside.", oldModsRoot);
+                    return;
+                }
+
+                var candidates = Directory.GetDirectories(oldModsRoot)
+                    .Where(d => File.Exists(Path.Combine(d, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE)))
+                    .OrderBy(d => Path.GetFileName(d), StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (candidates.Count == 0)
+                {
+                    _logger.LogError("No valid mods found in {Path}. Each subfolder must contain a {File}.",
+                        oldModsRoot, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE);
+                    return;
+                }
+
+                var choices = candidates.Select(Path.GetFileName).ToList();
+                var selected = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .WrapAround()
+                        .Title("Select an old Sma5h mod to convert:")
+                        .HighlightStyle(new Style(Color.Cyan1))
+                        .AddChoices(choices));
+
+                oldModPath = Path.Combine(oldModsRoot, selected);
             }
-
-            var choices = candidates.Select(Path.GetFileName).ToList();
-            var selected = AnsiConsole.Prompt(
-                new SelectionPrompt<string>()
-                    .WrapAround()
-                    .Title("Select an old Sma5h mod to convert:")
-                    .HighlightStyle(new Style(Color.Cyan1))
-                    .AddChoices(choices));
-
-            var oldModPath = Path.Combine(oldModsRoot, selected);
 
             var jsonPath = Path.Combine(oldModPath, MusicConstants.MusicModFiles.MUSIC_MOD_METADATA_JSON_FILE);
             JObject json;
@@ -81,11 +103,13 @@ namespace UMB.CLI.Services
             // Load base game tone IDs from nusbank_ids.csv
             var baseGameToneIds = LoadBaseGameToneIds();
 
-            // Prompt for output mod name
+            // Resolve output mod name (supplied arg, else prompt)
             var modName = json["name"]?.ToString() ?? Path.GetFileName(oldModPath);
-            var outputModName = AnsiConsole.Prompt(
-                new TextPrompt<string>("Name for the new UMB mod folder:")
-                    .DefaultValue(SanitizeFolderName(modName)));
+            var outputModName = !string.IsNullOrWhiteSpace(outputName)
+                ? SanitizeFolderName(outputName)
+                : AnsiConsole.Prompt(
+                    new TextPrompt<string>("Name for the new UMB mod folder:")
+                        .DefaultValue(SanitizeFolderName(modName)));
 
             var outputModDir = Path.Combine(modPath, outputModName);
 

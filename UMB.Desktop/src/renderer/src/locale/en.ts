@@ -4,11 +4,23 @@ export default {
     subtitle: 'Build and scaffold mod output for your Nintendo Switch.',
     buildButton: 'Build',
     buildDescription: 'Compile all mods into ArcOutput for the Switch.',
-    buildDisabled: 'Build is not yet available in the desktop app.',
     scaffoldButton: 'Scaffold',
     scaffoldDescription: 'Generate folder structure and series order for existing mods.',
     cleanupButton: 'Cleanup',
     cleanupDescription: 'Remove generated output and temporary build files.',
+    importButton: 'Import',
+    importDescription: 'Import a Sma5h mod into UMB folder format.',
+    importModal: {
+      title: 'Import Sma5h Mod',
+      subtitle: 'Convert a Sma5h mod into UMB folder format.',
+      sourceLabel: 'Sma5h mod location',
+      sourcePlaceholder: 'No folder selected',
+      browse: 'Browse',
+      nameLabel: 'New UMB mod name',
+      namePlaceholder: 'my-mod-name',
+      close: 'Close',
+      import: 'Import'
+    },
     running: 'Running...'
   },
   app: {

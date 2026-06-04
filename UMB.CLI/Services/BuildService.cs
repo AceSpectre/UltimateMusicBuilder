@@ -39,7 +39,7 @@ namespace UMB.CLI.Services
             _logger = logger;
         }
 
-        public async Task Run()
+        public async Task Run(string requestedMod = null)
         {
             Script.PrintBanner(_logger);
 
@@ -56,12 +56,33 @@ namespace UMB.CLI.Services
                 return;
             }
 
+            // Non-interactive terminals (e.g. the desktop app) cannot show selection
+            // prompts. Default to building everything and proceeding past warnings.
+            var interactive = AnsiConsole.Profile.Capabilities.Interactive;
+
             // Let user pick which mod to build
             string selectedMod = null;
-            if (modDirs.Count == 1)
+            if (!string.IsNullOrWhiteSpace(requestedMod))
+            {
+                // Caller (e.g. the desktop app) named the mod explicitly.
+                var match = modDirs.FirstOrDefault(d =>
+                    Path.GetFileName(d).Equals(requestedMod, StringComparison.OrdinalIgnoreCase));
+                if (match == null)
+                {
+                    _logger.LogError("Requested mod \"{ModName}\" not found in {ModPath}.", requestedMod, modPath);
+                    return;
+                }
+                selectedMod = Path.GetFileName(match);
+                _logger.LogInformation("Building mod: {ModName}", selectedMod);
+            }
+            else if (modDirs.Count == 1)
             {
                 selectedMod = Path.GetFileName(modDirs[0]);
                 _logger.LogInformation("Building mod: {ModName}", selectedMod);
+            }
+            else if (!interactive)
+            {
+                _logger.LogInformation("Non-interactive build: building all {Count} mods.", modDirs.Count);
             }
             else
             {
@@ -96,7 +117,7 @@ namespace UMB.CLI.Services
                     .Where(d => !Path.GetFileName(d).StartsWith("."))
                     .ToList();
 
-                if (seriesDirs.Count > 1)
+                if (seriesDirs.Count > 1 && interactive)
                 {
                     var buildScope = AnsiConsole.Prompt(
                         new SelectionPrompt<string>()
@@ -169,17 +190,24 @@ namespace UMB.CLI.Services
                 foreach (var w in warnings)
                     _logger.LogWarning("{Warning}", w);
 
-                var proceed = AnsiConsole.Prompt(
-                    new SelectionPrompt<string>()
-                        .WrapAround()
-                        .Title("[yellow]Validation warnings found. Proceed with build?[/]")
-                        .HighlightStyle(new Style(Color.Cyan1))
-                        .AddChoices("Yes - build anyway", "No - cancel build"));
-
-                if (proceed.StartsWith("No"))
+                if (interactive)
                 {
-                    _logger.LogInformation("Build cancelled.");
-                    return;
+                    var proceed = AnsiConsole.Prompt(
+                        new SelectionPrompt<string>()
+                            .WrapAround()
+                            .Title("[yellow]Validation warnings found. Proceed with build?[/]")
+                            .HighlightStyle(new Style(Color.Cyan1))
+                            .AddChoices("Yes - build anyway", "No - cancel build"));
+
+                    if (proceed.StartsWith("No"))
+                    {
+                        _logger.LogInformation("Build cancelled.");
+                        return;
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("Non-interactive build: proceeding despite validation warnings.");
                 }
             }
 

@@ -111,13 +111,15 @@ namespace UMB.CLI
                 switch (action)
                 {
                     case "build":
-                        await entry.RunBuild();
+                        await entry.RunBuild(extraArgs?.Length > 0 ? extraArgs[0] : null);
                         break;
                     case "scaffold":
                         entry.RunScaffold();
                         break;
                     case "convert":
-                        entry.RunConvert();
+                        entry.RunConvert(
+                            extraArgs?.Length > 0 ? extraArgs[0] : null,
+                            extraArgs?.Length > 1 ? extraArgs[1] : null);
                         break;
                     case "merge":
                         entry.RunMerge();

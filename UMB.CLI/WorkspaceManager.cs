@@ -40,7 +40,9 @@ namespace UMB.CLI
                 if (existingFiles.Length == 0 && existingDirs.Length == 0)
                     return true;
 
-                if (!_config.CurrentValue.SkipOutputPathCleanupConfirmation)
+                // Non-interactive callers (e.g. the desktop app) have stdin redirected and
+                // cannot answer a prompt; auto-confirm the cleanup for them.
+                if (!_config.CurrentValue.SkipOutputPathCleanupConfirmation && !Console.IsInputRedirected)
                 {
                     _logger.LogWarning("Files found in the workspace folder, delete? Y/N (Default: N)");
                     var response = Console.ReadKey();

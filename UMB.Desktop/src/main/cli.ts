@@ -17,10 +17,19 @@ function nowTs(): string {
 function parseLogLine(raw: string): LogLine {
   const timestamp = nowTs()
 
-  if (raw.includes('[Warning]') || raw.includes('[WRN]') || raw.toLowerCase().includes('warning')) {
+  // .NET's console logger prefixes each line with its level: "info:", "warn:", "fail:"
+  // (and "crit:"). Classify on that prefix — scanning the whole line for the word
+  // "error"/"warning" misclassifies success messages like "...check for any error."
+  const level = raw.match(/^\s*(info|warn|fail|crit|dbug|trce)\s*:/i)?.[1]?.toLowerCase()
+  if (level === 'warn') return { timestamp, level: 'warn', message: raw.trim() }
+  if (level === 'fail' || level === 'crit') return { timestamp, level: 'error', message: raw.trim() }
+  if (level) return { timestamp, level: 'info', message: raw.trim() }
+
+  // No recognized prefix — fall back to bracket tags then a substring scan.
+  if (raw.includes('[Warning]') || raw.includes('[WRN]')) {
     return { timestamp, level: 'warn', message: raw.replace(/\[Warning\]|\[WRN\]\s*/g, '').trim() }
   }
-  if (raw.includes('[Error]') || raw.includes('[ERR]') || raw.toLowerCase().includes('error')) {
+  if (raw.includes('[Error]') || raw.includes('[ERR]')) {
     return { timestamp, level: 'error', message: raw.replace(/\[Error\]|\[ERR\]\s*/g, '').trim() }
   }
   return { timestamp, level: 'info', message: raw.trim() }

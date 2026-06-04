@@ -1,6 +1,6 @@
 import {
   Hammer, AudioWaveform, Volume2,
-  ListOrdered, ArrowUpDown, ArrowLeftRight, GitMerge,
+  ListOrdered, ArrowUpDown, GitMerge,
   Image, Database
 } from '@lucide/svelte'
 import type { Component } from 'svelte'
@@ -46,7 +46,6 @@ export const navGroups: NavGroup[] = [
     id: 'transfer',
     label: 'TRANSFER',
     items: [
-      { id: 'convert', label: 'Import', icon: ArrowLeftRight },
       { id: 'merge', label: 'Merge', icon: GitMerge },
       { id: 'extract-icons', label: 'Extract Icons', icon: Image }
     ]

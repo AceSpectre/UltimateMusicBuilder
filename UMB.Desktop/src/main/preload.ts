@@ -168,6 +168,7 @@ const api = {
   generateLoopPreview: (seriesPath: string, filename: string, loopStartSec: number, loopEndSec: number, previewLength: number): Promise<string | null> => ipcRenderer.invoke(IPC.GENERATE_LOOP_PREVIEW, seriesPath, filename, loopStartSec, loopEndSec, previewLength),
   runAction: (action: string, args?: string[]) =>
     ipcRenderer.invoke(IPC.RUN_ACTION, action, args) as Promise<void>,
+  selectFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.SELECT_FOLDER),
   cancelAction: () => { ipcRenderer.send(IPC.CANCEL_ACTION) },
   subscribeLogs: (cb: (line: LogLine) => void): (() => void) => {
     const handler = (_event: unknown, line: LogLine): void => cb(line)

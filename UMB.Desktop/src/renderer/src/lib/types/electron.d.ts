@@ -165,6 +165,7 @@ export interface UmbApi {
   getTrackDuration(seriesPath: string, filename: string): Promise<number>
   generateLoopPreview(seriesPath: string, filename: string, loopStartSec: number, loopEndSec: number, previewLength: number): Promise<string | null>
   runAction(action: string, args?: string[]): Promise<void>
+  selectFolder(): Promise<string | null>
   cancelAction(): void
   subscribeLogs(cb: (line: LogLine) => void): () => void
   windowMinimize(): Promise<WindowActionResult>

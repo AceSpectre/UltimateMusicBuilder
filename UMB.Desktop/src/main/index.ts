@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'path'
 import { listModSeries, listMods, getModStats } from './mods'
 import { loadTrackOrderData, saveTrackOrderData } from './order-tracks'
@@ -137,6 +137,15 @@ function registerIpcHandlers(): void {
     spawnCliAction(workspace, action, args || [], (line) => {
       mainWindow?.webContents.send(IPC.LOG_STREAM, line)
     })
+  })
+
+  ipcMain.handle(IPC.SELECT_FOLDER, async () => {
+    if (!mainWindow) return null
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory']
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
   })
 
   ipcMain.on(IPC.CANCEL_ACTION, () => {

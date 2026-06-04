@@ -138,7 +138,7 @@
 
     <main class="flex-1 flex flex-col overflow-hidden bg-background">
       {#if activeTab === 'build'}
-        <BuildView />
+        <BuildView activeMod={activeMod} />
       {:else if activeTab === 'order-series'}
         <OrderSeriesView activeMod={activeMod} />
       {:else if activeTab === 'nus3-convert'}
