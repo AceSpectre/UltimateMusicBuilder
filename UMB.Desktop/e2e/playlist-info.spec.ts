@@ -20,18 +20,21 @@ test('getPlaylistInfo parses vanilla playlists and stages', async () => {
   const page = await firstWindow(app)
   const data = await page.evaluate(() => window.electron.umb.getPlaylistInfo())
 
-  expect(data.playlists.length).toBeGreaterThan(0)
-  expect(data.stages.length).toBeGreaterThan(0)
+  // Lower bounds (well under the real vanilla counts) catch a partial parse, not just empty.
+  expect(data.playlists.length).toBeGreaterThanOrEqual(30)
+  expect(data.stages.length).toBeGreaterThanOrEqual(100)
 
   // bgmjack → "Persona" (PLAYLIST_NAMES) with vanilla songs.
   const persona = data.playlists.find((p) => p.id === 'bgmjack')
-  expect(persona?.name).toBe('Persona')
-  expect((persona?.songCount ?? 0)).toBeGreaterThan(0)
+  expect(persona, 'bgmjack playlist not found').toBeDefined()
+  expect(persona!.name).toBe('Persona')
+  expect(persona!.songCount).toBeGreaterThan(0)
 
   // A known stage resolves its display name + has songs.
   const battlefield = data.stages.find((s) => s.uiStageId === 'ui_stage_battle_field')
-  expect(battlefield?.name).toBe('Battlefield')
-  expect((battlefield?.songs.length ?? 0)).toBeGreaterThan(0)
+  expect(battlefield, 'ui_stage_battle_field not found').toBeDefined()
+  expect(battlefield!.name).toBe('Battlefield')
+  expect(battlefield!.songs.length).toBeGreaterThan(0)
 })
 
 test('UI smoke: Playlist Info view opens', async () => {
