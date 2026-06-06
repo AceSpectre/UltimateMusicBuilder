@@ -32,12 +32,14 @@ test('no raw i18n keys leak in app bar or sidebar', async () => {
 test('sidebar labels match locale strings', async () => {
   const page = await firstWindow(app)
 
+  // Labels mirror navGroups in src/renderer/src/lib/actions.ts + nav.items locale keys.
+  // 'Accept Nus3', 'Cleanup', 'Import', 'Dump Stages' are not sidebar items.
   const expectedLabels = [
     'Build',
-    'Nus3 Convert', 'Accept Nus3', 'Config Volume',
-    'Order Series', 'Order Tracks', 'Cleanup',
-    'Import', 'Merge', 'Extract Icons',
-    'Dump Stages'
+    'Nus3 Convert', 'Config Volume',
+    'Order Series', 'Order Tracks',
+    'Merge', 'Extract Icons',
+    'Playlist Info'
   ]
 
   const sidebar = page.getByRole('navigation')
