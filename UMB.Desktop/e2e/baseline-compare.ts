@@ -1,6 +1,6 @@
 import { createHash } from 'crypto'
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs'
-import { join, extname, relative } from 'path'
+import { basename, join, extname, relative } from 'path'
 
 const HASHED = new Set(['.prc', '.msbt', '.bin'])
 const MANIFEST_EXT = new Set(['.nus3audio', '.nus3bank'])
@@ -36,7 +36,7 @@ function hashTree(root: string): Record<string, string> {
   const result: Record<string, string> = {}
   for (const file of walk(root)) {
     if (!HASHED.has(extname(file).toLowerCase())) continue
-    if (file.toLowerCase().endsWith(MANIFEST_FILE)) continue
+    if (basename(file).toLowerCase() === MANIFEST_FILE) continue
     result[toRel(root, file)] = createHash('sha256').update(readFileSync(file)).digest('hex')
   }
   return result
@@ -87,8 +87,10 @@ function diff(
 
 /** Symmetric directory compare (both sides hold real files). Used by the build differential. */
 export function compareDirs(expectedDir: string, actualDir: string): BaselineReport {
-  const setup = existsSync(expectedDir) ? null : `Expected dir does not exist: ${expectedDir}`
-  return diff(hashTree(expectedDir), buildManifest(expectedDir), actualDir, setup)
+  if (!existsSync(expectedDir)) {
+    return diff({}, {}, actualDir, `Expected dir does not exist: ${expectedDir}`)
+  }
+  return diff(hashTree(expectedDir), buildManifest(expectedDir), actualDir, null)
 }
 
 /** Compare against a committed baseline dir that holds hashed files + a nus3 manifest FILE. */

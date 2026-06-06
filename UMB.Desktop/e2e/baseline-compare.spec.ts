@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { cpSync, readFileSync, writeFileSync, rmSync, mkdtempSync, readdirSync } from 'fs'
+import { cpSync, readFileSync, writeFileSync, rmSync, mkdtempSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { compareDirs, compareToBaseline, buildManifest } from './baseline-compare'
@@ -61,11 +61,8 @@ test('compareToBaseline diffs nus3 sizes against a committed manifest file', () 
 })
 
 test('buildManifest records nus3 sizes keyed by forward-slash relative path', () => {
-  const dir = join(tmp, 'out', 'sound', 'bgm')
   cpSync(BASELINE, join(tmp, 'out'), { recursive: true }) // ensure dir exists then add a nus3
   writeFileSync(join(tmp, 'out', 'a.nus3audio'), Buffer.alloc(10))
   const m = buildManifest(join(tmp, 'out'))
   expect(m['a.nus3audio']).toBe(10)
-  void readdirSync // keep import used
-  void dir
 })
