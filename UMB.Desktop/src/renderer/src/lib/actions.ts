@@ -47,7 +47,7 @@ export const navGroups: NavGroup[] = [
     label: 'TRANSFER',
     items: [
       { id: 'merge', label: 'Merge', icon: GitMerge },
-      { id: 'extract-icons', label: 'Extract Icons', icon: Image }
+      { id: 'extract-icons', label: 'Extract Icons', icon: Image, mode: 'view' }
     ]
   },
   {

@@ -10,6 +10,7 @@
   import OrderSeriesView from '$lib/components/actions/order-series-view.svelte'
   import Nus3ConvertView from '$lib/components/actions/nus3-convert-view.svelte'
   import ConfigVolumeView from '$lib/components/actions/config-volume-view.svelte'
+  import ExtractIconsView from '$lib/components/actions/extract-icons-view.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
   import type { ModInfo, WindowActionResult } from '$lib/types/electron'
 
@@ -147,6 +148,8 @@
         <ConfigVolumeView activeMod={activeMod} />
       {:else if activeTab === 'order-tracks'}
         <OrderTracksView activeMod={activeMod} />
+      {:else if activeTab === 'extract-icons'}
+        <ExtractIconsView activeMod={activeMod} mods={mods} />
       {:else}
         <div class="flex-1 grid place-items-center p-8">
           <div class="flex flex-col items-center gap-3 max-w-[420px] text-center">

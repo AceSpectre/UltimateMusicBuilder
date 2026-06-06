@@ -133,6 +133,26 @@ export interface VolumeOverride {
   volume: number
 }
 
+export interface ExtractIconMatch {
+  seriesId: string
+  bntxPath: string
+  hasExistingIcon: boolean
+}
+
+export interface ExtractIconsAnalysis {
+  compiledModPath: string
+  modPath: string
+  modName: string
+  matched: ExtractIconMatch[]
+  unmatched: string[]
+}
+
+export interface ExtractIconsResult {
+  extracted: number
+  skipped: number
+  failed: number
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string
@@ -166,6 +186,10 @@ const api = {
   extractWaveform: (seriesPath: string, filename: string, bars?: number): Promise<number[]> => ipcRenderer.invoke(IPC.EXTRACT_WAVEFORM, seriesPath, filename, bars),
   getTrackDuration: (seriesPath: string, filename: string): Promise<number> => ipcRenderer.invoke(IPC.GET_TRACK_DURATION, seriesPath, filename),
   generateLoopPreview: (seriesPath: string, filename: string, loopStartSec: number, loopEndSec: number, previewLength: number): Promise<string | null> => ipcRenderer.invoke(IPC.GENERATE_LOOP_PREVIEW, seriesPath, filename, loopStartSec, loopEndSec, previewLength),
+  analyzeExtractIcons: (compiledModPath: string, modPath: string): Promise<ExtractIconsAnalysis> =>
+    ipcRenderer.invoke(IPC.ANALYZE_EXTRACT_ICONS, compiledModPath, modPath),
+  extractIcons: (compiledModPath: string, modPath: string, mode: 'all' | 'missing-only'): Promise<ExtractIconsResult> =>
+    ipcRenderer.invoke(IPC.EXTRACT_ICONS, compiledModPath, modPath, mode),
   runAction: (action: string, args?: string[]) =>
     ipcRenderer.invoke(IPC.RUN_ACTION, action, args) as Promise<void>,
   selectFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.SELECT_FOLDER),

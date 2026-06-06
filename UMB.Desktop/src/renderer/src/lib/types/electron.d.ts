@@ -126,6 +126,26 @@ export interface VolumeConfigData {
   items: VolumeRowItem[]
 }
 
+export interface ExtractIconMatch {
+  seriesId: string
+  bntxPath: string
+  hasExistingIcon: boolean
+}
+
+export interface ExtractIconsAnalysis {
+  compiledModPath: string
+  modPath: string
+  modName: string
+  matched: ExtractIconMatch[]
+  unmatched: string[]
+}
+
+export interface ExtractIconsResult {
+  extracted: number
+  skipped: number
+  failed: number
+}
+
 export interface AppSettings {
   globalVolumeMultiplier: number
 }
@@ -174,6 +194,8 @@ export interface UmbApi {
   extractWaveform(seriesPath: string, filename: string, bars?: number): Promise<number[]>
   getTrackDuration(seriesPath: string, filename: string): Promise<number>
   generateLoopPreview(seriesPath: string, filename: string, loopStartSec: number, loopEndSec: number, previewLength: number): Promise<string | null>
+  analyzeExtractIcons(compiledModPath: string, modPath: string): Promise<ExtractIconsAnalysis>
+  extractIcons(compiledModPath: string, modPath: string, mode: 'all' | 'missing-only'): Promise<ExtractIconsResult>
   checkArcOutput(): Promise<boolean>
   getAppSettings(): Promise<AppSettings>
   saveAppSettings(settings: AppSettings): Promise<void>

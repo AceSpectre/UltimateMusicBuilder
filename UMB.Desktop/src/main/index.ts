@@ -11,6 +11,7 @@ import {
 import type { Nus3TrackDecision, LoopAnalysisOptions } from './nus3-convert'
 import { loadVolumeConfig, saveVolumeConfig, decodeTrackPreview, type VolumeOverride } from './config-volume'
 import { getAppSettings, saveAppSettings, checkArcOutput, type AppSettings } from './app-settings'
+import { analyzeExtractIcons, extractIcons } from './extract-icons'
 import { IPC } from '../shared/ipc-channels'
 
 let mainWindow: BrowserWindow | null = null
@@ -138,6 +139,16 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.DECODE_TRACK_PREVIEW, (_event, seriesPath: string, filename: string) =>
     decodeTrackPreview(workspace, seriesPath, filename, (line) => {
+      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
+    })
+  )
+
+  ipcMain.handle(IPC.ANALYZE_EXTRACT_ICONS, (_event, compiledModPath: string, modPath: string) =>
+    analyzeExtractIcons(workspace, compiledModPath, modPath)
+  )
+
+  ipcMain.handle(IPC.EXTRACT_ICONS, (_event, compiledModPath: string, modPath: string, mode: 'all' | 'missing-only') =>
+    extractIcons(workspace, compiledModPath, modPath, mode, (line) => {
       mainWindow?.webContents.send(IPC.LOG_STREAM, line)
     })
   )

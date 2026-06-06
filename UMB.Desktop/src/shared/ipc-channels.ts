@@ -26,6 +26,8 @@ export const IPC = {
   CHECK_ARC_OUTPUT: 'umb:check-arc-output',
   GET_APP_SETTINGS: 'umb:get-app-settings',
   SAVE_APP_SETTINGS: 'umb:save-app-settings',
+  ANALYZE_EXTRACT_ICONS: 'umb:analyze-extract-icons',
+  EXTRACT_ICONS: 'umb:extract-icons',
   CANCEL_ACTION: 'umb:cancel-action',
   DEBUG_PING: 'umb:debug-ping',
   WINDOW_MINIMIZE: 'umb:window-minimize',
