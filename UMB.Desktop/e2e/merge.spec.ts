@@ -55,6 +55,13 @@ test('executeMerge produces a merged mod with all series and resolved conflict',
   expect(existsSync(join(out, 'mario', 'tracks.csv'))).toBe(true)
   expect(existsSync(join(out, 'custom', 'series.toml'))).toBe(true)
 
+  // Conflict resolution: merged dev must union both mods' tracks, with mod-a metadata winning.
+  const mergedDevCsv = readFileSync(join(out, 'dev', 'tracks.csv'), 'utf8')
+  expect(mergedDevCsv).toContain('KARTS!')      // a mod-a track
+  expect(mergedDevCsv).toContain('b-only.flac') // mod-b's unique track
+  const mergedDevToml = readFileSync(join(out, 'dev', 'series.toml'), 'utf8')
+  expect(mergedDevToml).toContain('Somewhat Good: Karts') // priority mod-a name, not "Dev B"
+
   // series-order merged, priority A first, deduped → dev, custom
   const order = [...readFileSync(join(out, 'series-order.toml'), 'utf8').matchAll(/^\s+"([^"]+)",/gm)].map((m) => m[1])
   expect(order).toEqual(['dev', 'custom'])
