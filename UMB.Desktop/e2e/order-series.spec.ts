@@ -25,6 +25,8 @@ test('loadSeriesOrder lists custom series; dev pre-ordered by series-order.toml'
   const ids = data.items.map((i) => i.seriesId).sort()
   expect(ids).toEqual(['dev', 'gamma'])
   expect(data.hasSeriesOrder).toBe(true) // configured-mod ships series-order.toml = ["dev"]
+  // series-order.toml = ["dev"] must be honoured end-to-end: dev before the unlisted gamma.
+  expect(data.items.map((i) => i.seriesId)).toEqual(['dev', 'gamma'])
 })
 
 test('saveSeriesOrder writes gamma before dev', async () => {
@@ -32,6 +34,8 @@ test('saveSeriesOrder writes gamma before dev', async () => {
   const loaded = await page.evaluate((mp) => window.electron.umb.loadSeriesOrder(mp), modDir)
   const gamma = loaded.items.find((i) => i.seriesId === 'gamma')!
   const dev = loaded.items.find((i) => i.seriesId === 'dev')!
+  expect(gamma, 'gamma series missing from loadSeriesOrder').toBeDefined()
+  expect(dev, 'dev series missing from loadSeriesOrder').toBeDefined()
 
   const result = await page.evaluate(
     ([mp, ids]) => window.electron.umb.saveSeriesOrder(mp as string, ids as string[]),
