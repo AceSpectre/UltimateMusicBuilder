@@ -10,10 +10,14 @@ const compiled = () => join(repoRoot(), 'Tests', 'TestData', 'baselines', 'extra
 
 function pngDims(file: string): { w: number; h: number } {
   const fd = openSync(file, 'r')
-  const b = Buffer.alloc(24)
-  readSync(fd, b, 0, 24, 0)
-  closeSync(fd)
-  return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) }
+  try {
+    const b = Buffer.alloc(24)
+    const read = readSync(fd, b, 0, 24, 0)
+    if (read < 24) throw new Error(`PNG too short (${read} bytes): ${file}`)
+    return { w: b.readUInt32BE(16), h: b.readUInt32BE(20) }
+  } finally {
+    closeSync(fd)
+  }
 }
 
 test.beforeAll(async () => {
@@ -49,6 +53,28 @@ test('extract produces icon.png whose dimensions match the source icon', async (
 
   const src = join(repoRoot(), 'Tests', 'TestData', 'configured-mod', 'dev', 'icon.png')
   expect(pngDims(out)).toEqual(pngDims(src))
+})
+
+test('a mod without a matching series extracts nothing', async () => {
+  // Mirrors ExtractIconsServiceTests.Extract_SkipsBntxWithNoMatchingSeriesFolder:
+  // the BNTX baseline only has series_0_dev.bntx, so a gamma-only mod matches nothing.
+  const noMatch = join(ws.root, 'Mods', 'MusicMods', 'no-match')
+  mkdirSync(join(noMatch, 'gamma'), { recursive: true })
+  const page = await firstWindow(app)
+
+  const a = await page.evaluate(
+    ([c, m]) => window.electron.umb.analyzeExtractIcons(c as string, m as string),
+    [compiled(), noMatch] as const
+  )
+  expect(a.matched).toEqual([])
+  expect(a.unmatched).toEqual(['dev'])
+
+  const result = await page.evaluate(
+    ([c, m]) => window.electron.umb.extractIcons(c as string, m as string, 'all'),
+    [compiled(), noMatch] as const
+  )
+  expect(result.extracted).toBe(0)
+  expect(existsSync(join(noMatch, 'gamma', 'icon.png'))).toBe(false)
 })
 
 test('UI smoke: Extract Icons view opens', async () => {
