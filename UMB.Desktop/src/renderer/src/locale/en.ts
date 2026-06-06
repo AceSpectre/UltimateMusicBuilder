@@ -67,7 +67,7 @@ export default {
       audio: 'AUDIO',
       organize: 'ORGANIZE',
       transfer: 'TRANSFER',
-      diagnostic: 'DIAGNOSTIC'
+      inspect: 'INSPECT'
     },
     items: {
       build: 'Build',
@@ -78,7 +78,7 @@ export default {
       convert: 'Import',
       merge: 'Merge',
       'extract-icons': 'Extract Icons',
-      'dump-stages': 'Dump Stages'
+      'playlist-info': 'Playlist Info'
     }
   },
   commandPalette: {
@@ -306,6 +306,30 @@ export default {
     nameError: 'Invalid name',
     noMods: 'No mods found. Add mods to Mods/MusicMods/ to get started.',
     mergeAnother: 'Merge Another'
+  },
+  playlistInfo: {
+    title: 'Playlist Info',
+    subtitle: 'Browse the vanilla game playlists and per-stage music assignments.',
+    tabPlaylists: 'Playlists',
+    tabStages: 'Stages',
+    loading: 'Reading game data...',
+    loadError: 'Failed to read game data from Resources.',
+    colPlaylist: 'Playlist',
+    colSeries: 'Series',
+    colSongs: 'Songs',
+    playlistCount: '{count} playlists',
+    stageCount: '{count} stages',
+    noSeries: '—',
+    searchStages: 'Search stages...',
+    noStageMatch: 'No stages match your search.',
+    selectStage: 'Select a stage to view its music assignment.',
+    fieldPlaylist: 'Playlist',
+    fieldOrder: 'Order',
+    fieldSeries: 'Series',
+    songsInOrder: 'Songs in order {order}',
+    noSongs: 'No songs are assigned to this order.',
+    noPlaylist: 'This stage has no playlist assigned.',
+    hiddenBadge: 'hidden'
   },
   orderTracks: {
     title: 'Order Tracks',

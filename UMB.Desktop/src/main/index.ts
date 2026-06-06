@@ -13,6 +13,7 @@ import { loadVolumeConfig, saveVolumeConfig, decodeTrackPreview, type VolumeOver
 import { getAppSettings, saveAppSettings, checkArcOutput, type AppSettings } from './app-settings'
 import { analyzeExtractIcons, extractIcons } from './extract-icons'
 import { analyzeMerge, validateOutputName, executeMerge } from './merge'
+import { getPlaylistInfo } from './playlist-info'
 import { IPC } from '../shared/ipc-channels'
 
 let mainWindow: BrowserWindow | null = null
@@ -167,6 +168,8 @@ function registerIpcHandlers(): void {
       mainWindow?.webContents.send(IPC.LOG_STREAM, line)
     })
   )
+
+  ipcMain.handle(IPC.GET_PLAYLIST_INFO, () => getPlaylistInfo(workspace))
 
   ipcMain.handle(IPC.CHECK_ARC_OUTPUT, () => checkArcOutput(workspace))
 

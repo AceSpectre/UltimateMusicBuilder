@@ -31,6 +31,7 @@ export const IPC = {
   ANALYZE_MERGE: 'umb:analyze-merge',
   VALIDATE_MERGE_NAME: 'umb:validate-merge-name',
   EXECUTE_MERGE: 'umb:execute-merge',
+  GET_PLAYLIST_INFO: 'umb:get-playlist-info',
   CANCEL_ACTION: 'umb:cancel-action',
   DEBUG_PING: 'umb:debug-ping',
   WINDOW_MINIMIZE: 'umb:window-minimize',

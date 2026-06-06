@@ -180,6 +180,36 @@ export interface MergeResult {
   conflictsResolved: number
 }
 
+export interface PlaylistInfo {
+  id: string
+  name: string
+  series: string[]
+  songCount: number
+}
+
+export interface StageSong {
+  order: number
+  bgmId: string
+  name: string
+}
+
+export interface StageInfo {
+  uiStageId: string
+  name: string
+  hidden: boolean
+  seriesId: string
+  seriesName: string
+  playlistId: string
+  playlistName: string
+  order: number
+  songs: StageSong[]
+}
+
+export interface PlaylistInfoData {
+  playlists: PlaylistInfo[]
+  stages: StageInfo[]
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string
@@ -223,6 +253,7 @@ const api = {
     ipcRenderer.invoke(IPC.VALIDATE_MERGE_NAME, name),
   executeMerge: (modPaths: string[], outputName: string, priorityModPath: string | null): Promise<MergeResult> =>
     ipcRenderer.invoke(IPC.EXECUTE_MERGE, modPaths, outputName, priorityModPath),
+  getPlaylistInfo: (): Promise<PlaylistInfoData> => ipcRenderer.invoke(IPC.GET_PLAYLIST_INFO),
   runAction: (action: string, args?: string[]) =>
     ipcRenderer.invoke(IPC.RUN_ACTION, action, args) as Promise<void>,
   selectFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.SELECT_FOLDER),

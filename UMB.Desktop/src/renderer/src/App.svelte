@@ -12,6 +12,7 @@
   import ConfigVolumeView from '$lib/components/actions/config-volume-view.svelte'
   import ExtractIconsView from '$lib/components/actions/extract-icons-view.svelte'
   import MergeView from '$lib/components/actions/merge-view.svelte'
+  import PlaylistInfoView from '$lib/components/actions/playlist-info-view.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
   import type { ModInfo, WindowActionResult } from '$lib/types/electron'
 
@@ -153,6 +154,8 @@
         <ExtractIconsView activeMod={activeMod} mods={mods} />
       {:else if activeTab === 'merge'}
         <MergeView mods={mods} />
+      {:else if activeTab === 'playlist-info'}
+        <PlaylistInfoView />
       {:else}
         <div class="flex-1 grid place-items-center p-8">
           <div class="flex flex-col items-center gap-3 max-w-[420px] text-center">

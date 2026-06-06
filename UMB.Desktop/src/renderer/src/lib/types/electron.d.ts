@@ -188,6 +188,36 @@ export interface VolumeProgress {
   currentFile: string
 }
 
+export interface PlaylistInfo {
+  id: string
+  name: string
+  series: string[]
+  songCount: number
+}
+
+export interface StageSong {
+  order: number
+  bgmId: string
+  name: string
+}
+
+export interface StageInfo {
+  uiStageId: string
+  name: string
+  hidden: boolean
+  seriesId: string
+  seriesName: string
+  playlistId: string
+  playlistName: string
+  order: number
+  songs: StageSong[]
+}
+
+export interface PlaylistInfoData {
+  playlists: PlaylistInfo[]
+  stages: StageInfo[]
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string
@@ -226,6 +256,7 @@ export interface UmbApi {
   analyzeMerge(modPaths: string[]): Promise<MergeAnalysis>
   validateMergeName(name: string): Promise<string | null>
   executeMerge(modPaths: string[], outputName: string, priorityModPath: string | null): Promise<MergeResult>
+  getPlaylistInfo(): Promise<PlaylistInfoData>
   checkArcOutput(): Promise<boolean>
   getAppSettings(): Promise<AppSettings>
   saveAppSettings(settings: AppSettings): Promise<void>

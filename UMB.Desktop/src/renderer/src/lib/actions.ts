@@ -1,7 +1,7 @@
 import {
   Hammer, AudioWaveform, Volume2,
   ListOrdered, ArrowUpDown, GitMerge,
-  Image, Database
+  Image, ListMusic
 } from '@lucide/svelte'
 import type { Component } from 'svelte'
 
@@ -51,10 +51,10 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
-    id: 'diagnostic',
-    label: 'DIAGNOSTIC',
+    id: 'inspect',
+    label: 'INSPECT',
     items: [
-      { id: 'dump-stages', label: 'Dump Stages', icon: Database }
+      { id: 'playlist-info', label: 'Playlist Info', icon: ListMusic, mode: 'view' }
     ]
   }
 ]
