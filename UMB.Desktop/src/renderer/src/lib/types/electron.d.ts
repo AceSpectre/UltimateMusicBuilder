@@ -126,6 +126,10 @@ export interface VolumeConfigData {
   items: VolumeRowItem[]
 }
 
+export interface AppSettings {
+  globalVolumeMultiplier: number
+}
+
 export interface VolumeOverride {
   originalIndex: number
   volume: number
@@ -170,6 +174,9 @@ export interface UmbApi {
   extractWaveform(seriesPath: string, filename: string, bars?: number): Promise<number[]>
   getTrackDuration(seriesPath: string, filename: string): Promise<number>
   generateLoopPreview(seriesPath: string, filename: string, loopStartSec: number, loopEndSec: number, previewLength: number): Promise<string | null>
+  checkArcOutput(): Promise<boolean>
+  getAppSettings(): Promise<AppSettings>
+  saveAppSettings(settings: AppSettings): Promise<void>
   runAction(action: string, args?: string[]): Promise<void>
   selectFolder(): Promise<string | null>
   cancelAction(): void

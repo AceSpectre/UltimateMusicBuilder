@@ -10,6 +10,7 @@ import {
 } from './nus3-convert'
 import type { Nus3TrackDecision, LoopAnalysisOptions } from './nus3-convert'
 import { loadVolumeConfig, saveVolumeConfig, decodeTrackPreview, type VolumeOverride } from './config-volume'
+import { getAppSettings, saveAppSettings, checkArcOutput, type AppSettings } from './app-settings'
 import { IPC } from '../shared/ipc-channels'
 
 let mainWindow: BrowserWindow | null = null
@@ -141,9 +142,17 @@ function registerIpcHandlers(): void {
     })
   )
 
+  ipcMain.handle(IPC.CHECK_ARC_OUTPUT, () => checkArcOutput(workspace))
+
+  ipcMain.handle(IPC.GET_APP_SETTINGS, () => getAppSettings(workspace))
+
+  ipcMain.handle(IPC.SAVE_APP_SETTINGS, (_event, settings: AppSettings) =>
+    saveAppSettings(workspace, settings)
+  )
+
   ipcMain.handle(IPC.RUN_ACTION, (_event, action: string, args?: string[]) => {
     if (!mainWindow) return
-    spawnCliAction(workspace, action, args || [], (line) => {
+    return spawnCliAction(workspace, action, args || [], (line) => {
       mainWindow?.webContents.send(IPC.LOG_STREAM, line)
     })
   })

@@ -169,6 +169,9 @@ const api = {
   runAction: (action: string, args?: string[]) =>
     ipcRenderer.invoke(IPC.RUN_ACTION, action, args) as Promise<void>,
   selectFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.SELECT_FOLDER),
+  checkArcOutput: (): Promise<boolean> => ipcRenderer.invoke(IPC.CHECK_ARC_OUTPUT),
+  getAppSettings: (): Promise<{ globalVolumeMultiplier: number }> => ipcRenderer.invoke(IPC.GET_APP_SETTINGS),
+  saveAppSettings: (settings: { globalVolumeMultiplier: number }): Promise<void> => ipcRenderer.invoke(IPC.SAVE_APP_SETTINGS, settings),
   cancelAction: () => { ipcRenderer.send(IPC.CANCEL_ACTION) },
   subscribeLogs: (cb: (line: LogLine) => void): (() => void) => {
     const handler = (_event: unknown, line: LogLine): void => cb(line)

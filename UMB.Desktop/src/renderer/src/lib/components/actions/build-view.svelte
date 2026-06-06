@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Hammer, FolderTree, Wand2, ArrowLeftRight, Folder } from '@lucide/svelte'
+  import { Hammer, FolderTree, Wand2, ArrowLeftRight, Folder, AlertTriangle } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
   import type { ModInfo } from '$lib/types/electron'
@@ -14,24 +14,37 @@
   let importModalOpen = $state(false)
   let importSource = $state('')
   let importName = $state('')
+  let overwriteModalOpen = $state(false)
 
   const canImport = $derived(importSource.trim() !== '' && importName.trim() !== '' && !importRunning)
 
-  async function handleBuild() {
-    if (buildRunning) return
+  async function handleBuildClick() {
+    if (buildRunning) {
+      window.electron.umb.cancelAction()
+      return
+    }
 
+    const hasOutput = await window.electron.umb.checkArcOutput()
+    if (hasOutput) {
+      overwriteModalOpen = true
+      return
+    }
+
+    startBuild()
+  }
+
+  function startBuild() {
+    overwriteModalOpen = false
     buildRunning = true
     logStore.clear()
     if (!logStore.drawerOpen) {
       logStore.toggleDrawer()
     }
 
-    try {
-      const mod = activeMod?.name
-      await window.electron.umb.runAction('build', mod ? [mod] : [])
-    } finally {
+    const mod = activeMod?.name
+    window.electron.umb.runAction('build', mod ? [mod] : []).finally(() => {
       buildRunning = false
-    }
+    })
   }
 
   async function handleScaffold() {
@@ -133,12 +146,13 @@
                 <p class="text-[12px] text-muted-foreground">{$_('build.buildDescription')}</p>
               </div>
               <button
-                onclick={handleBuild}
-                disabled={buildRunning}
-                class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+                onclick={handleBuildClick}
+                class="shrink-0 inline-flex items-center gap-2 rounded-lg px-4 py-2 text-[12.5px] font-medium transition-colors {buildRunning
+                  ? 'border-0 bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                  : 'border border-input bg-background hover:bg-muted'}"
               >
                 <Hammer size={14} />
-                {buildRunning ? $_('build.running') : $_('build.buildButton')}
+                {buildRunning ? $_('build.stopBuild') : $_('build.buildButton')}
               </button>
             </div>
           </div>
@@ -300,6 +314,56 @@
         >
           <ArrowLeftRight size={14} />
           {importRunning ? $_('build.running') : $_('build.importModal.import')}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if overwriteModalOpen}
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    onclick={() => { overwriteModalOpen = false }}
+    onkeydown={(e) => { if (e.key === 'Escape') overwriteModalOpen = false }}
+  >
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="w-full max-w-[420px] rounded-xl border border-border bg-popover shadow-2xl overflow-hidden"
+      onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => e.stopPropagation()}
+    >
+      <div class="h-[3px] shrink-0" style="background: hsl(var(--destructive));"></div>
+      <div class="border-b border-border px-5 py-4 flex items-center gap-3">
+        <div
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
+          style="background: hsl(var(--destructive) / .12); color: hsl(var(--destructive));"
+        >
+          <AlertTriangle size={18} />
+        </div>
+        <div class="min-w-0">
+          <h2 class="truncate text-sm font-semibold">{$_('build.overwriteModal.title')}</h2>
+          <p class="truncate text-[12.5px] text-muted-foreground">{$_('build.overwriteModal.subtitle')}</p>
+        </div>
+      </div>
+
+      <div class="px-5 py-5">
+        <p class="text-[12.5px] text-muted-foreground">{$_('build.overwriteModal.description')}</p>
+      </div>
+
+      <div class="border-t border-border px-5 py-4 flex items-center justify-end gap-2">
+        <button
+          onclick={() => { overwriteModalOpen = false }}
+          class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted"
+        >
+          {$_('build.overwriteModal.cancel')}
+        </button>
+        <button
+          onclick={startBuild}
+          class="inline-flex items-center gap-2 rounded-lg border-0 px-4 py-2 text-[12.5px] font-medium text-white transition-colors bg-destructive hover:bg-destructive/90"
+        >
+          <Hammer size={14} />
+          {$_('build.overwriteModal.overwrite')}
         </button>
       </div>
     </div>

@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { _ } from 'svelte-i18n'
-  import { Check, Minus, Square, X, FolderTree, ChevronDown, Folder, Sun, Moon } from '@lucide/svelte'
+  import { Check, Minus, Square, X, FolderTree, ChevronDown, Folder, Sun, Moon, Settings } from '@lucide/svelte'
   import { themeStore } from '$lib/stores/theme.svelte'
+  import SettingsModal from './settings-modal.svelte'
   import type { ModInfo } from '$lib/types/electron'
 
   let {
@@ -19,6 +20,7 @@
     onWindowControlAttempt: (action: 'minimize' | 'fullscreen' | 'close') => void | Promise<void>
   } = $props()
 
+  let settingsOpen = $state(false)
   let pickerOpen = $state(false)
   let pickerEl: HTMLDivElement | undefined = $state()
   let stats = $state<{ seriesCount: number; trackCount: number } | null>(null)
@@ -160,7 +162,7 @@
       </span>
     </div>
 
-    <!-- Settings -->
+    <!-- Theme toggle -->
     <button
       onclick={() => themeStore.toggle()}
       class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
@@ -171,6 +173,15 @@
       {:else}
         <Moon size={15} class="text-muted-foreground" />
       {/if}
+    </button>
+
+    <!-- Settings -->
+    <button
+      onclick={() => { settingsOpen = true }}
+      class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
+      title={$_('appBar.settings')}
+    >
+      <Settings size={15} class="text-muted-foreground" />
     </button>
 
     <!-- Window controls -->
@@ -199,3 +210,5 @@
     </div>
   </div>
 </div>
+
+<SettingsModal open={settingsOpen} onClose={() => { settingsOpen = false }} />

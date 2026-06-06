@@ -21,7 +21,15 @@ export default {
       close: 'Close',
       import: 'Import'
     },
-    running: 'Running...'
+    running: 'Running...',
+    stopBuild: 'Stop Build',
+    overwriteModal: {
+      title: 'Overwrite Previous Build',
+      subtitle: 'ArcOutput already contains files from a previous build.',
+      description: 'Building will overwrite the existing output. Are you sure you want to continue?',
+      cancel: 'Cancel',
+      overwrite: 'Overwrite & Build'
+    }
   },
   app: {
     selectAction: 'Select an action',
@@ -40,7 +48,18 @@ export default {
     tracksCount: '{value} tracks',
     minimize: 'Minimize window',
     fullscreen: 'Toggle fullscreen',
-    close: 'Close window'
+    close: 'Close window',
+    settings: 'Settings'
+  },
+  settings: {
+    title: 'Settings',
+    subtitle: 'Configure build defaults',
+    globalVolume: 'Global Volume Multiplier',
+    globalVolumeHint: 'Applied to every track during build. Default is 1.5×.',
+    save: 'Save',
+    saving: 'Saving...',
+    saved: 'Saved',
+    cancel: 'Cancel'
   },
   nav: {
     groups: {
