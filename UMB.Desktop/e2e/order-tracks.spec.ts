@@ -1,5 +1,5 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { readFileSync } from 'fs'
+import { readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { createWorkspace, seedTestDataMod, launchApp, firstWindow, type E2EWorkspace } from './e2e-utils'
 
@@ -69,7 +69,6 @@ test('pre-existing song_order.toml is loaded with vanilla entries locked', async
     '  "ui_bgm_ps01",\n' +
     '  "ui_bgm_flowerhead___somewhat_good__lofi___01_summer",\n' +
     ']\n'
-  const { writeFileSync } = await import('fs')
   writeFileSync(join(marioPath(), 'song_order.toml'), songOrder, 'utf8')
 
   const data = await page.evaluate((sp) => window.electron.umb.loadTrackOrder(sp), marioPath())
