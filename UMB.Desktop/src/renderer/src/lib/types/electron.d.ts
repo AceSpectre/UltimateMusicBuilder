@@ -150,6 +150,33 @@ export interface AppSettings {
   globalVolumeMultiplier: number
 }
 
+export interface MergeSeriesSource {
+  modName: string
+  modPath: string
+  seriesPath: string
+}
+
+export interface MergeConflict {
+  seriesName: string
+  mods: string[]
+}
+
+export interface MergeAnalysis {
+  modNames: string[]
+  modPaths: string[]
+  series: { name: string; sources: MergeSeriesSource[] }[]
+  conflicts: MergeConflict[]
+  totalSeries: number
+}
+
+export interface MergeResult {
+  outputPath: string
+  outputName: string
+  totalSeries: number
+  totalTracks: number
+  conflictsResolved: number
+}
+
 export interface VolumeOverride {
   originalIndex: number
   volume: number
@@ -196,6 +223,9 @@ export interface UmbApi {
   generateLoopPreview(seriesPath: string, filename: string, loopStartSec: number, loopEndSec: number, previewLength: number): Promise<string | null>
   analyzeExtractIcons(compiledModPath: string, modPath: string): Promise<ExtractIconsAnalysis>
   extractIcons(compiledModPath: string, modPath: string, mode: 'all' | 'missing-only'): Promise<ExtractIconsResult>
+  analyzeMerge(modPaths: string[]): Promise<MergeAnalysis>
+  validateMergeName(name: string): Promise<string | null>
+  executeMerge(modPaths: string[], outputName: string, priorityModPath: string | null): Promise<MergeResult>
   checkArcOutput(): Promise<boolean>
   getAppSettings(): Promise<AppSettings>
   saveAppSettings(settings: AppSettings): Promise<void>

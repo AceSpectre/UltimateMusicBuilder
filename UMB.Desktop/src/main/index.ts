@@ -12,6 +12,7 @@ import type { Nus3TrackDecision, LoopAnalysisOptions } from './nus3-convert'
 import { loadVolumeConfig, saveVolumeConfig, decodeTrackPreview, type VolumeOverride } from './config-volume'
 import { getAppSettings, saveAppSettings, checkArcOutput, type AppSettings } from './app-settings'
 import { analyzeExtractIcons, extractIcons } from './extract-icons'
+import { analyzeMerge, validateOutputName, executeMerge } from './merge'
 import { IPC } from '../shared/ipc-channels'
 
 let mainWindow: BrowserWindow | null = null
@@ -149,6 +150,20 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.EXTRACT_ICONS, (_event, compiledModPath: string, modPath: string, mode: 'all' | 'missing-only') =>
     extractIcons(workspace, compiledModPath, modPath, mode, (line) => {
+      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
+    })
+  )
+
+  ipcMain.handle(IPC.ANALYZE_MERGE, (_event, modPaths: string[]) =>
+    analyzeMerge(workspace, modPaths)
+  )
+
+  ipcMain.handle(IPC.VALIDATE_MERGE_NAME, (_event, name: string) =>
+    validateOutputName(workspace, name)
+  )
+
+  ipcMain.handle(IPC.EXECUTE_MERGE, (_event, modPaths: string[], outputName: string, priorityModPath: string | null) =>
+    executeMerge(workspace, modPaths, outputName, priorityModPath, (line) => {
       mainWindow?.webContents.send(IPC.LOG_STREAM, line)
     })
   )

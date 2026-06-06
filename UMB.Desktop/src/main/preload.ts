@@ -153,6 +153,33 @@ export interface ExtractIconsResult {
   failed: number
 }
 
+export interface MergeSeriesSource {
+  modName: string
+  modPath: string
+  seriesPath: string
+}
+
+export interface MergeConflict {
+  seriesName: string
+  mods: string[]
+}
+
+export interface MergeAnalysis {
+  modNames: string[]
+  modPaths: string[]
+  series: { name: string; sources: MergeSeriesSource[] }[]
+  conflicts: MergeConflict[]
+  totalSeries: number
+}
+
+export interface MergeResult {
+  outputPath: string
+  outputName: string
+  totalSeries: number
+  totalTracks: number
+  conflictsResolved: number
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string
@@ -190,6 +217,12 @@ const api = {
     ipcRenderer.invoke(IPC.ANALYZE_EXTRACT_ICONS, compiledModPath, modPath),
   extractIcons: (compiledModPath: string, modPath: string, mode: 'all' | 'missing-only'): Promise<ExtractIconsResult> =>
     ipcRenderer.invoke(IPC.EXTRACT_ICONS, compiledModPath, modPath, mode),
+  analyzeMerge: (modPaths: string[]): Promise<MergeAnalysis> =>
+    ipcRenderer.invoke(IPC.ANALYZE_MERGE, modPaths),
+  validateMergeName: (name: string): Promise<string | null> =>
+    ipcRenderer.invoke(IPC.VALIDATE_MERGE_NAME, name),
+  executeMerge: (modPaths: string[], outputName: string, priorityModPath: string | null): Promise<MergeResult> =>
+    ipcRenderer.invoke(IPC.EXECUTE_MERGE, modPaths, outputName, priorityModPath),
   runAction: (action: string, args?: string[]) =>
     ipcRenderer.invoke(IPC.RUN_ACTION, action, args) as Promise<void>,
   selectFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.SELECT_FOLDER),
