@@ -70,13 +70,24 @@ export function prepareIsolatedBuild(): IsolatedBuild {
   }
 }
 
-/** Runs the CLI build directly (the reference run). Throws on non-zero exit. */
+/**
+ * Runs the CLI build directly (the reference run). Throws on non-zero exit,
+ * surfacing the captured dotnet stdout/stderr in the error so a build failure
+ * is diagnosable (otherwise execFileSync only reports "Command failed").
+ */
 export function runCliBuild(b: IsolatedBuild): void {
-  execFileSync('dotnet', ['run', '--project', b.cliProjectDir, '--no-launch-profile', '--', 'build'], {
-    cwd: b.wsRoot,
-    stdio: 'pipe',
-    timeout: 300_000
-  })
+  try {
+    execFileSync('dotnet', ['run', '--project', b.cliProjectDir, '--no-launch-profile', '--', 'build'], {
+      cwd: b.wsRoot,
+      stdio: 'pipe',
+      timeout: 300_000
+    })
+  } catch (err) {
+    const e = err as { stdout?: Buffer; stderr?: Buffer; message?: string }
+    const out = e.stdout?.toString() ?? ''
+    const errOut = e.stderr?.toString() ?? ''
+    throw new Error(`CLI reference build failed: ${e.message}\n--- stdout ---\n${out}\n--- stderr ---\n${errOut}`)
+  }
 }
 
 /** Copies a directory tree (e.g. snapshot ArcOutput aside before the desktop run). */
