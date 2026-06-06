@@ -27,6 +27,9 @@ test('analyze returns per-track LUFS + auto-gain matching the CLI gain formula',
 
   expect(data.ffmpegAvailable).toBe(true)
   expect(data.items.length).toBe(13)
+  // Pin the analysis config so the formula loop verifies real values, not just internal consistency.
+  expect(data.targetLufs).toBe(-14)
+  expect(data.maxMultiplier).toBe(4)
 
   const target = data.targetLufs   // -14 from appsettings
   const max = data.maxMultiplier   // 4
@@ -48,10 +51,14 @@ test('save writes the per-track override into tracks.csv volume column', async (
     (sp) => window.electron.umb.saveVolumeConfig(sp, [{ originalIndex: 0, volume: 0.5 }]),
     series.dir
   )
-  const csv = readFileSync(join(series.dir, 'tracks.csv'), 'utf8').split(/\r?\n/)
-  // volume is column index 7 (filename,game,title,author,copyright,record_type,special_category,volume,...)
-  const cols = csv[1].split(',')
-  expect(cols[7]).toBe('0.5')
+  const csv = readFileSync(join(series.dir, 'tracks.csv'), 'utf8').split(/\r?\n/).filter((l) => l.trim())
+  // Look up the volume column by header name rather than a magic index.
+  const header = csv[0].split(',')
+  const volIdx = header.indexOf('volume')
+  expect(volIdx).toBeGreaterThanOrEqual(0)
+  expect(csv[1].split(',')[volIdx]).toBe('0.5')
+  // Override must be surgical: a non-targeted row keeps its original volume.
+  expect(csv[2].split(',')[volIdx]).toBe('1')
 })
 
 test('UI smoke: Config Volume view opens', async () => {
