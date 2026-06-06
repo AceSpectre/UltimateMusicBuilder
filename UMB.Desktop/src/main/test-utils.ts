@@ -51,3 +51,11 @@ export function makeDir(ws: Workspace, ...segments: string[]): string {
   mkdirSync(dir, { recursive: true })
   return dir
 }
+
+/** Writes a file (creating the directory if needed) and returns its full path. */
+export function writeFile(dir: string, name: string, content: string | Buffer): string {
+  mkdirSync(dir, { recursive: true })
+  const full = join(dir, name)
+  writeFileSync(full, content)
+  return full
+}
