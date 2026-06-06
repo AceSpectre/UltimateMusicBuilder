@@ -131,6 +131,12 @@ export interface VolumeOverride {
   volume: number
 }
 
+export interface VolumeProgress {
+  completed: number
+  total: number
+  currentFile: string
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string
@@ -168,6 +174,7 @@ export interface UmbApi {
   selectFolder(): Promise<string | null>
   cancelAction(): void
   subscribeLogs(cb: (line: LogLine) => void): () => void
+  subscribeVolumeProgress(cb: (progress: VolumeProgress) => void): () => void
   windowMinimize(): Promise<WindowActionResult>
   windowFullscreen(): Promise<WindowActionResult>
   windowClose(): Promise<WindowActionResult>

@@ -219,7 +219,10 @@ export default {
     analyzeHint: 'Measure each track\'s loudness with FFmpeg to compute auto-gain. May take a while for large series.',
     notAnalyzed: 'Loudness has not been measured for this series yet. Press "Calculate Loudness" to run analysis.',
     analyzing: 'Analyzing track loudness...',
+    analyzingProgress: 'Analyzing {completed}/{total}…',
+    analyzingFile: 'Processing: {file}',
     chooseSeries: 'Select a series from the sidebar to preview and balance track volume.',
+    loadingTracks: 'Waiting for background process to start…',
     empty: 'This series has no tracks in tracks.csv.',
     intro:
       'Per-track loudness preview. Auto-gain shows the multiplier LUFS normalization will apply to hit the target loudness. Override nudges individual tracks on top of that — the final bank volume is global × auto × override. Press play to hear the track at the exact volume the built mod will produce; adjusting the override while playing updates loudness in real time.',

@@ -116,6 +116,15 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.LOAD_VOLUME_CONFIG, (_event, seriesPath: string, analyze: boolean) =>
     loadVolumeConfig(workspace, seriesPath, analyze, (line) => {
+      const match = line.message.match(/^__LUFS_PROGRESS__\t(\d+)\t(\d+)\t(.+)$/)
+      if (match) {
+        mainWindow?.webContents.send(IPC.VOLUME_PROGRESS, {
+          completed: parseInt(match[1]),
+          total: parseInt(match[2]),
+          currentFile: match[3]
+        })
+        return
+      }
       mainWindow?.webContents.send(IPC.LOG_STREAM, line)
     })
   )

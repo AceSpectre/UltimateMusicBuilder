@@ -21,6 +21,7 @@ export const IPC = {
   RUN_ACTION: 'umb:run-action',
   SELECT_FOLDER: 'umb:select-folder',
   LOG_STREAM: 'umb:log-stream',
+  VOLUME_PROGRESS: 'umb:volume-progress',
   GET_WORKSPACE: 'umb:get-workspace',
   CANCEL_ACTION: 'umb:cancel-action',
   DEBUG_PING: 'umb:debug-ping',

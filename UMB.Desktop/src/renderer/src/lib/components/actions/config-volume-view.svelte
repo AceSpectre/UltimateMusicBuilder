@@ -3,7 +3,7 @@
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
-  import type { ModInfo, ModSeriesInfo, VolumeConfigData, VolumeRowItem } from '$lib/types/electron'
+  import type { ModInfo, ModSeriesInfo, VolumeConfigData, VolumeRowItem, VolumeProgress } from '$lib/types/electron'
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
 
@@ -11,6 +11,7 @@
   // `loadingConfig` = fast cache-only read; `analyzing` = FFmpeg LUFS analysis (slow, user-triggered).
   let loadingConfig = $state(false)
   let analyzing = $state(false)
+  let analyzeProgress = $state<VolumeProgress | null>(null)
   let series = $state<ModSeriesInfo[]>([])
   // No series is selected by default — the user must pick one, and LUFS analysis only
   // runs when they press "Calculate loudness". Selection is local to this view.
@@ -80,7 +81,7 @@
       return
     }
 
-    if (analyze) analyzing = true
+    if (analyze) { analyzing = true; analyzeProgress = null }
     else loadingConfig = true
     saveState = 'idle'
     try {
@@ -95,6 +96,7 @@
       rows = []
     } finally {
       analyzing = false
+      analyzeProgress = null
       loadingConfig = false
     }
   }
@@ -217,6 +219,14 @@
       rows = []
       void loadSeries(modPath)
     })
+  })
+
+  // Subscribe to LUFS analysis progress from the main process.
+  $effect(() => {
+    const unsub = window.electron.umb.subscribeVolumeProgress((p: VolumeProgress) => {
+      analyzeProgress = p
+    })
+    return unsub
   })
 
   // Tear down audio when the view is destroyed.
@@ -347,9 +357,28 @@
 
       {#if analyzing}
         <div class="grid h-full min-h-[320px] place-items-center">
-          <div class="flex flex-col items-center gap-4 text-center">
-            <RefreshCw size={36} class="animate-spin" style="color: hsl(var(--gradient-from));" />
-            <p class="text-sm font-semibold">{$_('configVolume.analyzing')}</p>
+          <div class="flex w-full max-w-[400px] flex-col items-center gap-4 px-6 text-center">
+            {#if analyzeProgress}
+              {@const pct = Math.round((analyzeProgress.completed / analyzeProgress.total) * 100)}
+              <Activity size={36} class="animate-pulse" style="color: hsl(var(--gradient-from));" />
+              <p class="text-sm font-semibold">
+                {$_('configVolume.analyzingProgress', { values: { completed: analyzeProgress.completed, total: analyzeProgress.total } })}
+              </p>
+              <div class="w-full overflow-hidden rounded-full border border-border bg-muted" style="height: 8px;">
+                <div
+                  class="h-full rounded-full transition-all duration-300 ease-out"
+                  style="width: {pct}%; background: linear-gradient(90deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));"
+                ></div>
+              </div>
+              <p class="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                <span class="font-semibold">{pct}%</span>
+                <span class="mx-1">·</span>
+                <span class="truncate">{analyzeProgress.currentFile}</span>
+              </p>
+            {:else}
+              <RefreshCw size={36} class="animate-spin" style="color: hsl(var(--gradient-from));" />
+              <p class="text-sm font-semibold">{$_('configVolume.analyzing')}</p>
+            {/if}
           </div>
         </div>
       {:else if !selectedSeries}
@@ -362,6 +391,13 @@
               <Volume2 size={20} />
             </div>
             <p class="text-[13px] text-muted-foreground">{$_('configVolume.chooseSeries')}</p>
+          </div>
+        </div>
+      {:else if loadingConfig}
+        <div class="grid h-full min-h-[320px] place-items-center">
+          <div class="flex flex-col items-center gap-4 text-center">
+            <RefreshCw size={36} class="animate-spin" style="color: hsl(var(--gradient-from));" />
+            <p class="text-sm font-semibold">{$_('configVolume.loadingTracks')}</p>
           </div>
         </div>
       {:else if rows.length === 0}

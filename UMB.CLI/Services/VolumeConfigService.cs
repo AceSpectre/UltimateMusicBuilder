@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -268,6 +269,7 @@ namespace UMB.CLI.Services
                 _logger.LogWarning("FFmpeg is not available — auto-gain values cannot be calculated. Overrides can still be edited.");
 
             var dtos = new VolumeRowDto[rows.Count];
+            var completed = 0;
             Parallel.For(0, rows.Count, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
             {
                 var row = rows[i];
@@ -286,8 +288,6 @@ namespace UMB.CLI.Services
 
                 if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
                 {
-                    // Analyze=true runs FFmpeg on cache misses; Analyze=false is a read-only
-                    // load that returns only already-cached measurements (no FFmpeg, no blocking).
                     var measurement = input.Analyze
                         ? _lufsService.Measure(sourcePath)
                         : _lufsService.MeasureCached(sourcePath);
@@ -306,6 +306,12 @@ namespace UMB.CLI.Services
                 }
 
                 dtos[i] = dto;
+
+                if (input.Analyze)
+                {
+                    var done = Interlocked.Increment(ref completed);
+                    Console.WriteLine($"__LUFS_PROGRESS__\t{done}\t{rows.Count}\t{filename}");
+                }
             });
 
             // Only the analysis path can mutate the cache; a read-only load writes nothing.

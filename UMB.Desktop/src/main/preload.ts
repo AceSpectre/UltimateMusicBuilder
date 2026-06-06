@@ -175,6 +175,11 @@ const api = {
     ipcRenderer.on(IPC.LOG_STREAM, handler)
     return () => { ipcRenderer.removeListener(IPC.LOG_STREAM, handler) }
   },
+  subscribeVolumeProgress: (cb: (progress: { completed: number; total: number; currentFile: string }) => void): (() => void) => {
+    const handler = (_event: unknown, progress: { completed: number; total: number; currentFile: string }): void => cb(progress)
+    ipcRenderer.on(IPC.VOLUME_PROGRESS, handler)
+    return () => { ipcRenderer.removeListener(IPC.VOLUME_PROGRESS, handler) }
+  },
   windowMinimize: (): Promise<WindowActionResult> => ipcRenderer.invoke(IPC.WINDOW_MINIMIZE),
   windowFullscreen: (): Promise<WindowActionResult> => ipcRenderer.invoke(IPC.WINDOW_FULLSCREEN),
   windowClose: (): Promise<WindowActionResult> => ipcRenderer.invoke(IPC.WINDOW_CLOSE)
