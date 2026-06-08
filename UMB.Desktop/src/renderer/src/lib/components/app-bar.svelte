@@ -24,6 +24,7 @@
   let pickerOpen = $state(false)
   let pickerEl: HTMLDivElement | undefined = $state()
   let stats = $state<{ seriesCount: number; trackCount: number } | null>(null)
+  let version = $state('')
 
   // Refresh series/track counts whenever the active mod changes.
   $effect(() => {
@@ -51,6 +52,8 @@
   }
 
   onMount(() => {
+    void window.electron.umb.getAppVersion().then((v) => { version = v })
+
     function handlePointerDown(event: PointerEvent) {
       if (!pickerOpen || !pickerEl) {
         return
@@ -94,7 +97,7 @@
       </div>
       <div class="flex flex-col leading-tight">
         <span class="font-bold text-sm tracking-[.02em]">{$_('appBar.brand')}</span>
-        <span class="font-mono text-[10.5px] text-muted-foreground">{$_('appBar.version')}</span>
+        <span class="font-mono text-[10.5px] text-muted-foreground">{$_('appBar.version', { values: { version } })}</span>
       </div>
     </div>
 

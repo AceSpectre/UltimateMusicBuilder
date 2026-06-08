@@ -280,6 +280,7 @@ export interface WindowActionResult {
 
 const api = {
   getWorkspace: (): Promise<string> => ipcRenderer.invoke(IPC.GET_WORKSPACE),
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke(IPC.GET_APP_VERSION),
   debugPing: (): Promise<DebugPingResult> => ipcRenderer.invoke(IPC.DEBUG_PING),
   listMods: (): Promise<ModInfo[]> => ipcRenderer.invoke(IPC.LIST_MODS),
   listModSeries: (modPath: string): Promise<ModSeriesInfo[]> => ipcRenderer.invoke(IPC.LIST_MOD_SERIES, modPath),

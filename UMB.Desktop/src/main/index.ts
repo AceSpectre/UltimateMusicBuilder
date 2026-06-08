@@ -67,6 +67,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.GET_WORKSPACE, () => workspace)
   ipcMain.handle(IPC.DEBUG_PING, () => ({ ok: true, workspace }))
+  ipcMain.handle(IPC.GET_APP_VERSION, () => app.getVersion())
 
   ipcMain.handle(IPC.LIST_MODS, () => listMods(workspace))
 

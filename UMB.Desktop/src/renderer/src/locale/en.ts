@@ -38,7 +38,7 @@ export default {
   },
   appBar: {
     brand: 'Ultimate Music Builder',
-    version: 'v0.8.2 · electron',
+    version: 'v{version} · electron',
     modsRoot: 'Mods/MusicMods/',
     loadingMods: 'Loading mods...',
     noModSelected: 'No mod selected',

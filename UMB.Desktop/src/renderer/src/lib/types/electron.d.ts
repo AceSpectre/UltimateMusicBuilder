@@ -288,6 +288,7 @@ export interface WindowActionResult {
 
 export interface UmbApi {
   getWorkspace(): Promise<string>
+  getAppVersion(): Promise<string>
   debugPing(): Promise<DebugPingResult>
   listMods(): Promise<ModInfo[]>
   listModSeries(modPath: string): Promise<ModSeriesInfo[]>

@@ -34,6 +34,7 @@ export const IPC = {
   GET_PLAYLIST_INFO: 'umb:get-playlist-info',
   CANCEL_ACTION: 'umb:cancel-action',
   DEBUG_PING: 'umb:debug-ping',
+  GET_APP_VERSION: 'umb:get-app-version',
   WINDOW_MINIMIZE: 'umb:window-minimize',
   WINDOW_FULLSCREEN: 'umb:window-fullscreen',
   WINDOW_CLOSE: 'umb:window-close'
