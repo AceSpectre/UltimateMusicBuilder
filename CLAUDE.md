@@ -72,3 +72,10 @@ npm run package  # electron-builder installer
 ### Testing
 - `npm test` — Vitest unit tests (colocated `*.test.ts` in `src/main/`)
 - `npm run test:e2e` — Playwright E2E against the built Electron app (`e2e/`)
+- E2E (`npm run test:e2e`) drives every action against `Tests/TestData` and compares output to the CLI:
+  Tier 1 (order-tracks/order-series/merge) structural; Tier 2 (config-volume/nus3-convert/extract-icons/
+  playlist-info) via the CLI daemon/tools on isolated temp paths; Tier 3 (`build-differential`) byte-compares
+  desktop `ArcOutput` against a CLI reference build using `e2e/baseline-compare.ts` (ported BaselineComparer).
+  Heavy tiers need local game resources + tools. They auto-skip (Playwright `test.skip`)
+  when those are absent — see `hasGameResources`/`hasTool` in `e2e/e2e-utils.ts` — so CI
+  (`.github/workflows/test.yml`) runs the portable subset green and skips the rest.

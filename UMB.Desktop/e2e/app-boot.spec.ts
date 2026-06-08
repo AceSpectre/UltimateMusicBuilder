@@ -1,23 +1,12 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { createWorkspace, seedMod, launchApp, firstWindow, type E2EWorkspace } from './e2e-utils'
+import { createWorkspace, seedTestDataMod, launchApp, firstWindow, type E2EWorkspace } from './e2e-utils'
 
 let ws: E2EWorkspace
 let app: ElectronApplication
 
-const TRACKS_CSV =
-  'filename,title,game\n' +
-  'Mass Destruction.flac,Mass Destruction,Persona 3\n' +
-  'reach-out.flac,Reach Out to the Truth,Persona 4\n'
-
 test.beforeAll(async () => {
   ws = createWorkspace()
-  seedMod(ws, 'persona', 'persona', {
-    tracksCsv: TRACKS_CSV,
-    seriesToml: 'existing-series = true\n'
-  })
-  seedMod(ws, 'mario', 'mushroom-kingdom', {
-    tracksCsv: 'filename,title,game\nground.flac,Ground Theme,Super Mario Bros.\n'
-  })
+  seedTestDataMod(ws, 'test-mod')
   app = await launchApp(ws)
 })
 
@@ -40,12 +29,10 @@ test('debug ping returns ok with correct workspace', async () => {
   expect(result.workspace).toBeTruthy()
 })
 
-test('listMods returns seeded mod directories', async () => {
+test('listMods returns the seeded TestData mod', async () => {
   const page = await firstWindow(app)
-
   const mods = await page.evaluate(() => window.electron.umb.listMods())
-  const names = mods.map((m: { name: string }) => m.name).sort()
-  expect(names).toEqual(['mario', 'persona'])
+  expect(mods.map((m: { name: string }) => m.name)).toContain('test-mod')
 })
 
 test('app bar displays brand text', async () => {

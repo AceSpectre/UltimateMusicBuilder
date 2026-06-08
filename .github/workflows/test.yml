@@ -27,6 +27,10 @@ jobs:
 
   e2e:
     name: Playwright E2E
+    # Heavy specs (build-differential, playlist-info, config-volume LUFS, nus3-convert)
+    # auto-skip here: they need un-committed game resources + ffmpeg/pymusiclooper that
+    # aren't on the runner. The portable subset (order/merge/extract-icons/boot/locale)
+    # runs for real. Full suite runs locally on Windows with resources + tools present.
     runs-on: windows-latest
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     defaults:
