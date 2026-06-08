@@ -37,7 +37,7 @@ test('sidebar labels match locale strings', async () => {
   const expectedLabels = [
     'Build',
     'Nus3 Convert', 'Config Volume',
-    'Order Series', 'Order Tracks',
+    'Manage Series', 'Manage Songs',
     'Merge', 'Extract Icons',
     'Playlist Info'
   ]
@@ -54,6 +54,6 @@ test('sidebar labels match locale strings', async () => {
 test('order tracks view shows localised text when selected', async () => {
   const page = await firstWindow(app)
 
-  await page.getByText('Order Tracks').first().click()
+  await page.getByText('Manage Songs').first().click()
   await expect(page.getByRole('heading', { name: 'Series', exact: true })).toBeVisible()
 })
