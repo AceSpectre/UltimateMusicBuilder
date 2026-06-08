@@ -173,8 +173,14 @@ jobs:
         shell: bash
         run: |
           mkdir -p publish/desktop
-          src=$(ls -d UMB.Desktop/out/*-unpacked UMB.Desktop/out/mac* 2>/dev/null | head -1)
-          cp -R "$src/." publish/desktop/
+          shopt -s nullglob
+          dirs=(UMB.Desktop/out/*-unpacked UMB.Desktop/out/mac*)
+          if [ ${#dirs[@]} -eq 0 ]; then
+            echo "No unpacked electron-builder output found in UMB.Desktop/out" >&2
+            exit 1
+          fi
+          echo "Staging desktop from: ${dirs[0]}"
+          cp -R "${dirs[0]}/." publish/desktop/
 
       - name: Archive (Windows)
         if: runner.os == 'Windows'
