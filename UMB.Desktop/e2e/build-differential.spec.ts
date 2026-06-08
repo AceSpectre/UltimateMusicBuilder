@@ -3,7 +3,7 @@ import { _electron as electron } from '@playwright/test'
 import { rmSync, existsSync } from 'fs'
 import { resolve, join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { firstWindow } from './e2e-utils'
+import { firstWindow, hasGameResources, hasTool } from './e2e-utils'
 import { prepareIsolatedBuild, runCliBuild, snapshot, type IsolatedBuild } from './build-harness'
 import { compareDirs, formatReport } from './baseline-compare'
 
@@ -15,6 +15,7 @@ let refDir: string
 test.describe.configure({ timeout: 600_000 }) // two real builds
 
 test.beforeAll(async () => {
+  test.skip(!hasGameResources() || !hasTool('dotnet'), 'requires local game resources + dotnet')
   build = prepareIsolatedBuild()
 
   // Reference: CLI build → snapshot ArcOutput → clear.

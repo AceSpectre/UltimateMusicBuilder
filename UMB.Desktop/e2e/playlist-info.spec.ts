@@ -1,6 +1,6 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
 import { _electron as electron } from '@playwright/test'
-import { firstWindow, repoRoot } from './e2e-utils'
+import { firstWindow, repoRoot, hasGameResources } from './e2e-utils'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -8,6 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 let app: ElectronApplication
 
 test.beforeAll(async () => {
+  test.skip(!hasGameResources(), 'requires local game resources (vanilla PRC/MSBT)')
   const mainPath = resolve(__dirname, '..', 'dist', 'main', 'index.js')
   app = await electron.launch({
     args: [mainPath],

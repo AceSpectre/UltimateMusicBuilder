@@ -3,12 +3,17 @@ import { _electron as electron } from '@playwright/test'
 import { existsSync, statSync } from 'fs'
 import { resolve, join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { firstWindow, repoRoot, copyConfiguredSeries } from './e2e-utils'
+import { firstWindow, repoRoot, copyConfiguredSeries, hasTool } from './e2e-utils'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FLAC = 'flowerhead - Somewhat Good- Karts - 13 Time Trials.flac'
 const NUS3 = 'flowerhead - Somewhat Good- Karts - 13 Time Trials.nus3audio'
 const BASELINE_SIZE = 855544
+
+// Conversion shells out to ffmpeg + pymusiclooper + the dotnet CLI; skip the encode
+// tests (and the ones that read their output) when those aren't on PATH, e.g. on CI.
+const ENCODE_DEPS_MISSING =
+  !hasTool('ffmpeg') || !hasTool('pymusiclooper') || !hasTool('dotnet')
 
 let app: ElectronApplication
 let series: { dir: string; cleanup(): void }
@@ -26,6 +31,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => { await app?.close(); series?.cleanup() })
 
 test('analyze + convert produces a non-empty nus3audio and persists the decision', async () => {
+  test.skip(ENCODE_DEPS_MISSING, 'requires ffmpeg + pymusiclooper + dotnet')
   const page = await firstWindow(app)
 
   const analysis = await page.evaluate(
@@ -54,6 +60,7 @@ test('analyze + convert produces a non-empty nus3audio and persists the decision
 })
 
 test('produced nus3audio size matches the CLI baseline manifest (within tolerance)', async () => {
+  test.skip(ENCODE_DEPS_MISSING, 'requires ffmpeg + pymusiclooper + dotnet')
   const produced = join(series.dir, 'songs-to-validate', NUS3)
   const size = statSync(produced).size
   // Audio payload is identical (same FLAC, same VGAudio encode); only loop-marker
@@ -62,6 +69,7 @@ test('produced nus3audio size matches the CLI baseline manifest (within toleranc
 })
 
 test('accept moves the validated nus3audio into the series folder', async () => {
+  test.skip(ENCODE_DEPS_MISSING, 'requires ffmpeg + pymusiclooper + dotnet')
   const page = await firstWindow(app)
   // acceptNus3Files returns the CLI exit code (0 = success, -1 = error)
   const exitCode = await page.evaluate((sp) => window.electron.umb.acceptNus3Files(sp, false), series.dir)

@@ -1,5 +1,6 @@
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync, existsSync } from 'fs'
+import { spawnSync } from 'child_process'
 import { tmpdir } from 'os'
 import { join, resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -70,6 +71,28 @@ export function repoRoot(): string {
 /** Absolute path to Tests/TestData/configured-mod in the repo. */
 export function configuredModSource(): string {
   return join(repoRoot(), 'Tests', 'TestData', 'configured-mod')
+}
+
+/**
+ * True when the real (copyrighted, un-committed) game resources are present locally.
+ * Heavy specs that read/build against them must skip when this is false (e.g. on CI),
+ * since `Resources/Game/` ships only placeholder stubs in the repo.
+ */
+export function hasGameResources(): boolean {
+  return existsSync(join(repoRoot(), 'Resources', 'Game', 'ui', 'param', 'database', 'ui_bgm_db.prc'))
+}
+
+/**
+ * True when `cmd` resolves on PATH. Used to gate specs that shell out to external
+ * tools not bundled in the repo (ffmpeg, pymusiclooper, dotnet). Probes via the
+ * platform locator (`where` on Windows, `command -v` elsewhere) — never runs the tool.
+ */
+export function hasTool(cmd: string): boolean {
+  const probe =
+    process.platform === 'win32'
+      ? spawnSync('where', [cmd], { stdio: 'ignore' })
+      : spawnSync('sh', ['-c', `command -v ${cmd}`], { stdio: 'ignore' })
+  return probe.status === 0
 }
 
 /** Copies the real configured-mod into <workspace>/Mods/MusicMods/<modName>. Returns the mod dir. */
