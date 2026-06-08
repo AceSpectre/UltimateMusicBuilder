@@ -2,9 +2,23 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join, relative, resolve, isAbsolute, basename } from 'path'
 import { parse as parseCsv } from 'csv-parse/sync'
 import { stringify as stringifyCsv } from 'csv-stringify/sync'
+import { getVanillaBgmTitles, getVanillaGameTitles, getVanillaSongs } from './playlist-info'
+
+const SERIES_ID_PREFIX = 'ui_series_'
 
 interface CsvRow {
   [key: string]: string
+}
+
+export interface TrackFields {
+  title: string
+  game: string
+  author: string
+  copyright: string
+  record_type: string
+  special_category: string
+  info1: string
+  in_soundtest: string
 }
 
 export interface TrackOrderItem {
@@ -12,8 +26,33 @@ export interface TrackOrderItem {
   title: string
   subtitle: string
   bgmId: string
+  filename: string
   isLocked: boolean
   originalIndex: number | null
+  fields: TrackFields | null
+  isPinchTarget: boolean
+}
+
+export interface SeriesGame {
+  id: string
+  name: string
+}
+
+export interface SaveTrackItem {
+  id: string
+  fields: TrackFields | null
+}
+
+export interface VanillaSongOption {
+  infoId: string
+  name: string
+}
+
+export interface DefaultTrackData {
+  game: string
+  author: string
+  copyright: string
+  record_type: string
 }
 
 export interface TrackOrderData {
@@ -21,8 +60,22 @@ export interface TrackOrderData {
   seriesPath: string
   isExistingSeries: boolean
   hasSongOrder: boolean
+  games: SeriesGame[]
+  vanillaSongs: VanillaSongOption[]
+  defaultTrackData: DefaultTrackData | null
   items: TrackOrderItem[]
 }
+
+const EDITABLE_COLUMNS: (keyof TrackFields)[] = [
+  'title',
+  'game',
+  'author',
+  'copyright',
+  'record_type',
+  'special_category',
+  'info1',
+  'in_soundtest'
+]
 
 function isChildOf(parentPath: string, childPath: string): boolean {
   const rel = relative(parentPath, childPath)
@@ -85,9 +138,14 @@ function formatVanillaTitle(bgmId: string): string {
     .join(' ')
 }
 
-function parseSeriesToml(seriesTomlPath: string): { id: string | null; existingSeries: boolean } {
+function parseSeriesToml(seriesTomlPath: string): {
+  id: string | null
+  existingSeries: boolean
+  games: SeriesGame[]
+  defaultTrackData: DefaultTrackData | null
+} {
   if (!existsSync(seriesTomlPath)) {
-    return { id: null, existingSeries: false }
+    return { id: null, existingSeries: false, games: [], defaultTrackData: null }
   }
 
   const text = readFileSync(seriesTomlPath, 'utf8')
@@ -96,8 +154,71 @@ function parseSeriesToml(seriesTomlPath: string): { id: string | null; existingS
 
   return {
     id: idMatch?.[1] ?? null,
-    existingSeries: existingMatch?.[1] === 'true'
+    existingSeries: existingMatch?.[1] === 'true',
+    games: parseSeriesGames(text),
+    defaultTrackData: parseDefaultTrackData(text)
   }
+}
+
+// Reads the [default-track-data] table (note `record-type` uses a dash in the TOML).
+function parseDefaultTrackData(seriesTomlText: string): DefaultTrackData | null {
+  const section = seriesTomlText.split(/^\s*\[default-track-data\]\s*$/m)[1]
+  if (section === undefined) {
+    return null
+  }
+  const scoped = section.split(/^\s*\[/m)[0]
+  const value = (key: string): string =>
+    scoped.match(new RegExp(`^\\s*${key}\\s*=\\s*"([^"]*)"`, 'm'))?.[1] ?? ''
+
+  return {
+    game: value('game'),
+    author: value('author'),
+    copyright: value('copyright'),
+    record_type: value('record-type') || 'original'
+  }
+}
+
+function parseSeriesGames(seriesTomlText: string): SeriesGame[] {
+  const games: SeriesGame[] = []
+  // Each [[games]] block holds an id and (optionally) a name on subsequent lines.
+  const blocks = seriesTomlText.split(/^\s*\[\[games\]\]\s*$/m).slice(1)
+  for (const block of blocks) {
+    // Stop at the next top-level table header so we don't bleed into other sections.
+    const scoped = block.split(/^\s*\[/m)[0]
+    const id = scoped.match(/^\s*id\s*=\s*"([^"]+)"/m)?.[1]
+    if (!id) {
+      continue
+    }
+    const name = scoped.match(/^\s*name\s*=\s*"([^"]*)"/m)?.[1] ?? id
+    games.push({ id, name })
+  }
+  return games
+}
+
+// Appends [[games]] blocks for any game ids used by rows but not yet declared in series.toml.
+// Only games present in `knownGames` (custom + vanilla catalog) are added — unknown ids are
+// left alone (the build skips them, same as before). Quotes are escaped for TOML safety.
+function ensureSeriesGames(seriesTomlPath: string, rows: CsvRow[], knownGames: SeriesGame[]): void {
+  if (!existsSync(seriesTomlPath)) {
+    return
+  }
+
+  const text = readFileSync(seriesTomlPath, 'utf8')
+  const declared = new Set(parseSeriesGames(text).map((game) => game.id))
+  const nameById = new Map(knownGames.map((game) => [game.id, game.name]))
+
+  const used = new Set(rows.map((row) => row.game?.trim()).filter((id): id is string => Boolean(id)))
+  const toAdd = [...used].filter((id) => !declared.has(id) && nameById.has(id))
+  if (toAdd.length === 0) {
+    return
+  }
+
+  const escape = (value: string): string => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  const blocks = toAdd
+    .map((id) => `\n[[games]]\nid = "${escape(id)}"\nname = "${escape(nameById.get(id) ?? id)}"\n`)
+    .join('')
+
+  writeFileSync(seriesTomlPath, `${text.replace(/\s*$/, '')}\n${blocks}`, 'utf8')
 }
 
 function parseSongOrder(songOrderPath: string): string[] {
@@ -109,7 +230,27 @@ function parseSongOrder(songOrderPath: string): string[] {
   return Array.from(text.matchAll(/"([^"]+)"/g), (match) => match[1].trim()).filter(Boolean)
 }
 
+function buildFields(row: CsvRow): TrackFields {
+  return {
+    title: row.title ?? '',
+    game: row.game ?? '',
+    author: row.author ?? '',
+    copyright: row.copyright ?? '',
+    record_type: row.record_type || 'original',
+    special_category: row.special_category ?? '',
+    info1: row.info1 ?? '',
+    in_soundtest: row.in_soundtest || 'True'
+  }
+}
+
 function buildModItems(rows: CsvRow[]): TrackOrderItem[] {
+  // A track is a "pinch target" when another row's info1 references its filename.
+  const referencedFilenames = new Set(
+    rows
+      .map((row) => row.info1?.trim())
+      .filter((info1): info1 is string => Boolean(info1) && !info1.startsWith('info_'))
+  )
+
   return rows.map((row, index) => {
     const filename = row.filename ?? ''
     const title = row.title || filename || `Track ${index + 1}`
@@ -122,8 +263,11 @@ function buildModItems(rows: CsvRow[]): TrackOrderItem[] {
       title,
       subtitle,
       bgmId,
+      filename,
       isLocked: false,
-      originalIndex: index
+      originalIndex: index,
+      fields: buildFields(row),
+      isPinchTarget: filename ? referencedFilenames.has(filename) : false
     }
   })
 }
@@ -138,7 +282,12 @@ function parseOrder(row: CsvRow): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-function buildOrderedItems(modItems: TrackOrderItem[], rows: CsvRow[], songOrder: string[]): TrackOrderItem[] {
+function buildOrderedItems(
+  modItems: TrackOrderItem[],
+  rows: CsvRow[],
+  songOrder: string[],
+  resolveVanillaTitle: (bgmId: string) => string
+): TrackOrderItem[] {
   if (songOrder.length > 0) {
     const modByBgmId = new Map(modItems.map((item) => [item.bgmId, item]))
     const seen = new Set<string>()
@@ -153,11 +302,14 @@ function buildOrderedItems(modItems: TrackOrderItem[], rows: CsvRow[], songOrder
       } else {
         result.push({
           id: `vanilla:${vanillaIndex}:${bgmId}`,
-          title: formatVanillaTitle(bgmId),
+          title: resolveVanillaTitle(bgmId),
           subtitle: '[vanilla] preserved from song_order.toml',
           bgmId,
+          filename: '',
           isLocked: true,
-          originalIndex: null
+          originalIndex: null,
+          fields: null,
+          isPinchTarget: false
         })
         vanillaIndex += 1
       }
@@ -184,13 +336,66 @@ function buildOrderedItems(modItems: TrackOrderItem[], rows: CsvRow[], songOrder
   return orderedMods
 }
 
-function loadTrackOrderDataUnsafe(seriesPath: string): { data: TrackOrderData; rows: CsvRow[]; headers: string[] } {
+interface VanillaCatalog {
+  resolveTitle: (bgmId: string) => string
+  games: SeriesGame[] // vanilla games belonging to this series
+  songs: VanillaSongOption[] // vanilla songs belonging to this series
+}
+
+// Loads the vanilla game catalog for a series, falling back to empty data / prettified
+// titles when the game resource dump is missing (e.g. CI / unconfigured workspace).
+function loadVanillaCatalog(workspace: string, uiSeriesId: string | null): VanillaCatalog {
+  let titles: Map<string, string> | null = null
+  try {
+    titles = getVanillaBgmTitles(workspace)
+  } catch {
+    titles = null
+  }
+
+  let games: SeriesGame[] = []
+  let songs: VanillaSongOption[] = []
+  if (uiSeriesId) {
+    try {
+      games = getVanillaGameTitles(workspace)
+        .filter((game) => game.seriesId === uiSeriesId)
+        .map((game) => ({ id: game.id, name: game.name }))
+    } catch {
+      games = []
+    }
+    try {
+      songs = getVanillaSongs(workspace)
+        .filter((song) => song.seriesId === uiSeriesId)
+        .map((song) => ({ infoId: song.infoId, name: song.name }))
+    } catch {
+      songs = []
+    }
+  }
+
+  return {
+    resolveTitle: (bgmId) => titles?.get(bgmId) ?? formatVanillaTitle(bgmId),
+    games,
+    songs
+  }
+}
+
+// Custom (series.toml) games first, then vanilla series games not already declared.
+function mergeGames(custom: SeriesGame[], vanilla: SeriesGame[]): SeriesGame[] {
+  const seen = new Set(custom.map((game) => game.id))
+  return [...custom, ...vanilla.filter((game) => !seen.has(game.id))]
+}
+
+function loadTrackOrderDataUnsafe(
+  workspace: string,
+  seriesPath: string
+): { data: TrackOrderData; rows: CsvRow[]; headers: string[] } {
   const { csvPath, seriesTomlPath, songOrderPath } = getSeriesFiles(seriesPath)
   const { rows, headers } = readCsvRows(csvPath)
   const seriesInfo = parseSeriesToml(seriesTomlPath)
   const songOrder = parseSongOrder(songOrderPath)
+  const uiSeriesId = seriesInfo.id ? SERIES_ID_PREFIX + seriesInfo.id : null
+  const vanilla = loadVanillaCatalog(workspace, uiSeriesId)
   const modItems = buildModItems(rows)
-  const items = buildOrderedItems(modItems, rows, songOrder)
+  const items = buildOrderedItems(modItems, rows, songOrder, vanilla.resolveTitle)
 
   return {
     data: {
@@ -198,6 +403,9 @@ function loadTrackOrderDataUnsafe(seriesPath: string): { data: TrackOrderData; r
       seriesPath,
       isExistingSeries: seriesInfo.existingSeries,
       hasSongOrder: songOrder.length > 0,
+      games: mergeGames(seriesInfo.games, vanilla.games),
+      vanillaSongs: vanilla.songs,
+      defaultTrackData: seriesInfo.defaultTrackData,
       items
     },
     rows,
@@ -212,25 +420,49 @@ export function loadTrackOrderData(workspace: string, seriesPath: string): Track
     throw new Error('Invalid series path.')
   }
 
-  return loadTrackOrderDataUnsafe(resolvedSeriesPath).data
+  return loadTrackOrderDataUnsafe(workspace, resolvedSeriesPath).data
 }
 
-export function saveTrackOrderData(workspace: string, seriesPath: string, orderedIds: string[]): TrackOrderData {
+export function saveTrackOrderData(workspace: string, seriesPath: string, items: SaveTrackItem[]): TrackOrderData {
   const modsDir = getMusicModsRoot(workspace)
   const resolvedSeriesPath = resolve(seriesPath)
   if (!isChildOf(modsDir, resolvedSeriesPath)) {
     throw new Error('Invalid series path.')
   }
 
-  const { data, rows, headers } = loadTrackOrderDataUnsafe(resolvedSeriesPath)
-  const { csvPath, songOrderPath } = getSeriesFiles(resolvedSeriesPath)
+  const { data, rows, headers } = loadTrackOrderDataUnsafe(workspace, resolvedSeriesPath)
+  const { csvPath, seriesTomlPath, songOrderPath } = getSeriesFiles(resolvedSeriesPath)
 
+  const orderedIds = items.map((item) => item.id)
+  const fieldsById = new Map(items.map((item) => [item.id, item.fields]))
   const itemById = new Map(data.items.map((item) => [item.id, item]))
   const orderedItems = orderedIds.map((id) => itemById.get(id)).filter((item): item is TrackOrderItem => Boolean(item))
   const missingItems = data.items.filter((item) => !orderedIds.includes(item.id))
   const finalItems = [...orderedItems, ...missingItems]
 
-  const nextHeaders = headers.includes('order') ? headers : [...headers, 'order']
+  // Write edited field values back into the matching CSV rows (filename/volume untouched).
+  for (const item of finalItems) {
+    if (item.originalIndex === null) {
+      continue
+    }
+    const fields = fieldsById.get(item.id)
+    if (!fields) {
+      continue
+    }
+    const row = rows[item.originalIndex]
+    for (const column of EDITABLE_COLUMNS) {
+      row[column] = fields[column] ?? ''
+    }
+  }
+
+  // Ensure every edited column is present in the header before writing.
+  let nextHeaders = headers
+  for (const column of EDITABLE_COLUMNS) {
+    if (!nextHeaders.includes(column)) {
+      nextHeaders = [...nextHeaders, column]
+    }
+  }
+  nextHeaders = nextHeaders.includes('order') ? nextHeaders : [...nextHeaders, 'order']
   for (const row of rows) {
     row.order = ''
   }
@@ -253,6 +485,11 @@ export function saveTrackOrderData(workspace: string, seriesPath: string, ordere
   }
 
   writeCsvRows(csvPath, reorderedRows, nextHeaders)
+
+  // A row may now reference a vanilla game title that isn't yet declared in series.toml.
+  // The build only accepts games listed under [[games]], so add any missing ones (with the
+  // localised name from the merged catalog) — keeps newly-assigned vanilla games building.
+  ensureSeriesGames(seriesTomlPath, rows, data.games)
 
   if (data.isExistingSeries) {
     const output = [

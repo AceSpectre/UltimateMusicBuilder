@@ -19,13 +19,49 @@ export interface ModStats {
   trackCount: number
 }
 
+export interface TrackFields {
+  title: string
+  game: string
+  author: string
+  copyright: string
+  record_type: string
+  special_category: string
+  info1: string
+  in_soundtest: string
+}
+
 export interface TrackOrderItem {
   id: string
   title: string
   subtitle: string
   bgmId: string
+  filename: string
   isLocked: boolean
   originalIndex: number | null
+  fields: TrackFields | null
+  isPinchTarget: boolean
+}
+
+export interface SeriesGame {
+  id: string
+  name: string
+}
+
+export interface SaveTrackItem {
+  id: string
+  fields: TrackFields | null
+}
+
+export interface VanillaSongOption {
+  infoId: string
+  name: string
+}
+
+export interface DefaultTrackData {
+  game: string
+  author: string
+  copyright: string
+  record_type: string
 }
 
 export interface TrackOrderData {
@@ -33,7 +69,22 @@ export interface TrackOrderData {
   seriesPath: string
   isExistingSeries: boolean
   hasSongOrder: boolean
+  games: SeriesGame[]
+  vanillaSongs: VanillaSongOption[]
+  defaultTrackData: DefaultTrackData | null
   items: TrackOrderItem[]
+}
+
+export interface SeriesFields {
+  name: string
+  seriesPlaylist: string
+  playlistIncidence: number
+  games: SeriesGame[]
+  defaultGame: string
+  defaultAuthor: string
+  defaultCopyright: string
+  defaultRecordType: string
+  defaultVolume: number
 }
 
 export interface SeriesOrderItem {
@@ -42,6 +93,12 @@ export interface SeriesOrderItem {
   seriesId: string
   iconDataUrl: string | null
   originalIndex: number
+  fields: SeriesFields
+}
+
+export interface SaveSeriesItem {
+  id: string
+  fields: SeriesFields | null
 }
 
 export interface SeriesOrderData {
@@ -236,9 +293,9 @@ export interface UmbApi {
   listModSeries(modPath: string): Promise<ModSeriesInfo[]>
   getModStats(modPath: string): Promise<ModStats>
   loadTrackOrder(seriesPath: string): Promise<TrackOrderData>
-  saveTrackOrder(seriesPath: string, orderedIds: string[]): Promise<TrackOrderData>
+  saveTrackOrder(seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData>
   loadSeriesOrder(modPath: string): Promise<SeriesOrderData>
-  saveSeriesOrder(modPath: string, orderedIds: string[]): Promise<SeriesOrderData>
+  saveSeriesOrder(modPath: string, items: SaveSeriesItem[]): Promise<SeriesOrderData>
   listNus3Sources(seriesPath: string): Promise<Nus3SourceTrack[]>
   analyzeLoopPoints(seriesPath: string, filename: string, options?: LoopAnalysisOptions): Promise<Nus3AnalysisResult>
   loadNus3Conversions(seriesPath: string): Promise<Record<string, Nus3ConversionMeta>>

@@ -1,12 +1,37 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs'
 import { join, relative, resolve, isAbsolute, basename } from 'path'
 
+export interface SeriesGame {
+  id: string
+  name: string
+}
+
+// Editable series.toml fields (series id stays read-only — it is the identity). Covers the
+// [series] table, the [[games]] array, and the [default-track-data] table (song defaults).
+export interface SeriesFields {
+  name: string
+  seriesPlaylist: string
+  playlistIncidence: number
+  games: SeriesGame[]
+  defaultGame: string
+  defaultAuthor: string
+  defaultCopyright: string
+  defaultRecordType: string
+  defaultVolume: number
+}
+
 export interface SeriesOrderItem {
   id: string
   name: string
   seriesId: string
   iconDataUrl: string | null
   originalIndex: number
+  fields: SeriesFields
+}
+
+export interface SaveSeriesItem {
+  id: string
+  fields: SeriesFields | null
 }
 
 export interface SeriesOrderData {
@@ -29,23 +54,215 @@ interface ParsedSeriesToml {
   id: string | null
   name: string | null
   existingSeries: boolean
+  fields: SeriesFields
+}
+
+// Returns the body of a table (up to the next table header) so field matches don't bleed
+// across tables ([[games]] / [default-track-data] reuse keys like `name` and `game`).
+function tableSection(text: string, header: string): string | null {
+  const after = text.split(new RegExp(`^\\s*\\[${header}\\]\\s*$`, 'm'))[1]
+  if (after === undefined) return null
+  return after.split(/^\s*\[/m)[0]
 }
 
 function parseSeriesToml(seriesTomlPath: string): ParsedSeriesToml {
+  const empty: SeriesFields = {
+    name: '',
+    seriesPlaylist: '',
+    playlistIncidence: 100,
+    games: [],
+    defaultGame: '',
+    defaultAuthor: '',
+    defaultCopyright: '',
+    defaultRecordType: 'original',
+    defaultVolume: 1
+  }
   if (!existsSync(seriesTomlPath)) {
-    return { id: null, name: null, existingSeries: false }
+    return { id: null, name: null, existingSeries: false, fields: empty }
   }
 
   const text = readFileSync(seriesTomlPath, 'utf8')
-  const idMatch = text.match(/^id\s*=\s*"([^"]+)"/m)
-  const nameMatch = text.match(/^name\s*=\s*"([^"]+)"/m)
-  const existingMatch = text.match(/^existing-series\s*=\s*(true|false)/m)
+  const series = tableSection(text, 'series') ?? text
+  const defaults = tableSection(text, 'default-track-data') ?? ''
+  const str = (section: string, key: string): string =>
+    section.match(new RegExp(`^\\s*${key}\\s*=\\s*"([^"]*)"`, 'm'))?.[1] ?? ''
+
+  const id = series.match(/^\s*id\s*=\s*"([^"]+)"/m)?.[1] ?? null
+  const name = series.match(/^\s*name\s*=\s*"([^"]+)"/m)?.[1] ?? null
+  const incidence = series.match(/^\s*playlist-incidence\s*=\s*(\d+)/m)
+  const volume = defaults.match(/^\s*volume\s*=\s*([0-9.]+)/m)
 
   return {
-    id: idMatch?.[1] ?? null,
-    name: nameMatch?.[1] ?? null,
-    existingSeries: existingMatch?.[1] === 'true'
+    id,
+    name,
+    existingSeries: series.match(/^\s*existing-series\s*=\s*(true|false)/m)?.[1] === 'true',
+    fields: {
+      name: name ?? id ?? '',
+      seriesPlaylist: str(series, 'series-playlist'),
+      playlistIncidence: incidence ? Number.parseInt(incidence[1], 10) : 100,
+      games: parseGames(text),
+      defaultGame: str(defaults, 'game'),
+      defaultAuthor: str(defaults, 'author'),
+      defaultCopyright: str(defaults, 'copyright'),
+      defaultRecordType: str(defaults, 'record-type') || 'original',
+      defaultVolume: volume ? Number.parseFloat(volume[1]) : 1
+    }
   }
+}
+
+// Parses the repeating [[games]] array-of-tables (id + name per block).
+function parseGames(text: string): SeriesGame[] {
+  const games: SeriesGame[] = []
+  for (const block of text.split(/^\s*\[\[games\]\]\s*$/m).slice(1)) {
+    const scoped = block.split(/^\s*\[/m)[0]
+    const id = scoped.match(/^\s*id\s*=\s*"([^"]+)"/m)?.[1]
+    if (!id) continue
+    games.push({ id, name: scoped.match(/^\s*name\s*=\s*"([^"]*)"/m)?.[1] ?? id })
+  }
+  return games
+}
+
+const tomlEscape = (value: string): string => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+
+interface TomlEntry {
+  key: string
+  line: string | null // null → drop the key from the table
+}
+
+// Upserts the given keys in a TOML table, preserving unmanaged keys, comments and other tables.
+// Missing table is created (at end of file) only when createIfMissing and there are lines to add.
+function upsertTable(lines: string[], header: string, entries: TomlEntry[], createIfMissing: boolean): string[] {
+  const headerIndex = lines.findIndex((line) => line.trim() === `[${header}]`)
+  if (headerIndex < 0) {
+    const additions = entries.map((e) => e.line).filter((line): line is string => line !== null)
+    if (!createIfMissing || additions.length === 0) return lines
+    const trimmed = [...lines]
+    while (trimmed.length && trimmed[trimmed.length - 1].trim() === '') trimmed.pop()
+    return [...trimmed, '', `[${header}]`, ...additions]
+  }
+
+  let endIndex = lines.length
+  for (let i = headerIndex + 1; i < lines.length; i++) {
+    if (/^\s*\[/.test(lines[i])) {
+      endIndex = i
+      break
+    }
+  }
+
+  const byKey = new Map(entries.map((e) => [e.key, e.line]))
+  const handled = new Set<string>()
+  const body: string[] = []
+  for (let i = headerIndex + 1; i < endIndex; i++) {
+    const key = lines[i].match(/^\s*([A-Za-z0-9_-]+)\s*=/)?.[1]
+    if (key && byKey.has(key)) {
+      handled.add(key)
+      const line = byKey.get(key)
+      if (line) body.push(line) // null → drop
+    } else {
+      body.push(lines[i])
+    }
+  }
+  for (const entry of entries) {
+    if (!handled.has(entry.key) && entry.line) body.push(entry.line)
+  }
+
+  return [...lines.slice(0, headerIndex + 1), ...body, ...lines.slice(endIndex)]
+}
+
+// Replaces all [[games]] blocks with fresh ones from `games`, preserving everything else.
+// Existing blocks are replaced in place; if none exist, the blocks go right after [series].
+function rewriteGames(lines: string[], games: SeriesGame[]): string[] {
+  const kept: string[] = []
+  let insertIndex = -1
+  let i = 0
+  while (i < lines.length) {
+    if (lines[i].trim() === '[[games]]') {
+      if (insertIndex < 0) insertIndex = kept.length
+      i++
+      while (i < lines.length && !/^\s*\[/.test(lines[i])) i++
+    } else {
+      kept.push(lines[i])
+      i++
+    }
+  }
+
+  if (insertIndex < 0) {
+    // No existing [[games]] — place them just after the [series] table.
+    const seriesHeader = kept.findIndex((line) => line.trim() === '[series]')
+    insertIndex = kept.length
+    if (seriesHeader >= 0) {
+      insertIndex = kept.length
+      for (let j = seriesHeader + 1; j < kept.length; j++) {
+        if (/^\s*\[/.test(kept[j])) {
+          insertIndex = j
+          break
+        }
+      }
+    }
+  }
+
+  const block: string[] = []
+  for (const game of games) {
+    block.push('[[games]]', `id = "${tomlEscape(game.id)}"`, `name = "${tomlEscape(game.name)}"`, '')
+  }
+  if (block.length) block.pop() // drop trailing blank
+
+  const before = kept.slice(0, insertIndex)
+  const after = kept.slice(insertIndex)
+  const result = [...before]
+  if (block.length) {
+    if (result.length && result[result.length - 1].trim() !== '') result.push('')
+    result.push(...block)
+    if (after.length && after[0].trim() !== '') result.push('')
+  }
+  result.push(...after)
+  return result
+}
+
+// Writes editable [series] + [[games]] + [default-track-data] fields, preserving id, existing-series,
+// comments, [[games]] and anything else. id and existing-series are never touched here.
+function writeSeriesTomlFields(seriesTomlPath: string, fields: SeriesFields): void {
+  if (!existsSync(seriesTomlPath)) return
+
+  let lines = readFileSync(seriesTomlPath, 'utf8').split(/\r?\n/)
+
+  lines = upsertTable(
+    lines,
+    'series',
+    [
+      { key: 'name', line: `name = "${tomlEscape(fields.name)}"` },
+      { key: 'series-playlist', line: fields.seriesPlaylist ? `series-playlist = "${tomlEscape(fields.seriesPlaylist)}"` : null },
+      { key: 'playlist-incidence', line: `playlist-incidence = ${Math.trunc(fields.playlistIncidence) || 0}` }
+    ],
+    false
+  )
+
+  lines = rewriteGames(lines, fields.games)
+
+  const recordType = fields.defaultRecordType || 'original'
+  const volume = Number.isInteger(fields.defaultVolume) ? fields.defaultVolume.toFixed(1) : String(fields.defaultVolume)
+  // Only create [default-track-data] when it already exists or the user set a non-default value.
+  const defaultsHaveContent =
+    Boolean(fields.defaultGame || fields.defaultAuthor || fields.defaultCopyright) ||
+    recordType !== 'original' ||
+    fields.defaultVolume !== 1
+  const sectionExists = lines.some((line) => line.trim() === '[default-track-data]')
+  if (sectionExists || defaultsHaveContent) {
+    lines = upsertTable(
+      lines,
+      'default-track-data',
+      [
+        { key: 'game', line: `game = "${tomlEscape(fields.defaultGame)}"` },
+        { key: 'author', line: `author = "${tomlEscape(fields.defaultAuthor)}"` },
+        { key: 'copyright', line: `copyright = "${tomlEscape(fields.defaultCopyright)}"` },
+        { key: 'record-type', line: `record-type = "${tomlEscape(recordType)}"` },
+        { key: 'volume', line: `volume = ${volume}` }
+      ],
+      true
+    )
+  }
+
+  writeFileSync(seriesTomlPath, lines.join('\n'), 'utf8')
 }
 
 function loadSeriesOrder(orderPath: string): string[] {
@@ -57,8 +274,16 @@ function loadSeriesOrder(orderPath: string): string[] {
   return Array.from(text.matchAll(/"([^"]+)"/g), (match) => match[1].trim()).filter(Boolean)
 }
 
-function scanCustomSeries(modPath: string): Array<{ dirName: string; id: string; name: string; iconDataUrl: string | null }> {
-  const results: Array<{ dirName: string; id: string; name: string; iconDataUrl: string | null }> = []
+interface ScannedSeries {
+  dirName: string
+  id: string
+  name: string
+  iconDataUrl: string | null
+  fields: SeriesFields
+}
+
+function scanCustomSeries(modPath: string): ScannedSeries[] {
+  const results: ScannedSeries[] = []
 
   let entries: string[]
   try {
@@ -93,7 +318,8 @@ function scanCustomSeries(modPath: string): Array<{ dirName: string; id: string;
       dirName: entry,
       id: config.id,
       name: config.name ?? config.id,
-      iconDataUrl
+      iconDataUrl,
+      fields: config.fields
     })
   }
 
@@ -126,7 +352,8 @@ export function loadSeriesOrderData(workspace: string, modPath: string): SeriesO
     name: s.name,
     seriesId: s.id,
     iconDataUrl: s.iconDataUrl,
-    originalIndex: index
+    originalIndex: index,
+    fields: s.fields
   }))
 
   return {
@@ -137,7 +364,7 @@ export function loadSeriesOrderData(workspace: string, modPath: string): SeriesO
   }
 }
 
-export function saveSeriesOrderData(workspace: string, modPath: string, orderedIds: string[]): SeriesOrderData {
+export function saveSeriesOrderData(workspace: string, modPath: string, items: SaveSeriesItem[]): SeriesOrderData {
   const modsDir = getMusicModsRoot(workspace)
   const resolvedModPath = resolve(modPath)
   if (!isChildOf(modsDir, resolvedModPath)) {
@@ -146,6 +373,8 @@ export function saveSeriesOrderData(workspace: string, modPath: string, orderedI
 
   const data = loadSeriesOrderData(workspace, resolvedModPath)
   const itemById = new Map(data.items.map((item) => [item.id, item]))
+  const fieldsById = new Map(items.map((item) => [item.id, item.fields]))
+  const orderedIds = items.map((item) => item.id)
 
   const orderedItems = orderedIds
     .map((id) => itemById.get(id))
@@ -153,6 +382,16 @@ export function saveSeriesOrderData(workspace: string, modPath: string, orderedI
 
   const missingItems = data.items.filter((item) => !orderedIds.includes(item.id))
   const finalItems = [...orderedItems, ...missingItems]
+
+  // Write each series' edited [series] fields back to its series.toml (located via dir scan).
+  const dirByseriesId = new Map(scanCustomSeries(resolvedModPath).map((s) => [s.id, s.dirName]))
+  for (const item of finalItems) {
+    const fields = fieldsById.get(item.id)
+    const dirName = dirByseriesId.get(item.seriesId)
+    if (fields && dirName) {
+      writeSeriesTomlFields(join(resolvedModPath, dirName, 'series.toml'), fields)
+    }
+  }
 
   const orderPath = join(resolvedModPath, 'series-order.toml')
   const lines = [

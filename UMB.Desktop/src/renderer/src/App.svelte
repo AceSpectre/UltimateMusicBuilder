@@ -149,7 +149,7 @@
       {:else if activeTab === 'config-volume'}
         <ConfigVolumeView activeMod={activeMod} />
       {:else if activeTab === 'order-tracks'}
-        <OrderTracksView activeMod={activeMod} />
+        <OrderTracksView activeMod={activeMod} onNavigate={selectAction} />
       {:else if activeTab === 'extract-icons'}
         <ExtractIconsView activeMod={activeMod} mods={mods} />
       {:else if activeTab === 'merge'}

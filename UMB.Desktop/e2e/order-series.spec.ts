@@ -37,9 +37,10 @@ test('saveSeriesOrder writes gamma before dev', async () => {
   expect(gamma, 'gamma series missing from loadSeriesOrder').toBeDefined()
   expect(dev, 'dev series missing from loadSeriesOrder').toBeDefined()
 
+  const items = [gamma, dev].map((s) => ({ id: s.id, fields: s.fields }))
   const result = await page.evaluate(
-    ([mp, ids]) => window.electron.umb.saveSeriesOrder(mp as string, ids as string[]),
-    [modDir, [gamma.id, dev.id]] as const
+    ([mp, payload]) => window.electron.umb.saveSeriesOrder(mp as string, payload as never),
+    [modDir, items] as const
   )
   expect(result.items.map((i) => i.seriesId)).toEqual(['gamma', 'dev'])
 
@@ -48,8 +49,51 @@ test('saveSeriesOrder writes gamma before dev', async () => {
   expect(order).toEqual(['gamma', 'dev'])
 })
 
-test('UI smoke: Order Series view opens', async () => {
+test('editing a [series] field persists to series.toml', async () => {
   const page = await firstWindow(app)
-  await page.getByText('Order Series').first().click()
+  const loaded = await page.evaluate((mp) => window.electron.umb.loadSeriesOrder(mp), modDir)
+  const items = loaded.items.map((i) => ({
+    id: i.id,
+    fields: i.seriesId === 'gamma' ? { ...i.fields, name: 'Gamma Edited', playlistIncidence: 42 } : i.fields
+  }))
+  const result = await page.evaluate(
+    ([mp, payload]) => window.electron.umb.saveSeriesOrder(mp as string, payload as never),
+    [modDir, items] as const
+  )
+  expect(result.items.find((i) => i.seriesId === 'gamma')?.fields.name).toBe('Gamma Edited')
+
+  const toml = readFileSync(join(modDir, 'gamma', 'series.toml'), 'utf8')
+  expect(toml).toContain('name = "Gamma Edited"')
+  expect(toml).toContain('playlist-incidence = 42')
+})
+
+test('UI smoke: Manage Series view opens', async () => {
+  const page = await firstWindow(app)
+  await page.getByText('Manage Series').first().click()
   await expect(page.getByText('test-mod').or(page.getByText('Gamma')).first()).toBeVisible({ timeout: 5000 })
+})
+
+test('UI: editing the name + adding a game via the panel persists to series.toml', async () => {
+  const page = await firstWindow(app)
+  await page.getByText('Manage Series').first().click()
+  await page.getByRole('button', { name: 'Reload series' }).click()
+  await page.getByText('Gamma').first().click() // select the card
+
+  // Settings tab: rename the series.
+  await page.getByLabel('Name', { exact: true }).fill('Gamma DOM')
+
+  // Games tab: add a game through the modal.
+  await page.getByRole('button', { name: 'Games', exact: true }).click()
+  await page.getByRole('button', { name: 'Add game', exact: true }).click()
+  await page.getByPlaceholder('mario_kart_8').fill('dom_game')
+  await page.getByPlaceholder('Mario Kart 8').fill('DOM Game')
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+
+  await page.getByRole('button', { name: 'Save Changes' }).click()
+  await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible({ timeout: 5000 })
+
+  const toml = readFileSync(join(modDir, 'gamma', 'series.toml'), 'utf8')
+  expect(toml).toContain('name = "Gamma DOM"')
+  expect(toml).toContain('id = "dom_game"')
+  expect(toml).toContain('name = "DOM Game"')
 })

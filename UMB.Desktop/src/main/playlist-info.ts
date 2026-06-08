@@ -446,6 +446,106 @@ export interface PlaylistInfoData {
 }
 
 let dataCache: { workspace: string; data: PlaylistInfoData } | null = null
+let bgmTitleCache: { workspace: string; map: Map<string, string> } | null = null
+
+/**
+ * Maps every vanilla ui_bgm_id to its localised English title (msg_bgm `bgm_title_<name_id>`).
+ * Cached per workspace. Throws if the game resource dump is absent — callers should fall back.
+ */
+export function getVanillaBgmTitles(workspace: string): Map<string, string> {
+  if (bgmTitleCache && bgmTitleCache.workspace === workspace) return bgmTitleCache.map
+
+  const dbDir = join(workspace, 'Resources', 'Game', 'ui', 'param', 'database')
+  const labels = loadLabels(workspace)
+  const bgmDb = readPrc(join(dbDir, 'ui_bgm_db.prc'), labels)
+  const msbt = readMsbt(join(workspace, 'Resources', 'Game', 'ui', 'message', 'msg_bgm+us_en.msbt'))
+
+  const map = new Map<string, string>()
+  for (const entry of (bgmDb['db_root'] as PrcNode[]) ?? []) {
+    const id = entry['ui_bgm_id'] as string
+    const title = msbt['bgm_title_' + entry['name_id']]
+    if (id) map.set(id, title || id)
+  }
+
+  bgmTitleCache = { workspace, map }
+  return map
+}
+
+export interface VanillaGameTitle {
+  id: string // bare id (ui_gametitle_ prefix stripped) — matches series.toml [[games]].id
+  name: string
+  seriesId: string // ui_series_*
+}
+
+let gameTitleCache: { workspace: string; list: VanillaGameTitle[] } | null = null
+
+/** Lists every vanilla game title (id, localised name, series). Throws if resources absent. */
+export function getVanillaGameTitles(workspace: string): VanillaGameTitle[] {
+  if (gameTitleCache && gameTitleCache.workspace === workspace) return gameTitleCache.list
+
+  const dbDir = join(workspace, 'Resources', 'Game', 'ui', 'param', 'database')
+  const labels = loadLabels(workspace)
+  const gtDb = readPrc(join(dbDir, 'ui_gametitle_db.prc'), labels)
+  const msbt = readMsbt(join(workspace, 'Resources', 'Game', 'ui', 'message', 'msg_title+us_en.msbt'))
+
+  const list: VanillaGameTitle[] = []
+  for (const entry of (gtDb['db_root'] as PrcNode[]) ?? []) {
+    const gameTitleId = entry['ui_gametitle_id'] as string
+    if (!gameTitleId) continue
+    const id = gameTitleId.replace(/^ui_gametitle_/, '')
+    const name = msbt['tit_' + entry['name_id']] || id
+    list.push({ id, name, seriesId: (entry['ui_series_id'] as string) ?? '' })
+  }
+
+  gameTitleCache = { workspace, list }
+  return list
+}
+
+export interface VanillaSong {
+  bgmId: string
+  infoId: string // info0 of the song's stream set — what info1 references for a pinch link
+  name: string
+  seriesId: string // ui_series_* (via the song's game title)
+}
+
+let vanillaSongCache: { workspace: string; list: VanillaSong[] } | null = null
+
+/** Lists every vanilla song with its info id + series. Throws if resources absent. */
+export function getVanillaSongs(workspace: string): VanillaSong[] {
+  if (vanillaSongCache && vanillaSongCache.workspace === workspace) return vanillaSongCache.list
+
+  const dbDir = join(workspace, 'Resources', 'Game', 'ui', 'param', 'database')
+  const labels = loadLabels(workspace)
+  const bgmDb = readPrc(join(dbDir, 'ui_bgm_db.prc'), labels)
+  const gtDb = readPrc(join(dbDir, 'ui_gametitle_db.prc'), labels)
+  const msbt = readMsbt(join(workspace, 'Resources', 'Game', 'ui', 'message', 'msg_bgm+us_en.msbt'))
+
+  const gameToSeries = new Map<string, string>()
+  for (const entry of (gtDb['db_root'] as PrcNode[]) ?? []) {
+    const gtId = entry['ui_gametitle_id'] as string
+    if (gtId) gameToSeries.set(gtId, (entry['ui_series_id'] as string) ?? '')
+  }
+
+  const info0ByStreamSet = new Map<string, string>()
+  for (const set of (bgmDb['stream_set'] as PrcNode[]) ?? []) {
+    const setId = set['stream_set_id'] as string
+    const info0 = set['info0'] as string
+    if (setId && info0) info0ByStreamSet.set(setId, info0)
+  }
+
+  const list: VanillaSong[] = []
+  for (const entry of (bgmDb['db_root'] as PrcNode[]) ?? []) {
+    const bgmId = entry['ui_bgm_id'] as string
+    if (!bgmId) continue
+    const infoId = info0ByStreamSet.get(entry['stream_set_id'] as string)
+    if (!infoId || !infoId.startsWith('info_')) continue
+    const name = msbt['bgm_title_' + entry['name_id']] || bgmId
+    list.push({ bgmId, infoId, name, seriesId: gameToSeries.get(entry['ui_gametitle_id'] as string) ?? '' })
+  }
+
+  vanillaSongCache = { workspace, list }
+  return list
+}
 
 export function getPlaylistInfo(workspace: string): PlaylistInfoData {
   if (dataCache && dataCache.workspace === workspace) return dataCache.data

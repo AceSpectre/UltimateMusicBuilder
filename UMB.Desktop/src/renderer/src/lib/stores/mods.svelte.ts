@@ -4,6 +4,8 @@ export const modsStore = $state({
   mods: [] as ModInfo[],
   activeMod: null as ModInfo | null,
   activeSeriesPath: null as string | null,
+  // One-shot: a series path another view asked Config Volume to open. Consumed + cleared there.
+  pendingConfigVolumePath: null as string | null,
   loading: false,
   async load() {
     modsStore.loading = true

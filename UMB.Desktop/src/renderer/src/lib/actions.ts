@@ -38,8 +38,8 @@ export const navGroups: NavGroup[] = [
     id: 'organize',
     label: 'ORGANIZE',
     items: [
-      { id: 'order-series', label: 'Order Series', icon: ListOrdered, mode: 'view' },
-      { id: 'order-tracks', label: 'Order Tracks', icon: ArrowUpDown, mode: 'view' }
+      { id: 'order-series', label: 'Manage Series', icon: ListOrdered, mode: 'view' },
+      { id: 'order-tracks', label: 'Manage Songs', icon: ArrowUpDown, mode: 'view' }
     ]
   },
   {

@@ -22,13 +22,49 @@ export interface ModStats {
   trackCount: number
 }
 
+export interface TrackFields {
+  title: string
+  game: string
+  author: string
+  copyright: string
+  record_type: string
+  special_category: string
+  info1: string
+  in_soundtest: string
+}
+
 export interface TrackOrderItem {
   id: string
   title: string
   subtitle: string
   bgmId: string
+  filename: string
   isLocked: boolean
   originalIndex: number | null
+  fields: TrackFields | null
+  isPinchTarget: boolean
+}
+
+export interface SeriesGame {
+  id: string
+  name: string
+}
+
+export interface SaveTrackItem {
+  id: string
+  fields: TrackFields | null
+}
+
+export interface VanillaSongOption {
+  infoId: string
+  name: string
+}
+
+export interface DefaultTrackData {
+  game: string
+  author: string
+  copyright: string
+  record_type: string
 }
 
 export interface TrackOrderData {
@@ -36,7 +72,22 @@ export interface TrackOrderData {
   seriesPath: string
   isExistingSeries: boolean
   hasSongOrder: boolean
+  games: SeriesGame[]
+  vanillaSongs: VanillaSongOption[]
+  defaultTrackData: DefaultTrackData | null
   items: TrackOrderItem[]
+}
+
+export interface SeriesFields {
+  name: string
+  seriesPlaylist: string
+  playlistIncidence: number
+  games: SeriesGame[]
+  defaultGame: string
+  defaultAuthor: string
+  defaultCopyright: string
+  defaultRecordType: string
+  defaultVolume: number
 }
 
 export interface SeriesOrderItem {
@@ -45,6 +96,12 @@ export interface SeriesOrderItem {
   seriesId: string
   iconDataUrl: string | null
   originalIndex: number
+  fields: SeriesFields
+}
+
+export interface SaveSeriesItem {
+  id: string
+  fields: SeriesFields | null
 }
 
 export interface SeriesOrderData {
@@ -228,9 +285,9 @@ const api = {
   listModSeries: (modPath: string): Promise<ModSeriesInfo[]> => ipcRenderer.invoke(IPC.LIST_MOD_SERIES, modPath),
   getModStats: (modPath: string): Promise<ModStats> => ipcRenderer.invoke(IPC.GET_MOD_STATS, modPath),
   loadTrackOrder: (seriesPath: string): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.LOAD_TRACK_ORDER, seriesPath),
-  saveTrackOrder: (seriesPath: string, orderedIds: string[]): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.SAVE_TRACK_ORDER, seriesPath, orderedIds),
+  saveTrackOrder: (seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.SAVE_TRACK_ORDER, seriesPath, items),
   loadSeriesOrder: (modPath: string): Promise<SeriesOrderData> => ipcRenderer.invoke(IPC.LOAD_SERIES_ORDER, modPath),
-  saveSeriesOrder: (modPath: string, orderedIds: string[]): Promise<SeriesOrderData> => ipcRenderer.invoke(IPC.SAVE_SERIES_ORDER, modPath, orderedIds),
+  saveSeriesOrder: (modPath: string, items: SaveSeriesItem[]): Promise<SeriesOrderData> => ipcRenderer.invoke(IPC.SAVE_SERIES_ORDER, modPath, items),
   listNus3Sources: (seriesPath: string): Promise<Nus3SourceTrack[]> => ipcRenderer.invoke(IPC.LIST_NUS3_SOURCES, seriesPath),
   analyzeLoopPoints: (seriesPath: string, filename: string, options?: LoopAnalysisOptions): Promise<Nus3AnalysisResult> => ipcRenderer.invoke(IPC.ANALYZE_LOOP_POINTS, seriesPath, filename, options),
   loadNus3Conversions: (seriesPath: string): Promise<Record<string, Nus3ConversionMeta>> => ipcRenderer.invoke(IPC.LOAD_NUS3_CONVERSIONS, seriesPath),

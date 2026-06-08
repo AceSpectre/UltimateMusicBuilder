@@ -1,8 +1,8 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'path'
 import { listModSeries, listMods, getModStats } from './mods'
-import { loadTrackOrderData, saveTrackOrderData } from './order-tracks'
-import { loadSeriesOrderData, saveSeriesOrderData } from './order-series'
+import { loadTrackOrderData, saveTrackOrderData, type SaveTrackItem } from './order-tracks'
+import { loadSeriesOrderData, saveSeriesOrderData, type SaveSeriesItem } from './order-series'
 import { spawnCliAction, cancelCurrentAction, shutdownDaemon } from './cli'
 import {
   listNus3Sources, analyzeLoopPoints, extractWaveformPeaks, getTrackDuration, generateLoopPreview,
@@ -76,11 +76,11 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.LOAD_TRACK_ORDER, (_event, seriesPath: string) => loadTrackOrderData(workspace, seriesPath))
 
-  ipcMain.handle(IPC.SAVE_TRACK_ORDER, (_event, seriesPath: string, orderedIds: string[]) => saveTrackOrderData(workspace, seriesPath, orderedIds))
+  ipcMain.handle(IPC.SAVE_TRACK_ORDER, (_event, seriesPath: string, items: SaveTrackItem[]) => saveTrackOrderData(workspace, seriesPath, items))
 
   ipcMain.handle(IPC.LOAD_SERIES_ORDER, (_event, modPath: string) => loadSeriesOrderData(workspace, modPath))
 
-  ipcMain.handle(IPC.SAVE_SERIES_ORDER, (_event, modPath: string, orderedIds: string[]) => saveSeriesOrderData(workspace, modPath, orderedIds))
+  ipcMain.handle(IPC.SAVE_SERIES_ORDER, (_event, modPath: string, items: SaveSeriesItem[]) => saveSeriesOrderData(workspace, modPath, items))
 
   ipcMain.handle(IPC.LIST_NUS3_SOURCES, (_event, seriesPath: string) => listNus3Sources(workspace, seriesPath))
 

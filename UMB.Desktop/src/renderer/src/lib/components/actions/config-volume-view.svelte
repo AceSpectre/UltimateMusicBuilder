@@ -3,6 +3,7 @@
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
+  import { modsStore } from '$lib/stores/mods.svelte'
   import type { ModInfo, ModSeriesInfo, VolumeConfigData, VolumeRowItem, VolumeProgress } from '$lib/types/electron'
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
@@ -218,6 +219,18 @@
       data = null
       rows = []
       void loadSeries(modPath)
+    })
+  })
+
+  // Another view (Manage Songs) can ask us to open a specific series. Declared after the
+  // activeMod reset effect so its selection wins on mount.
+  $effect(() => {
+    const pending = modsStore.pendingConfigVolumePath
+    if (!pending) return
+    untrack(() => {
+      modsStore.pendingConfigVolumePath = null
+      selectedPath = pending
+      void loadConfig(pending)
     })
   })
 

@@ -29,10 +29,10 @@ test('loads all 13 custom-series tracks, not an existing series', async () => {
 test('reversing the custom series rewrites tracks.csv with an order column', async () => {
   const page = await firstWindow(app)
   const loaded = await page.evaluate((sp) => window.electron.umb.loadTrackOrder(sp), devPath())
-  const reversed = loaded.items.map((i) => i.id).reverse()
+  const reversed = loaded.items.map((i) => ({ id: i.id, fields: i.fields })).reverse()
 
   const saved = await page.evaluate(
-    ([sp, ids]) => window.electron.umb.saveTrackOrder(sp as string, ids as string[]),
+    ([sp, items]) => window.electron.umb.saveTrackOrder(sp as string, items as never),
     [devPath(), reversed] as const
   )
   expect(saved.items[0].title).toBe('Time Trials')
@@ -49,8 +49,8 @@ test('existing series writes song_order.toml with derived bgmIds matching the CL
   expect(loaded.items).toHaveLength(6)
 
   await page.evaluate(
-    ([sp, ids]) => window.electron.umb.saveTrackOrder(sp as string, ids as string[]),
-    [marioPath(), loaded.items.map((i) => i.id)] as const
+    ([sp, items]) => window.electron.umb.saveTrackOrder(sp as string, items as never),
+    [marioPath(), loaded.items.map((i) => ({ id: i.id, fields: i.fields }))] as const
   )
 
   const toml = readFileSync(join(marioPath(), 'song_order.toml'), 'utf8')
@@ -78,8 +78,47 @@ test('pre-existing song_order.toml is loaded with vanilla entries locked', async
   expect(vanilla?.isLocked).toBe(true)
 })
 
-test('UI smoke: Order Tracks shows the series list', async () => {
+test('editing a track field via saveTrackOrder persists to tracks.csv', async () => {
   const page = await firstWindow(app)
-  await page.getByText('Order Tracks').first().click()
-  await expect(page.getByRole('heading', { name: 'test-mod' }).or(page.getByText('dev')).first()).toBeVisible({ timeout: 5000 })
+  const loaded = await page.evaluate((sp) => window.electron.umb.loadTrackOrder(sp), devPath())
+  const items = loaded.items.map((i) => ({ id: i.id, fields: i.fields }))
+  items[0].fields!.title = 'Edited Title E2E'
+
+  const saved = await page.evaluate(
+    ([sp, payload]) => window.electron.umb.saveTrackOrder(sp as string, payload as never),
+    [devPath(), items] as const
+  )
+  expect(saved.items.some((i) => i.fields?.title === 'Edited Title E2E')).toBe(true)
+
+  const csv = readFileSync(join(devPath(), 'tracks.csv'), 'utf8')
+  expect(csv).toContain('Edited Title E2E')
+})
+
+test('UI: editing a title in the table and clicking Save persists to tracks.csv', async () => {
+  const page = await firstWindow(app)
+  await page.getByText('Manage Songs').first().click()
+  await page.getByRole('button', { name: 'dev' }).first().click()
+
+  const titleInput = page.getByLabel('Title').first()
+  await titleInput.waitFor({ state: 'visible', timeout: 5000 })
+  await titleInput.fill('DOM Edited Title')
+
+  await page.getByRole('button', { name: 'Save Changes' }).click()
+  // Drives the real renderer save path (the $state→plain-object snapshot over IPC).
+  await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible({ timeout: 5000 })
+
+  const csv = readFileSync(join(devPath(), 'tracks.csv'), 'utf8')
+  expect(csv).toContain('DOM Edited Title')
+})
+
+test('UI: Use Default Values enables only after selecting a custom song', async () => {
+  const page = await firstWindow(app)
+  await page.getByText('Manage Songs').first().click()
+  // mario ships [default-track-data]; the button stays disabled until a row is selected.
+  await page.getByRole('button', { name: 'mario' }).first().click()
+  const useDefaults = page.getByRole('button', { name: 'Use Default Values' })
+  await expect(useDefaults).toBeDisabled()
+
+  await page.getByLabel('Title').first().click()
+  await expect(useDefaults).toBeEnabled()
 })
