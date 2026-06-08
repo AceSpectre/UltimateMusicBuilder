@@ -46,7 +46,7 @@ namespace UMB.CLI
             // Interactive loop
             while (true)
             {
-                var action = ShowMenu();
+                var action = ShowMenu(AnsiConsole.Console);
                 if (action == "quit")
                     return;
 
@@ -182,11 +182,12 @@ namespace UMB.CLI
             }
         }
 
-        private static readonly Dictionary<string, string> MenuOptions = new()
+        internal static readonly Dictionary<string, string> MenuOptions = new()
         {
             ["Build          - Build mods and generate ArcOutput"] = "build",
             ["Scaffold       - Create series.toml/tracks.csv and populate new music files"] = "scaffold",
             ["Nus3 Convert   - Convert audio files to nus3audio with loop points"] = "nus3-convert",
+            ["Accept Nus3    - Accept validated nus3audio files into series"] = "accept-nus3",
             ["Convert        - Import a Sma5h mod to UMB folder format"] = "convert",
             ["Merge          - Merge two or more UMB mods into one"] = "merge",
             ["Extract Icons  - Extract series icons from a built Sma5h mod"] = "extract-icons",
@@ -198,12 +199,12 @@ namespace UMB.CLI
             ["Quit"] = "quit",
         };
 
-        private static string ShowMenu()
+        internal static string ShowMenu(IAnsiConsole console)
         {
-            AnsiConsole.MarkupLine("[bold]Sma5h Music Mod Builder[/]");
-            AnsiConsole.WriteLine();
+            console.MarkupLine("[bold]Sma5h Music Mod Builder[/]");
+            console.WriteLine();
 
-            var choice = AnsiConsole.Prompt(
+            var choice = console.Prompt(
                 new SelectionPrompt<string>()
                     .WrapAround()
                     .Title("Select an action:")
