@@ -110,6 +110,16 @@ const PLAYLIST_NAMES: Record<string, string> = {
   bgmplaylist: 'Playlist'
 }
 
+// The canonical list of existing in-game BGM playlists (id + friendly name), derived from the
+// hard-coded name map so it needs no game PRC files. Used by Manage Playlists as assignable targets.
+export function listExistingPlaylists(): { id: string; name: string }[] {
+  return Object.entries(PLAYLIST_NAMES).map(([id, name]) => ({ id, name }))
+}
+
+export function playlistDisplayName(id: string): string {
+  return PLAYLIST_NAMES[id] ?? id
+}
+
 const STAGE_NAMES: Record<string, string> = {
   ui_stage_random: '(H) Random',
   ui_stage_random_normal: '(H) Random Normal',

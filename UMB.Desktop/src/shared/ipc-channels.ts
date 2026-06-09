@@ -8,6 +8,8 @@ export const IPC = {
   SAVE_SERIES_ORDER: 'umb:save-series-order',
   CREATE_SERIES: 'umb:create-series',
   SET_SERIES_ICON: 'umb:set-series-icon',
+  LOAD_MANAGE_PLAYLISTS: 'umb:load-manage-playlists',
+  SAVE_MANAGE_PLAYLISTS: 'umb:save-manage-playlists',
   LIST_NUS3_SOURCES: 'umb:list-nus3-sources',
   ANALYZE_LOOP_POINTS: 'umb:analyze-loop-points',
   LOAD_NUS3_CONVERSIONS: 'umb:load-nus3-conversions',

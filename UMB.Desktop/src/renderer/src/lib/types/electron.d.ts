@@ -283,6 +283,42 @@ export interface PlaylistInfoData {
   stages: StageInfo[]
 }
 
+export interface PlaylistSongAssignment {
+  seriesId: string
+  seriesName: string
+  filename: string
+  title: string
+  incidence: number
+}
+
+export interface PlaylistTarget {
+  id: string
+  name: string
+  assignedCount: number
+  assignments: PlaylistSongAssignment[]
+}
+
+export interface ModSong {
+  seriesId: string
+  seriesName: string
+  filename: string
+  title: string
+}
+
+export interface ManagePlaylistsData {
+  modName: string
+  modPath: string
+  playlists: PlaylistTarget[]
+  songs: ModSong[]
+}
+
+export interface PlaylistAssignmentInput {
+  playlistId: string
+  seriesId: string
+  filename: string
+  incidence: number
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string
@@ -325,6 +361,8 @@ export interface UmbApi {
   validateMergeName(name: string): Promise<string | null>
   executeMerge(modPaths: string[], outputName: string, priorityModPath: string | null): Promise<MergeResult>
   getPlaylistInfo(): Promise<PlaylistInfoData>
+  loadManagePlaylists(modPath: string): Promise<ManagePlaylistsData>
+  saveManagePlaylists(modPath: string, assignments: PlaylistAssignmentInput[]): Promise<ManagePlaylistsData>
   checkArcOutput(): Promise<boolean>
   getAppSettings(): Promise<AppSettings>
   saveAppSettings(settings: AppSettings): Promise<void>

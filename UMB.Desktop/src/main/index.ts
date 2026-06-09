@@ -14,6 +14,7 @@ import { getAppSettings, saveAppSettings, checkArcOutput, type AppSettings } fro
 import { analyzeExtractIcons, extractIcons } from './extract-icons'
 import { analyzeMerge, validateOutputName, executeMerge } from './merge'
 import { getPlaylistInfo } from './playlist-info'
+import { loadManagePlaylists, saveManagePlaylists, type PlaylistAssignmentInput } from './manage-playlists'
 import { IPC } from '../shared/ipc-channels'
 
 let mainWindow: BrowserWindow | null = null
@@ -176,6 +177,11 @@ function registerIpcHandlers(): void {
   )
 
   ipcMain.handle(IPC.GET_PLAYLIST_INFO, () => getPlaylistInfo(workspace))
+
+  ipcMain.handle(IPC.LOAD_MANAGE_PLAYLISTS, (_event, modPath: string) => loadManagePlaylists(workspace, modPath))
+
+  ipcMain.handle(IPC.SAVE_MANAGE_PLAYLISTS, (_event, modPath: string, assignments: PlaylistAssignmentInput[]) =>
+    saveManagePlaylists(workspace, modPath, assignments))
 
   ipcMain.handle(IPC.CHECK_ARC_OUTPUT, () => checkArcOutput(workspace))
 

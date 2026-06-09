@@ -275,6 +275,42 @@ export interface PlaylistInfoData {
   stages: StageInfo[]
 }
 
+export interface PlaylistSongAssignment {
+  seriesId: string
+  seriesName: string
+  filename: string
+  title: string
+  incidence: number
+}
+
+export interface PlaylistTarget {
+  id: string
+  name: string
+  assignedCount: number
+  assignments: PlaylistSongAssignment[]
+}
+
+export interface ModSong {
+  seriesId: string
+  seriesName: string
+  filename: string
+  title: string
+}
+
+export interface ManagePlaylistsData {
+  modName: string
+  modPath: string
+  playlists: PlaylistTarget[]
+  songs: ModSong[]
+}
+
+export interface PlaylistAssignmentInput {
+  playlistId: string
+  seriesId: string
+  filename: string
+  incidence: number
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string
@@ -322,6 +358,9 @@ const api = {
   executeMerge: (modPaths: string[], outputName: string, priorityModPath: string | null): Promise<MergeResult> =>
     ipcRenderer.invoke(IPC.EXECUTE_MERGE, modPaths, outputName, priorityModPath),
   getPlaylistInfo: (): Promise<PlaylistInfoData> => ipcRenderer.invoke(IPC.GET_PLAYLIST_INFO),
+  loadManagePlaylists: (modPath: string): Promise<ManagePlaylistsData> => ipcRenderer.invoke(IPC.LOAD_MANAGE_PLAYLISTS, modPath),
+  saveManagePlaylists: (modPath: string, assignments: PlaylistAssignmentInput[]): Promise<ManagePlaylistsData> =>
+    ipcRenderer.invoke(IPC.SAVE_MANAGE_PLAYLISTS, modPath, assignments),
   runAction: (action: string, args?: string[]) =>
     ipcRenderer.invoke(IPC.RUN_ACTION, action, args) as Promise<void>,
   selectFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.SELECT_FOLDER),

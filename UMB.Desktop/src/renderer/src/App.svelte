@@ -13,6 +13,7 @@
   import ExtractIconsView from '$lib/components/actions/extract-icons-view.svelte'
   import MergeView from '$lib/components/actions/merge-view.svelte'
   import PlaylistInfoView from '$lib/components/actions/playlist-info-view.svelte'
+  import ManagePlaylistsView from '$lib/components/actions/manage-playlists-view.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
   import type { ModInfo, WindowActionResult } from '$lib/types/electron'
 
@@ -150,6 +151,8 @@
         <ConfigVolumeView activeMod={activeMod} />
       {:else if activeTab === 'order-tracks'}
         <OrderTracksView activeMod={activeMod} onNavigate={selectAction} />
+      {:else if activeTab === 'manage-playlists'}
+        <ManagePlaylistsView activeMod={activeMod} />
       {:else if activeTab === 'extract-icons'}
         <ExtractIconsView activeMod={activeMod} mods={mods} />
       {:else if activeTab === 'merge'}
