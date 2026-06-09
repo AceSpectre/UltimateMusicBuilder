@@ -101,6 +101,14 @@ export interface SaveSeriesItem {
   fields: SeriesFields | null
 }
 
+export interface CreateSeriesInput {
+  seriesId: string
+  name: string
+  seriesPlaylist: string
+  games: SeriesGame[]
+  iconDataUrl?: string | null
+}
+
 export interface SeriesOrderData {
   modName: string
   modPath: string
@@ -297,6 +305,8 @@ export interface UmbApi {
   saveTrackOrder(seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData>
   loadSeriesOrder(modPath: string): Promise<SeriesOrderData>
   saveSeriesOrder(modPath: string, items: SaveSeriesItem[]): Promise<SeriesOrderData>
+  createSeries(modPath: string, input: CreateSeriesInput): Promise<SeriesOrderData>
+  setSeriesIcon(modPath: string, seriesId: string, iconDataUrl: string): Promise<string>
   listNus3Sources(seriesPath: string): Promise<Nus3SourceTrack[]>
   analyzeLoopPoints(seriesPath: string, filename: string, options?: LoopAnalysisOptions): Promise<Nus3AnalysisResult>
   loadNus3Conversions(seriesPath: string): Promise<Record<string, Nus3ConversionMeta>>

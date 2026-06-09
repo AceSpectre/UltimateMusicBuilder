@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'path'
 import { listModSeries, listMods, getModStats } from './mods'
 import { loadTrackOrderData, saveTrackOrderData, type SaveTrackItem } from './order-tracks'
-import { loadSeriesOrderData, saveSeriesOrderData, type SaveSeriesItem } from './order-series'
+import { createSeries, loadSeriesOrderData, saveSeriesOrderData, setSeriesIcon, type CreateSeriesInput, type SaveSeriesItem } from './order-series'
 import { spawnCliAction, cancelCurrentAction, shutdownDaemon } from './cli'
 import {
   listNus3Sources, analyzeLoopPoints, extractWaveformPeaks, getTrackDuration, generateLoopPreview,
@@ -67,7 +67,8 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.GET_WORKSPACE, () => workspace)
   ipcMain.handle(IPC.DEBUG_PING, () => ({ ok: true, workspace }))
-  ipcMain.handle(IPC.GET_APP_VERSION, () => app.getVersion())
+  // Packaged builds carry the real version (set by the release action); in dev show "dev".
+  ipcMain.handle(IPC.GET_APP_VERSION, () => (app.isPackaged ? app.getVersion() : 'dev'))
 
   ipcMain.handle(IPC.LIST_MODS, () => listMods(workspace))
 
@@ -82,6 +83,10 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.LOAD_SERIES_ORDER, (_event, modPath: string) => loadSeriesOrderData(workspace, modPath))
 
   ipcMain.handle(IPC.SAVE_SERIES_ORDER, (_event, modPath: string, items: SaveSeriesItem[]) => saveSeriesOrderData(workspace, modPath, items))
+
+  ipcMain.handle(IPC.CREATE_SERIES, (_event, modPath: string, input: CreateSeriesInput) => createSeries(workspace, modPath, input))
+
+  ipcMain.handle(IPC.SET_SERIES_ICON, (_event, modPath: string, seriesId: string, iconDataUrl: string) => setSeriesIcon(workspace, modPath, seriesId, iconDataUrl))
 
   ipcMain.handle(IPC.LIST_NUS3_SOURCES, (_event, seriesPath: string) => listNus3Sources(workspace, seriesPath))
 

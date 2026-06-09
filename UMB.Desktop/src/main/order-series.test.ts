@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { loadSeriesOrderData, saveSeriesOrderData } from './order-series'
+import { createSeries, loadSeriesOrderData, saveSeriesOrderData, setSeriesIcon } from './order-series'
 import { makeWorkspace, makeDir, writeSeries, writeFile, type Workspace } from './test-utils'
 
 let ws: Workspace
@@ -87,6 +87,137 @@ describe('path traversal guard', () => {
     const outside = join(ws.root, 'outside')
     expect(() => loadSeriesOrderData(ws.root, outside)).toThrow('Invalid mod path.')
     expect(() => saveSeriesOrderData(ws.root, outside, [])).toThrow('Invalid mod path.')
+    expect(() =>
+      createSeries(ws.root, outside, { seriesId: 'x', name: 'X', seriesPlaylist: '', games: [{ id: 'g', name: 'G' }] })
+    ).toThrow('Invalid mod path.')
+  })
+})
+
+describe('createSeries', () => {
+  const oneGame = (over: Partial<Parameters<typeof createSeries>[2]> = {}) => ({
+    seriesId: 'my_series',
+    name: 'My Series',
+    seriesPlaylist: 'bgm_my_series',
+    games: [{ id: 'first_game', name: 'First Game' }],
+    ...over
+  })
+
+  it('creates the folder with series.toml + header-only tracks.csv and returns it in the reload', () => {
+    const modPath = makeDir(ws, 'mymod')
+    const result = createSeries(ws.root, modPath, oneGame())
+
+    expect(result.items.map((i) => i.seriesId)).toContain('my_series')
+
+    const toml = readFileSync(join(modPath, 'my_series', 'series.toml'), 'utf8')
+    expect(toml).toContain('id = "my_series"')
+    expect(toml).toContain('name = "My Series"')
+    expect(toml).toContain('playlist-incidence = 100')
+    expect(toml).toContain('series-playlist = "bgm_my_series"')
+    expect(toml).toContain('[[games]]')
+    expect(toml).toContain('id = "first_game"')
+
+    const csv = readFileSync(join(modPath, 'my_series', 'tracks.csv'), 'utf8')
+    expect(csv.trim()).toBe('filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest')
+  })
+
+  it('makes the first game the default game in [default-track-data]', () => {
+    const modPath = makeDir(ws, 'mymod')
+    createSeries(
+      ws.root,
+      modPath,
+      oneGame({ games: [{ id: 'first_game', name: 'First' }, { id: 'second_game', name: 'Second' }] })
+    )
+
+    const data = loadSeriesOrderData(ws.root, modPath)
+    const item = data.items.find((i) => i.seriesId === 'my_series')!
+    expect(item.fields.defaultGame).toBe('first_game')
+    expect(item.fields.games).toEqual([
+      { id: 'first_game', name: 'First' },
+      { id: 'second_game', name: 'Second' }
+    ])
+    expect(item.fields.defaultRecordType).toBe('original')
+    expect(item.fields.defaultVolume).toBe(1)
+  })
+
+  it('omits series-playlist when blank', () => {
+    const modPath = makeDir(ws, 'mymod')
+    createSeries(ws.root, modPath, oneGame({ seriesPlaylist: '' }))
+    const toml = readFileSync(join(modPath, 'my_series', 'series.toml'), 'utf8')
+    expect(toml).not.toContain('series-playlist')
+  })
+
+  it('rejects a duplicate series id (folder already exists)', () => {
+    const modPath = makeDir(ws, 'mymod')
+    writeCustomSeries('mymod', 'my_series', 'id = "my_series"\nname = "Existing"\n')
+    expect(() => createSeries(ws.root, modPath, oneGame())).toThrow('already exists')
+  })
+
+  it('rejects an invalid series id', () => {
+    const modPath = makeDir(ws, 'mymod')
+    expect(() => createSeries(ws.root, modPath, oneGame({ seriesId: 'Bad Id!' }))).toThrow()
+    expect(() => createSeries(ws.root, modPath, oneGame({ seriesId: '' }))).toThrow()
+  })
+
+  it('rejects the reserved "etc" id', () => {
+    const modPath = makeDir(ws, 'mymod')
+    expect(() => createSeries(ws.root, modPath, oneGame({ seriesId: 'etc' }))).toThrow('reserved')
+  })
+
+  it('rejects a blank name', () => {
+    const modPath = makeDir(ws, 'mymod')
+    expect(() => createSeries(ws.root, modPath, oneGame({ name: '  ' }))).toThrow()
+  })
+
+  it('requires at least one game', () => {
+    const modPath = makeDir(ws, 'mymod')
+    expect(() => createSeries(ws.root, modPath, oneGame({ games: [] }))).toThrow('game')
+  })
+
+  it('writes icon.png when an icon data URL is supplied', () => {
+    const modPath = makeDir(ws, 'mymod')
+    createSeries(ws.root, modPath, oneGame({ iconDataUrl: PNG_DATA_URL }))
+
+    const data = loadSeriesOrderData(ws.root, modPath)
+    expect(data.items.find((i) => i.seriesId === 'my_series')!.iconDataUrl).toBe(PNG_DATA_URL)
+  })
+
+  it('rejects a non-PNG icon data URL', () => {
+    const modPath = makeDir(ws, 'mymod')
+    expect(() =>
+      createSeries(ws.root, modPath, oneGame({ iconDataUrl: 'data:image/jpeg;base64,AAAA' }))
+    ).toThrow('PNG')
+  })
+})
+
+// 1x1 transparent PNG.
+const PNG_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+
+describe('setSeriesIcon', () => {
+  it('writes icon.png to an existing series and returns the data URL', () => {
+    const modPath = makeDir(ws, 'mymod')
+    writeCustomSeries('mymod', 'da', 'id = "a"\nname = "A"\n')
+
+    const returned = setSeriesIcon(ws.root, modPath, 'a', PNG_DATA_URL)
+    expect(returned).toBe(PNG_DATA_URL)
+    expect(loadSeriesOrderData(ws.root, modPath).items[0].iconDataUrl).toBe(PNG_DATA_URL)
+  })
+
+  it('throws for an unknown series id', () => {
+    const modPath = makeDir(ws, 'mymod')
+    writeCustomSeries('mymod', 'da', 'id = "a"\nname = "A"\n')
+    expect(() => setSeriesIcon(ws.root, modPath, 'nope', PNG_DATA_URL)).toThrow('not found')
+  })
+
+  it('rejects a non-PNG icon', () => {
+    const modPath = makeDir(ws, 'mymod')
+    writeCustomSeries('mymod', 'da', 'id = "a"\nname = "A"\n')
+    expect(() => setSeriesIcon(ws.root, modPath, 'a', 'data:text/plain;base64,AAAA')).toThrow('PNG')
+  })
+
+  it('rejects a mod path outside Mods/MusicMods', () => {
+    const outside = join(ws.root, 'outside')
+    expect(() => setSeriesIcon(ws.root, outside, 'a', PNG_DATA_URL)).toThrow('Invalid mod path.')
   })
 })
 

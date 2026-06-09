@@ -104,6 +104,14 @@ export interface SaveSeriesItem {
   fields: SeriesFields | null
 }
 
+export interface CreateSeriesInput {
+  seriesId: string
+  name: string
+  seriesPlaylist: string
+  games: SeriesGame[]
+  iconDataUrl?: string | null
+}
+
 export interface SeriesOrderData {
   modName: string
   modPath: string
@@ -289,6 +297,8 @@ const api = {
   saveTrackOrder: (seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.SAVE_TRACK_ORDER, seriesPath, items),
   loadSeriesOrder: (modPath: string): Promise<SeriesOrderData> => ipcRenderer.invoke(IPC.LOAD_SERIES_ORDER, modPath),
   saveSeriesOrder: (modPath: string, items: SaveSeriesItem[]): Promise<SeriesOrderData> => ipcRenderer.invoke(IPC.SAVE_SERIES_ORDER, modPath, items),
+  createSeries: (modPath: string, input: CreateSeriesInput): Promise<SeriesOrderData> => ipcRenderer.invoke(IPC.CREATE_SERIES, modPath, input),
+  setSeriesIcon: (modPath: string, seriesId: string, iconDataUrl: string): Promise<string> => ipcRenderer.invoke(IPC.SET_SERIES_ICON, modPath, seriesId, iconDataUrl),
   listNus3Sources: (seriesPath: string): Promise<Nus3SourceTrack[]> => ipcRenderer.invoke(IPC.LIST_NUS3_SOURCES, seriesPath),
   analyzeLoopPoints: (seriesPath: string, filename: string, options?: LoopAnalysisOptions): Promise<Nus3AnalysisResult> => ipcRenderer.invoke(IPC.ANALYZE_LOOP_POINTS, seriesPath, filename, options),
   loadNus3Conversions: (seriesPath: string): Promise<Record<string, Nus3ConversionMeta>> => ipcRenderer.invoke(IPC.LOAD_NUS3_CONVERSIONS, seriesPath),

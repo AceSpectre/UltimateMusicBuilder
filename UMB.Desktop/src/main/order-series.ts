@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs'
 import { join, relative, resolve, isAbsolute, basename } from 'path'
 
 export interface SeriesGame {
@@ -40,6 +40,32 @@ export interface SeriesOrderData {
   hasSeriesOrder: boolean
   items: SeriesOrderItem[]
 }
+
+// Payload for creating a brand-new custom series folder.
+export interface CreateSeriesInput {
+  seriesId: string
+  name: string
+  seriesPlaylist: string
+  games: SeriesGame[]
+  iconDataUrl?: string | null
+}
+
+// Series icons are stored verbatim as icon.png; the app has no transcoder, so only PNG is accepted.
+const PNG_DATA_URL_RE = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/
+
+function writeSeriesIcon(seriesDir: string, dataUrl: string): void {
+  const match = PNG_DATA_URL_RE.exec(dataUrl.trim())
+  if (!match) throw new Error('Icon must be a PNG image.')
+  writeFileSync(join(seriesDir, 'icon.png'), Buffer.from(match[1], 'base64'))
+}
+
+// Series id doubles as the folder name, so keep it filesystem-safe and consistent with
+// the lowercase_snake convention used by game ids elsewhere.
+const SERIES_ID_RE = /^[a-z0-9_]+$/
+
+// Header-only tracks.csv: the series exists but has no songs yet (added later via Manage Songs).
+const TRACKS_CSV_HEADER =
+  'filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\n'
 
 function isChildOf(parentPath: string, childPath: string): boolean {
   const rel = relative(parentPath, childPath)
@@ -362,6 +388,76 @@ export function loadSeriesOrderData(workspace: string, modPath: string): SeriesO
     hasSeriesOrder: existingOrder.length > 0,
     items
   }
+}
+
+// Creates a new custom series folder (series.toml + header-only tracks.csv) under the mod and
+// returns the reloaded series list. The first game becomes the [default-track-data] game.
+export function createSeries(workspace: string, modPath: string, input: CreateSeriesInput): SeriesOrderData {
+  const modsDir = getMusicModsRoot(workspace)
+  const resolvedModPath = resolve(modPath)
+  if (!isChildOf(modsDir, resolvedModPath)) {
+    throw new Error('Invalid mod path.')
+  }
+
+  const seriesId = input.seriesId.trim()
+  if (!SERIES_ID_RE.test(seriesId)) {
+    throw new Error('Series ID must contain only lowercase letters, numbers, and underscores.')
+  }
+  if (seriesId === 'etc') {
+    throw new Error('"etc" is a reserved series ID.')
+  }
+
+  const name = input.name.trim()
+  if (!name) {
+    throw new Error('Series name is required.')
+  }
+
+  const games = input.games.map((g) => ({ id: g.id.trim(), name: g.name.trim() })).filter((g) => g.id)
+  if (games.length === 0) {
+    throw new Error('At least one game is required.')
+  }
+
+  const seriesDir = join(resolvedModPath, seriesId)
+  const existingIds = new Set(scanCustomSeries(resolvedModPath).map((s) => s.id))
+  if (existsSync(seriesDir) || existingIds.has(seriesId)) {
+    throw new Error('A series with that ID already exists.')
+  }
+
+  mkdirSync(seriesDir, { recursive: true })
+
+  const playlist = input.seriesPlaylist.trim()
+  const lines: string[] = ['[series]', `id = "${tomlEscape(seriesId)}"`, `name = "${tomlEscape(name)}"`, 'playlist-incidence = 100']
+  if (playlist) lines.push(`series-playlist = "${tomlEscape(playlist)}"`)
+  lines.push('')
+  for (const g of games) {
+    lines.push('[[games]]', `id = "${tomlEscape(g.id)}"`, `name = "${tomlEscape(g.name)}"`, '')
+  }
+  lines.push('[default-track-data]', `game = "${tomlEscape(games[0].id)}"`, 'author = ""', 'copyright = ""', 'record-type = "original"', 'volume = 1.0', '')
+
+  writeFileSync(join(seriesDir, 'series.toml'), lines.join('\n'), 'utf8')
+  writeFileSync(join(seriesDir, 'tracks.csv'), TRACKS_CSV_HEADER, 'utf8')
+  if (input.iconDataUrl) writeSeriesIcon(seriesDir, input.iconDataUrl)
+
+  return loadSeriesOrderData(workspace, resolvedModPath)
+}
+
+// Writes (or replaces) icon.png for an existing custom series and returns the new data URL.
+export function setSeriesIcon(workspace: string, modPath: string, seriesId: string, iconDataUrl: string): string {
+  const modsDir = getMusicModsRoot(workspace)
+  const resolvedModPath = resolve(modPath)
+  if (!isChildOf(modsDir, resolvedModPath)) {
+    throw new Error('Invalid mod path.')
+  }
+
+  const dirName = scanCustomSeries(resolvedModPath).find((s) => s.id === seriesId)?.dirName
+  if (!dirName) {
+    throw new Error('Series not found.')
+  }
+
+  const seriesDir = join(resolvedModPath, dirName)
+  writeSeriesIcon(seriesDir, iconDataUrl)
+  const bytes = readFileSync(join(seriesDir, 'icon.png'))
+  return `data:image/png;base64,${bytes.toString('base64')}`
 }
 
 export function saveSeriesOrderData(workspace: string, modPath: string, items: SaveSeriesItem[]): SeriesOrderData {

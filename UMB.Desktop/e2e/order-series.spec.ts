@@ -1,5 +1,5 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { mkdirSync, writeFileSync, readFileSync } from 'fs'
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { createWorkspace, seedTestDataMod, launchApp, firstWindow, type E2EWorkspace } from './e2e-utils'
 
@@ -96,4 +96,112 @@ test('UI: editing the name + adding a game via the panel persists to series.toml
   expect(toml).toContain('name = "Gamma DOM"')
   expect(toml).toContain('id = "dom_game"')
   expect(toml).toContain('name = "DOM Game"')
+})
+
+test('createSeries writes a new series folder (series.toml + header-only tracks.csv)', async () => {
+  const page = await firstWindow(app)
+  const result = await page.evaluate(
+    (mp) =>
+      window.electron.umb.createSeries(mp, {
+        seriesId: 'ipc_series',
+        name: 'IPC Series',
+        seriesPlaylist: 'bgm_ipc_series',
+        games: [{ id: 'ipc_game', name: 'IPC Game' }]
+      }),
+    modDir
+  )
+  expect(result.items.map((i) => i.seriesId)).toContain('ipc_series')
+
+  const toml = readFileSync(join(modDir, 'ipc_series', 'series.toml'), 'utf8')
+  expect(toml).toContain('id = "ipc_series"')
+  expect(toml).toContain('name = "IPC Series"')
+  expect(toml).toContain('series-playlist = "bgm_ipc_series"')
+  expect(toml).toContain('id = "ipc_game"')
+  // First game becomes the default game.
+  expect(toml).toContain('game = "ipc_game"')
+
+  const csv = readFileSync(join(modDir, 'ipc_series', 'tracks.csv'), 'utf8')
+  expect(csv.trim()).toBe('filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest')
+})
+
+test('UI: New Series modal creates a series (playlist auto-filled, one game required)', async () => {
+  const page = await firstWindow(app)
+  await page.getByText('Manage Series').first().click()
+  await page.getByRole('button', { name: 'Reload series' }).click()
+
+  await page.getByRole('button', { name: 'New Series' }).click()
+  await page.getByPlaceholder('my_series', { exact: true }).fill('ui_series')
+  await page.getByPlaceholder('My Series', { exact: true }).fill('UI Series')
+
+  // Create is disabled until a game is added.
+  await expect(page.getByRole('button', { name: 'Create' })).toBeDisabled()
+  await page.getByPlaceholder('my_game').fill('ui_game')
+  await page.getByPlaceholder('My Game').fill('UI Game')
+  await page.getByRole('button', { name: 'Add game' }).click()
+
+  await page.getByRole('button', { name: 'Create' }).click()
+
+  // Modal closes and the new series card appears in the list.
+  await expect(page.getByText('UI Series').first()).toBeVisible({ timeout: 5000 })
+
+  const toml = readFileSync(join(modDir, 'ui_series', 'series.toml'), 'utf8')
+  expect(toml).toContain('id = "ui_series"')
+  expect(toml).toContain('name = "UI Series"')
+  expect(toml).toContain('series-playlist = "bgm_ui_series"') // auto-filled from the id
+  expect(toml).toContain('id = "ui_game"')
+  expect(toml).toContain('game = "ui_game"')
+
+  const csv = readFileSync(join(modDir, 'ui_series', 'tracks.csv'), 'utf8')
+  expect(csv.trim()).toBe('filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest')
+})
+
+// 1x1 transparent PNG.
+const PNG_B64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+const pngFile = () => ({ name: 'icon.png', mimeType: 'image/png', buffer: Buffer.from(PNG_B64, 'base64') })
+
+test('setSeriesIcon writes icon.png; loadSeriesOrder returns the data URL', async () => {
+  const page = await firstWindow(app)
+  const dataUrl = 'data:image/png;base64,' + PNG_B64
+  const returned = await page.evaluate(
+    ([mp, id, url]) => window.electron.umb.setSeriesIcon(mp as string, id as string, url as string),
+    [modDir, 'gamma', dataUrl] as const
+  )
+  expect(returned).toBe(dataUrl)
+  expect(existsSync(join(modDir, 'gamma', 'icon.png'))).toBe(true)
+
+  const data = await page.evaluate((mp) => window.electron.umb.loadSeriesOrder(mp), modDir)
+  expect(data.items.find((i) => i.seriesId === 'gamma')?.iconDataUrl).toBe(dataUrl)
+})
+
+test('UI: New Series modal can attach a PNG icon', async () => {
+  const page = await firstWindow(app)
+  await page.getByText('Manage Series').first().click()
+  await page.getByRole('button', { name: 'Reload series' }).click()
+
+  await page.getByRole('button', { name: 'New Series' }).click()
+  await page.getByPlaceholder('my_series', { exact: true }).fill('icon_series')
+  await page.getByPlaceholder('My Series', { exact: true }).fill('Icon Series')
+  await page.locator('label:has-text("Upload icon") input[type="file"]').setInputFiles(pngFile())
+  await page.getByPlaceholder('my_game').fill('icon_game')
+  await page.getByPlaceholder('My Game').fill('Icon Game')
+  await page.getByRole('button', { name: 'Add game' }).click()
+  await page.getByRole('button', { name: 'Create' }).click()
+
+  await expect(page.getByText('Icon Series').first()).toBeVisible({ timeout: 5000 })
+  const iconPath = join(modDir, 'icon_series', 'icon.png')
+  expect(existsSync(iconPath)).toBe(true)
+  expect(readFileSync(iconPath).toString('base64')).toBe(PNG_B64)
+})
+
+test('UI: Change icon in the settings panel writes the chosen PNG', async () => {
+  const page = await firstWindow(app)
+  await page.getByText('Manage Series').first().click()
+  await page.getByRole('button', { name: 'Reload series' }).click()
+  await page.getByText('Somewhat Good: Karts').first().click() // select the dev series card
+
+  await page.locator('label:has-text("Change icon") input[type="file"]').setInputFiles(pngFile())
+
+  const iconPath = join(modDir, 'dev', 'icon.png')
+  await expect.poll(() => (existsSync(iconPath) ? readFileSync(iconPath).toString('base64') : null)).toBe(PNG_B64)
 })
