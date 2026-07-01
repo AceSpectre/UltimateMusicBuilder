@@ -89,7 +89,9 @@ function spawnOneShot(
 
     const proc = spawn(command, spawnArgs, {
       cwd: workspace,
-      env: { ...process.env },
+      // UMB_WORKSPACE tells the CLI to resolve Mods/, Resources/, ArcOutput/ against the
+      // shared workspace root instead of walking up to wherever its bundled Resources/ sits.
+      env: { ...process.env, UMB_WORKSPACE: workspace },
       stdio: ['pipe', 'pipe', 'pipe']
     })
 
@@ -174,7 +176,8 @@ function ensureDaemon(workspace: string): ChildProcess | null {
   const { command, args } = cliInvocation(workspace, ['serve'])
   const proc = spawn(command, args, {
     cwd: workspace,
-    env: { ...process.env },
+    // See spawnOneShot: anchor the CLI's relative paths to the shared workspace root.
+    env: { ...process.env, UMB_WORKSPACE: workspace },
     stdio: ['pipe', 'pipe', 'pipe']
   })
   daemonProcess = proc

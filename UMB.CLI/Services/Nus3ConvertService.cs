@@ -186,10 +186,13 @@ namespace UMB.CLI.Services
                     fullLoops++;
                 }
 
-                // Step 2: Convert to WAV at 48kHz if needed
+                // Step 2: Convert to WAV at 48kHz if needed.
+                // Opus (Namco header) only accepts 8/12/16/24/48 kHz — a .wav at any other
+                // rate (e.g. 44.1 kHz) must still be resampled, so don't blindly trust .wav inputs.
                 var wavFile = sourceFile;
                 bool tempWav = false;
-                if (!sourceFile.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                bool isWav = sourceFile.EndsWith(".wav", StringComparison.OrdinalIgnoreCase);
+                if (!isWav || GetSourceSampleRate(sourceFile) != 48000)
                 {
                     wavFile = Path.Combine(tempDir, basename + ".wav");
                     if (!RunFfmpeg(sourceFile, wavFile))
@@ -216,10 +219,12 @@ namespace UMB.CLI.Services
 
                 // Step 3: Convert WAV → lopus via VGAudioCli library
                 var lopusFile = Path.Combine(tempDir, basename + ".lopus");
+                string vgOutput;
                 try
                 {
                     var oldOut = Console.Out;
-                    using (var writer = new StringWriter())
+                    using var writer = new StringWriter();
+                    try
                     {
                         Console.SetOut(writer);
                         Converter.RunConverterCli(new string[]
@@ -231,7 +236,11 @@ namespace UMB.CLI.Services
                             "-l", $"{loopStart}-{loopEnd}"
                         });
                     }
-                    Console.SetOut(oldOut);
+                    finally
+                    {
+                        Console.SetOut(oldOut);
+                    }
+                    vgOutput = writer.ToString();
                 }
                 catch (Exception e)
                 {
@@ -241,7 +250,8 @@ namespace UMB.CLI.Services
 
                 if (!File.Exists(lopusFile) || new FileInfo(lopusFile).Length == 0)
                 {
-                    _logger.LogError("  VGAudioCli produced no output for '{Basename}', skipping.", basename);
+                    _logger.LogError("  VGAudioCli produced no output for '{Basename}', skipping. VGAudio said: {Msg}",
+                        basename, string.IsNullOrWhiteSpace(vgOutput) ? "(no message)" : vgOutput.Trim());
                     continue;
                 }
 
@@ -389,10 +399,13 @@ namespace UMB.CLI.Services
 
                 _logger.LogInformation("Processing '{Basename}' (mode: {Mode})...", basename, decision.Mode);
 
-                // Step 2: Convert to WAV at 48kHz if needed
+                // Step 2: Convert to WAV at 48kHz if needed.
+                // Opus (Namco header) only accepts 8/12/16/24/48 kHz — a .wav at any other
+                // rate (e.g. 44.1 kHz) must still be resampled, so don't blindly trust .wav inputs.
                 var wavFile = sourceFile;
                 bool tempWav = false;
-                if (!sourceFile.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                bool isWav = sourceFile.EndsWith(".wav", StringComparison.OrdinalIgnoreCase);
+                if (!isWav || GetSourceSampleRate(sourceFile) != 48000)
                 {
                     wavFile = Path.Combine(tempDir, basename + ".wav");
                     if (!RunFfmpeg(sourceFile, wavFile))
@@ -427,10 +440,12 @@ namespace UMB.CLI.Services
 
                 // Step 3: Convert WAV -> lopus via VGAudioCli library
                 var lopusFile = Path.Combine(tempDir, basename + ".lopus");
+                string vgOutput;
                 try
                 {
                     var oldOut = Console.Out;
-                    using (var writer = new StringWriter())
+                    using var writer = new StringWriter();
+                    try
                     {
                         Console.SetOut(writer);
                         Converter.RunConverterCli(new string[]
@@ -442,7 +457,11 @@ namespace UMB.CLI.Services
                             "-l", $"{loopStart}-{loopEnd}"
                         });
                     }
-                    Console.SetOut(oldOut);
+                    finally
+                    {
+                        Console.SetOut(oldOut);
+                    }
+                    vgOutput = writer.ToString();
                 }
                 catch (Exception e)
                 {
@@ -452,7 +471,8 @@ namespace UMB.CLI.Services
 
                 if (!File.Exists(lopusFile) || new FileInfo(lopusFile).Length == 0)
                 {
-                    _logger.LogError("  VGAudioCli produced no output for '{Basename}', skipping.", basename);
+                    _logger.LogError("  VGAudioCli produced no output for '{Basename}', skipping. VGAudio said: {Msg}",
+                        basename, string.IsNullOrWhiteSpace(vgOutput) ? "(no message)" : vgOutput.Trim());
                     continue;
                 }
 

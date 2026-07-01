@@ -92,4 +92,16 @@
     </Resource>
   </ItemGroup>
 
+  <!--
+    VGAudioCli.exe is a <Reference> (compile-time) AND matched by the Tools/** Content
+    glob above. MSBuild dedupes the two and a single-file publish bundles neither on
+    disk, so publish/Tools/VGAudioCli.exe goes missing and audio conversion fails at
+    runtime (Program.cs resolves it from Tools/ at load time — this puts it there).
+  -->
+  <Target Name="CopyVGAudioCliToPublishTools" AfterTargets="Publish">
+    <Copy SourceFiles="..\Tools\VGAudioCli.exe"
+          DestinationFolder="$(PublishDir)Tools"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

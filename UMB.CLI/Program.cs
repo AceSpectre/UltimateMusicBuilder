@@ -6,6 +6,7 @@ using Spectre.Console;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.Loader;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -15,11 +16,45 @@ namespace UMB.CLI
     {
         async static Task Main(string[] args)
         {
-            var appRoot = new DirectoryInfo(AppContext.BaseDirectory);
-            while (appRoot != null && !Directory.Exists(Path.Combine(appRoot.FullName, "Resources")))
-                appRoot = appRoot.Parent;
-            if (appRoot != null)
-                Directory.SetCurrentDirectory(appRoot.FullName);
+            // VGAudioCli ships as a loose managed .exe in Tools/ (referenced via HintPath),
+            // not a NuGet package. A single-file self-contained publish neither bundles it
+            // nor lists it in the .deps.json, so audio conversion (build + nus3-convert)
+            // throws FileNotFoundException at runtime. Resolve it by hand from Tools/.
+            // In the dev build it's copied next to the binary and this never fires.
+            AssemblyLoadContext.Default.Resolving += (ctx, name) =>
+            {
+                if (!string.Equals(name.Name, "VGAudioCli", StringComparison.OrdinalIgnoreCase))
+                    return null;
+                foreach (var root in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory() })
+                {
+                    var candidate = Path.Combine(root, "Tools", "VGAudioCli.exe");
+                    if (File.Exists(candidate))
+                        return ctx.LoadFromAssemblyPath(candidate);
+                }
+                return null;
+            };
+
+            // Resolve the working directory that relative paths (Mods/, Resources/, Tools/,
+            // ArcOutput/, …) are resolved against. Priority:
+            //   1. UMB_WORKSPACE env var — explicit override used by the desktop app and
+            //      power users to point UMB at any folder.
+            //   2. The launch CWD, if it already looks like a workspace (has Resources/).
+            //      Lets a release build run straight from a populated folder, and stops us
+            //      from snapping back into a read-only app bundle that also ships Resources/.
+            //   3. Walk up from the executable's directory to find Resources/ (dev: repo root).
+            var envWorkspace = Environment.GetEnvironmentVariable("UMB_WORKSPACE");
+            if (!string.IsNullOrWhiteSpace(envWorkspace) && Directory.Exists(envWorkspace))
+            {
+                Directory.SetCurrentDirectory(Path.GetFullPath(envWorkspace));
+            }
+            else if (!Directory.Exists(Path.Combine(Directory.GetCurrentDirectory(), "Resources")))
+            {
+                var appRoot = new DirectoryInfo(AppContext.BaseDirectory);
+                while (appRoot != null && !Directory.Exists(Path.Combine(appRoot.FullName, "Resources")))
+                    appRoot = appRoot.Parent;
+                if (appRoot != null)
+                    Directory.SetCurrentDirectory(appRoot.FullName);
+            }
 
             var services = new ServiceCollection();
             ConfigureServices(services, args);

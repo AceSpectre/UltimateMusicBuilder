@@ -24,7 +24,11 @@ function getWorkspacePath(): string {
     return resolve(process.env['UMB_WORKSPACE'])
   }
   if (app.isPackaged) {
-    return resolve(process.resourcesPath, '..')
+    // Layout: <root>/desktop/resources/cli/UMB.CLI.exe and <root>/UMB.CLI.exe (standalone).
+    // Workspace is <root> — the folder holding both the desktop/ subfolder and the CLI —
+    // so the GUI and the standalone CLI share the same Resources/, Mods/, ArcOutput/.
+    // process.resourcesPath = <root>/desktop/resources → up two = <root>.
+    return resolve(process.resourcesPath, '..', '..')
   }
   return resolve(__dirname, '..', '..', '..')
 }

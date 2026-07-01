@@ -99,6 +99,12 @@ jobs:
             macOS:     desktop/UltimateMusicBuilder.app
             Linux:     desktop/ultimatemusicbuilder
 
+          Where to put your data (the CLI and the GUI share these — put them in THIS
+          folder, next to UMB.CLI.exe and the desktop/ subfolder):
+            Mods/MusicMods/<your mods>       your mods
+            Resources/Game/<extracted data>  vanilla game data (see Resources/Game/README.txt)
+          Build output is written here to ArcOutput/.
+
           System prerequisites (not bundled — install once):
 
             ffmpeg (required for LUFS normalization and loop-preview playback):

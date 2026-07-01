@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
+import { app } from 'electron'
 
 export interface AppSettings {
   globalVolumeMultiplier: number
@@ -9,7 +10,13 @@ const DEFAULTS: AppSettings = {
   globalVolumeMultiplier: 1.5
 }
 
+// The CLI loads appsettings.json from its own directory (AppContext.BaseDirectory):
+// the bundled cli/ folder when packaged, or the dev bin/ when running via `dotnet run`.
+// Edit that same file so GUI changes actually reach the CLI.
 function settingsPath(workspace: string): string {
+  if (app.isPackaged) {
+    return join(process.resourcesPath, 'cli', 'appsettings.json')
+  }
   return join(workspace, 'UMB.CLI', 'bin', 'Debug', 'net8.0', 'appsettings.json')
 }
 

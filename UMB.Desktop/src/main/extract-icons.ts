@@ -3,7 +3,6 @@ import { join, resolve, relative, isAbsolute, basename } from 'path'
 import { execFile } from 'child_process'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
-import { app } from 'electron'
 
 export interface ExtractIconsAnalysis {
   compiledModPath: string
@@ -51,9 +50,9 @@ function getMusicModsRoot(workspace: string): string {
 }
 
 function resolveUltimateTexCli(workspace: string): string | null {
-  const toolsDir = app.isPackaged
-    ? resolve(process.resourcesPath, 'tools')
-    : resolve(workspace, 'Tools')
+  // Tools/ lives in the shared workspace root in both dev and packaged builds
+  // (the release archive ships Tools/ next to the standalone CLI at <root>).
+  const toolsDir = resolve(workspace, 'Tools')
 
   const candidates = [
     join(toolsDir, 'UltimateTexCli', 'ultimate_tex_cli.exe'),
