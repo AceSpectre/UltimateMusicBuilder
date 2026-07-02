@@ -50,7 +50,16 @@ if ($Force -or -not (Test-Path $vgAudio)) {
     Write-Host "Tools already present (pass -Force to re-fetch)." -ForegroundColor DarkGray
 }
 
-# 2. Publish the CLI exactly like the release workflow does.
+# 2. Clean the publish dir. `dotnet publish` doesn't remove stale files, and an
+#    incremental re-publish can leave the folder in an inconsistent state (missing
+#    appsettings.json / native DLLs / Resources). A clean dir guarantees the output
+#    matches the release archive exactly.
+if (Test-Path $PublishDir) {
+    Write-Host "Cleaning $PublishDir ..." -ForegroundColor DarkGray
+    Get-ChildItem -Path $PublishDir -Force | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+# 3. Publish the CLI exactly like the release workflow does.
 Write-Host ""
 Write-Host "== Publishing CLI (self-contained, single-file) ==" -ForegroundColor Cyan
 & dotnet publish (Join-Path $RepoRoot 'UMB.CLI') `
@@ -72,16 +81,39 @@ if ($Desktop) {
     Write-Host ""
     Write-Host "== Building desktop app ==" -ForegroundColor Cyan
     $DesktopDir = Join-Path $RepoRoot 'UMB.Desktop'
+    $unpacked = Join-Path $DesktopDir 'out\win-unpacked'
     Push-Location $DesktopDir
     try {
-        & npm ci;              if ($LASTEXITCODE -ne 0) { throw "npm ci failed." }
+        # `npm ci` wipes node_modules and can fail on Windows if a binary (esbuild.exe) is
+        # locked. Locally we only need deps present, so skip install when they already are.
+        if (Test-Path (Join-Path $DesktopDir 'node_modules')) {
+            Write-Host "node_modules present, skipping install (delete it to force a clean npm ci)." -ForegroundColor DarkGray
+        } else {
+            & npm ci;          if ($LASTEXITCODE -ne 0) { throw "npm ci failed." }
+        }
         & npm run build;       if ($LASTEXITCODE -ne 0) { throw "npm run build failed." }
-        & npx electron-builder --dir; if ($LASTEXITCODE -ne 0) { throw "electron-builder failed." }
+        # No code signing for a local test build.
+        $env:CSC_IDENTITY_AUTO_DISCOVERY = 'false'
+        & npx electron-builder --dir
+        # electron-builder finishes packaging out\win-unpacked BEFORE its code-signing prep.
+        # That prep downloads winCodeSign, whose archive holds macOS symlinks that Windows
+        # refuses to create without Developer Mode / admin, so it exits non-zero even though
+        # the unpacked app is already complete. Signing is skipped anyway (no cert), so treat
+        # a non-zero exit as OK as long as the runnable app exists.
+        if ($LASTEXITCODE -ne 0) {
+            if (Test-Path (Join-Path $unpacked 'UltimateMusicBuilder.exe')) {
+                Write-Host ""
+                Write-Host "electron-builder exited non-zero during code-signing prep (winCodeSign" -ForegroundColor Yellow
+                Write-Host "symlink privilege). The unpacked app built fine; continuing." -ForegroundColor Yellow
+                Write-Host "To silence it, enable Developer Mode or run from an elevated terminal." -ForegroundColor DarkGray
+            } else {
+                throw "electron-builder failed before producing out\win-unpacked."
+            }
+        }
     } finally {
         Pop-Location
     }
 
-    $unpacked = Join-Path $DesktopDir 'out\win-unpacked'
     if (-not (Test-Path $unpacked)) { throw "electron-builder output not found: $unpacked" }
     $stageDesktop = Join-Path $PublishDir 'desktop'
     New-Item -ItemType Directory -Force $stageDesktop | Out-Null
