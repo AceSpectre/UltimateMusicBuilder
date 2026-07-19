@@ -16,6 +16,10 @@ win:
     - nsis
     - zip
   icon: static/icons/icon.ico
+mac:
+  icon: static/icons/icon.png
+linux:
+  icon: static/icons/icon.png
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
