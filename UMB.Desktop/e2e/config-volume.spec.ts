@@ -50,6 +50,9 @@ test('analyze returns per-track LUFS + auto-gain matching the CLI gain formula',
 })
 
 test('save writes the per-track override into tracks.csv volume column', async () => {
+  // Routed through the CLI daemon (`dotnet run … serve`), so it needs dotnet even
+  // though it never touches ffmpeg or the game resources.
+  test.skip(!hasTool('dotnet'), 'requires dotnet for the CLI daemon')
   const page = await firstWindow(app)
   await page.evaluate(
     (sp) => window.electron.umb.saveVolumeConfig(sp, [{ originalIndex: 0, volume: 0.5 }]),
