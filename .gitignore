@@ -375,3 +375,8 @@ stages_dump.csv
 # UMB.Desktop (Electron)
 UMB.Desktop/dist/
 UMB.Desktop/out/
+
+# Generated test/coverage output
+UMB.Desktop/coverage/
+UMB.Desktop/playwright-report/
+UMB.Desktop/test-results/
