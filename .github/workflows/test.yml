@@ -46,5 +46,6 @@ jobs:
           cache-dependency-path: UMB.Desktop/package-lock.json
 
       - run: npm ci
-      - run: npm run build
-      - run: npx playwright test
+      # test:e2e builds first via the pretest hook, so the suite can never run
+      # against a stale dist/. A globalSetup staleness check backs this up.
+      - run: npm run test:e2e

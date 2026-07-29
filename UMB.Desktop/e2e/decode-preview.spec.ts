@@ -13,10 +13,17 @@ let series: { dir: string; cleanup(): void }
  * decodeTrackPreview drives the Config Volume gain-preview player: it routes a
  * single track through the CLI daemon's config-volume-preview action, which
  * decodes any Smash or standard format to WAV, and hands the renderer a data URL
- * for the Web Audio API. Needs dotnet for the daemon (no ffmpeg, no game resources).
+ * for the Web Audio API. Needs dotnet for the daemon; no game resources.
+ *
+ * The test fixtures are .flac, and AudioDecodeService only handles .wav (copy) and
+ * the Smash formats (in-process VGAudio) itself — everything else, .flac included,
+ * shells out to ffmpeg, resolved from PATH only. Without ffmpeg the CLI fails soft
+ * (warns, writes no output, still exits 0) and the helper legitimately returns null,
+ * so the decoding tests gate on ffmpeg too. The null-result tests below do not.
  */
 
 const DAEMON_MISSING = !hasTool('dotnet')
+const FFMPEG_MISSING = !hasTool('ffmpeg')
 
 test.describe.configure({ timeout: 240_000 }) // dotnet run + daemon bootstrap
 
@@ -65,6 +72,7 @@ function firstFlac(): string {
 
 test('decodeTrackPreview returns a playable WAV data URL for a source track', async () => {
   test.skip(DAEMON_MISSING, 'requires dotnet for the CLI daemon')
+  test.skip(FFMPEG_MISSING, 'requires ffmpeg to decode the .flac fixtures')
   const page = await firstWindow(app)
 
   const dataUrl = await page.evaluate(
@@ -109,6 +117,7 @@ test('decodeTrackPreview returns null for a series path that does not exist', as
 
 test('decodeTrackPreview serialises concurrent requests through the daemon', async () => {
   test.skip(DAEMON_MISSING, 'requires dotnet for the CLI daemon')
+  test.skip(FFMPEG_MISSING, 'requires ffmpeg to decode the .flac fixtures')
   const page = await firstWindow(app)
   const flac = firstFlac()
 
