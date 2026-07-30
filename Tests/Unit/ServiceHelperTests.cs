@@ -9,15 +9,14 @@ using Xunit;
 namespace Tests.Unit
 {
     /// <summary>
-    /// Pure private helpers scattered across the CLI services, reached via
-    /// reflection so production visibility stays untouched:
-    /// ConvertService.SanitizeFolderName/EscapeTomlString, VolumeConfigService.ParseVolume,
-    /// AudioPreviewDecoder.MakeSafeFileName, TrackOrderService.ParseOrder/ComposeMergedList,
-    /// MergeService.AppendSongsField.
+    /// Pure helpers behind the CLI services: the shared CliUtil statics plus the
+    /// remaining private helpers reached via reflection so production visibility
+    /// stays untouched (VolumeConfigService.ParseVolume,
+    /// TrackOrderService.ParseOrder/ComposeMergedList, MergeService.AppendSongsField).
     /// </summary>
     public class ServiceHelperTests
     {
-        // ── ConvertService.SanitizeFolderName ───────────────────────────────
+        // ── CliUtil.SanitizeFolderName ──────────────────────────────────────
 
         [Theory]
         [InlineData("My Series", "my-series")]
@@ -26,31 +25,40 @@ namespace Tests.Unit
         [InlineData("multi word name", "multi-word-name")]
         public void SanitizeFolderName_LowercasesTrimsAndDashesSpaces(string input, string expected)
         {
-            Assert.Equal(expected,
-                Reflect.InvokeStatic<string>(typeof(ConvertService), "SanitizeFolderName", input));
+            Assert.Equal(expected, CliUtil.SanitizeFolderName(input));
         }
 
         [Fact]
         public void SanitizeFolderName_ReplacesInvalidPathChars()
         {
-            var result = Reflect.InvokeStatic<string>(
-                typeof(ConvertService), "SanitizeFolderName", "a/b:c?");
+            var result = CliUtil.SanitizeFolderName("a/b:c?");
             foreach (var c in System.IO.Path.GetInvalidFileNameChars())
                 Assert.DoesNotContain(c, result);
             Assert.StartsWith("a_b", result);
         }
 
-        // ── ConvertService.EscapeTomlString ─────────────────────────────────
+        // ── CliUtil.EscapeToml ──────────────────────────────────────────────
 
         [Theory]
         [InlineData("plain", "plain")]
         [InlineData("say \"hi\"", "say \\\"hi\\\"")]
         [InlineData("back\\slash", "back\\\\slash")]
         [InlineData(null, "")]
-        public void EscapeTomlString_EscapesQuotesAndBackslashes(string input, string expected)
+        public void EscapeToml_EscapesQuotesAndBackslashes(string input, string expected)
         {
-            Assert.Equal(expected,
-                Reflect.InvokeStatic<string>(typeof(ConvertService), "EscapeTomlString", input));
+            Assert.Equal(expected, CliUtil.EscapeToml(input));
+        }
+
+        // ── CliUtil.ToKebabCase ─────────────────────────────────────────────
+
+        [Theory]
+        [InlineData("ExistingSeries", "existing-series")]
+        [InlineData("Name", "name")]
+        [InlineData("already-kebab", "already-kebab")]
+        [InlineData("SeriesPlaylist", "series-playlist")]
+        public void ToKebabCase_InsertsDashesBeforeInnerCapitals(string input, string expected)
+        {
+            Assert.Equal(expected, CliUtil.ToKebabCase(input));
         }
 
         // ── VolumeConfigService.ParseVolume ─────────────────────────────────
@@ -68,13 +76,12 @@ namespace Tests.Unit
                 Reflect.InvokeStatic<float>(typeof(VolumeConfigService), "ParseVolume", input));
         }
 
-        // ── AudioPreviewDecoder.MakeSafeFileName ────────────────────────────
+        // ── CliUtil.MakeSafeFileName ────────────────────────────────────────
 
         [Fact]
         public void MakeSafeFileName_ReplacesInvalidChars()
         {
-            var result = Reflect.InvokeStatic<string>(
-                typeof(AudioPreviewDecoder), "MakeSafeFileName", "a/b\\c");
+            var result = CliUtil.MakeSafeFileName("a/b\\c");
             foreach (var c in System.IO.Path.GetInvalidFileNameChars())
                 Assert.DoesNotContain(c, result);
         }
@@ -82,8 +89,7 @@ namespace Tests.Unit
         [Fact]
         public void MakeSafeFileName_LeavesCleanNameUntouched()
         {
-            Assert.Equal("clean_name",
-                Reflect.InvokeStatic<string>(typeof(AudioPreviewDecoder), "MakeSafeFileName", "clean_name"));
+            Assert.Equal("clean_name", CliUtil.MakeSafeFileName("clean_name"));
         }
 
         // ── TrackOrderService.ParseOrder ────────────────────────────────────

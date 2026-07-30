@@ -13,7 +13,6 @@ namespace UMB.CLI
     public class Script
     {
         private const double CLIVersion = 1.41;
-        private const string VALIDATE_FOLDER = "songs-to-validate";
 
         private readonly BuildService _build;
         private readonly ScaffoldService _scaffold;
@@ -123,7 +122,7 @@ namespace UMB.CLI
             }
 
             var seriesDirs = Directory.GetDirectories(selectedModDir)
-                .Where(d => !Path.GetFileName(d).StartsWith(".") && Path.GetFileName(d) != VALIDATE_FOLDER)
+                .Where(d => !Path.GetFileName(d).StartsWith(".") && Path.GetFileName(d) != CliUtil.ValidateFolder)
                 .ToList();
 
             if (seriesDirs.Count == 0)

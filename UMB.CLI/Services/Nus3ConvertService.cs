@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Sma5h.Helpers;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
+using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using Spectre.Console;
 using System;
 using System.Collections.Generic;
@@ -35,13 +36,6 @@ namespace UMB.CLI.Services
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
 
-        private static readonly HashSet<string> SOURCE_AUDIO_EXTENSIONS = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ".mp3", ".flac", ".wav", ".ogg"
-        };
-
-        private const string VALIDATE_FOLDER = "songs-to-validate";
-
         public Nus3ConvertService(IOptionsMonitor<Sma5hMusicOptions> musicConfig, ILogger<Nus3ConvertService> logger)
         {
             _musicConfig = musicConfig;
@@ -66,7 +60,7 @@ namespace UMB.CLI.Services
 
             // Find source audio files that aren't already game formats
             var sourceFiles = Directory.GetFiles(seriesDir)
-                .Where(f => SOURCE_AUDIO_EXTENSIONS.Contains(Path.GetExtension(f)))
+                .Where(f => CliUtil.SourceAudioExtensions.Contains(Path.GetExtension(f)))
                 .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -88,7 +82,7 @@ namespace UMB.CLI.Services
                 new TextPrompt<float>("Loop preview length in seconds (total, split evenly before/after loop point):")
                     .DefaultValue(5f));
 
-            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
+            var validateDir = Path.Combine(seriesDir, CliUtil.ValidateFolder);
             Directory.CreateDirectory(validateDir);
 
             var tempDir = Path.Combine(_musicConfig.CurrentValue.TempPath, "nus3convert");
@@ -249,7 +243,7 @@ namespace UMB.CLI.Services
                     continue;
                 }
 
-                var toneId = DeriveToneId(basename);
+                var toneId = FolderMusicMod.DeriveToneId(basename);
                 try
                 {
                     var process = new Process
@@ -339,7 +333,7 @@ namespace UMB.CLI.Services
 
             var jsonText = File.ReadAllText(jsonPath);
             var input = JsonSerializer.Deserialize<Nus3BatchInput>(jsonText,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                CliUtil.JsonCaseInsensitive);
 
             if (input == null || input.Decisions == null || input.Decisions.Count == 0)
             {
@@ -361,7 +355,7 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
+            var validateDir = Path.Combine(seriesDir, CliUtil.ValidateFolder);
             Directory.CreateDirectory(validateDir);
 
             var tempDir = Path.Combine(_musicConfig.CurrentValue.TempPath, "nus3convert");
@@ -462,7 +456,7 @@ namespace UMB.CLI.Services
                     continue;
                 }
 
-                var toneId = DeriveToneId(basename);
+                var toneId = FolderMusicMod.DeriveToneId(basename);
                 try
                 {
                     var process = new Process
@@ -839,18 +833,6 @@ namespace UMB.CLI.Services
                 _logger.LogError(e, "ffmpeg failed converting {File}.", inputFile);
                 return false;
             }
-        }
-
-        private static string DeriveToneId(string filename)
-        {
-            var nameOnly = Path.GetFileNameWithoutExtension(filename).ToLowerInvariant();
-            var sb = new StringBuilder(nameOnly.Length);
-            foreach (var c in nameOnly)
-                sb.Append(char.IsAsciiLetterOrDigit(c) || c == '_' ? c : '_');
-            var toneId = sb.ToString().Trim('_');
-            if (toneId.Length > MusicConstants.GameResources.ToneIdMaximumSize)
-                toneId = toneId[..MusicConstants.GameResources.ToneIdMaximumSize];
-            return toneId;
         }
     }
 }

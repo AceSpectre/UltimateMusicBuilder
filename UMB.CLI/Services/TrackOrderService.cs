@@ -362,13 +362,7 @@ namespace UMB.CLI.Services
 
         private (List<Dictionary<string, string>> rows, string[] headers) ReadCsvRows(string csvPath)
         {
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-                TrimOptions = TrimOptions.Trim,
-                MissingFieldFound = null,
-                BadDataFound = null,
-            };
+            var config = CliUtil.CsvReadLenient();
 
             using var reader = new StreamReader(csvPath);
             using var csv = new CsvReader(reader, config);
@@ -390,10 +384,7 @@ namespace UMB.CLI.Services
 
         private void WriteCsvRows(string csvPath, List<Dictionary<string, string>> rows, string[] headers)
         {
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-            };
+            var config = CliUtil.CsvWrite();
 
             using var writer = new StreamWriter(csvPath);
             using var csv = new CsvWriter(writer, config);

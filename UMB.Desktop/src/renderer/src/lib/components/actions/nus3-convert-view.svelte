@@ -552,7 +552,7 @@
           <button
             onclick={handleReload}
             class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-input bg-background transition-colors hover:bg-muted"
-            title={$_('orderTracks.reload')}
+            title={$_('nus3Convert.reload')}
           >
             <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
           </button>

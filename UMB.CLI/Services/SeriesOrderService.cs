@@ -76,7 +76,7 @@ namespace UMB.CLI.Services
                 {
                     var tomlText = File.ReadAllText(tomlPath);
                     config = Toml.ToModel<FolderSeriesFileConfig>(tomlText,
-                        options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
+                        options: CliUtil.KebabTomlOptions());
                 }
                 catch (Exception ex)
                 {
@@ -179,18 +179,6 @@ namespace UMB.CLI.Services
                 sb.AppendLine($"    \"{id}\",");
             sb.AppendLine("]");
             File.WriteAllText(path, sb.ToString());
-        }
-
-        private static string ToKebabCase(string name)
-        {
-            var sb = new StringBuilder(name.Length + 4);
-            for (int i = 0; i < name.Length; i++)
-            {
-                if (char.IsUpper(name[i]) && i > 0)
-                    sb.Append('-');
-                sb.Append(char.ToLower(name[i]));
-            }
-            return sb.ToString();
         }
     }
 }

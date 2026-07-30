@@ -20,7 +20,6 @@ namespace UMB.CLI.Services
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
 
-        private const string VALIDATE_FOLDER = "songs-to-validate";
 
         public CleanupService(IOptionsMonitor<Sma5hMusicOptions> musicConfig, ILogger<CleanupService> logger)
         {
@@ -52,7 +51,7 @@ namespace UMB.CLI.Services
             foreach (var modDir in modDirs)
             {
                 var seriesDirs = Directory.GetDirectories(modDir)
-                    .Where(d => !Path.GetFileName(d).StartsWith(".") && Path.GetFileName(d) != VALIDATE_FOLDER)
+                    .Where(d => !Path.GetFileName(d).StartsWith(".") && Path.GetFileName(d) != CliUtil.ValidateFolder)
                     .ToList();
 
                 foreach (var seriesDir in seriesDirs)
@@ -63,12 +62,7 @@ namespace UMB.CLI.Services
 
                     totalFiles++;
 
-                    var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
-                    {
-                        HasHeaderRecord = true,
-                        TrimOptions = TrimOptions.Trim,
-                        MissingFieldFound = null
-                    };
+                    var csvConfig = CliUtil.CsvRead();
                     List<FolderTrackCsvRow> rows;
                     using (var reader = new StreamReader(csvPath))
                     using (var csv = new CsvReader(reader, csvConfig))
@@ -96,10 +90,7 @@ namespace UMB.CLI.Services
                         }
 
                         using var writer = new StreamWriter(csvPath);
-                        using var csvWriter = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
-                        {
-                            HasHeaderRecord = true
-                        });
+                        using var csvWriter = new CsvWriter(writer, CliUtil.CsvWrite());
                         csvWriter.Context.RegisterClassMap<FolderTrackCsvRowMap>();
                         csvWriter.WriteRecords(rows);
                     }
@@ -172,7 +163,7 @@ namespace UMB.CLI.Services
                 for (int i = 0; i < kept.Count; i++)
                 {
                     var comma = i < kept.Count - 1 ? "," : "";
-                    sb.AppendLine($"    \"{EscapeTomlString(kept[i])}\"{comma}");
+                    sb.AppendLine($"    \"{CliUtil.EscapeToml(kept[i])}\"{comma}");
                 }
                 sb.Append("]");
                 return sb.ToString();
@@ -182,11 +173,6 @@ namespace UMB.CLI.Services
                 File.WriteAllText(tomlPath, rewritten);
 
             return totalDropped;
-        }
-
-        private static string EscapeTomlString(string value)
-        {
-            return value?.Replace("\\", "\\\\").Replace("\"", "\\\"") ?? "";
         }
     }
 }

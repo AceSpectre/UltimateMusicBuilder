@@ -1,5 +1,4 @@
 using CsvHelper;
-using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UMB.CLI.Views;
@@ -13,7 +12,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -401,7 +399,7 @@ namespace UMB.CLI.Services
             {
                 return JsonSerializer.Deserialize<T>(
                     File.ReadAllText(jsonPath),
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    CliUtil.JsonCaseInsensitive);
             }
             catch (Exception ex)
             {
@@ -425,13 +423,7 @@ namespace UMB.CLI.Services
 
         private (List<Dictionary<string, string>> rows, string[] headers) ReadCsvRows(string csvPath)
         {
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-                TrimOptions = TrimOptions.Trim,
-                MissingFieldFound = null,
-                BadDataFound = null,
-            };
+            var config = CliUtil.CsvReadLenient();
 
             using var reader = new StreamReader(csvPath);
             using var csv = new CsvReader(reader, config);
@@ -453,10 +445,7 @@ namespace UMB.CLI.Services
 
         private void WriteCsvRows(string csvPath, List<Dictionary<string, string>> rows, string[] headers)
         {
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-            };
+            var config = CliUtil.CsvWrite();
 
             using var writer = new StreamWriter(csvPath);
             using var csv = new CsvWriter(writer, config);
@@ -515,7 +504,7 @@ namespace UMB.CLI.Services
                 try
                 {
                     Directory.CreateDirectory(_tempDir);
-                    var safeName = MakeSafeFileName(Path.GetFileNameWithoutExtension(sourcePath));
+                    var safeName = CliUtil.MakeSafeFileName(Path.GetFileNameWithoutExtension(sourcePath));
                     var outPath = Path.Combine(_tempDir, $"preview_{safeName}_{Guid.NewGuid():N}.wav");
                     if (_decodeService.DecodeToWav(sourcePath, outPath))
                     {
@@ -545,13 +534,5 @@ namespace UMB.CLI.Services
             }
         }
 
-        private static string MakeSafeFileName(string name)
-        {
-            var invalid = Path.GetInvalidFileNameChars();
-            var sb = new StringBuilder(name.Length);
-            foreach (var c in name)
-                sb.Append(invalid.Contains(c) ? '_' : c);
-            return sb.ToString();
-        }
     }
 }

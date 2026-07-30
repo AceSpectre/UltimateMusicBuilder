@@ -300,7 +300,7 @@ namespace UMB.CLI.Services
                         {
                             var tomlText = File.ReadAllText(tomlPath);
                             seriesConfig = Toml.ToModel<FolderSeriesFileConfig>(tomlText,
-                                options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
+                                options: CliUtil.KebabTomlOptions());
                             foreach (var game in seriesConfig.Games ?? new List<FolderGameConfig>())
                             {
                                 if (!string.IsNullOrWhiteSpace(game.Id))
@@ -332,13 +332,7 @@ namespace UMB.CLI.Services
                     var csvFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     try
                     {
-                        var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
-                        {
-                            HasHeaderRecord = true,
-                            TrimOptions = TrimOptions.Trim,
-                            MissingFieldFound = null,
-                            BadDataFound = null,
-                        };
+                        var csvConfig = CliUtil.CsvReadLenient();
                         using var reader = new StreamReader(csvPath);
                         using var csv = new CsvReader(reader, csvConfig);
                         csv.Read();
@@ -410,18 +404,6 @@ namespace UMB.CLI.Services
             }
 
             return warnings;
-        }
-
-        private static string ToKebabCase(string name)
-        {
-            var sb = new System.Text.StringBuilder(name.Length + 4);
-            for (int i = 0; i < name.Length; i++)
-            {
-                if (char.IsUpper(name[i]) && i > 0)
-                    sb.Append('-');
-                sb.Append(char.ToLower(name[i]));
-            }
-            return sb.ToString();
         }
     }
 }
