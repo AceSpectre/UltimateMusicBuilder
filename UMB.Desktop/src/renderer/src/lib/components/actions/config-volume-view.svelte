@@ -14,8 +14,6 @@
   let analyzing = $state(false)
   let analyzeProgress = $state<VolumeProgress | null>(null)
   let series = $state<ModSeriesInfo[]>([])
-  // No series is selected by default — the user must pick one, and LUFS analysis only
-  // runs when they press "Calculate loudness". Selection is local to this view.
   let selectedPath = $state<string | null>(null)
   let data = $state<VolumeConfigData | null>(null)
   let rows = $state<VolumeRowItem[]>([])
@@ -23,7 +21,7 @@
   let baseline = new Map<number, number>()
   let loadToken = 0
 
-  // ── Web Audio preview (mirrors the Avalonia VolumeSampleProvider) ──
+  // Web Audio preview
   let audioCtx: AudioContext | null = null
   let sourceNode: AudioBufferSourceNode | null = null
   let gainNode: GainNode | null = null
@@ -34,8 +32,7 @@
   const seriesPath = $derived(selectedPath)
   const selectedSeries = $derived(series.find((e) => e.path === selectedPath) ?? null)
   const isDirty = $derived(rows.some((r) => Math.abs((baseline.get(r.originalIndex) ?? r.userOverride) - r.userOverride) > 0.0001))
-  // Show the analyze button once a series is loaded and FFmpeg is present. Highlighted when no
-  // cache exists yet (the primary "run analysis" case); otherwise offered as a re-measure.
+  // Highlighted when no LUFS cache exists yet.
   const canAnalyze = $derived(!!data && !!selectedPath && data.ffmpegAvailable && !analyzing && !loadingConfig)
   const needsAnalysis = $derived(!!data && !data.lufsCacheExists)
 
@@ -72,7 +69,6 @@
     }
   }
 
-  // `analyze` true runs FFmpeg LUFS analysis; false is a fast cache-only read.
   async function loadConfig(path: string | null, analyze = false) {
     stopPreview()
     bufferCache.clear()
@@ -126,7 +122,6 @@
   function onOverrideInput(row: VolumeRowItem, raw: string) {
     const next = clampOverride(parseFloat(raw))
     rows = rows.map((r) => (r.originalIndex === row.originalIndex ? { ...r, userOverride: next } : r))
-    // Live update: if this row is currently playing, retarget the gain node.
     if (playingIndex === row.originalIndex && gainNode) {
       gainNode.gain.value = (data?.globalVolumeMultiplier ?? 1) * row.autoGain * next
     }
@@ -149,7 +144,6 @@
     }
   }
 
-  // ── preview playback ──
 
   function stopPreview() {
     if (sourceNode) {
@@ -214,7 +208,6 @@
     untrack(() => {
       stopPreview()
       bufferCache.clear()
-      // Reset to "no series selected" whenever the active mod changes.
       selectedPath = null
       data = null
       rows = []
@@ -234,7 +227,6 @@
     })
   })
 
-  // Subscribe to LUFS analysis progress from the main process.
   $effect(() => {
     const unsub = window.electron.umb.subscribeVolumeProgress((p: VolumeProgress) => {
       analyzeProgress = p
@@ -242,7 +234,6 @@
     return unsub
   })
 
-  // Tear down audio when the view is destroyed.
   $effect(() => () => {
     stopPreview()
     if (audioCtx) {
@@ -254,7 +245,6 @@
 
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
-    <!-- Series sidebar -->
     <section class="flex h-full min-h-0 w-[280px] shrink-0 flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
       <div class="shrink-0 border-b border-border px-4 py-3">
@@ -314,11 +304,9 @@
       </div>
     </section>
 
-    <!-- Main content -->
     <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
 
-      <!-- Header -->
       <div class="shrink-0 border-b border-border px-5 py-3 flex items-center justify-between gap-4">
         <div class="flex min-w-0 items-center gap-3">
           <div
@@ -418,7 +406,6 @@
           <p class="max-w-[340px] px-6 text-center text-[13px] text-muted-foreground">{$_('configVolume.empty')}</p>
         </div>
       {:else}
-        <!-- Scrollable body -->
         <div class="min-h-0 flex-1 overflow-auto bg-background px-5 py-3">
           <p class="mb-3 max-w-[820px] text-[12.5px] leading-relaxed text-muted-foreground">{$_('configVolume.intro')}</p>
 

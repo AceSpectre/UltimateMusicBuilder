@@ -196,8 +196,8 @@ function parseSeriesGames(seriesTomlText: string): SeriesGame[] {
 }
 
 // Appends [[games]] blocks for any game ids used by rows but not yet declared in series.toml.
-// Only games present in `knownGames` (custom + vanilla catalog) are added — unknown ids are
-// left alone (the build skips them, same as before). Quotes are escaped for TOML safety.
+// Only games present in `knownGames` (custom + vanilla catalog) are added.
+// Unknown ids are left alone (the build skips them). Quotes are escaped for TOML safety.
 function ensureSeriesGames(seriesTomlPath: string, rows: CsvRow[], knownGames: SeriesGame[]): void {
   if (!existsSync(seriesTomlPath)) {
     return

@@ -26,7 +26,6 @@
   let stats = $state<{ seriesCount: number; trackCount: number } | null>(null)
   let version = $state('')
 
-  // Refresh series/track counts whenever the active mod changes.
   $effect(() => {
     const path = activeMod?.path ?? null
     stats = null
@@ -82,12 +81,9 @@
 </script>
 
 <div class="drag-region flex flex-col shrink-0">
-  <!-- Gradient strip -->
   <div class="h-[2px] gradient-strip"></div>
 
-  <!-- App bar -->
   <div class="h-14 flex items-center gap-3 px-4 bg-card border-b border-border">
-    <!-- Brand -->
     <div class="flex items-center gap-2.5 no-drag">
       <div
         class="w-[30px] h-[30px] rounded-lg gradient-bg flex items-center justify-center text-white font-bold text-sm tracking-wider"
@@ -101,7 +97,6 @@
       </div>
     </div>
 
-    <!-- Mod picker -->
     <div bind:this={pickerEl} class="relative no-drag w-[320px] shrink-0">
       <button
         onclick={togglePicker}
@@ -154,7 +149,6 @@
 
     <div class="flex-1"></div>
 
-    <!-- Status badges -->
     <div class="no-drag flex items-center gap-1.5">
       <span class="inline-flex items-center gap-1 px-2 h-[22px] rounded-full border border-border bg-muted text-[11px] font-medium text-muted-foreground tracking-[.02em]">
         <FolderTree size={11} />
@@ -165,7 +159,6 @@
       </span>
     </div>
 
-    <!-- Theme toggle -->
     <button
       onclick={() => themeStore.toggle()}
       class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
@@ -178,7 +171,6 @@
       {/if}
     </button>
 
-    <!-- Settings -->
     <button
       onclick={() => { settingsOpen = true }}
       class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
@@ -187,7 +179,6 @@
       <Settings size={15} class="text-muted-foreground" />
     </button>
 
-    <!-- Window controls -->
     <div class="no-drag flex items-center ml-2">
       <button
         onclick={() => onWindowControlAttempt('minimize')}

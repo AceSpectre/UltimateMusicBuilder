@@ -6,11 +6,7 @@ import { createWorkspace, seedTestDataMod, launchApp, firstWindow, type E2EWorks
 let ws: E2EWorkspace
 let app: ElectronApplication
 
-/**
- * Unpackaged (which is how E2E runs the app), app-settings.ts resolves
- * appsettings.json to <workspace>/UMB.CLI/bin/Debug/net8.0/appsettings.json —
- * the same file `dotnet run` loads — so the GUI's edits actually reach the CLI.
- */
+/** Where app-settings.ts resolves appsettings.json when unpackaged. */
 function settingsPath(): string {
   return join(ws.root, 'UMB.CLI', 'bin', 'Debug', 'net8.0', 'appsettings.json')
 }
@@ -47,7 +43,6 @@ test.afterAll(async () => {
 })
 
 test.beforeEach(() => {
-  // Each test starts from the same on-disk settings, so ordering can't leak.
   writeSettings(BASE_SETTINGS)
 })
 
@@ -77,7 +72,6 @@ test('saveAppSettings rewrites the multiplier and preserves every other key', as
 
   const raw = readSettings()
   expect(raw.Sma5hMusic.GlobalVolumeMultiplier).toBe(0.8)
-  // The whole file is round-tripped through JSON, so unrelated settings must survive.
   expect(raw.OutputPath).toBe('ArcOutput')
   expect(raw.ModPath).toBe('Mods/MusicMods')
   expect(raw.Sma5hMusic.CachePath).toBe('Cache')
@@ -101,7 +95,6 @@ test('checkArcOutput is false when the output dir is missing, then empty, and tr
   rmSync(arcOutput, { recursive: true, force: true })
   expect(await page.evaluate(() => window.electron.umb.checkArcOutput())).toBe(false)
 
-  // An existing but empty dir must still read as "nothing built yet".
   mkdirSync(arcOutput, { recursive: true })
   expect(await page.evaluate(() => window.electron.umb.checkArcOutput())).toBe(false)
 
@@ -138,13 +131,12 @@ test('settings modal loads the current multiplier, saves the edit, and closes', 
 
   const input = page.locator('#global-volume')
   await expect(input).toBeVisible()
-  // The modal must show what is on disk, not the component's 1.5 placeholder.
   await expect(input).toHaveValue('2.25')
 
   await input.fill('0.6')
   await page.getByRole('button', { name: 'Save' }).click()
 
-  // handleSave closes the modal ~600ms after a successful write.
+  // closes ~600ms after save
   await expect(input).toBeHidden({ timeout: 8000 })
   expect(readSettings().Sma5hMusic.GlobalVolumeMultiplier).toBe(0.6)
 })

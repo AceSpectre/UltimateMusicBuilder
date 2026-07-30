@@ -10,9 +10,7 @@ import { join } from 'path'
  * are the same hard-coded English maps the Sma5h GUI uses (Sma5hMusic.GUI/Helpers/Constants.cs).
  */
 
-// ---------------------------------------------------------------------------
-// English display-name maps (ported verbatim from Sma5hMusic.GUI Constants.cs)
-// ---------------------------------------------------------------------------
+// English display-name maps
 
 const SERIES_NAMES: Record<string, string> = {
   ui_series_none: 'None',
@@ -260,9 +258,7 @@ const STAGE_NAMES: Record<string, string> = {
   ui_stage_battle_field_s: 'Small Battlefield'
 }
 
-// ---------------------------------------------------------------------------
 // ParamLabels (hash40 -> label string), parsed once and cached
-// ---------------------------------------------------------------------------
 
 let labelCache: Map<bigint, string> | null = null
 
@@ -282,9 +278,7 @@ function loadLabels(workspace: string): Map<bigint, string> {
   return map
 }
 
-// ---------------------------------------------------------------------------
 // PRC (paracobble) reader
-// ---------------------------------------------------------------------------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PrcNode = any
@@ -368,9 +362,7 @@ function readPrc(path: string, labels: Map<bigint, string>): Record<string, PrcN
   return readParam(paramStart) as Record<string, PrcNode>
 }
 
-// ---------------------------------------------------------------------------
 // MSBT reader (LBL1 labels + TXT2 UTF-16LE strings)
-// ---------------------------------------------------------------------------
 
 function readMsbt(path: string): Record<string, string> {
   const buf = readFileSync(path)
@@ -420,10 +412,6 @@ function readMsbt(path: string): Record<string, string> {
   }
   return out
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export interface PlaylistInfo {
   id: string
@@ -481,7 +469,7 @@ export function getVanillaBgmTitles(workspace: string): Map<string, string> {
   return map
 }
 
-export interface VanillaGameTitle {
+interface VanillaGameTitle {
   id: string // bare id (ui_gametitle_ prefix stripped) — matches series.toml [[games]].id
   name: string
   seriesId: string // ui_series_*
@@ -511,7 +499,7 @@ export function getVanillaGameTitles(workspace: string): VanillaGameTitle[] {
   return list
 }
 
-export interface VanillaSong {
+interface VanillaSong {
   bgmId: string
   infoId: string // info0 of the song's stream set — what info1 references for a pinch link
   name: string

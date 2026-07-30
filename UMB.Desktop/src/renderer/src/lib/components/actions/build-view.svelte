@@ -132,7 +132,6 @@
 
       <div class="min-h-0 flex-1 overflow-auto p-6">
         <div class="flex flex-col gap-4 max-w-[520px]">
-          <!-- Build button (active) -->
           <div class="rounded-xl border border-border bg-background/75 p-4">
             <div class="flex items-center gap-3">
               <div
@@ -157,7 +156,6 @@
             </div>
           </div>
 
-          <!-- Scaffold button (active) -->
           <div class="rounded-xl border border-border bg-background/75 p-4">
             <div class="flex items-center gap-3">
               <div
@@ -181,7 +179,6 @@
             </div>
           </div>
 
-          <!-- Cleanup button (active) -->
           <div class="rounded-xl border border-border bg-background/75 p-4">
             <div class="flex items-center gap-3">
               <div
@@ -205,7 +202,6 @@
             </div>
           </div>
 
-          <!-- Import button (active) -->
           <div class="rounded-xl border border-border bg-background/75 p-4">
             <div class="flex items-center gap-3">
               <div
@@ -262,7 +258,6 @@
       </div>
 
       <div class="px-5 py-5 flex flex-col gap-4">
-        <!-- Sma5h mod location -->
         <div class="flex flex-col gap-1.5">
           <label for="import-source" class="text-[12.5px] font-medium">{$_('build.importModal.sourceLabel')}</label>
           <div class="flex items-center gap-2">
@@ -285,7 +280,6 @@
           </div>
         </div>
 
-        <!-- New UMB mod name -->
         <div class="flex flex-col gap-1.5">
           <label for="import-name" class="text-[12.5px] font-medium">{$_('build.importModal.nameLabel')}</label>
           <input

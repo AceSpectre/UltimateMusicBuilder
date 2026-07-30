@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { join } from 'path'
 
-// extract-icons imports electron's `app` (app.isPackaged). Stub it; hoisted
-// above the imports below.
+// Stub electron's app (hoisted above the imports).
 vi.mock('electron', () => ({ app: { isPackaged: false } }))
 
 import { analyzeExtractIcons, extractIcons } from './extract-icons'
@@ -39,13 +38,13 @@ describe('analyzeExtractIcons', () => {
     const modPath = makeDir(ws, 'mymod')
     makeDir(ws, 'mymod', 'mario')
     makeDir(ws, 'mymod', 'persona')
-    writeFile(join(modPath, 'mario'), 'icon.png', 'IMG') // mario already has an icon
+    writeFile(join(modPath, 'mario'), 'icon.png', 'IMG')
 
     const bntx = BNTX_DIR(ws.root)
     writeFile(bntx, 'series_0_mario.bntx', 'B')
     writeFile(bntx, 'series_0_persona.bntx', 'B')
-    writeFile(bntx, 'series_0_ghost.bntx', 'B') // no matching folder
-    writeFile(bntx, 'series_0_skip.png', 'B') // not a .bntx
+    writeFile(bntx, 'series_0_ghost.bntx', 'B')
+    writeFile(bntx, 'series_0_skip.png', 'B')
     writeFile(bntx, 'unrelated.txt', 'B')
 
     const analysis = analyzeExtractIcons(ws.root, join(ws.root, 'compiled'), modPath)

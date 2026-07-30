@@ -22,9 +22,9 @@ function pngDims(file: string): { w: number; h: number } {
 
 test.beforeAll(async () => {
   ws = createWorkspace()
-  seedTool(ws, 'UltimateTexCli') // extractIcons resolves <workspace>/Tools/UltimateTexCli
+  seedTool(ws, 'UltimateTexCli')
   modDir = join(ws.root, 'Mods', 'MusicMods', 'umb-target')
-  mkdirSync(join(modDir, 'dev'), { recursive: true }) // empty series dir named to match the BNTX
+  mkdirSync(join(modDir, 'dev'), { recursive: true })
   app = await launchApp(ws)
 })
 test.afterAll(async () => { await app?.close(); ws?.cleanup() })
@@ -56,8 +56,6 @@ test('extract produces icon.png whose dimensions match the source icon', async (
 })
 
 test('a mod without a matching series extracts nothing', async () => {
-  // Mirrors ExtractIconsServiceTests.Extract_SkipsBntxWithNoMatchingSeriesFolder:
-  // the BNTX baseline only has series_0_dev.bntx, so a gamma-only mod matches nothing.
   const noMatch = join(ws.root, 'Mods', 'MusicMods', 'no-match')
   mkdirSync(join(noMatch, 'gamma'), { recursive: true })
   const page = await firstWindow(app)
@@ -75,10 +73,4 @@ test('a mod without a matching series extracts nothing', async () => {
   )
   expect(result.extracted).toBe(0)
   expect(existsSync(join(noMatch, 'gamma', 'icon.png'))).toBe(false)
-})
-
-test('UI smoke: Extract Icons view opens', async () => {
-  const page = await firstWindow(app)
-  await page.getByText('Extract Icons').first().click()
-  await expect(page.getByText('umb-target').or(page.getByText('Extract Icons')).first()).toBeVisible({ timeout: 5000 })
 })

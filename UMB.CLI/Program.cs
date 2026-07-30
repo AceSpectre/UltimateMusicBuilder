@@ -16,11 +16,7 @@ namespace UMB.CLI
     {
         async static Task Main(string[] args)
         {
-            // VGAudioCli ships as a loose managed .exe in Tools/ (referenced via HintPath),
-            // not a NuGet package. A single-file self-contained publish neither bundles it
-            // nor lists it in the .deps.json, so audio conversion (build + nus3-convert)
-            // throws FileNotFoundException at runtime. Resolve it by hand from Tools/.
-            // In the dev build it's copied next to the binary and this never fires.
+            // VGAudioCli is a loose managed .exe in Tools/, not a NuGet package; a single-file publish neither bundles it nor lists it in .deps.json, so resolve it by hand.
             AssemblyLoadContext.Default.Resolving += (ctx, name) =>
             {
                 if (!string.Equals(name.Name, "VGAudioCli", StringComparison.OrdinalIgnoreCase))
@@ -39,8 +35,7 @@ namespace UMB.CLI
             //   1. UMB_WORKSPACE env var — explicit override used by the desktop app and
             //      power users to point UMB at any folder.
             //   2. The launch CWD, if it already looks like a workspace (has Resources/).
-            //      Lets a release build run straight from a populated folder, and stops us
-            //      from snapping back into a read-only app bundle that also ships Resources/.
+            //      Lets a release build run straight from a populated folder.
             //   3. Walk up from the executable's directory to find Resources/ (dev: repo root).
             var envWorkspace = Environment.GetEnvironmentVariable("UMB_WORKSPACE");
             if (!string.IsNullOrWhiteSpace(envWorkspace) && Directory.Exists(envWorkspace))
@@ -69,7 +64,6 @@ namespace UMB.CLI
                 return;
             }
 
-            // If args provided, run once and exit
             if (args.Length > 0)
             {
                 using var scope = serviceProvider.CreateScope();
@@ -78,7 +72,6 @@ namespace UMB.CLI
                 return;
             }
 
-            // Interactive loop
             while (true)
             {
                 var action = ShowMenu(AnsiConsole.Console);
@@ -206,9 +199,6 @@ namespace UMB.CLI
             }
             catch (Exception ex)
             {
-                // Write the full stack trace to the rolling log file so the cause is recoverable,
-                // and print a concise, color-coded message to the console so the user sees
-                // exactly what's missing without scrolling past a wall of stack frames.
                 entry.Logger.LogError(ex, "'{Action}' failed.", action);
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine($"[red]✗ '{action}' failed:[/] {ex.Message.EscapeMarkup()}");
@@ -270,11 +260,9 @@ namespace UMB.CLI
             services.AddSingleton(configuration);
             services.AddSingleton(loggerFactory);
 
-            //Sma5h Core
             services.AddSma5hCore(configuration);
             services.AddSma5hMusic(configuration);
 
-            //CLI
             services.AddScoped<IWorkspaceManager, WorkspaceManager>();
             services.AddScoped<Services.BuildService>();
             services.AddScoped<Services.ScaffoldService>();
@@ -289,8 +277,6 @@ namespace UMB.CLI
             services.AddScoped<Services.VolumeConfigService>();
             services.AddScoped<Services.DumpStagesService>();
             services.AddScoped<Script>();
-
-            services.AddLogging();
         }
     }
 }

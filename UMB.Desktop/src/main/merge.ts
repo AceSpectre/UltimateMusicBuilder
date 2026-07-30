@@ -369,7 +369,6 @@ function mergeSeriesFolders(
 
   writeMergedSeriesToml(outputDir, priorityConfig.series, mergedGames, mergedPlaylists, priorityConfig.defaultTrackData)
 
-  // Merge tracks.csv
   const allTracks: TrackRow[] = []
   const seenFilenames = new Set<string>()
 
@@ -438,7 +437,7 @@ function mergeSeriesOrderToml(
           }
         }
       }
-    } catch (e) {
+    } catch {
       onLine(log('warn', `Failed to parse ${orderFile}, skipping.`))
     }
   }

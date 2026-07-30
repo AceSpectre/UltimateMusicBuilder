@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from 'svelte'
-  import { _ } from 'svelte-i18n'
   import AppBar from '$lib/components/app-bar.svelte'
   import Sidebar from '$lib/components/sidebar.svelte'
   import BottomPanel from '$lib/components/bottom-panel.svelte'
@@ -109,10 +108,6 @@
         e.preventDefault()
         commandPaletteOpen = !commandPaletteOpen
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-        e.preventDefault()
-        // Sidebar collapse is handled inside the sidebar component for now.
-      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
         e.preventDefault()
         logStore.toggleDrawer()
@@ -159,24 +154,6 @@
         <MergeView mods={mods} />
       {:else if activeTab === 'playlist-info'}
         <PlaylistInfoView />
-      {:else}
-        <div class="flex-1 grid place-items-center p-8">
-          <div class="flex flex-col items-center gap-3 max-w-[420px] text-center">
-            <div
-              class="w-14 h-14 rounded-[14px] flex items-center justify-center border border-border"
-              style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .15), hsl(var(--gradient-to) / .15)); color: hsl(var(--gradient-from));"
-            >
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <path d="M3 14h18"/>
-              </svg>
-            </div>
-            <h2 class="text-base font-semibold">{diagnostics.lastAction === 'none' ? $_('app.selectAction') : diagnostics.lastAction}</h2>
-            <p class="text-[13.5px] text-muted-foreground">
-              {$_('app.viewModeNotice')}
-            </p>
-          </div>
-        </div>
       {/if}
     </main>
   </div>

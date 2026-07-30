@@ -145,7 +145,6 @@
       const already = tracks.length - pending.length
       if (already > 0) {
         log('info', `${already} song(s) already converted.`)
-        // Converted songs go straight to Review & Save.
         if (pending.length === 0) tab = 'review'
       }
 
@@ -217,9 +216,7 @@
     }
   }
 
-  // Load real waveform peaks + duration for converted tracks shown on the Review
-  // tab. With per-song lazy analysis, tracks converted in a previous session have
-  // neither loaded yet, so the cards would otherwise use synthetic placeholders.
+  // Load real waveform peaks + duration for converted tracks on the Review tab.
   async function ensureReviewData() {
     const path = seriesPath
     if (!path) return
@@ -339,7 +336,6 @@
     selectedRank = rank
   }
 
-  // ── per-track conversion ──
 
   async function convertCurrent(mode: 'loop' | 'end-to-end', candidate?: LoopCandidate) {
     if (!currentTrack || !seriesPath || converting) return
@@ -387,7 +383,6 @@
     stopPreview()
   }
 
-  // ── review actions ──
 
   async function rejectFromReview(track: Nus3SourceTrack) {
     if (!seriesPath) return
@@ -418,7 +413,6 @@
     } finally {
       writing = false
     }
-    // Files moved into the series folder — reload to reflect the new state.
     await loadSources(seriesPath)
   }
 
@@ -451,8 +445,7 @@
     })
   })
 
-  // Lazily analyze the current track's loop points as the user opens each song,
-  // rather than batch-analyzing the whole queue up front.
+  // Analyze the current track's loop points lazily.
   $effect(() => {
     const track = currentTrack
     const path = seriesPath
@@ -460,7 +453,6 @@
     untrack(() => { void ensureAnalysis(track) })
   })
 
-  // Load real waveforms + durations for converted tracks when the Review tab is open.
   $effect(() => {
     if (tab !== 'review' || !seriesPath) return
     // Re-run when the set of converted tracks changes (convert/reject).
@@ -533,7 +525,6 @@
 
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
-    <!-- Series sidebar -->
     <section class="flex h-full min-h-0 w-[280px] shrink-0 flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
       <div class="shrink-0 border-b border-border px-4 py-3">
@@ -600,12 +591,10 @@
       </div>
     </section>
 
-    <!-- Main content -->
     <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
 
       {#if !selectedSeries || sourcesTracks.length === 0}
-        <!-- Empty state -->
         <div class="grid h-full min-h-[320px] place-items-center">
           <div class="flex max-w-[340px] flex-col items-center gap-3 px-6 text-center">
             <div
@@ -631,7 +620,6 @@
           </div>
         </div>
       {:else}
-        <!-- Convert / Review tabs -->
         <div class="shrink-0 flex items-center gap-1 border-b border-border bg-card px-4 pt-1">
           <button
             onclick={() => (tab = 'convert')}
@@ -679,7 +667,6 @@
             </div>
           </div>
         {:else}
-        <!-- Page header -->
         <div class="shrink-0 border-b border-border bg-card px-5 py-3">
           <div class="flex flex-col gap-2">
             <span class="gradient-text text-[11px] font-semibold uppercase tracking-wide">
@@ -730,7 +717,6 @@
           </div>
         </div>
 
-        <!-- Scrollable body -->
         <div class="min-h-0 flex-1 overflow-auto bg-background px-5 py-2.5" style="display: flex; flex-direction: column; gap: 10px;">
           <!-- Progress strip + track pills (single row) -->
           <div class="flex items-center gap-2">
@@ -764,7 +750,6 @@
             </div>
           </div>
 
-          <!-- Waveform card -->
           {#if currentTrackAnalyzing}
             <div class="grid min-h-[260px] flex-1 place-items-center rounded-xl border border-border bg-card p-6">
               <div class="flex flex-col items-center gap-4 text-center">
@@ -781,7 +766,6 @@
             {@const peaks = currentPeaks.length > 0 ? currentPeaks : generatePeaks(140)}
             {@const bars = peaks.length > 0 ? peaks.length : 140}
             <div class="rounded-xl border border-border bg-card p-3">
-              <!-- Waveform header -->
               <div class="mb-2 flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
                   <span class="text-base font-semibold">
@@ -945,10 +929,8 @@
             </div>
           {/if}
 
-          <!-- Candidates table -->
           {#if !currentTrackAnalyzing && currentCandidates.length > 0}
             <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
-              <!-- Table header -->
               <div class="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5">
                 <div class="flex items-center gap-2">
                   <span class="text-[13px] font-semibold">
@@ -961,7 +943,6 @@
                 <span class="font-mono text-[11px] text-muted-foreground">{$_('nus3Convert.sortedBy')}</span>
               </div>
 
-              <!-- Scrollable table body -->
               <div class="min-h-0 flex-1 overflow-auto">
                 <table class="w-full border-collapse text-[12px]">
                   <thead class="sticky top-0">
@@ -1019,7 +1000,6 @@
 
         {:else}
         <!-- ── Review & Save tab ── -->
-        <!-- Page header -->
         <div class="shrink-0 border-b border-border bg-card px-5 py-3">
           <div class="flex items-center gap-4">
             <div class="flex min-w-0 flex-1 flex-col gap-1">
@@ -1047,14 +1027,12 @@
           </div>
         </div>
 
-        <!-- Scrollable body -->
         <div class="min-h-0 flex-1 overflow-auto bg-background px-5 py-2.5" style="display: flex; flex-direction: column; gap: 8px;">
           {#if convertedTracks.length === 0}
             <div class="grid min-h-[240px] place-items-center">
               <p class="max-w-[360px] text-center text-[13px] text-muted-foreground">{$_('nus3Convert.reviewEmpty')}</p>
             </div>
           {:else}
-          <!-- Summary strip -->
           <div class="flex items-center gap-2.5">
             <span class="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
               {$_('nus3Convert.reviewQueue')}
@@ -1067,7 +1045,6 @@
             </span>
           </div>
 
-          <!-- Review cards -->
           {#each convertedTracks as track}
             {@const meta = conversions[track.id]}
             {@const cand = meta?.candidate}
@@ -1075,7 +1052,6 @@
             {@const miniPeaks = realPeaks.length > 0 ? downsamplePeaks(realPeaks, 60) : generatePeaks(60, track.id.charCodeAt(0))}
             <div class="rounded-xl border border-border bg-card p-3">
               <div class="flex items-center gap-3.5">
-                <!-- Play button -->
                 <button
                   onclick={() => playReviewPreview(track)}
                   disabled={reviewLoadingId === track.id}
@@ -1091,7 +1067,6 @@
                   {/if}
                 </button>
 
-                <!-- Track info -->
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div class="flex items-center gap-2">
                     <span class="text-[13.5px] font-semibold">{track.name}</span>
@@ -1113,7 +1088,6 @@
                   {/if}
                 </div>
 
-                <!-- Mini waveform -->
                 {#if cand}
                   {@const sFrac = cand.loopStart / (track.durationSeconds || 228)}
                   {@const eFrac = cand.loopEnd / (track.durationSeconds || 228)}
@@ -1168,7 +1142,6 @@
   </div>
 </div>
 
-<!-- Settings modal -->
 {#if settingsOpen}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div

@@ -18,10 +18,7 @@ test('compareDirs reports clean when a directory is compared to a copy of itself
   expect(report.isClean).toBe(true)
 })
 
-// These exercise the comparer's hashed-file logic, which treats any .prc/.msbt/.bin
-// purely by content — so they build a synthetic db tree rather than copying the
-// real default-build baseline, whose *.prc files are gitignored (game-derived) and
-// thus absent on CI.
+// Synthetic .prc tree: the real baseline's *.prc are gitignored.
 const DB_REL = ['ui', 'param', 'database']
 function seedDb(dir: string, files: Record<string, Buffer>): void {
   mkdirSync(join(dir, ...DB_REL), { recursive: true })
@@ -56,16 +53,14 @@ test('compareDirs flags missing and extra hashed files', () => {
 })
 
 test('compareToBaseline diffs nus3 sizes against a committed manifest file', () => {
-  // The nus3-convert baseline ships only a manifest (no nus3 binaries).
   const baselineDir = join(repoRoot(), 'Tests', 'TestData', 'baselines', 'nus3-convert')
   const manifest = JSON.parse(
     readFileSync(join(baselineDir, 'nus3-manifest.json'), 'utf8')
   ) as Record<string, { Size: number }>
   const [name, entry] = Object.entries(manifest)[0]
 
-  // produced dir whose nus3 size differs by 1 byte → mismatch
   const produced = join(tmp, 'produced')
-  cpSync(baselineDir, produced, { recursive: true }) // copies the manifest (ignored on actual side)
+  cpSync(baselineDir, produced, { recursive: true })
   rmSync(join(produced, 'nus3-manifest.json'))
   writeFileSync(join(produced, name), Buffer.alloc(entry.Size + 1))
 
@@ -74,7 +69,7 @@ test('compareToBaseline diffs nus3 sizes against a committed manifest file', () 
 })
 
 test('buildManifest records nus3 sizes keyed by forward-slash relative path', () => {
-  cpSync(BASELINE, join(tmp, 'out'), { recursive: true }) // ensure dir exists then add a nus3
+  cpSync(BASELINE, join(tmp, 'out'), { recursive: true })
   writeFileSync(join(tmp, 'out', 'a.nus3audio'), Buffer.alloc(10))
   const m = buildManifest(join(tmp, 'out'))
   expect(m['a.nus3audio']).toBe(10)

@@ -3,7 +3,6 @@ using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UMB.CLI.Views;
-using Sma5h;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
@@ -20,8 +19,6 @@ using System.Threading.Tasks;
 
 namespace UMB.CLI.Services
 {
-    // ── Desktop batch I/O contracts (mirrors the Avalonia VolumeConfigWindow, headless) ──
-
     public class VolumeAnalyzeBatchInput
     {
         public string SeriesPath { get; set; }
@@ -139,7 +136,6 @@ namespace UMB.CLI.Services
                 _logger.LogWarning("FFmpeg is not available — auto-gain values cannot be calculated. You can still edit per-song overrides, but they will not be informed by measurement.");
             }
 
-            // Build view models with LUFS analysis (parallelized with progress bar)
             var viewModels = new VolumeRowViewModel[rows.Count];
             AnsiConsole.Status()
                 .Spinner(Spinner.Known.Dots)
@@ -161,8 +157,6 @@ namespace UMB.CLI.Services
                             SourcePath = sourcePath,
                             UserOverride = userOverride,
                             GlobalVolumeMultiplier = globalMult,
-                            TargetLufs = target,
-                            MaxMultiplier = maxMult,
                         };
 
                         if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
@@ -191,7 +185,6 @@ namespace UMB.CLI.Services
                     });
                 });
 
-            // Persist any new measurements
             _lufsService.SaveCache();
 
             var tempDir = _musicConfig.CurrentValue.TempPath ?? "Temp";
@@ -218,7 +211,6 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            // Persist UserOverride back into tracks.csv `volume` column
             if (!headers.Contains("volume"))
                 headers = headers.Append("volume").ToArray();
 

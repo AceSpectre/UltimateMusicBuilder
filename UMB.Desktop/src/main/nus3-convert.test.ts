@@ -2,9 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { existsSync } from 'fs'
 import { join } from 'path'
 
-// nus3-convert imports cli.ts, which imports electron's `app`. Stub it so the
-// module loads in a plain Node (vitest) context. vi.mock is hoisted above the
-// imports below, so the stub is in place before nus3-convert loads.
+// Stub electron's app (hoisted above the imports).
 vi.mock('electron', () => ({ app: { isPackaged: false } }))
 
 import {
@@ -37,7 +35,7 @@ describe('listNus3Sources', () => {
     writeFile(dir, 'notes.txt', 'ignore')
     makeDir(ws, 'mod', 'series', 'subdir')
 
-    const tracks = listNus3Sources(ws.root, dir).sort((a, b) => a.id.localeCompare(b.id))
+    const tracks = listNus3Sources(dir).sort((a, b) => a.id.localeCompare(b.id))
 
     expect(tracks.map((t) => t.id)).toEqual([
       'clip.wav',
@@ -59,7 +57,7 @@ describe('listNus3Sources', () => {
     writeFile(dir, 'done.nus3audio', 'x')
     writeFile(dir, 'pending.flac', 'b')
 
-    const ids = listNus3Sources(ws.root, dir).map((t) => t.id)
+    const ids = listNus3Sources(dir).map((t) => t.id)
     expect(ids).toEqual(['pending.flac'])
   })
 
@@ -68,12 +66,12 @@ describe('listNus3Sources', () => {
     writeFile(dir, 'staged.flac', 'a')
     writeFile(join(dir, 'songs-to-validate'), 'staged.nus3audio', 'x')
 
-    const track = listNus3Sources(ws.root, dir).find((t) => t.id === 'staged.flac')!
+    const track = listNus3Sources(dir).find((t) => t.id === 'staged.flac')!
     expect(track.converted).toBe(true)
   })
 
   it('returns [] for a missing series folder', () => {
-    expect(listNus3Sources(ws.root, join(ws.root, 'nope'))).toEqual([])
+    expect(listNus3Sources(join(ws.root, 'nope'))).toEqual([])
   })
 })
 
@@ -95,9 +93,7 @@ describe('loadConversions', () => {
 })
 
 describe('cached reads (short-circuit before any external tool)', () => {
-  // When the source file is absent the cache guard can't stat it, so a seeded
-  // entry is used unconditionally — exercising the cache-hit path without
-  // ffprobe / ffmpeg / pymusiclooper.
+  // No source file ⇒ cache guard can't stat ⇒ seeded entry always used.
   function seedCache(seriesDir: string, filename: string, entry: object): void {
     writeFile(
       join(seriesDir, 'songs-to-validate'),
@@ -123,7 +119,7 @@ describe('cached reads (short-circuit before any external tool)', () => {
       candidates: [candidate]
     })
 
-    const res = await analyzeLoopPoints(ws.root, join(dir, 'song-name.flac'))
+    const res = await analyzeLoopPoints(join(dir, 'song-name.flac'))
     expect(res.candidates).toEqual([candidate])
     expect(res.track.name).toBe('Song Name')
     expect(res.track.duration).toBe('0:30')

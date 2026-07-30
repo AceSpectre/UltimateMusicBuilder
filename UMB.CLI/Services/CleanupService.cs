@@ -2,7 +2,6 @@
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Sma5h;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
@@ -96,7 +95,6 @@ namespace UMB.CLI.Services
                             totalRemoved++;
                         }
 
-                        // Rewrite tracks.csv
                         using var writer = new StreamWriter(csvPath);
                         using var csvWriter = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
                         {
@@ -106,7 +104,6 @@ namespace UMB.CLI.Services
                         csvWriter.WriteRecords(rows);
                     }
 
-                    // Prune dead filenames from any [[playlists]] songs = [...] arrays in series.toml
                     var tomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
                     if (File.Exists(tomlPath))
                     {

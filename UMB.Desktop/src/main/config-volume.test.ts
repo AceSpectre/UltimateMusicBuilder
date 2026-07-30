@@ -1,13 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LogLine } from './cli'
 
-/**
- * config-volume.ts is the temp-file protocol between the renderer and the CLI's
- * three config-volume batch actions: write an input JSON, run the action, read
- * (and always delete) whatever it produced. spawnCliAction is mocked so the
- * marshalling, defaulting and cleanup are tested without a CLI.
- */
+// spawnCliAction is mocked; asserts the temp-file marshalling and cleanup.
 
 const mocks = vi.hoisted(() => ({ spawnCliAction: vi.fn() }))
 vi.mock('./cli', () => ({ spawnCliAction: mocks.spawnCliAction }))
@@ -74,12 +69,6 @@ beforeEach(() => {
   lines = []
 })
 
-afterEach(() => {
-  vi.restoreAllMocks()
-})
-
-// ── loadVolumeConfig ──
-
 describe('loadVolumeConfig', () => {
   it('sends seriesPath, outputPath and the analyze flag to config-volume-analyze', async () => {
     stubCli((input) => writeFileSync(input.outputPath, JSON.stringify(ANALYZE_RESULT), 'utf-8'))
@@ -91,7 +80,6 @@ describe('loadVolumeConfig', () => {
     expect(captured!.input.seriesPath).toBe(SERIES)
     expect(captured!.input.analyze).toBe(true)
     expect(captured!.input.outputPath).toMatch(/umb-volume-analyze-.*\.json$/)
-    // The log callback must reach the CLI so LUFS progress lines are streamed.
     expect(captured!.onLine).toBe(onLine)
   })
 
@@ -140,7 +128,7 @@ describe('loadVolumeConfig', () => {
   })
 
   it('returns safe defaults when the CLI produces no output file', async () => {
-    stubCli() // action runs but writes nothing
+    stubCli()
 
     const data = await loadVolumeConfig(WS, SERIES, true, onLine)
 
@@ -194,8 +182,6 @@ describe('loadVolumeConfig', () => {
   })
 })
 
-// ── saveVolumeConfig ──
-
 describe('saveVolumeConfig', () => {
   it('sends the overrides to config-volume-save', async () => {
     stubCli()
@@ -235,8 +221,6 @@ describe('saveVolumeConfig', () => {
   })
 })
 
-// ── decodeTrackPreview ──
-
 describe('decodeTrackPreview', () => {
   const WAV = Buffer.from('RIFF____WAVEfmt fake pcm payload')
 
@@ -274,7 +258,6 @@ describe('decodeTrackPreview', () => {
     await decodeTrackPreview(WS, SERIES, 'karts.flac', onLine)
 
     expect(existsSync(captured!.inputPath)).toBe(false)
-    // The decoded wav is large; leaving it behind would fill the temp dir.
     expect(existsSync(outputPath)).toBe(false)
   })
 

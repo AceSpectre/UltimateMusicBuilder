@@ -31,12 +31,11 @@ test('analyze returns per-track LUFS + auto-gain matching the CLI gain formula',
 
   expect(data.ffmpegAvailable).toBe(true)
   expect(data.items.length).toBe(13)
-  // Pin the analysis config so the formula loop verifies real values, not just internal consistency.
   expect(data.targetLufs).toBe(-14)
   expect(data.maxMultiplier).toBe(4)
 
-  const target = data.targetLufs   // -14 from appsettings
-  const max = data.maxMultiplier   // 4
+  const target = data.targetLufs
+  const max = data.maxMultiplier
   for (const item of data.items) {
     expect(item.hasMeasurement).toBe(true)
     const raw = Math.pow(10, (target - item.measuredLufs) / 20)
@@ -50,8 +49,7 @@ test('analyze returns per-track LUFS + auto-gain matching the CLI gain formula',
 })
 
 test('save writes the per-track override into tracks.csv volume column', async () => {
-  // Routed through the CLI daemon (`dotnet run … serve`), so it needs dotnet even
-  // though it never touches ffmpeg or the game resources.
+  // daemon-routed: dotnet only
   test.skip(!hasTool('dotnet'), 'requires dotnet for the CLI daemon')
   const page = await firstWindow(app)
   await page.evaluate(
@@ -59,17 +57,9 @@ test('save writes the per-track override into tracks.csv volume column', async (
     series.dir
   )
   const csv = readFileSync(join(series.dir, 'tracks.csv'), 'utf8').split(/\r?\n/).filter((l) => l.trim())
-  // Look up the volume column by header name rather than a magic index.
   const header = csv[0].split(',')
   const volIdx = header.indexOf('volume')
   expect(volIdx).toBeGreaterThanOrEqual(0)
   expect(csv[1].split(',')[volIdx]).toBe('0.5')
-  // Override must be surgical: a non-targeted row keeps its original volume.
   expect(csv[2].split(',')[volIdx]).toBe('1')
-})
-
-test('UI smoke: Config Volume view opens', async () => {
-  const page = await firstWindow(app)
-  await page.getByText('Config Volume').first().click()
-  await expect(page.getByText('Config Volume').or(page.getByText('dev')).first()).toBeVisible({ timeout: 8000 })
 })

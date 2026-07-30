@@ -2,7 +2,6 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Sma5h;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
@@ -46,7 +45,6 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            // Multi-select mods
             var modNames = modDirs.Select(Path.GetFileName).ToList();
             var selectedNames = AnsiConsole.Prompt(
                 new MultiSelectionPrompt<string>()
@@ -65,7 +63,6 @@ namespace UMB.CLI.Services
 
             var selectedDirs = selectedNames.Select(n => modDirs.First(d => Path.GetFileName(d) == n)).ToList();
 
-            // Prompt for output mod name
             var outputModName = AnsiConsole.Prompt(
                 new TextPrompt<string>("Name for the merged mod folder:")
                     .Validate(name =>
@@ -79,7 +76,6 @@ namespace UMB.CLI.Services
 
             var outputModDir = Path.Combine(modPath, outputModName);
 
-            // Collect all series folders across selected mods
             var seriesMap = new Dictionary<string, List<(string modDir, string seriesDir)>>(StringComparer.OrdinalIgnoreCase);
             foreach (var modDir in selectedDirs)
             {
@@ -102,7 +98,6 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            // Check for conflicts (same series in multiple mods)
             var conflicts = seriesMap.Where(kv => kv.Value.Count > 1).ToList();
             string priorityMod = null;
             if (conflicts.Count > 0)
@@ -134,7 +129,6 @@ namespace UMB.CLI.Services
 
                 if (sources.Count == 1)
                 {
-                    // No conflict — just copy
                     CopySeriesFolder(sources[0].seriesDir, outputSeriesDir);
                     var trackCount = CountTracksInCsv(
                         Path.Combine(outputSeriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE));
@@ -177,10 +171,8 @@ namespace UMB.CLI.Services
 
         private int MergeSeriesFolders(List<string> orderedSourceDirs, string outputDir, string seriesName)
         {
-            // orderedSourceDirs[0] is the priority mod's series dir
             var tomlOptions = new TomlModelOptions { ConvertPropertyName = ToKebabCase };
 
-            // ── Merge series.toml ──
             FolderSeriesFileConfig priorityConfig = null;
             var mergedGames = new List<(string id, string name)>();
             var mergedPlaylists = new List<(string id, int incidence, object songs)>();
@@ -225,7 +217,6 @@ namespace UMB.CLI.Services
 
             WriteMergedSeriesToml(outputDir, priorityConfig, mergedGames, mergedPlaylists);
 
-            // ── Merge tracks.csv ──
             var allTracks = new List<MergeTrackRow>();
             var seenFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -244,7 +235,7 @@ namespace UMB.CLI.Services
 
             WriteMergedTracksCsv(outputDir, allTracks);
 
-            // ── Copy audio and other files (priority first so it wins on duplicates) ──
+            // Priority mod wins on duplicate filenames
             var copiedFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var srcDir in orderedSourceDirs)
             {

@@ -17,15 +17,12 @@ function nowTs(): string {
 function parseLogLine(raw: string): LogLine {
   const timestamp = nowTs()
 
-  // .NET's console logger prefixes each line with its level: "info:", "warn:", "fail:"
-  // (and "crit:"). Classify on that prefix — scanning the whole line for the word
-  // "error"/"warning" misclassifies success messages like "...check for any error."
+  // .NET console logger prefixes each line with its level: "info:", "warn:", "fail:", "crit:".
   const level = raw.match(/^\s*(info|warn|fail|crit|dbug|trce)\s*:/i)?.[1]?.toLowerCase()
   if (level === 'warn') return { timestamp, level: 'warn', message: raw.trim() }
   if (level === 'fail' || level === 'crit') return { timestamp, level: 'error', message: raw.trim() }
   if (level) return { timestamp, level: 'info', message: raw.trim() }
 
-  // No recognized prefix — fall back to bracket tags then a substring scan.
   if (raw.includes('[Warning]') || raw.includes('[WRN]')) {
     return { timestamp, level: 'warn', message: raw.replace(/\[Warning\]|\[WRN\]\s*/g, '').trim() }
   }
@@ -67,8 +64,6 @@ export function spawnCliAction(
   return spawnOneShot(workspace, action, args, onLine)
 }
 
-// ── One-shot spawn (window / heavy actions) ──
-
 function spawnOneShot(
   workspace: string,
   action: string,
@@ -89,8 +84,7 @@ function spawnOneShot(
 
     const proc = spawn(command, spawnArgs, {
       cwd: workspace,
-      // UMB_WORKSPACE tells the CLI to resolve Mods/, Resources/, ArcOutput/ against the
-      // shared workspace root instead of walking up to wherever its bundled Resources/ sits.
+      // UMB_WORKSPACE anchors the CLI's relative paths (Mods/, Resources/, ArcOutput/) to the shared workspace root.
       env: { ...process.env, UMB_WORKSPACE: workspace },
       stdio: ['pipe', 'pipe', 'pipe']
     })
@@ -141,8 +135,6 @@ export function cancelCurrentAction(): void {
   }
 }
 
-// ── Persistent daemon (headless batch actions) ──
-
 let daemonProcess: ChildProcess | null = null
 let daemonStdout = ''
 let daemonStderr = ''
@@ -152,8 +144,7 @@ let nextReqId = 1
 // so there is at most one active at any time and stdout lines map unambiguously.
 let activeReq: { id: number; onLine: (line: LogLine) => void; resolve: (code: number) => void } | null = null
 
-// Serial queue: one stdin pipe means one request at a time. This matches the
-// renderer's stale-response guard and the previous single-flight model.
+// Serial queue: one stdin pipe means one request at a time.
 let daemonQueue: Promise<unknown> = Promise.resolve()
 
 const DONE_RE = /^__DONE__\t(\d+)\t(-?\d+)$/
@@ -226,8 +217,7 @@ function ensureDaemon(workspace: string): ChildProcess | null {
 }
 
 function handleDaemonLine(rawLine: string): void {
-  // .NET WriteLine emits CRLF on Windows; splitting on '\n' leaves a trailing '\r'
-  // that would otherwise break the sentinel match (and the request would hang).
+  // .NET emits CRLF; strip the trailing '\r' so the sentinel matches.
   const line = rawLine.replace(/\r$/, '')
   const done = line.match(DONE_RE)
   if (done) {

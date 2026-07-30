@@ -1,11 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { installBrowserStubs, removeBrowserStubs, type Stubs } from './store-test-utils'
 
-/**
- * The theme store resolves an initial theme at module load and mirrors it onto
- * <html class="dark">, so both the stored-value parsing and the class side effect
- * matter. 'system' additionally defers to the OS via matchMedia.
- */
+// Covers stored-value parsing and the <html class="dark"> side effect.
 
 let stubs: Stubs
 let themeStore: typeof import('./theme.svelte').themeStore
@@ -75,7 +71,6 @@ describe('set', () => {
     await load({ 'umb-theme': 'light' }, true)
 
     themeStore.set('system')
-    // The stored value stays 'system' so the choice survives an OS preference change.
     expect(stubs.storage.getItem('umb-theme')).toBe('system')
     expect(themeStore.current).toBe('system')
     expect(isDark()).toBe(true)
@@ -98,8 +93,6 @@ describe('toggle', () => {
   })
 
   it('treats system as non-dark and moves to dark', async () => {
-    // toggle() only checks `current === 'dark'`, so system always lands on dark
-    // regardless of what the OS currently reports.
     await load({ 'umb-theme': 'system' }, true)
     themeStore.toggle()
     expect(themeStore.current).toBe('dark')

@@ -9,18 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 let app: ElectronApplication
 let series: { dir: string; cleanup(): void }
 
-/**
- * decodeTrackPreview drives the Config Volume gain-preview player: it routes a
- * single track through the CLI daemon's config-volume-preview action, which
- * decodes any Smash or standard format to WAV, and hands the renderer a data URL
- * for the Web Audio API. Needs dotnet for the daemon; no game resources.
- *
- * The test fixtures are .flac, and AudioDecodeService only handles .wav (copy) and
- * the Smash formats (in-process VGAudio) itself — everything else, .flac included,
- * shells out to ffmpeg, resolved from PATH only. Without ffmpeg the CLI fails soft
- * (warns, writes no output, still exits 0) and the helper legitimately returns null,
- * so the decoding tests gate on ffmpeg too. The null-result tests below do not.
- */
+// decodeTrackPreview via the CLI daemon; .flac fixtures need ffmpeg, so decode tests gate on it.
 
 const DAEMON_MISSING = !hasTool('dotnet')
 const FFMPEG_MISSING = !hasTool('ffmpeg')
@@ -32,8 +21,7 @@ test.beforeAll(async () => {
   const mainPath = resolve(__dirname, '..', 'dist', 'main', 'index.js')
   app = await electron.launch({
     args: [mainPath],
-    // repoRoot so the daemon resolves to the real UMB.CLI project (dev spawns
-    // `dotnet run --project <workspace>/UMB.CLI`).
+    // repoRoot: daemon spawns dotnet run --project <workspace>/UMB.CLI
     env: { ...process.env, UMB_WORKSPACE: repoRoot(), NODE_ENV: 'test' }
   })
 })
@@ -87,7 +75,6 @@ test('decodeTrackPreview returns a playable WAV data URL for a source track', as
   expect(header.sampleRate).toBeGreaterThan(0)
   expect(header.channels).toBeGreaterThanOrEqual(1)
   expect(header.bitsPerSample).toBeGreaterThanOrEqual(8)
-  // The dev tracks run ~1 minute; anything near zero means a truncated decode.
   expect(header.seconds).toBeGreaterThan(5)
 })
 
@@ -95,8 +82,6 @@ test('decodeTrackPreview returns null when the track is not in the series', asyn
   test.skip(DAEMON_MISSING, 'requires dotnet for the CLI daemon')
   const page = await firstWindow(app)
 
-  // The CLI writes no output file, so the helper must report null rather than
-  // handing the player a truncated or empty buffer.
   const dataUrl = await page.evaluate(
     (sp) => window.electron.umb.decodeTrackPreview(sp, 'does-not-exist.flac'),
     series.dir
@@ -121,8 +106,6 @@ test('decodeTrackPreview serialises concurrent requests through the daemon', asy
   const page = await firstWindow(app)
   const flac = firstFlac()
 
-  // The daemon has one stdin pipe, so cli.ts queues requests. Firing two at once
-  // must yield two complete, independent results — not one truncated pair.
   const [a, b] = await page.evaluate(
     ([sp, f]) =>
       Promise.all([

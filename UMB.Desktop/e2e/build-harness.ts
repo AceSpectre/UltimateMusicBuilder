@@ -20,20 +20,17 @@ export function prepareIsolatedBuild(): IsolatedBuild {
   const wsRoot = mkdtempSync(join(tmpdir(), 'umb-e2e-build-'))
   const cliProjectDir = join(wsRoot, 'UMB.CLI')
 
-  // 1. Copy UMB.CLI source (skip bin/obj).
   cpSync(join(repo, 'UMB.CLI'), cliProjectDir, {
     recursive: true,
     filter: (src) => !/[\\/](bin|obj)[\\/]/.test(src) && !src.endsWith(`${'\\'}bin`) && !src.endsWith(`${'\\'}obj`)
   })
 
-  // 2. Rewrite the two relative refs in the csproj to absolute repo paths.
   const csprojPath = join(cliProjectDir, 'UMB.CLI.csproj')
   let csproj = readFileSync(csprojPath, 'utf8')
   csproj = csproj.replace('Include="..\\Sma5h\\', `Include="${repo}\\Sma5h\\`)
   csproj = csproj.replace('<HintPath>..\\Tools\\', `<HintPath>${repo}\\Tools\\`)
   writeFileSync(csprojPath, csproj, 'utf8')
 
-  // 3. Absolute-path appsettings.json (cwd-independent; deterministic build settings).
   const fwd = (p: string): string => p.split('\\').join('/')
   const appsettings = {
     GameResourcesPath: fwd(join(repo, 'Resources', 'Game')),
@@ -57,7 +54,6 @@ export function prepareIsolatedBuild(): IsolatedBuild {
   }
   writeFileSync(join(cliProjectDir, 'appsettings.json'), JSON.stringify(appsettings, null, 2), 'utf8')
 
-  // 4. Seed the only mod.
   const modDir = join(wsRoot, 'Mods', 'MusicMods', 'test-mod')
   mkdirSync(join(wsRoot, 'Mods', 'MusicMods'), { recursive: true })
   cpSync(configuredModSource(), modDir, { recursive: true })
@@ -70,11 +66,7 @@ export function prepareIsolatedBuild(): IsolatedBuild {
   }
 }
 
-/**
- * Runs the CLI build directly (the reference run). Throws on non-zero exit,
- * surfacing the captured dotnet stdout/stderr in the error so a build failure
- * is diagnosable (otherwise execFileSync only reports "Command failed").
- */
+/** Runs the CLI reference build. Throws with dotnet stdout/stderr on failure. */
 export function runCliBuild(b: IsolatedBuild): void {
   try {
     execFileSync('dotnet', ['run', '--project', b.cliProjectDir, '--no-launch-profile', '--', 'build'], {
@@ -90,7 +82,7 @@ export function runCliBuild(b: IsolatedBuild): void {
   }
 }
 
-/** Copies a directory tree (e.g. snapshot ArcOutput aside before the desktop run). */
+/** Copies a directory tree, replacing the destination. */
 export function snapshot(srcDir: string, destDir: string): void {
   if (existsSync(destDir)) rmSync(destDir, { recursive: true, force: true })
   cpSync(srcDir, destDir, { recursive: true })

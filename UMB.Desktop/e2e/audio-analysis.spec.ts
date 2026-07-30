@@ -9,16 +9,10 @@ let ws: E2EWorkspace
 let app: ElectronApplication
 let series: { dir: string; cleanup(): void }
 
-/**
- * The ffprobe/ffmpeg-backed helpers behind the Nus3 Convert waveform + loop
- * preview UI. They take absolute paths and never touch the workspace, so the
- * series is copied to a temp dir where the analysis cache they write is
- * disposable. Gated on ffmpeg (which ships ffprobe).
- */
+// ffprobe/ffmpeg-backed helpers; gated on ffmpeg.
 
 const FFMPEG_MISSING = !hasTool('ffmpeg')
 
-// 'flowerhead - Somewhat Good- Karts - 01 KARTS!.flac' — 60.458s per ffprobe.
 const TRACK = 'flowerhead - Somewhat Good- Karts - 01 KARTS!.flac'
 const TRACK_SECONDS = 60.458
 
@@ -49,8 +43,6 @@ function clearCache(): void {
   rmSync(cachePath(), { force: true })
 }
 
-// ── getTrackDuration ──
-
 test('getTrackDuration probes the real duration and caches it', async () => {
   test.skip(FFMPEG_MISSING, 'requires ffmpeg/ffprobe')
   const page = await firstWindow(app)
@@ -62,7 +54,6 @@ test('getTrackDuration probes the real duration and caches it', async () => {
   )
   expect(seconds).toBeCloseTo(TRACK_SECONDS, 1)
 
-  // The probe result is persisted so the UI never re-shells out for the same file.
   expect(existsSync(cachePath())).toBe(true)
   const entry = readCache()[TRACK]
   expect(entry.durationSeconds).toBeCloseTo(TRACK_SECONDS, 1)
@@ -95,8 +86,6 @@ test('getTrackDuration returns 0 for a file that does not exist', async () => {
   expect(seconds).toBe(0)
 })
 
-// ── extractWaveform ──
-
 test('extractWaveform returns one normalised peak per bar and caches them', async () => {
   test.skip(FFMPEG_MISSING, 'requires ffmpeg/ffprobe')
   const page = await firstWindow(app)
@@ -107,15 +96,12 @@ test('extractWaveform returns one normalised peak per bar and caches them', asyn
     [series.dir, TRACK] as const
   )
 
-  // Default bar count is 140, and the array is always padded to exactly that.
   expect(peaks.length).toBe(140)
   for (const p of peaks) {
     expect(p).toBeGreaterThanOrEqual(0)
     expect(p).toBeLessThanOrEqual(1)
   }
-  // Normalisation divides by the loudest sample, so at least one bar must be 1.
   expect(Math.max(...peaks)).toBeCloseTo(1, 5)
-  // Real audio, not a silent buffer.
   expect(peaks.filter((p) => p > 0).length).toBeGreaterThan(10)
 
   expect(readCache()[TRACK].peaks.length).toBe(140)
@@ -142,7 +128,6 @@ test('extractWaveform serves a second call from the cache', async () => {
     ([sp, f]) => window.electron.umb.extractWaveform(sp, f, 64),
     [series.dir, TRACK] as const
   )
-  // Cached peaks are returned verbatim, so the bars argument is ignored on a hit.
   const second = await page.evaluate(
     ([sp, f]) => window.electron.umb.extractWaveform(sp, f, 140),
     [series.dir, TRACK] as const
@@ -160,8 +145,6 @@ test('extractWaveform returns empty for a file that does not exist', async () =>
   )
   expect(peaks).toEqual([])
 })
-
-// ── generateLoopPreview ──
 
 /** Seconds of 16-bit PCM in a base64 wav data URL, from its RIFF header. */
 function wavSeconds(dataUrl: string): number {
@@ -186,7 +169,6 @@ test('generateLoopPreview stitches the loop tail onto the loop head', async () =
   )
 
   expect(dataUrl).not.toBeNull()
-  // Two 4s halves (previewLength / 2 each side of the loop point).
   expect(wavSeconds(dataUrl!)).toBeCloseTo(8, 1)
 })
 
@@ -194,8 +176,6 @@ test('generateLoopPreview falls back to the tail-to-head transition when loop po
   test.skip(FFMPEG_MISSING, 'requires ffmpeg')
   const page = await firstWindow(app)
 
-  // loopEnd <= loopStart is how the UI signals an end-to-end (no chosen loop)
-  // track; the helper then previews the song's own end → start transition.
   const dataUrl = await page.evaluate(
     ([sp, f]) => window.electron.umb.generateLoopPreview(sp, f, 0, 0, 6),
     [series.dir, TRACK] as const
@@ -209,8 +189,7 @@ test('generateLoopPreview clamps a loop tail that runs past the start of the tra
   test.skip(FFMPEG_MISSING, 'requires ffmpeg')
   const page = await firstWindow(app)
 
-  // loopEnd 3s with a 10s preview wants a tail starting at -2s; it must clamp to
-  // 0, giving 3s of tail + 5s of head = 8s rather than failing or over-reading.
+  // tail clamps at 0 → 3s tail + 5s head = 8s
   const dataUrl = await page.evaluate(
     ([sp, f]) => window.electron.umb.generateLoopPreview(sp, f, 1, 3, 10),
     [series.dir, TRACK] as const

@@ -93,10 +93,10 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.SET_SERIES_ICON, (_event, modPath: string, seriesId: string, iconDataUrl: string) => setSeriesIcon(workspace, modPath, seriesId, iconDataUrl))
 
-  ipcMain.handle(IPC.LIST_NUS3_SOURCES, (_event, seriesPath: string) => listNus3Sources(workspace, seriesPath))
+  ipcMain.handle(IPC.LIST_NUS3_SOURCES, (_event, seriesPath: string) => listNus3Sources(seriesPath))
 
   ipcMain.handle(IPC.ANALYZE_LOOP_POINTS, (_event, seriesPath: string, filename: string, options?: LoopAnalysisOptions) =>
-    analyzeLoopPoints(workspace, join(seriesPath, filename), options)
+    analyzeLoopPoints(join(seriesPath, filename), options)
   )
 
   ipcMain.handle(IPC.EXTRACT_WAVEFORM, (_event, seriesPath: string, filename: string, bars?: number) =>

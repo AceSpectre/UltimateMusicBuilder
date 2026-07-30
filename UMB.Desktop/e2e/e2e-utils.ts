@@ -59,7 +59,6 @@ export async function firstWindow(app: ElectronApplication): Promise<Page> {
 /** Walks up from this file to the UltimateMusicBuilder working tree (contains Sma5h.sln). */
 export function repoRoot(): string {
   let dir = __dirname
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     if (existsSync(join(dir, 'Sma5h.sln'))) return dir
     const parent = dirname(dir)
@@ -73,20 +72,12 @@ export function configuredModSource(): string {
   return join(repoRoot(), 'Tests', 'TestData', 'configured-mod')
 }
 
-/**
- * True when the real (copyrighted, un-committed) game resources are present locally.
- * Heavy specs that read/build against them must skip when this is false (e.g. on CI),
- * since `Resources/Game/` ships only placeholder stubs in the repo.
- */
+/** True when the real game resources are present locally (absent on CI). */
 export function hasGameResources(): boolean {
   return existsSync(join(repoRoot(), 'Resources', 'Game', 'ui', 'param', 'database', 'ui_bgm_db.prc'))
 }
 
-/**
- * True when `cmd` resolves on PATH. Used to gate specs that shell out to external
- * tools not bundled in the repo (ffmpeg, pymusiclooper, dotnet). Probes via the
- * platform locator (`where` on Windows, `command -v` elsewhere) — never runs the tool.
- */
+/** True when `cmd` resolves on PATH. Gates specs that shell out to ffmpeg/pymusiclooper/dotnet. */
 export function hasTool(cmd: string): boolean {
   const probe =
     process.platform === 'win32'

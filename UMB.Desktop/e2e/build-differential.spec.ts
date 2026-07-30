@@ -18,15 +18,12 @@ test.beforeAll(async () => {
   test.skip(!hasGameResources() || !hasTool('dotnet'), 'requires local game resources + dotnet')
   build = prepareIsolatedBuild()
 
-  // Reference: CLI build → snapshot ArcOutput → clear.
   runCliBuild(build)
-  // Use 'Ref' (not 'ArcOutput-ref') so the path doesn't share the 'ArcOutput' prefix,
-  // which confuses Node's cpSync "copy into self" guard on Windows.
+  // 'Ref': avoids cpSync's copy-into-self guard on the ArcOutput prefix
   refDir = join(build.wsRoot, 'Ref')
   snapshot(build.arcOutput, refDir)
   rmSync(build.arcOutput, { recursive: true, force: true })
 
-  // Actual: desktop drives the build against the SAME isolated workspace.
   const mainPath = resolve(__dirname, '..', 'dist', 'main', 'index.js')
   app = await electron.launch({
     args: [mainPath],
@@ -36,13 +33,12 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await app?.close()
-  // Dotnet may still hold a short-lived lock on the copied UMB.CLI dir after the build
-  // completes; retry cleanup once after a brief pause so temp files are not left on disk.
+  // retry once: dotnet may still lock the temp dir
   try {
     build?.cleanup()
   } catch {
     await new Promise((r) => setTimeout(r, 3000))
-    try { build?.cleanup() } catch { /* ignore residual lock on temp dir */ }
+    try { build?.cleanup() } catch { /* ignore */ }
   }
 })
 

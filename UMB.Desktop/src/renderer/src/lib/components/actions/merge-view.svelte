@@ -117,7 +117,6 @@
     <section class="flex h-full min-h-0 w-full flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
 
-      <!-- Header -->
       <div class="shrink-0 border-b border-border px-5 py-3 flex items-center gap-3">
         <div
           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
@@ -131,7 +130,6 @@
         </div>
       </div>
 
-      <!-- Content -->
       <div class="min-h-0 flex-1 overflow-auto px-5 py-5">
         {#if mods.length === 0}
           <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
@@ -139,7 +137,6 @@
           </div>
         {:else}
           <div class="flex flex-col gap-5">
-            <!-- Mod selection checkboxes -->
             <div class="flex flex-col gap-2">
               <label class="text-[12.5px] font-medium text-muted-foreground">{$_('merge.selectMods')}</label>
               <div class="max-h-[220px] overflow-auto rounded-lg border border-border bg-background">
@@ -164,7 +161,6 @@
               {/if}
             </div>
 
-            <!-- Analyze button -->
             {#if canAnalyze && !analysis && !result}
               <button
                 onclick={handleAnalyze}
@@ -182,7 +178,6 @@
               </button>
             {/if}
 
-            <!-- Analysis results -->
             {#if analysis && !result}
               <div class="rounded-xl border border-border bg-background p-4">
                 <div class="grid grid-cols-2 gap-3 text-[13px]">
@@ -204,7 +199,6 @@
                 {#if analysis.totalSeries === 0}
                   <p class="mt-3 text-[12.5px] text-muted-foreground">{$_('merge.noSeries')}</p>
                 {:else}
-                  <!-- Conflicts table -->
                   {#if analysis.conflicts.length > 0}
                     <p class="mt-3 mb-2 text-[12px] text-muted-foreground">{$_('merge.conflictsHint')}</p>
                     <div class="max-h-[160px] overflow-auto rounded-lg border border-border bg-card">
@@ -244,7 +238,6 @@
                     </div>
                   {/if}
 
-                  <!-- Output name input -->
                   <div class="mt-4 flex flex-col gap-2">
                     <label class="text-[12.5px] font-medium text-muted-foreground">{$_('merge.outputName')}</label>
                     <input
@@ -259,7 +252,6 @@
                     {/if}
                   </div>
 
-                  <!-- Merge button -->
                   <div class="mt-4">
                     <button
                       onclick={handleMerge}
@@ -280,7 +272,6 @@
               </div>
             {/if}
 
-            <!-- Result -->
             {#if result}
               <div class="rounded-xl border border-green-500/30 bg-green-500/5 p-4">
                 <div class="flex items-center gap-2 text-[13px] font-semibold text-green-500">

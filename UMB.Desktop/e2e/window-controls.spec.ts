@@ -4,7 +4,7 @@ import { createWorkspace, seedTestDataMod, launchApp, firstWindow, type E2EWorks
 let ws: E2EWorkspace
 let app: ElectronApplication
 
-/** The window is frameless (`frame: false`), so these IPC handlers ARE the title bar. */
+// The window is frameless, so these IPC handlers are the title bar.
 
 test.beforeAll(async () => {
   ws = createWorkspace()
@@ -49,10 +49,8 @@ test('windowFullscreen toggles the flag and reports the new state', async () => 
 
   const off = await page.evaluate(() => window.electron.umb.windowFullscreen())
   expect(off.ok).toBe(true)
-  // Two calls must land on opposite states — that is the whole contract of a toggle.
   expect(off.fullScreen).toBe(!on.fullScreen)
 
-  // Leave the window non-fullscreen for the remaining tests.
   if (off.fullScreen) await page.evaluate(() => window.electron.umb.windowFullscreen())
 })
 
@@ -91,7 +89,7 @@ test('windowClose acknowledges and closes the window', async () => {
   const page = await firstWindow(app)
 
   const result = await page.evaluate(() => window.electron.umb.windowClose()).catch(() => null)
-  // The reply can be lost to the teardown race, but the window must be gone either way.
+  // reply can be lost to teardown
   if (result) expect(result).toEqual({ ok: true, action: 'close' })
 
   await expect

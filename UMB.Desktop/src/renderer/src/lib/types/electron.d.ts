@@ -331,7 +331,6 @@ export interface WindowActionResult {
 }
 
 export interface UmbApi {
-  getWorkspace(): Promise<string>
   getAppVersion(): Promise<string>
   debugPing(): Promise<DebugPingResult>
   listMods(): Promise<ModInfo[]>
@@ -363,6 +362,7 @@ export interface UmbApi {
   getPlaylistInfo(): Promise<PlaylistInfoData>
   loadManagePlaylists(modPath: string): Promise<ManagePlaylistsData>
   saveManagePlaylists(modPath: string, assignments: PlaylistAssignmentInput[]): Promise<ManagePlaylistsData>
+  getWorkspace(): Promise<string>
   checkArcOutput(): Promise<boolean>
   getAppSettings(): Promise<AppSettings>
   saveAppSettings(settings: AppSettings): Promise<void>

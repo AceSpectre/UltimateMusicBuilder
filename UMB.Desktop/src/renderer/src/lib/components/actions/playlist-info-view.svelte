@@ -46,7 +46,6 @@
     <section class="flex h-full min-h-0 w-full flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
 
-      <!-- Header -->
       <div class="shrink-0 border-b border-border px-5 py-3 flex items-center gap-3">
         <div
           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
@@ -60,7 +59,6 @@
         </div>
       </div>
 
-      <!-- Tabs -->
       <div class="shrink-0 border-b border-border px-5 flex items-center gap-1">
         <button
           onclick={() => (tab = 'playlists')}
@@ -82,7 +80,6 @@
         </button>
       </div>
 
-      <!-- Content -->
       <div class="min-h-0 flex-1 overflow-hidden">
         {#if loading}
           <div class="flex h-full items-center justify-center gap-2 text-[13px] text-muted-foreground">
@@ -95,7 +92,6 @@
             {$_('playlistInfo.loadError')}
           </div>
         {:else if tab === 'playlists'}
-          <!-- Playlists tab -->
           <div class="flex h-full flex-col">
             <div class="shrink-0 px-5 pt-4 pb-2 text-[12px] text-muted-foreground">
               {$_('playlistInfo.playlistCount', { values: { count: data.playlists.length } })}
@@ -127,9 +123,7 @@
             </div>
           </div>
         {:else}
-          <!-- Stages tab -->
           <div class="flex h-full min-h-0">
-            <!-- Left: stage list -->
             <div class="flex h-full w-[280px] shrink-0 flex-col border-r border-border">
               <div class="shrink-0 p-3">
                 <div class="flex items-center gap-2 rounded-lg border border-input bg-background px-2.5 py-1.5">
@@ -165,7 +159,6 @@
               </div>
             </div>
 
-            <!-- Right: stage detail -->
             <div class="min-h-0 flex-1 overflow-auto p-5">
               {#if !selectedStage}
                 <div class="flex h-full items-center justify-center text-center text-[13px] text-muted-foreground">
@@ -183,7 +176,6 @@
                   {#if !selectedStage.playlistId}
                     <p class="text-[13px] text-muted-foreground">{$_('playlistInfo.noPlaylist')}</p>
                   {:else}
-                    <!-- Assignment fields -->
                     <div class="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1.5 text-[13px]">
                       <span class="text-muted-foreground">{$_('playlistInfo.fieldPlaylist')}</span>
                       <span>{selectedStage.playlistName} <span class="text-muted-foreground">({selectedStage.playlistId})</span></span>
@@ -193,7 +185,6 @@
                       <span>{selectedStage.seriesName}</span>
                     </div>
 
-                    <!-- Songs for the active order -->
                     <div>
                       <div class="mb-2 text-[12.5px] font-medium text-muted-foreground">
                         {$_('playlistInfo.songsInOrder', { values: { order: selectedStage.order } })}

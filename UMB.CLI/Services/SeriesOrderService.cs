@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UMB.CLI.Views;
-using Sma5h;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
@@ -32,7 +31,6 @@ namespace UMB.CLI.Services
         {
             Script.PrintBanner(_logger);
 
-            // Select mod directory
             var modPath = _musicConfig.CurrentValue.Sma5hMusic.ModPath;
             Directory.CreateDirectory(modPath);
             var modDirs = Directory.GetDirectories(modPath, "*", SearchOption.TopDirectoryOnly)
@@ -62,7 +60,6 @@ namespace UMB.CLI.Services
                 selectedModDir = modDirs.First(d => Path.GetFileName(d) == choice);
             }
 
-            // Scan for custom series
             var customSeries = new List<(string id, string name, string iconPath)>();
             foreach (var seriesDir in Directory.GetDirectories(selectedModDir))
             {
@@ -107,7 +104,6 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            // Load existing order
             var orderFile = Path.Combine(selectedModDir,
                 MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE);
             var existingOrder = LoadSeriesOrder(orderFile);
@@ -123,7 +119,6 @@ namespace UMB.CLI.Services
                 .ThenBy(s => s.name)
                 .ToList();
 
-            // Build ViewModels
             var viewModels = sorted.Select(s => new SeriesViewModel
             {
                 Id = s.id,
@@ -144,7 +139,6 @@ namespace UMB.CLI.Services
                 _logger.LogError(ex, "Failed to launch series order window.");
             }
 
-            // Save result
             if (result != null)
             {
                 SaveSeriesOrder(orderFile, result);

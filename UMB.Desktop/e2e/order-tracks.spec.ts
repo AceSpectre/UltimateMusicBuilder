@@ -55,13 +55,11 @@ test('existing series writes song_order.toml with derived bgmIds matching the CL
 
   const toml = readFileSync(join(marioPath(), 'song_order.toml'), 'utf8')
   expect(toml).toContain('song_order = [')
-  // Tone-id derivation parity with C# (BaselineGenerator.WriteMarioSongOrderToml).
   expect(toml).toContain('ui_bgm_flowerhead___somewhat_good__lofi___01_summer')
   expect(toml).toContain('ui_bgm_flowerhead___somewhat_good__lofi___03_brain_empty')
 })
 
 test('pre-existing song_order.toml is loaded with vanilla entries locked', async () => {
-  // Mirrors OrderingTests.TrackOrder_ExistingSeriesRespectsSongOrderToml: interleaved vanilla ps01.
   const page = await firstWindow(app)
   const songOrder =
     'song_order = [\n' +
@@ -104,7 +102,6 @@ test('UI: editing a title in the table and clicking Save persists to tracks.csv'
   await titleInput.fill('DOM Edited Title')
 
   await page.getByRole('button', { name: 'Save Changes' }).click()
-  // Drives the real renderer save path (the $state→plain-object snapshot over IPC).
   await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible({ timeout: 5000 })
 
   const csv = readFileSync(join(devPath(), 'tracks.csv'), 'utf8')
@@ -114,7 +111,6 @@ test('UI: editing a title in the table and clicking Save persists to tracks.csv'
 test('UI: Use Default Values enables only after selecting a custom song', async () => {
   const page = await firstWindow(app)
   await page.getByText('Manage Songs').first().click()
-  // mario ships [default-track-data]; the button stays disabled until a row is selected.
   await page.getByRole('button', { name: 'mario' }).first().click()
   const useDefaults = page.getByRole('button', { name: 'Use Default Values' })
   await expect(useDefaults).toBeDisabled()

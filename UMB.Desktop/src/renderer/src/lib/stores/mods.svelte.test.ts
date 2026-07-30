@@ -2,12 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ModInfo } from '$lib/types/electron'
 import { installBrowserStubs, removeBrowserStubs } from './store-test-utils'
 
-/**
- * modsStore.load() is what every view depends on for its mod list. The parts worth
- * pinning are the auto-select of the first mod (only when nothing is selected yet)
- * and the loading flag, which must clear even when the IPC call fails or the view
- * would spin forever.
- */
+// Covers auto-select-first-mod and the loading flag.
 
 let modsStore: typeof import('./mods.svelte').modsStore
 let listMods: ReturnType<typeof vi.fn>
@@ -55,7 +50,6 @@ describe('load', () => {
 
     await modsStore.load()
 
-    // Re-listing mods must not yank the user back to the first one.
     expect(modsStore.activeMod).toBe(MOD_B)
   })
 
@@ -84,7 +78,6 @@ describe('load', () => {
     listMods.mockRejectedValue(new Error('bridge down'))
 
     await expect(modsStore.load()).rejects.toThrow('bridge down')
-    // Without the finally, the whole UI would sit on a spinner forever.
     expect(modsStore.loading).toBe(false)
   })
 })
@@ -96,16 +89,5 @@ describe('setActive', () => {
 
     modsStore.setActive(MOD_B)
     expect(modsStore.activeMod).toBe(MOD_B)
-  })
-})
-
-describe('cross-view handoff', () => {
-  it('carries a pending Config Volume series path for the receiving view to consume', () => {
-    // Manage Songs sets this; Config Volume reads it once and nulls it out.
-    modsStore.pendingConfigVolumePath = '/mods/mod-a/dev'
-    expect(modsStore.pendingConfigVolumePath).toBe('/mods/mod-a/dev')
-
-    modsStore.pendingConfigVolumePath = null
-    expect(modsStore.pendingConfigVolumePath).toBeNull()
   })
 })

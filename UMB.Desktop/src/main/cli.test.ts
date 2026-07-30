@@ -2,12 +2,7 @@ import { EventEmitter } from 'events'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LogLine } from './cli'
 
-/**
- * cli.ts owns every path from the renderer to the CLI: log-level classification,
- * dev-vs-packaged invocation, the one-shot concurrency guard, and the persistent
- * daemon's framing/queueing. `spawn` is its only dependency, so it is faked here
- * and the module is re-imported per test because all of that state is module-level.
- */
+// spawn is faked; the module is re-imported per test because its state is module-level.
 
 const mocks = vi.hoisted(() => ({
   app: { isPackaged: false },
@@ -24,7 +19,6 @@ class FakeProc extends EventEmitter {
   stdin = { write: vi.fn() }
   kill = vi.fn()
 
-  /** Feeds a raw chunk (newlines included) to stdout. */
   out(chunk: string): void {
     this.stdout.emit('data', Buffer.from(chunk))
   }
@@ -87,11 +81,8 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
-  // Leave no daemon behind for the next test's fresh module instance.
   cli.shutdownDaemon()
 })
-
-// ── log line classification ──
 
 describe('log level classification', () => {
   /** Runs one CLI line through a one-shot action and returns the parsed entry. */
@@ -120,7 +111,6 @@ describe('log level classification', () => {
   })
 
   it('does NOT classify on the word "error" appearing inside a success message', async () => {
-    // Regression: scanning the whole line for "error" mislabelled this info line.
     const line = await parse('info: Build finished, check the log for any error.')
     expect(line.level).toBe('info')
   })
@@ -154,14 +144,12 @@ describe('log level classification', () => {
   })
 })
 
-// ── stdout/stderr chunk buffering ──
-
 describe('output buffering', () => {
   it('joins a line split across two data chunks', async () => {
     const done = cli.spawnCliAction(WS, 'build', [], onLine)
     const proc = lastProc()
     proc.out('info: half')
-    expect(lines).toHaveLength(0) // nothing emitted until the newline arrives
+    expect(lines).toHaveLength(0)
     proc.out(' of a line\ninfo: second\n')
     proc.close(0)
     await done
@@ -192,8 +180,6 @@ describe('output buffering', () => {
     expect(levels()).toHaveLength(1)
   })
 })
-
-// ── invocation shape ──
 
 describe('CLI invocation', () => {
   it('runs the dev project through dotnet with the action appended after --', async () => {
@@ -228,15 +214,11 @@ describe('CLI invocation', () => {
     await done
 
     const { opts } = spawnCall()
-    // Without UMB_WORKSPACE the CLI walks up to its own bundled Resources/ and
-    // silently ignores the user's mods.
     expect(opts.cwd).toBe(WS)
     expect(opts.env.UMB_WORKSPACE).toBe(WS)
     expect(opts.stdio).toEqual(['pipe', 'pipe', 'pipe'])
   })
 })
-
-// ── exit reporting ──
 
 describe('exit reporting', () => {
   it('reports a clean exit as info and resolves 0', async () => {
@@ -275,8 +257,6 @@ describe('exit reporting', () => {
   })
 })
 
-// ── one-shot concurrency guard / cancel ──
-
 describe('one-shot concurrency', () => {
   it('refuses a second action while one is running', async () => {
     const first = cli.spawnCliAction(WS, 'build', [], onLine)
@@ -311,7 +291,6 @@ describe('one-shot concurrency', () => {
     cli.cancelCurrentAction()
     expect(proc.kill).toHaveBeenCalledTimes(1)
 
-    // The slot is released immediately, so the user can start again at once.
     const second = cli.spawnCliAction(WS, 'build', [], onLine)
     expect(mocks.spawn).toHaveBeenCalledTimes(2)
 
@@ -324,8 +303,6 @@ describe('one-shot concurrency', () => {
     expect(() => cli.cancelCurrentAction()).not.toThrow()
   })
 })
-
-// ── daemon routing ──
 
 describe('daemon routing', () => {
   const DAEMON_ACTIONS = [
@@ -340,7 +317,6 @@ describe('daemon routing', () => {
     const done = cli.spawnCliAction(WS, action, ['in.json'], onLine)
     await flush()
 
-    // The daemon is spawned as `serve`; the action travels over stdin instead.
     expect(spawnCall().args).toContain('serve')
     expect(spawnCall().args).not.toContain(action)
 
@@ -380,8 +356,6 @@ describe('daemon routing', () => {
   })
 })
 
-// ── daemon protocol ──
-
 describe('daemon protocol', () => {
   /** Starts a daemon request and returns [promise, daemon]. */
   async function request(action = 'config-volume-save'): Promise<[Promise<number>, FakeProc]> {
@@ -398,8 +372,6 @@ describe('daemon protocol', () => {
 
   it('resolves on a sentinel terminated by CRLF', async () => {
     const [done, daemon] = await request()
-    // .NET's WriteLine emits CRLF on Windows; an unstripped '\r' broke the match
-    // and the request hung forever.
     daemon.out('__DONE__\t1\t0\r\n')
     expect(await done).toBe(0)
   })
@@ -445,8 +417,6 @@ describe('daemon protocol', () => {
     await flush()
     const daemon = lastProc()
 
-    // One stdin pipe means the second request must wait for the first to finish,
-    // otherwise stdout lines could not be attributed to a request.
     expect(daemon.stdin.write).toHaveBeenCalledTimes(1)
 
     daemon.out('__DONE__\t1\t0\n')
@@ -463,7 +433,6 @@ describe('daemon protocol', () => {
     daemon.close(1)
     expect(await first).toBe(1)
 
-    // A new daemon is spawned for the next request rather than the chain wedging.
     const second = cli.spawnCliAction(WS, 'config-volume-save', ['b'], onLine)
     await flush()
     expect(mocks.spawn).toHaveBeenCalledTimes(2)
@@ -512,8 +481,6 @@ describe('daemon protocol', () => {
   })
 })
 
-// ── daemon shutdown ──
-
 describe('shutdownDaemon', () => {
   it('sends the shutdown request and kills the process', async () => {
     const done = cli.spawnCliAction(WS, 'config-volume-save', ['a'], onLine)
@@ -545,7 +512,6 @@ describe('shutdownDaemon', () => {
       throw new Error('EPIPE')
     })
 
-    // App quit must not be blocked by an already-dead pipe.
     expect(() => cli.shutdownDaemon()).not.toThrow()
     expect(daemon.kill).toHaveBeenCalledTimes(1)
   })

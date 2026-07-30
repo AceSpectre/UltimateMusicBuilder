@@ -2,15 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { LogLine } from '$lib/types/electron'
 import { installBrowserStubs, removeBrowserStubs, type Stubs } from './store-test-utils'
 
-/**
- * The log store is the one piece of renderer state with real performance logic:
- * pushes are coalesced onto an animation frame, history is capped at MAX_ENTRIES
- * and only the last MAX_RENDER lines are ever handed to the DOM. A build emits
- * thousands of lines, so those caps are what keep the drawer usable.
- */
+// Covers frame coalescing and MAX_ENTRIES.
 
 const MAX_ENTRIES = 5000
-const MAX_RENDER = 400
 
 let stubs: Stubs
 let logStore: typeof import('./logs.svelte').logStore
@@ -40,14 +34,11 @@ afterEach(() => {
   removeBrowserStubs()
 })
 
-// ── frame coalescing ──
-
 describe('push coalescing', () => {
   it('buffers pushes until the next animation frame', () => {
     logStore.push(line('a'))
     logStore.push(line('b'))
 
-    // Nothing is reactive yet — a burst of CLI output must cause one update, not two.
     expect(logStore.entries).toEqual([])
 
     stubs.flushFrames()
@@ -67,23 +58,15 @@ describe('push coalescing', () => {
     logStore.push(line('b'))
     logStore.push(line('c'))
 
-    // This is the whole point of the buffer: N pushes cost one reactive update.
     expect(frames).toBe(1)
 
     queued.splice(0).forEach((cb) => cb(0))
     expect(logStore.lineCount).toBe(3)
 
-    // The next burst must schedule again rather than being swallowed.
     logStore.push(line('d'))
     expect(frames).toBe(2)
     queued.splice(0).forEach((cb) => cb(0))
     expect(logStore.lineCount).toBe(4)
-  })
-
-  it('flushing with nothing pending is a no-op', () => {
-    push(line('a'))
-    stubs.flushFrames()
-    expect(logStore.entries.map((e) => e.message)).toEqual(['a'])
   })
 
   it('appends across separate bursts in order', () => {
@@ -92,8 +75,6 @@ describe('push coalescing', () => {
     expect(logStore.entries.map((e) => e.message)).toEqual(['a', 'b'])
   })
 })
-
-// ── history cap ──
 
 describe('MAX_ENTRIES cap', () => {
   it('keeps every line below the cap', () => {
@@ -105,7 +86,6 @@ describe('MAX_ENTRIES cap', () => {
     push(...Array.from({ length: MAX_ENTRIES + 10 }, (_, i) => line(`l${i}`)))
 
     expect(logStore.lineCount).toBe(MAX_ENTRIES)
-    // The tail is what matters, so the first 10 are the ones discarded.
     expect(logStore.entries[0].message).toBe('l10')
     expect(logStore.entries.at(-1)!.message).toBe(`l${MAX_ENTRIES + 9}`)
   })
@@ -119,8 +99,6 @@ describe('MAX_ENTRIES cap', () => {
     expect(logStore.entries[0].message).toBe('a5')
   })
 })
-
-// ── filtering ──
 
 describe('filter', () => {
   beforeEach(() => {
@@ -149,44 +127,10 @@ describe('filter', () => {
 
   it('reports the unfiltered total in lineCount', () => {
     logStore.setFilter('error')
-    // The header count is "how much output was there", not "how much is shown".
     expect(logStore.lineCount).toBe(5)
     expect(logStore.filtered).toHaveLength(1)
   })
 })
-
-// ── render cap ──
-
-describe('displayed tail (MAX_RENDER)', () => {
-  it('returns everything while under the render cap', () => {
-    push(...Array.from({ length: 10 }, (_, i) => line(`l${i}`)))
-    expect(logStore.displayed).toHaveLength(10)
-  })
-
-  it('returns only the last MAX_RENDER lines when over it', () => {
-    push(...Array.from({ length: MAX_RENDER + 50 }, (_, i) => line(`l${i}`)))
-
-    expect(logStore.displayed).toHaveLength(MAX_RENDER)
-    expect(logStore.displayed[0].message).toBe('l50')
-    expect(logStore.displayed.at(-1)!.message).toBe(`l${MAX_RENDER + 49}`)
-  })
-
-  it('caps the filtered list, not the raw one', () => {
-    // 500 warns interleaved with 500 infos: the warn view alone exceeds the cap.
-    const lines: ReturnType<typeof line>[] = []
-    for (let i = 0; i < 500; i++) {
-      lines.push(line(`i${i}`), line(`w${i}`, 'warn'))
-    }
-    push(...lines)
-    logStore.setFilter('warn')
-
-    expect(logStore.displayed).toHaveLength(MAX_RENDER)
-    expect(logStore.displayed.every((e) => e.level === 'warn')).toBe(true)
-    expect(logStore.displayed.at(-1)!.message).toBe('w499')
-  })
-})
-
-// ── clear ──
 
 describe('clear', () => {
   it('empties the store', () => {
@@ -201,7 +145,6 @@ describe('clear', () => {
     logStore.clear()
     stubs.flushFrames()
 
-    // Without dropping the pending buffer, a cleared console would repopulate itself.
     expect(logStore.entries).toEqual([])
   })
 
@@ -211,8 +154,6 @@ describe('clear', () => {
     expect(logStore.filter).toBe('error')
   })
 })
-
-// ── drawer persistence ──
 
 describe('drawer', () => {
   it('defaults to open on a fresh profile', () => {

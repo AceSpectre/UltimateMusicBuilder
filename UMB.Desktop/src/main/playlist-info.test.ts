@@ -12,9 +12,8 @@ describe.runIf(HAS_RESOURCES)('vanilla catalog (needs Resources/Game)', () => {
   it('resolves localised vanilla bgm titles', () => {
     const titles = getVanillaBgmTitles(REPO_ROOT)
     expect(titles.size).toBeGreaterThan(100)
-    // Every value should be a non-empty string.
     for (const [, name] of titles) {
-      expect(typeof name).toBe('string')
+      expect(name.length).toBeGreaterThan(0)
     }
   })
 
@@ -22,10 +21,9 @@ describe.runIf(HAS_RESOURCES)('vanilla catalog (needs Resources/Game)', () => {
     const games = getVanillaGameTitles(REPO_ROOT)
     expect(games.length).toBeGreaterThan(50)
     for (const game of games) {
-      expect(game.id).not.toMatch(/^ui_gametitle_/) // bare id for series.toml
+      expect(game.id).not.toMatch(/^ui_gametitle_/)
       expect(game.seriesId === '' || game.seriesId.startsWith('ui_series_')).toBe(true)
     }
-    // Mario Kart series has at least one vanilla game.
     expect(games.some((g) => g.seriesId === 'ui_series_mariokart')).toBe(true)
   })
 

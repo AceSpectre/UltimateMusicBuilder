@@ -3,7 +3,6 @@ using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
-using Sma5h;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Spectre.Console;
@@ -97,13 +96,10 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            // Load existing series IDs from ParamLabels.csv
             var existingSeriesIds = LoadExistingSeriesIds();
 
-            // Load base game tone IDs from nusbank_ids.csv
             var baseGameToneIds = LoadBaseGameToneIds();
 
-            // Resolve output mod name (supplied arg, else prompt)
             var modName = json["name"]?.ToString() ?? Path.GetFileName(oldModPath);
             var outputModName = !string.IsNullOrWhiteSpace(outputName)
                 ? SanitizeFolderName(outputName)
@@ -200,7 +196,6 @@ namespace UMB.CLI.Services
                         if (!string.IsNullOrEmpty(info1Raw))
                         {
                             var info1ToneId = info1Raw.StartsWith("info_") ? info1Raw.Substring(5) : info1Raw;
-                            // Will resolve after all tracks are collected
                             info1Filename = info1ToneId; // placeholder — resolved below
                         }
 
@@ -219,7 +214,6 @@ namespace UMB.CLI.Services
                             InSoundtest = testDispOrder >= 0
                         });
 
-                        // Copy audio file
                         var srcFile = Path.Combine(oldModPath, filename);
                         var destFile = Path.Combine(seriesDir, filename);
                         if (File.Exists(srcFile))
@@ -239,7 +233,6 @@ namespace UMB.CLI.Services
                     continue;
                 }
 
-                // Sort tracks by original display order, then by filename as tiebreaker
                 trackRows = trackRows
                     .OrderBy(t => t.OriginalOrder)
                     .ThenBy(t => t.Filename, StringComparer.OrdinalIgnoreCase)
@@ -271,10 +264,8 @@ namespace UMB.CLI.Services
                     }
                 }
 
-                // Write series.toml
                 WriteConvertedSeriesToml(seriesDir, seriesNameId, seriesName, isExisting, gameInfos);
 
-                // Write tracks.csv
                 WriteConvertedTracksCsv(seriesDir, trackRows);
 
                 totalTracks += trackRows.Count;
@@ -283,7 +274,6 @@ namespace UMB.CLI.Services
                     seriesName, seriesNameId, trackRows.Count, isExisting ? " [existing series]" : "");
             }
 
-            // Write series-order.toml if there are multiple custom series
             if (customSeriesOrder.Count >= 2)
             {
                 var orderSb = new StringBuilder();
@@ -342,7 +332,7 @@ namespace UMB.CLI.Services
                 _logger.LogWarning("nusbank_ids.csv not found at {Path}. Base game tone_id detection disabled.", nusBankPath);
                 return toneIds;
             }
-            foreach (var line in File.ReadLines(nusBankPath).Skip(1)) // skip header
+            foreach (var line in File.ReadLines(nusBankPath).Skip(1))
             {
                 var parts = line.Split(',');
                 if (parts.Length < 2) continue;
@@ -389,7 +379,6 @@ namespace UMB.CLI.Services
                 HasHeaderRecord = true
             });
 
-            // Write header
             csv.WriteField("filename");
             csv.WriteField("game");
             csv.WriteField("title");
@@ -403,7 +392,6 @@ namespace UMB.CLI.Services
             csv.WriteField("order");
             csv.NextRecord();
 
-            // Write rows in order
             for (int i = 0; i < tracks.Count; i++)
             {
                 var t = tracks[i];
@@ -452,7 +440,7 @@ namespace UMB.CLI.Services
             public float Volume { get; set; }
             public int OriginalOrder { get; set; }
             public string Info1 { get; set; }
-            public bool InSoundtest { get; set; } = true;
+            public bool InSoundtest { get; set; }
         }
     }
 }

@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Sma5h;
 using Sma5h.Helpers;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
@@ -132,7 +131,6 @@ namespace UMB.CLI.Services
 
                 _logger.LogInformation("Processing '{Basename}'...", basename);
 
-                // Step 1: Detect loop points via pymusiclooper
                 var loopCandidates = RunPymusiclooper(sourceFile);
                 var sourceSampleRate = GetSourceSampleRate(sourceFile);
                 long loopStart, loopEnd;
@@ -177,7 +175,6 @@ namespace UMB.CLI.Services
                 }
                 else
                 {
-                    // No candidates above threshold — auto-reject
                     loopStart = 0;
                     loopEnd = 0; // will be set from WAV after conversion
                     isFullSongLoop = true;
@@ -186,9 +183,7 @@ namespace UMB.CLI.Services
                     fullLoops++;
                 }
 
-                // Step 2: Convert to WAV at 48kHz if needed.
-                // Opus (Namco header) only accepts 8/12/16/24/48 kHz — a .wav at any other
-                // rate (e.g. 44.1 kHz) must still be resampled, so don't blindly trust .wav inputs.
+                // Namco Opus accepts only 8/12/16/24/48 kHz, so non-48k .wav still needs resampling.
                 var wavFile = sourceFile;
                 bool tempWav = false;
                 bool isWav = sourceFile.EndsWith(".wav", StringComparison.OrdinalIgnoreCase);
@@ -217,7 +212,6 @@ namespace UMB.CLI.Services
                     _logger.LogInformation("  Full-song loop: 0-{End}", loopEnd);
                 }
 
-                // Step 3: Convert WAV → lopus via VGAudioCli library
                 var lopusFile = Path.Combine(tempDir, basename + ".lopus");
                 string vgOutput;
                 try
@@ -255,7 +249,6 @@ namespace UMB.CLI.Services
                     continue;
                 }
 
-                // Step 4: Wrap lopus → nus3audio
                 var toneId = DeriveToneId(basename);
                 try
                 {
@@ -300,7 +293,6 @@ namespace UMB.CLI.Services
                     _logger.LogInformation("  → {OutputPath}", outputNus3);
                     converted++;
 
-                    // Generate loop preview clip if a loop was selected.
                     // Always emit in both modes so users can review the whole batch after auto-convert.
                     if (!isFullSongLoop)
                     {
@@ -315,14 +307,12 @@ namespace UMB.CLI.Services
                     _logger.LogError("  nus3audio output was empty for '{Basename}'.", basename);
                 }
 
-                // Clean up temp files
                 if (tempWav && File.Exists(wavFile))
                     File.Delete(wavFile);
                 if (File.Exists(lopusFile))
                     File.Delete(lopusFile);
             }
 
-            // Clean up temp dir
             try { Directory.Delete(tempDir, recursive: false); } catch { }
 
             _logger.LogInformation("--------------------");
@@ -399,9 +389,7 @@ namespace UMB.CLI.Services
 
                 _logger.LogInformation("Processing '{Basename}' (mode: {Mode})...", basename, decision.Mode);
 
-                // Step 2: Convert to WAV at 48kHz if needed.
-                // Opus (Namco header) only accepts 8/12/16/24/48 kHz — a .wav at any other
-                // rate (e.g. 44.1 kHz) must still be resampled, so don't blindly trust .wav inputs.
+                // Namco Opus accepts only 8/12/16/24/48 kHz, so non-48k .wav still needs resampling.
                 var wavFile = sourceFile;
                 bool tempWav = false;
                 bool isWav = sourceFile.EndsWith(".wav", StringComparison.OrdinalIgnoreCase);
@@ -425,7 +413,6 @@ namespace UMB.CLI.Services
                 }
                 else
                 {
-                    // end-to-end
                     loopStart = 0;
                     var wavSamples = GetWavSampleCount(wavFile);
                     if (wavSamples <= 0)
@@ -438,7 +425,6 @@ namespace UMB.CLI.Services
                     _logger.LogInformation("  Full-song loop: 0-{End}", loopEnd);
                 }
 
-                // Step 3: Convert WAV -> lopus via VGAudioCli library
                 var lopusFile = Path.Combine(tempDir, basename + ".lopus");
                 string vgOutput;
                 try
@@ -476,7 +462,6 @@ namespace UMB.CLI.Services
                     continue;
                 }
 
-                // Step 4: Wrap lopus -> nus3audio
                 var toneId = DeriveToneId(basename);
                 try
                 {
@@ -526,14 +511,12 @@ namespace UMB.CLI.Services
                     _logger.LogError("  nus3audio output was empty for '{Basename}'.", basename);
                 }
 
-                // Clean up temp files
                 if (tempWav && File.Exists(wavFile))
                     File.Delete(wavFile);
                 if (File.Exists(lopusFile))
                     File.Delete(lopusFile);
             }
 
-            // Clean up temp dir
             try { Directory.Delete(tempDir, recursive: false); } catch { }
 
             _logger.LogInformation("--------------------");
@@ -646,7 +629,7 @@ namespace UMB.CLI.Services
                     }
                 }
 
-                // Sort by score descending (should already be sorted, but be safe)
+                // pymusiclooper usually emits sorted output; re-sort defensively.
                 results.Sort((a, b) => b.score.CompareTo(a.score));
             }
             catch (Exception e)

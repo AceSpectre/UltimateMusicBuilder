@@ -57,10 +57,9 @@ test('UI: add a song to a playlist, set incidence, and Save persists it', async 
 
   await page.getByRole('button', { name: 'Add song' }).click()
   const modal = page.locator('div.fixed.z-50')
-  await modal.getByRole('button').first().click() // add first song in the pool
+  await modal.getByRole('button').first().click()
   await page.getByRole('button', { name: 'Cancel' }).click()
 
-  // Set the incidence on the first assigned row, then save.
   await page.getByRole('spinbutton').first().fill('45')
   await page.getByRole('button', { name: 'Save Changes' }).click()
   await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible({ timeout: 5000 })

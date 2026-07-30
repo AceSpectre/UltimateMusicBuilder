@@ -29,8 +29,7 @@ namespace UMB.CLI
         private readonly DumpStagesService _dumpStages;
         private readonly ILogger<Script> _logger;
 
-        // Exposed so Program.RunAction can log unhandled exceptions to the same
-        // log file the build pipeline writes to.
+        // Used by Program.RunAction for top-level exception logging.
         public ILogger Logger => _logger;
 
         public Script(BuildService build, ScaffoldService scaffold, ConvertService convert,
@@ -76,7 +75,6 @@ namespace UMB.CLI
         public void RunConfigVolumePreview(string jsonPath) => _volumeConfig.RunPreviewBatch(jsonPath);
         public void RunDumpStages() => _dumpStages.Run();
 
-        // ── Shared helpers used by services ──
 
         public static void PrintBanner(ILogger logger)
         {
@@ -107,7 +105,6 @@ namespace UMB.CLI
                 return (null, null);
             }
 
-            // Select mod
             string selectedModDir;
             if (modDirs.Count == 1)
             {
@@ -125,7 +122,6 @@ namespace UMB.CLI
                 selectedModDir = modDirs.First(d => Path.GetFileName(d) == modChoice);
             }
 
-            // Select series
             var seriesDirs = Directory.GetDirectories(selectedModDir)
                 .Where(d => !Path.GetFileName(d).StartsWith(".") && Path.GetFileName(d) != VALIDATE_FOLDER)
                 .ToList();

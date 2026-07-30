@@ -110,7 +110,7 @@ describe('saveManagePlaylists', () => {
 
   it('removes a series’ [[playlists]] blocks when it has no assignments', () => {
     const modPath = seedMod()
-    saveManagePlaylists(ws.root, modPath, []) // clear everything
+    saveManagePlaylists(ws.root, modPath, [])
 
     const toml = readFileSync(join(modPath, 'mario', 'series.toml'), 'utf8')
     expect(toml).not.toContain('[[playlists]]')

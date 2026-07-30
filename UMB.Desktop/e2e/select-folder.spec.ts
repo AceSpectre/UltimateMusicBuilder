@@ -4,12 +4,7 @@ import { createWorkspace, seedTestDataMod, launchApp, firstWindow, type E2EWorks
 let ws: E2EWorkspace
 let app: ElectronApplication
 
-/**
- * selectFolder wraps a native modal, which would hang a headless run, so each
- * test replaces dialog.showOpenDialog in the main process for the duration of
- * the call. The handler under test — argument shape, cancel handling and the
- * first-path unwrap — is still the real one.
- */
+// selectFolder wraps a native modal; each test stubs dialog.showOpenDialog in the main process.
 
 /** Makes the next showOpenDialog calls resolve to `result`, and records its args. */
 async function stubDialog(
@@ -18,7 +13,7 @@ async function stubDialog(
   await app.evaluate(async ({ dialog }, res) => {
     const g = globalThis as unknown as { __dialogArgs?: unknown[] }
     g.__dialogArgs = []
-    // @ts-expect-error deliberately monkey-patching the real dialog module
+    // @ts-expect-error monkey-patching dialog
     dialog.showOpenDialog = async (...args: unknown[]) => {
       g.__dialogArgs!.push(args)
       return res
@@ -91,7 +86,6 @@ test('selectFolder returns null when the user cancels', async () => {
 
 test('selectFolder returns null when the dialog yields no path', async () => {
   const page = await firstWindow(app)
-  // Not cancelled, but empty — must not resolve to undefined and blow up callers.
   await stubDialog({ canceled: false, filePaths: [] })
 
   expect(await page.evaluate(() => window.electron.umb.selectFolder())).toBeNull()
@@ -107,7 +101,6 @@ test('Extract Icons Browse fills the compiled mod folder from the dialog', async
   await page.getByRole('button', { name: 'Browse' }).click()
 
   await expect(page.getByText('No folder selected')).toBeHidden()
-  // Scoped to <main>: the workspace path also appears in the Runtime Debug pane.
   await expect(page.getByRole('main').getByText(ws.root, { exact: false })).toBeVisible()
 })
 
@@ -122,7 +115,6 @@ test('Extract Icons Browse leaves the folder unchanged when the dialog is cancel
   await stubDialog({ canceled: true, filePaths: [] })
   await page.getByRole('button', { name: 'Browse' }).click()
 
-  // A cancel must not clear an already-picked folder.
   await expect(page.getByRole('main').getByText(ws.root, { exact: false })).toBeVisible()
   await expect(page.getByText('No folder selected')).toBeHidden()
 })

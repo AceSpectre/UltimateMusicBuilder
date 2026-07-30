@@ -6,7 +6,6 @@ import { makeWorkspace, writeSeries, type Workspace } from './test-utils'
 
 let ws: Workspace
 
-// Reorder-only payload: ids in the desired order, no field edits.
 const ord = (...ids: string[]) => ids.map((id) => ({ id, fields: null }))
 
 beforeEach(() => {
@@ -331,8 +330,7 @@ describe('track fields', () => {
     const reloaded = loadTrackOrderData(ws.root, seriesPath)
     const row = reloaded.items.find((i) => i.filename === 'b.nus3audio')!
     expect(row.fields).toMatchObject({ info1: 'info_bgm_some_vanilla_song', special_category: 'sf_situationlink' })
-    // info_* references point at the base game, so they never mark a mod row as a pinch target.
-    expect(reloaded.items.some((i) => i.isPinchTarget)).toBe(true) // a_pinch is still a target via a.nus3audio
+    expect(reloaded.items.some((i) => i.isPinchTarget)).toBe(true)
     expect(row.isPinchTarget).toBe(false)
   })
 })
@@ -347,7 +345,6 @@ const HAS_REAL_MARIOKART =
 describe.runIf(HAS_REAL_MARIOKART)('vanilla catalog wired into a real existing series', () => {
   it('merges vanilla mariokart games and exposes vanilla songs', () => {
     const data = loadTrackOrderData(REPO_ROOT, MARIOKART)
-    // Custom [[games]] (mario_kart_wii / mario_kart_ds) + vanilla mariokart games.
     expect(data.games.length).toBeGreaterThan(2)
     expect(data.vanillaSongs.length).toBeGreaterThan(0)
     expect(data.vanillaSongs.every((s) => s.infoId.startsWith('info_'))).toBe(true)

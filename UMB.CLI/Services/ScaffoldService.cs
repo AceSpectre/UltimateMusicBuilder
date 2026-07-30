@@ -2,7 +2,6 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Sma5h;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
@@ -80,7 +79,6 @@ namespace UMB.CLI.Services
                     var tomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
                     var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
 
-                    // ── Step 1: Create missing series.toml / tracks.csv ──
                     bool wasScaffolded = false;
                     if (!File.Exists(tomlPath))
                     {
@@ -99,21 +97,18 @@ namespace UMB.CLI.Services
                     if (wasScaffolded)
                         totalScaffolded++;
 
-                    // ── Step 2: Ensure [default-track-data] section exists ──
                     if (EnsureDefaultTrackDataSection(tomlPath))
                     {
                         _logger.LogInformation("Added [default-track-data] section to {Path}", tomlPath);
                         totalDefaultsAdded++;
                     }
 
-                    // ── Step 2a: Ensure series-playlist field and songs = "*" on each [[playlists]] block ──
                     if (EnsureSeriesPlaylistField(tomlPath))
                         _logger.LogInformation("Added series-playlist field to {Path}", tomlPath);
                     var addedSongs = EnsureSongsOnPlaylistBlocks(tomlPath);
                     if (addedSongs > 0)
                         _logger.LogInformation("Added songs = \"*\" to {Count} [[playlists]] block(s) in {Path}", addedSongs, tomlPath);
 
-                    // ── Step 3: Populate tracks.csv with any new music files ──
                     var tomlText = File.ReadAllText(tomlPath);
                     var tomlOptions = new TomlModelOptions { ConvertPropertyName = ToKebabCase };
                     FolderSeriesFileConfig seriesFile;
@@ -129,7 +124,7 @@ namespace UMB.CLI.Services
 
                     var defaults = seriesFile.DefaultTrackData;
 
-                    // Read existing CSV rows (dynamic — preserves all columns including "order")
+                    // dynamic columns: preserves "order" and any extras
                     var (existingRows, existingHeaders) = ReadCsvRows(csvPath);
 
                     var existingFilenames = new HashSet<string>(
@@ -138,7 +133,6 @@ namespace UMB.CLI.Services
                             .Select(r => r["filename"]),
                         StringComparer.OrdinalIgnoreCase);
 
-                    // Find music files not already in CSV, sorted alphabetically
                     var newFiles = Directory.GetFiles(seriesDir)
                         .Where(f => validExtensions.Contains(Path.GetExtension(f)))
                         .Select(f => Path.GetFileName(f))
@@ -153,7 +147,6 @@ namespace UMB.CLI.Services
                             .Concat(ExpectedCsvColumns.Where(h => !currentHeaderSet.Contains(h)))
                             .ToArray();
 
-                    // Add new rows
                     foreach (var filename in newFiles)
                     {
                         var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -179,7 +172,6 @@ namespace UMB.CLI.Services
                     if (newFiles.Count == 0 && !needsColumnUpdate)
                         continue;
 
-                    // Rewrite CSV with all rows (preserves every column)
                     WriteCsvRows(csvPath, existingRows, existingHeaders);
 
                     if (needsColumnUpdate)
@@ -195,7 +187,6 @@ namespace UMB.CLI.Services
                     }
                 }
 
-                // ── Step 4: Append any new custom series to series-order.toml ──
                 totalSeriesOrderAdded += SyncSeriesOrderToml(modDir);
             }
 
@@ -383,7 +374,6 @@ namespace UMB.CLI.Services
             File.WriteAllText(tomlPath, sb.ToString());
         }
 
-        // ── series.toml generation ───────────────────────────────────────────
 
         private string BuildSeriesToml(string folderName)
         {
@@ -523,11 +513,9 @@ namespace UMB.CLI.Services
         {
             var text = File.ReadAllText(tomlPath);
 
-            // Already has it?
             if (Regex.IsMatch(text, @"^\s*series-playlist\s*=", RegexOptions.Multiline))
                 return false;
 
-            // Locate the [series] block.
             var seriesHeader = Regex.Match(text, @"^\s*\[series\]\s*$", RegexOptions.Multiline);
             if (!seriesHeader.Success)
                 return false;
@@ -630,7 +618,6 @@ namespace UMB.CLI.Services
             return added;
         }
 
-        // ── Vanilla data lookup ──────────────────────────────────────────────
 
         private void EnsureVanillaDataLoaded()
         {

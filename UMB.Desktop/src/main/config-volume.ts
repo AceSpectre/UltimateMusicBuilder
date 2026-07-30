@@ -43,8 +43,6 @@ interface VolumeAnalyzeResult {
 }
 
 function tempPath(prefix: string, ext: string): string {
-  // Math.random()/Date.now() avoided elsewhere in the codebase only inside the
-  // workflow sandbox; here in the main process they are fine for temp names.
   return join(tmpdir(), `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}.${ext}`)
 }
 

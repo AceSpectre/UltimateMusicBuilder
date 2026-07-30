@@ -4,14 +4,9 @@ import { createWorkspace, seedTestDataMod, launchApp, firstWindow, type E2EWorks
 let ws: E2EWorkspace
 let app: ElectronApplication
 
-/**
- * The app shell: sidebar navigation, command palette, bottom panel and theme
- * toggle. None of it needs game resources or external tools, so it runs in CI —
- * and the Runtime Debug pane in the bottom panel is the assertion surface for
- * "did the click actually reach the handler".
- */
+// App shell: nav, palette, bottom panel, theme. Runtime Debug pane is the assertion surface.
 
-// Every sidebar entry, in nav order (see src/renderer/src/lib/actions.ts).
+// nav order — src/renderer/src/lib/actions.ts
 const NAV_ITEMS: Array<{ id: string; label: string }> = [
   { id: 'build', label: 'Build' },
   { id: 'nus3-convert', label: 'Nus3 Convert' },
@@ -46,10 +41,7 @@ async function clickNav(page: Page, label: string): Promise<void> {
   await page.getByRole('navigation').getByText(label, { exact: true }).click()
 }
 
-/**
- * The palette overlay. Action labels are duplicated in the sidebar, so palette
- * assertions must be scoped or they hit a strict-mode violation.
- */
+/** The palette overlay, scoped so sidebar labels don't collide. */
 function paletteOf(page: Page): Locator {
   return page
     .locator('div.fixed.inset-0.z-50')
@@ -61,8 +53,7 @@ async function openPalette(page: Page): Promise<[Locator, Locator]> {
   await page.keyboard.press('Control+k')
   const search = page.getByPlaceholder('Search actions...')
   await expect(search).toBeVisible()
-  // The component focuses the input on a 50ms timeout; wait for it so keyboard
-  // events (Escape) reach the palette's handler rather than <body>.
+  // wait for the 50ms autofocus so Escape reaches the palette
   await expect(search).toBeFocused()
   return [paletteOf(page), search]
 }
@@ -82,12 +73,9 @@ test('sidebar navigates to every action view', async () => {
 
   for (const item of NAV_ITEMS) {
     await clickNav(page, item.label)
-    // The Runtime Debug pane echoes the dispatched action id, so this asserts the
-    // click reached App.svelte's selectAction — not merely that a label exists.
     await expect(page.getByText(`active tab: ${item.id}`)).toBeVisible({ timeout: 8000 })
   }
 
-  // Every view mounted without taking the renderer down with it.
   expect((await page.evaluate(() => window.electron.umb.debugPing())).ok).toBe(true)
 })
 
@@ -118,7 +106,6 @@ test('command palette closes when the backdrop is clicked', async () => {
   const page = await firstWindow(app)
 
   const [palette, search] = await openPalette(page)
-  // Click the overlay itself (top-left corner), not the inner card.
   await palette.click({ position: { x: 5, y: 5 } })
   await expect(search).toBeHidden()
 })
@@ -129,12 +116,10 @@ test('command palette filters actions by the typed query', async () => {
   const [palette, search] = await openPalette(page)
   await search.fill('manage')
 
-  // 'Manage Series', 'Manage Songs', 'Manage Playlists' match; 'Build' must not.
   await expect(palette.getByRole('button', { name: 'Manage Series' })).toBeVisible()
   await expect(palette.getByRole('button', { name: 'Manage Songs' })).toBeVisible()
   await expect(palette.getByRole('button', { name: 'Manage Playlists' })).toBeVisible()
   await expect(palette.getByRole('button', { name: 'Build', exact: true })).toHaveCount(0)
-  // The Mods group is suppressed while a query is active.
   await expect(palette.getByText('Mods', { exact: true })).toHaveCount(0)
 
   await search.press('Escape')
@@ -170,7 +155,6 @@ test('command palette lists mods and selecting one sets the active mod', async (
   await openBottomPanel(page)
 
   const [palette, search] = await openPalette(page)
-  // The Mods group only renders while the query is empty.
   await expect(palette.getByText('Mods', { exact: true })).toBeVisible()
   await palette.getByRole('button', { name: 'test-mod', exact: true }).click()
 
@@ -202,8 +186,6 @@ test('console pane renders its empty state and every level filter', async () => 
   const page = await firstWindow(app)
   await openBottomPanel(page)
 
-  // No CLI action has run in this workspace, so the console must be empty rather
-  // than showing stale or placeholder rows — and each filter must stay operable.
   await expect(page.getByText('0 log lines')).toBeVisible()
   for (const filter of ['Info', 'Warn', 'Error', 'All']) {
     await page.getByRole('button', { name: filter, exact: true }).click()
@@ -225,7 +207,6 @@ test('theme toggle flips the dark class and persists the choice', async () => {
   expect(await isDark()).toBe(!before)
   expect(await stored()).toBe(before ? 'light' : 'dark')
 
-  // Toggle back so later tests see the default.
   await page.getByTitle(!before ? 'Switch to light mode' : 'Switch to dark mode').click()
   expect(await isDark()).toBe(before)
 })

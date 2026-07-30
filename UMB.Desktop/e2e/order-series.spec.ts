@@ -10,7 +10,6 @@ let modDir: string
 test.beforeAll(async () => {
   ws = createWorkspace()
   modDir = seedTestDataMod(ws, 'test-mod')
-  // Add a second custom series so series ordering has two entries.
   const gamma = join(modDir, 'gamma')
   mkdirSync(gamma, { recursive: true })
   writeFileSync(join(gamma, 'series.toml'), '[series]\nid = "gamma"\nname = "Gamma"\n', 'utf8')
@@ -24,8 +23,7 @@ test('loadSeriesOrder lists custom series; dev pre-ordered by series-order.toml'
   const data = await page.evaluate((mp) => window.electron.umb.loadSeriesOrder(mp), modDir)
   const ids = data.items.map((i) => i.seriesId).sort()
   expect(ids).toEqual(['dev', 'gamma'])
-  expect(data.hasSeriesOrder).toBe(true) // configured-mod ships series-order.toml = ["dev"]
-  // series-order.toml = ["dev"] must be honoured end-to-end: dev before the unlisted gamma.
+  expect(data.hasSeriesOrder).toBe(true)
   expect(data.items.map((i) => i.seriesId)).toEqual(['dev', 'gamma'])
 })
 
@@ -77,12 +75,10 @@ test('UI: editing the name + adding a game via the panel persists to series.toml
   const page = await firstWindow(app)
   await page.getByText('Manage Series').first().click()
   await page.getByRole('button', { name: 'Reload series' }).click()
-  await page.getByText('Gamma').first().click() // select the card
+  await page.getByText('Gamma').first().click()
 
-  // Settings tab: rename the series.
   await page.getByLabel('Name', { exact: true }).fill('Gamma DOM')
 
-  // Games tab: add a game through the modal.
   await page.getByRole('button', { name: 'Games', exact: true }).click()
   await page.getByRole('button', { name: 'Add game', exact: true }).click()
   await page.getByPlaceholder('mario_kart_8').fill('dom_game')
@@ -117,7 +113,6 @@ test('createSeries writes a new series folder (series.toml + header-only tracks.
   expect(toml).toContain('name = "IPC Series"')
   expect(toml).toContain('series-playlist = "bgm_ipc_series"')
   expect(toml).toContain('id = "ipc_game"')
-  // First game becomes the default game.
   expect(toml).toContain('game = "ipc_game"')
 
   const csv = readFileSync(join(modDir, 'ipc_series', 'tracks.csv'), 'utf8')
@@ -133,7 +128,6 @@ test('UI: New Series modal creates a series (playlist auto-filled, one game requ
   await page.getByPlaceholder('my_series', { exact: true }).fill('ui_series')
   await page.getByPlaceholder('My Series', { exact: true }).fill('UI Series')
 
-  // Create is disabled until a game is added.
   await expect(page.getByRole('button', { name: 'Create' })).toBeDisabled()
   await page.getByPlaceholder('my_game').fill('ui_game')
   await page.getByPlaceholder('My Game').fill('UI Game')
@@ -141,13 +135,12 @@ test('UI: New Series modal creates a series (playlist auto-filled, one game requ
 
   await page.getByRole('button', { name: 'Create' }).click()
 
-  // Modal closes and the new series card appears in the list.
   await expect(page.getByText('UI Series').first()).toBeVisible({ timeout: 5000 })
 
   const toml = readFileSync(join(modDir, 'ui_series', 'series.toml'), 'utf8')
   expect(toml).toContain('id = "ui_series"')
   expect(toml).toContain('name = "UI Series"')
-  expect(toml).toContain('series-playlist = "bgm_ui_series"') // auto-filled from the id
+  expect(toml).toContain('series-playlist = "bgm_ui_series"')
   expect(toml).toContain('id = "ui_game"')
   expect(toml).toContain('game = "ui_game"')
 
@@ -198,7 +191,7 @@ test('UI: Change icon in the settings panel writes the chosen PNG', async () => 
   const page = await firstWindow(app)
   await page.getByText('Manage Series').first().click()
   await page.getByRole('button', { name: 'Reload series' }).click()
-  await page.getByText('Somewhat Good: Karts').first().click() // select the dev series card
+  await page.getByText('Somewhat Good: Karts').first().click()
 
   await page.locator('label:has-text("Change icon") input[type="file"]').setInputFiles(pngFile())
 

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Sma5h.Mods.Music.Interfaces;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
@@ -9,8 +8,7 @@ namespace UMB.CLI.Services
 {
     /// <summary>
     /// Diagnostic action: prints every stage's UiStageId / UiSeriesId / BgmSetId so we can
-    /// see exactly which playlist each stage rolls from. Useful for confirming things like
-    /// "does Hyrule Castle actually use bgmzelda?" without guessing or reading PRC bytes.
+    /// see exactly which playlist each stage rolls from.
     /// </summary>
     public class DumpStagesService
     {
@@ -46,7 +44,6 @@ namespace UMB.CLI.Services
             _logger.LogInformation("Stage â†’ BgmSetId map ({Count} stages)", stages.Count);
             _logger.LogInformation("--------------------");
 
-            // Flat per-stage list.
             foreach (var s in stages)
             {
                 _logger.LogInformation("  {Stage,-50} series={Series,-30} bgm={Bgm}",

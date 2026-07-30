@@ -26,7 +26,6 @@ namespace UMB.CLI
             {
                 var outputPath = _config.CurrentValue.OutputPath;
 
-                //Create workspace
                 if (!Directory.Exists(outputPath))
                 {
                     _logger.LogDebug("Creating Working folder...");
@@ -34,7 +33,6 @@ namespace UMB.CLI
                     return true;
                 }
 
-                //Reset â€” count any files or directories left from a previous build.
                 var existingFiles = Directory.GetFiles(outputPath, "*", SearchOption.AllDirectories);
                 var existingDirs = Directory.GetDirectories(outputPath, "*", SearchOption.AllDirectories);
                 if (existingFiles.Length == 0 && existingDirs.Length == 0)

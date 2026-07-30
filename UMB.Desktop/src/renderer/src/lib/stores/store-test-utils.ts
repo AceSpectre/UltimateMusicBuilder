@@ -1,19 +1,13 @@
-/**
- * The rune stores read localStorage (and, for theme, document + matchMedia) at
- * module load, so these stubs must be installed before the dynamic import. Small
- * enough that the test suite stays on the node environment instead of jsdom.
- */
+// Browser-global stubs; must be installed before the dynamic store import.
 
 export interface FakeStorage {
-  store: Map<string, string>
   getItem(key: string): string | null
   setItem(key: string, value: string): void
 }
 
-export function fakeStorage(initial: Record<string, string> = {}): FakeStorage {
+function fakeStorage(initial: Record<string, string> = {}): FakeStorage {
   const store = new Map(Object.entries(initial))
   return {
-    store,
     getItem: (key) => store.get(key) ?? null,
     setItem: (key, value) => {
       store.set(key, value)
@@ -42,9 +36,6 @@ export function installBrowserStubs(options: StubOptions = {}): Stubs {
   let frames: FrameRequestCallback[] = []
 
   const classList = {
-    add: (c: string) => rootClasses.add(c),
-    remove: (c: string) => rootClasses.delete(c),
-    contains: (c: string) => rootClasses.has(c),
     toggle: (c: string, force?: boolean) => {
       const next = force ?? !rootClasses.has(c)
       if (next) rootClasses.add(c)
@@ -71,7 +62,7 @@ export function installBrowserStubs(options: StubOptions = {}): Stubs {
     storage,
     rootClasses,
     flushFrames() {
-      // Callbacks may queue more frames; drain what is pending, once.
+      // Drain only what is currently queued.
       const queued = frames
       frames = []
       for (const cb of queued) cb(0)

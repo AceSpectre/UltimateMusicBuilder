@@ -5,14 +5,10 @@ import { analyzeMerge, validateOutputName, executeMerge } from './merge'
 import { makeWorkspace, makeDir, writeSeries, writeFile, type Workspace } from './test-utils'
 
 let ws: Workspace
-let lines: { level: string; message: string }[]
-const onLine = (l: { level: string; message: string }): void => {
-  lines.push(l)
-}
+const onLine = (): void => {}
 
 beforeEach(() => {
   ws = makeWorkspace()
-  lines = []
 })
 
 afterEach(() => {
@@ -154,7 +150,7 @@ describe('executeMerge', () => {
     const outSeries = join(result.outputPath, 'persona')
     const mergedToml = readFileSync(join(outSeries, 'series.toml'), 'utf8')
     expect(mergedToml).toContain('id = "persona"')
-    expect(mergedToml).toContain('name = "Persona A"') // priority wins
+    expect(mergedToml).toContain('name = "Persona A"')
     expect(mergedToml).toContain('id = "p3"')
     expect(mergedToml).toContain('id = "p5"')
     expect(mergedToml).toContain('id = "bgmjack"')
@@ -164,7 +160,6 @@ describe('executeMerge', () => {
     expect(mergedCsv).toContain('a.flac')
     expect(mergedCsv).toContain('b.flac')
     expect(mergedCsv.split(/\r?\n/)[0]).toContain('order')
-    // a.flac appears once (deduped, priority A's row kept).
     const aCount = (mergedCsv.match(/a\.flac/g) ?? []).length
     expect(aCount).toBe(1)
   })
@@ -179,7 +174,6 @@ describe('executeMerge', () => {
 
     const result = await executeMerge(ws.root, [a, b], 'merged', a, onLine)
     const order = readFileSync(join(result.outputPath, 'series-order.toml'), 'utf8')
-    // Only the indented entry lines (`    "id",`), not the header comments.
     const ids = [...order.matchAll(/^\s+"([^"]+)",/gm)].map((m) => m[1])
     expect(ids).toEqual(['x', 'y', 'z'])
   })

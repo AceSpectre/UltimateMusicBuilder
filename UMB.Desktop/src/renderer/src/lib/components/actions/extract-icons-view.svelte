@@ -75,7 +75,6 @@
     <section class="flex h-full min-h-0 w-full flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
 
-      <!-- Header -->
       <div class="shrink-0 border-b border-border px-5 py-3 flex items-center gap-3">
         <div
           class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
@@ -89,7 +88,6 @@
         </div>
       </div>
 
-      <!-- Content -->
       <div class="min-h-0 flex-1 overflow-auto px-5 py-5">
         {#if mods.length === 0}
           <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
@@ -97,7 +95,6 @@
           </div>
         {:else}
           <div class="flex flex-col gap-5">
-            <!-- Compiled mod folder picker -->
             <div class="flex flex-col gap-2">
               <label class="text-[12.5px] font-medium text-muted-foreground">{$_('extractIcons.compiledModLabel')}</label>
               <div class="flex items-center gap-2">
@@ -114,7 +111,6 @@
               </div>
             </div>
 
-            <!-- Target mod dropdown -->
             <div class="flex flex-col gap-2">
               <label class="text-[12.5px] font-medium text-muted-foreground">{$_('extractIcons.targetModLabel')}</label>
               <select
@@ -128,7 +124,6 @@
               </select>
             </div>
 
-            <!-- Analyze button -->
             {#if compiledModPath && selectedMod && !analysis}
               <button
                 onclick={handleAnalyze}
@@ -146,7 +141,6 @@
               </button>
             {/if}
 
-            <!-- Analysis results -->
             {#if analysis}
               <div class="rounded-xl border border-border bg-background p-4">
                 <div class="grid grid-cols-2 gap-3 text-[13px]">
@@ -171,7 +165,6 @@
                 {#if analysis.matched.length === 0}
                   <p class="mt-3 text-[12.5px] text-muted-foreground">{$_('extractIcons.noMatches')}</p>
                 {:else}
-                  <!-- Series list -->
                   <div class="mt-4 max-h-[200px] overflow-auto rounded-lg border border-border bg-card">
                     <table class="w-full border-collapse text-[12px]">
                       <tbody>
@@ -193,7 +186,6 @@
                     </table>
                   </div>
 
-                  <!-- Extract buttons -->
                   {#if !result}
                     <div class="mt-4 flex items-center gap-3">
                       <button
@@ -231,7 +223,6 @@
               </div>
             {/if}
 
-            <!-- Result -->
             {#if result}
               <div class="rounded-xl border border-green-500/30 bg-green-500/5 p-4">
                 <div class="flex items-center gap-2 text-[13px] font-semibold text-green-500">

@@ -109,8 +109,6 @@ function prettifyName(filename: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
-// ── JSON sidecar helpers (cache + conversion metadata live in songs-to-validate) ──
-
 function validateDirOf(seriesPath: string): string {
   return join(seriesPath, VALIDATE_FOLDER)
 }
@@ -202,8 +200,6 @@ function nus3PathFor(seriesPath: string, trackId: string): string {
   return join(validateDirOf(seriesPath), base + '.nus3audio')
 }
 
-// ── ffprobe ──
-
 async function ffprobe(filePath: string): Promise<{ sampleRate: number; duration: number }> {
   try {
     const { stdout } = await execFileAsync('ffprobe', [
@@ -223,9 +219,7 @@ async function ffprobe(filePath: string): Promise<{ sampleRate: number; duration
   return { sampleRate: 0, duration: 0 }
 }
 
-// ── source listing ──
-
-export function listNus3Sources(_workspace: string, seriesPath: string): Nus3SourceTrack[] {
+export function listNus3Sources(seriesPath: string): Nus3SourceTrack[] {
   try {
     const entries = readdirSync(seriesPath)
     const validateDir = validateDirOf(seriesPath)
@@ -262,10 +256,7 @@ export function listNus3Sources(_workspace: string, seriesPath: string): Nus3Sou
   }
 }
 
-// ── pymusiclooper analysis (cached) ──
-
 export async function analyzeLoopPoints(
-  _workspace: string,
   filePath: string,
   options: LoopAnalysisOptions = {}
 ): Promise<Nus3AnalysisResult> {
@@ -351,7 +342,6 @@ async function runPymusiclooper(
     const candidates: LoopCandidate[] = []
     const lines = stdout.split('\n').filter((l) => l.trim().length > 0)
     const rate = sampleRate > 0 ? sampleRate : 48000
-    console.log(`[nus3] pymusiclooper raw output: ${lines.length} line(s)`)
 
     for (const line of lines) {
       const parts = line.trim().split(/\s+/)
@@ -407,8 +397,6 @@ async function runPymusiclooper(
 
 const previewDir = join(tmpdir(), 'umb-previews')
 
-// ── duration probe (cached, no pymusiclooper) ──
-
 /** Track duration in seconds from the analysis cache, or a cheap ffprobe. */
 export async function getTrackDuration(filePath: string): Promise<number> {
   const seriesPath = dirname(filePath)
@@ -426,8 +414,6 @@ export async function getTrackDuration(filePath: string): Promise<number> {
   }
   return probe.duration
 }
-
-// ── waveform peaks (cached) ──
 
 export async function extractWaveformPeaks(filePath: string, bars: number = 140): Promise<number[]> {
   const seriesPath = dirname(filePath)
@@ -528,8 +514,6 @@ export async function generateLoopPreview(
     return null
   }
 }
-
-// ── conversion (per track) ──
 
 /**
  * Converts a single source track to .nus3audio in songs-to-validate via the CLI

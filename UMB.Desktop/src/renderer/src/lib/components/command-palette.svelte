@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Search } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
-  import { actions, shouldRunCliAction } from '$lib/actions'
+  import { actions } from '$lib/actions'
   import type { ModInfo } from '$lib/types/electron'
 
   let {
@@ -61,7 +61,6 @@
       onclick={(e) => e.stopPropagation()}
       onkeydown={handleKeydown}
     >
-      <!-- Search input -->
       <div class="flex items-center gap-2 px-4 border-b border-border">
         <Search size={16} class="text-muted-foreground shrink-0" />
         <input
@@ -72,7 +71,6 @@
         />
       </div>
 
-      <!-- Results -->
       <div class="max-h-[300px] overflow-y-auto p-2">
         {#if filtered().length === 0}
           <div class="px-3 py-6 text-center text-sm text-muted-foreground">{$_('commandPalette.noResults')}</div>

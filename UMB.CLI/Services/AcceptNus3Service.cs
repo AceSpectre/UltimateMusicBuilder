@@ -2,7 +2,6 @@
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Sma5h;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
@@ -47,8 +46,8 @@ namespace UMB.CLI.Services
         {
             Script.PrintBanner(_logger);
 
-            var (modDir, seriesDir) = Script.PromptModAndSeries(_musicConfig, _logger);
-            if (modDir == null || seriesDir == null)
+            var (_, seriesDir) = Script.PromptModAndSeries(_musicConfig, _logger);
+            if (seriesDir == null)
                 return;
 
             var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
@@ -123,11 +122,9 @@ namespace UMB.CLI.Services
             int sourcesRemoved = 0;
             int csvUpdated = 0;
 
-            // Read tracks.csv if it exists, for updating filenames
             var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
             List<FolderTrackCsvRow> csvRows = null;
-            bool csvExists = File.Exists(csvPath);
-            if (csvExists)
+            if (File.Exists(csvPath))
             {
                 var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
                 {
@@ -146,7 +143,6 @@ namespace UMB.CLI.Services
                 var basename = Path.GetFileNameWithoutExtension(nus3File);
                 var destFile = Path.Combine(seriesDir, Path.GetFileName(nus3File));
 
-                // Move nus3audio into series folder
                 if (File.Exists(destFile))
                     File.Delete(destFile);
                 File.Move(nus3File, destFile);
@@ -168,7 +164,6 @@ namespace UMB.CLI.Services
                             sourcesRemoved++;
                         }
 
-                        // Update tracks.csv if it had a row with the old filename
                         if (csvRows != null)
                         {
                             var matchingRow = csvRows.FirstOrDefault(r =>
@@ -183,7 +178,6 @@ namespace UMB.CLI.Services
                 }
             }
 
-            // Rewrite tracks.csv if any rows were updated
             if (csvUpdated > 0 && csvRows != null)
             {
                 using var writer = new StreamWriter(csvPath);
@@ -196,7 +190,6 @@ namespace UMB.CLI.Services
                 _logger.LogInformation("Updated {Count} filename(s) in tracks.csv.", csvUpdated);
             }
 
-            // Remove validate folder if no nus3audio files remain
             if (Directory.GetFiles(validateDir, "*.nus3audio").Length == 0)
             {
                 Directory.Delete(validateDir, true);

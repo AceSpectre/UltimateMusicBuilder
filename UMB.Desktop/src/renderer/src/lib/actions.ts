@@ -7,68 +7,53 @@ import type { Component } from 'svelte'
 
 export interface NavItem {
   id: string
-  label: string
   icon: Component
-  mode?: 'cli' | 'view'
 }
 
 export interface NavGroup {
   id: string
-  label: string
   items: NavItem[]
 }
 
 export const navGroups: NavGroup[] = [
   {
     id: 'build',
-    label: 'BUILD',
     items: [
-      { id: 'build', label: 'Build', icon: Hammer, mode: 'view' }
+      { id: 'build', icon: Hammer }
     ]
   },
   {
     id: 'audio',
-    label: 'AUDIO',
     items: [
-      { id: 'nus3-convert', label: 'Nus3 Convert', icon: AudioWaveform, mode: 'view' },
-      { id: 'config-volume', label: 'Config Volume', icon: Volume2, mode: 'view' }
+      { id: 'nus3-convert', icon: AudioWaveform },
+      { id: 'config-volume', icon: Volume2 }
     ]
   },
   {
     id: 'organize',
-    label: 'ORGANIZE',
     items: [
-      { id: 'order-series', label: 'Manage Series', icon: ListOrdered, mode: 'view' },
-      { id: 'order-tracks', label: 'Manage Songs', icon: ArrowUpDown, mode: 'view' },
-      { id: 'manage-playlists', label: 'Manage Playlists', icon: ListPlus, mode: 'view' }
+      { id: 'order-series', icon: ListOrdered },
+      { id: 'order-tracks', icon: ArrowUpDown },
+      { id: 'manage-playlists', icon: ListPlus }
     ]
   },
   {
     id: 'transfer',
-    label: 'TRANSFER',
     items: [
-      { id: 'merge', label: 'Merge', icon: GitMerge, mode: 'view' },
-      { id: 'extract-icons', label: 'Extract Icons', icon: Image, mode: 'view' }
+      { id: 'merge', icon: GitMerge },
+      { id: 'extract-icons', icon: Image }
     ]
   },
   {
     id: 'inspect',
-    label: 'INSPECT',
     items: [
-      { id: 'playlist-info', label: 'Playlist Info', icon: ListMusic, mode: 'view' }
+      { id: 'playlist-info', icon: ListMusic }
     ]
   }
 ]
 
 export const actions = navGroups.flatMap((group) =>
   group.items.map((item) => ({
-    id: item.id,
-    label: item.label,
-    group: 'Actions',
-    mode: item.mode ?? 'cli'
+    id: item.id
   }))
 )
-
-export function shouldRunCliAction(actionId: string): boolean {
-  return actions.find((action) => action.id === actionId)?.mode !== 'view'
-}

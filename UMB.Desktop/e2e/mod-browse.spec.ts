@@ -7,7 +7,7 @@ let ws: E2EWorkspace
 let app: ElectronApplication
 let modPath: string
 
-// Tests/TestData/configured-mod: 'dev' (13 tracks, 13 .flac sources) + 'mario' (6 tracks).
+// Tests/TestData/configured-mod fixture counts.
 const DEV_TRACKS = 13
 const MARIO_TRACKS = 6
 
@@ -22,8 +22,6 @@ test.afterAll(async () => {
   ws?.cleanup()
 })
 
-// ── workspace / version plumbing ──
-
 test('getWorkspace reports the UMB_WORKSPACE root the app was launched with', async () => {
   const page = await firstWindow(app)
   const workspace = await page.evaluate(() => window.electron.umb.getWorkspace())
@@ -34,8 +32,6 @@ test('getAppVersion reports "dev" when the app is not packaged', async () => {
   const page = await firstWindow(app)
   expect(await page.evaluate(() => window.electron.umb.getAppVersion())).toBe('dev')
 })
-
-// ── mod / series inspection (drives the app-bar picker and every view's series list) ──
 
 test('listModSeries returns each series folder that has a tracks.csv', async () => {
   const page = await firstWindow(app)
@@ -65,7 +61,6 @@ test('listModSeries skips songs-to-validate, dot-folders, and folders without a 
 
 test('listModSeries refuses a path outside Mods/MusicMods', async () => {
   const page = await firstWindow(app)
-  // Path-traversal guard: the renderer must not be able to enumerate arbitrary dirs.
   const escaped = await page.evaluate((root) => window.electron.umb.listModSeries(root), ws.root)
   expect(escaped).toEqual([])
 })
@@ -80,12 +75,9 @@ test('getModStats counts series and tracks across the whole mod', async () => {
 
 test('app bar shows the series and track counts for the active mod', async () => {
   const page = await firstWindow(app)
-  // The active mod is auto-selected on load, so its stats must render, not the "—" placeholder.
   await expect(page.getByText('2 series')).toBeVisible({ timeout: 8000 })
   await expect(page.getByText(`${DEV_TRACKS + MARIO_TRACKS} tracks`)).toBeVisible({ timeout: 8000 })
 })
-
-// ── nus3 source listing / rejection (portable: no ffmpeg, no pymusiclooper) ──
 
 test('listNus3Sources lists every convertible audio file in the series', async () => {
   const page = await firstWindow(app)
@@ -95,7 +87,6 @@ test('listNus3Sources lists every convertible audio file in the series', async (
   )
 
   expect(sources.length).toBe(DEV_TRACKS)
-  // .txt/.png/.toml siblings must not be offered for conversion.
   for (const s of sources) {
     expect(s.src.toLowerCase()).toMatch(/\.(mp3|wav|flac|ogg)$/)
     expect(s.converted).toBe(false)
@@ -115,7 +106,6 @@ test('listNus3Sources marks a source converted once its nus3audio sits in songs-
 
   const after = await page.evaluate((sp) => window.electron.umb.listNus3Sources(sp), seriesPath)
   expect(after.find((s) => s.src === target.src)?.converted).toBe(true)
-  // The others are untouched.
   expect(after.filter((s) => s.converted).length).toBe(1)
 
   rmSync(validateDir, { recursive: true, force: true })
@@ -204,11 +194,8 @@ test('rejectNus3Track is a no-op when the track was never converted', async () =
   expect(existsSync(join(seriesPath, 'songs-to-validate', '.conversions.json'))).toBe(false)
 })
 
-// ── cancel ──
-
 test('cancelAction is safe when no CLI action is running', async () => {
   const page = await firstWindow(app)
   await page.evaluate(() => window.electron.umb.cancelAction())
-  // The bridge must still be alive afterwards.
   expect((await page.evaluate(() => window.electron.umb.debugPing())).ok).toBe(true)
 })

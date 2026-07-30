@@ -3,10 +3,7 @@ import { defineConfig } from 'vitest/config'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 
 export default defineConfig({
-  // Needed so the rune-based stores (`*.svelte.ts`) compile under vitest. The plugin
-  // only transforms .svelte/.svelte.ts, so the main-process tests are unaffected.
-  // The store tests stay on the node environment and stub the handful of browser
-  // globals they touch, which avoids pulling jsdom in as a dependency.
+  // Compiles the rune stores (*.svelte.ts) under vitest.
   plugins: [svelte({ hot: false })],
   test: {
     environment: 'node',

@@ -126,7 +126,6 @@
     dndItems = orderData ? orderData.items : []
   })
 
-  // Clear "saved" once the user starts editing again.
   $effect(() => {
     if (isDirty && saveState === 'saved') {
       saveState = 'idle'
@@ -429,7 +428,6 @@
           </datalist>
 
           <div class="min-w-[1000px]">
-            <!-- Header row -->
             <div
               class="sticky z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
               style="grid-template-columns: 24px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px 60px minmax(160px,1fr) 84px; top: -5px"

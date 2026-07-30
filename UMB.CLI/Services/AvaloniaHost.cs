@@ -14,7 +14,6 @@ namespace UMB.CLI.Services
     internal static class AvaloniaHost
     {
         private static readonly object _initLock = new();
-        private static Thread _uiThread;
         private static volatile bool _started;
 
         public static TResult ShowWindow<TWindow, TResult>(Func<TWindow> windowFactory, Func<TWindow, TResult> resultExtractor)
@@ -47,7 +46,7 @@ namespace UMB.CLI.Services
         // Windows blocks foreground activation from non-foreground processes (anti focus-stealing),
         // so a plain Show()/Activate() from this CLI host often leaves the window behind whatever
         // app the user is currently looking at. Briefly toggling Topmost yanks the window to the
-        // front regardless â€” a well-known WPF/WinForms trick that also works in Avalonia.
+        // front regardless.
         private static void ForceForeground(Window window)
         {
             try
@@ -74,7 +73,7 @@ namespace UMB.CLI.Services
                 var ready = new ManualResetEventSlim(false);
                 Exception startupError = null;
 
-                _uiThread = new Thread(() =>
+                var uiThread = new Thread(() =>
                 {
                     try
                     {
@@ -95,8 +94,8 @@ namespace UMB.CLI.Services
                     Name = "Avalonia UI"
                 };
                 if (OperatingSystem.IsWindows())
-                    _uiThread.SetApartmentState(ApartmentState.STA);
-                _uiThread.Start();
+                    uiThread.SetApartmentState(ApartmentState.STA);
+                uiThread.Start();
                 ready.Wait();
 
                 if (startupError != null)

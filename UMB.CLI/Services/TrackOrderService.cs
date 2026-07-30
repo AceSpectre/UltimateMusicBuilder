@@ -3,7 +3,6 @@ using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UMB.CLI.Views;
-using Sma5h;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
@@ -56,7 +55,7 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            // Parse tracks.csv (dynamic columns, preserving every value)
+            // dynamic columns: every value preserved
             List<Dictionary<string, string>> rows;
             string[] headers;
             try
@@ -95,7 +94,6 @@ namespace UMB.CLI.Services
                 }
             }
 
-            // Load vanilla data if needed
             List<TrackViewModel> vanillaRows = new();
             if (isExistingSeries && uiSeriesId != null)
             {
@@ -111,13 +109,10 @@ namespace UMB.CLI.Services
                 }
             }
 
-            // Build modded view models from tracks.csv
             var modRows = BuildModRows(rows);
 
-            // Compose initial merged list
             var viewModels = ComposeMergedList(vanillaRows, modRows, rows, headers, songOrderPath);
 
-            // Launch GUI
             List<TrackViewModel> result = null;
             try
             {
@@ -170,7 +165,6 @@ namespace UMB.CLI.Services
             WriteCsvRows(csvPath, reorderedRows, headers);
             _logger.LogInformation("Track order saved to {Path}.", csvPath);
 
-            // For existing-series: also write the full song_order.toml
             if (isExistingSeries && uiSeriesId != null)
             {
                 WriteSongOrderToml(songOrderPath, result);

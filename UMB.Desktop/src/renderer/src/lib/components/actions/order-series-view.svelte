@@ -15,7 +15,7 @@
   let newGameId = $state('')
   let newGameName = $state('')
 
-  // Same friendly labels as Manage Songs (Original / Remix / New Remix).
+  // Mirrors recordLabel in order-tracks-view.
   function recordLabel(value: string): string {
     if (value === 'arrange') return $_('orderTracks.recordArrange')
     if (value === 'new_arrange') return $_('orderTracks.recordNewArrange')
@@ -55,7 +55,6 @@
     showAddGame = false
   }
 
-  // ---- New Series modal ----
   const SERIES_ID_RE = /^[a-z0-9_]+$/
 
   let showNewSeries = $state(false)
@@ -73,7 +72,6 @@
   let panelIconBusy = $state(false)
   let panelIconError = $state<string | null>(null)
 
-  // Reads a picked PNG file as a data URL, rejecting anything that is not image/png.
   function readPngDataUrl(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       if (file.type !== 'image/png') {
@@ -196,7 +194,6 @@
     if (isDirty && saveState === 'saved') saveState = 'idle'
   })
 
-  // Clear any icon error when switching series.
   $effect(() => {
     void selectedItemId
     panelIconError = null

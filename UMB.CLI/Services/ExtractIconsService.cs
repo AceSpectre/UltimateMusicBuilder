@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Sma5h;
 using Sma5h.Helpers;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
@@ -200,7 +199,7 @@ namespace UMB.CLI.Services
                     break;
                 }
             }
-            if (brti < 0 || brti + 0x30 > bytes.Length)
+            if (brti < 0)
                 return false;
 
             int mipOffset = brti + 0x16;

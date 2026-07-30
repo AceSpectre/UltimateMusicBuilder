@@ -4,8 +4,7 @@ import { join } from 'path'
 import { getAppSettings, checkArcOutput, saveAppSettings } from './app-settings'
 import { makeWorkspace, writeFile, type Workspace } from './test-utils'
 
-// app-settings imports electron's `app` (app.isPackaged). Stub it so the dev
-// settings path (workspace/UMB.CLI/bin/Debug/net8.0) is used under test.
+// Stub electron's app so the dev settings path is used.
 vi.mock('electron', () => ({ app: { isPackaged: false } }))
 
 let ws: Workspace

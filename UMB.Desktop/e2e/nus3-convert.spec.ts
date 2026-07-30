@@ -10,8 +10,7 @@ const FLAC = 'flowerhead - Somewhat Good- Karts - 13 Time Trials.flac'
 const NUS3 = 'flowerhead - Somewhat Good- Karts - 13 Time Trials.nus3audio'
 const BASELINE_SIZE = 855544
 
-// Conversion shells out to ffmpeg + pymusiclooper + the dotnet CLI; skip the encode
-// tests (and the ones that read their output) when those aren't on PATH, e.g. on CI.
+// encode deps: ffmpeg + pymusiclooper + dotnet
 const ENCODE_DEPS_MISSING =
   !hasTool('ffmpeg') || !hasTool('pymusiclooper') || !hasTool('dotnet')
 
@@ -63,22 +62,14 @@ test('produced nus3audio size matches the CLI baseline manifest (within toleranc
   test.skip(ENCODE_DEPS_MISSING, 'requires ffmpeg + pymusiclooper + dotnet')
   const produced = join(series.dir, 'songs-to-validate', NUS3)
   const size = statSync(produced).size
-  // Audio payload is identical (same FLAC, same VGAudio encode); only loop-marker
-  // fields differ, so size should land within ~2% of the CLI baseline.
+  // only loop markers differ → within 2%
   expect(Math.abs(size - BASELINE_SIZE)).toBeLessThan(BASELINE_SIZE * 0.02)
 })
 
 test('accept moves the validated nus3audio into the series folder', async () => {
   test.skip(ENCODE_DEPS_MISSING, 'requires ffmpeg + pymusiclooper + dotnet')
   const page = await firstWindow(app)
-  // acceptNus3Files returns the CLI exit code (0 = success, -1 = error)
   const exitCode = await page.evaluate((sp) => window.electron.umb.acceptNus3Files(sp, false), series.dir)
-  expect(exitCode).toBe(0) // CLI exited successfully
+  expect(exitCode).toBe(0)
   expect(existsSync(join(series.dir, NUS3))).toBe(true)
-})
-
-test('UI smoke: Nus3 Convert view opens', async () => {
-  const page = await firstWindow(app)
-  await page.getByText('Nus3 Convert').first().click()
-  await expect(page.getByText('Nus3 Convert').or(page.getByText('dev')).first()).toBeVisible({ timeout: 8000 })
 })

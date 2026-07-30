@@ -217,7 +217,6 @@ function rewriteGames(lines: string[], games: SeriesGame[]): string[] {
     const seriesHeader = kept.findIndex((line) => line.trim() === '[series]')
     insertIndex = kept.length
     if (seriesHeader >= 0) {
-      insertIndex = kept.length
       for (let j = seriesHeader + 1; j < kept.length; j++) {
         if (/^\s*\[/.test(kept[j])) {
           insertIndex = j
@@ -363,7 +362,7 @@ export function loadSeriesOrderData(workspace: string, modPath: string): SeriesO
   const orderPath = join(resolvedModPath, 'series-order.toml')
   const existingOrder = loadSeriesOrder(orderPath)
 
-  const orderedIds = existingOrder.length > 0 ? existingOrder : []
+  const orderedIds = existingOrder
   const sorted = [...customSeries].sort((a, b) => {
     const aIdx = orderedIds.indexOf(a.id)
     const bIdx = orderedIds.indexOf(b.id)

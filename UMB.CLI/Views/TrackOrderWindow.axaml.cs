@@ -1,7 +1,5 @@
-using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
-using Avalonia.Markup.Xaml;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;

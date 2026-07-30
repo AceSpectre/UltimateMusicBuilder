@@ -46,7 +46,7 @@ namespace UMB.CLI.Views
         private void OnRowPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName != nameof(VolumeRowViewModel.UserOverride)) return;
-            // If the row whose override just changed is currently playing, update playback volume live.
+            // live volume update while playing
             if (_playingRow != null && _volumeProvider != null && ReferenceEquals(sender, _playingRow))
             {
                 _volumeProvider.Volume = _playingRow.EffectiveBankVolume;
@@ -58,7 +58,6 @@ namespace UMB.CLI.Views
             if (sender is not Button btn || btn.DataContext is not VolumeRowViewModel vm)
                 return;
 
-            // Toggle: clicking the currently-playing row's button stops it.
             if (_playingRow != null && ReferenceEquals(_playingRow, vm))
             {
                 StopAndReset();
@@ -108,8 +107,7 @@ namespace UMB.CLI.Views
             }
         }
 
-        // Natural end-of-track. Only fires here — manual stops via StopAndReset()
-        // unsubscribe first so this can't run when we're switching tracks.
+        // Natural end-of-track only; manual stops unsubscribe first.
         private void OnPlaybackStopped(object sender, StoppedEventArgs e)
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -175,8 +173,6 @@ namespace UMB.CLI.Views
         public string Title { get; set; }
         public string Filename { get; set; }
         public string SourcePath { get; set; }
-        public float TargetLufs { get; set; }
-        public float MaxMultiplier { get; set; }
 
         public bool HasMeasurement { get; set; }
         public float MeasuredLufs { get; set; }

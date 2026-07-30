@@ -16,7 +16,6 @@ afterEach(() => {
 
 const DUMMY_CSV = 'filename,title,game\nx.flac,X,Game\n'
 
-// Reorder-only payload: ids in the desired order, no field edits.
 const ord = (...ids: string[]) => ids.map((id) => ({ id, fields: null }))
 
 /** Lays down a custom-series folder (tracks.csv + series.toml) under a mod. */
@@ -228,7 +227,6 @@ describe('saveSeriesOrderData', () => {
     writeCustomSeries('mymod', 'db', 'id = "b"\nname = "B"\n')
     writeCustomSeries('mymod', 'dc', 'id = "c"\nname = "C"\n')
 
-    // Default load sorts by name: series:0=a, series:1=b, series:2=c.
     const result = saveSeriesOrderData(ws.root, modPath, ord('series:2', 'series:0'))
 
     expect(result.hasSeriesOrder).toBe(true)
@@ -282,8 +280,8 @@ describe('series.toml [series] fields', () => {
     expect(toml).toContain('name = "Game One Renamed"')
     expect(toml).toContain('id = "g2"')
     expect(toml).toContain('name = "Game Two"')
-    expect(toml).toContain('id = "a"') // series id preserved
-    expect(toml).toContain('[default-track-data]') // preserved
+    expect(toml).toContain('id = "a"')
+    expect(toml).toContain('[default-track-data]')
     expect((toml.match(/\[\[games\]\]/g) ?? []).length).toBe(2)
 
     const reloaded = loadSeriesOrderData(ws.root, modPath)
@@ -317,7 +315,7 @@ describe('series.toml [series] fields', () => {
 
     const toml = readFileSync(join(modPath, 'da', 'series.toml'), 'utf8')
     expect(toml).not.toContain('[[games]]')
-    expect(toml).toContain('[series]') // other tables intact
+    expect(toml).toContain('[series]')
     expect(toml).toContain('[default-track-data]')
   })
 
@@ -335,8 +333,8 @@ describe('series.toml [series] fields', () => {
     expect(toml).toContain('name = "Renamed"')
     expect(toml).toContain('series-playlist = "bgmother"')
     expect(toml).toContain('playlist-incidence = 50')
-    expect(toml).toContain('id = "a"') // identity preserved
-    expect(toml).toContain('[[games]]') // other tables preserved
+    expect(toml).toContain('id = "a"')
+    expect(toml).toContain('[[games]]')
     expect(toml).toContain('[default-track-data]')
 
     const reloaded = loadSeriesOrderData(ws.root, modPath)

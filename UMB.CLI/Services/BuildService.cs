@@ -3,7 +3,6 @@ using CsvHelper.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Sma5h;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
@@ -60,7 +59,6 @@ namespace UMB.CLI.Services
             // prompts. Default to building everything and proceeding past warnings.
             var interactive = AnsiConsole.Profile.Capabilities.Interactive;
 
-            // Let user pick which mod to build
             string selectedMod = null;
             if (!string.IsNullOrWhiteSpace(requestedMod))
             {
@@ -100,11 +98,9 @@ namespace UMB.CLI.Services
                     selectedMod = choice;
             }
 
-            // Set mod filter if a specific mod was selected
             if (selectedMod != null)
                 MusicModManagerService.ModFilter = new HashSet<string> { selectedMod };
 
-            // Let user pick which series to build within the selected mod(s)
             var activeMods = selectedMod != null
                 ? new List<string> { modDirs.First(d => Path.GetFileName(d).Equals(selectedMod, StringComparison.OrdinalIgnoreCase)) }
                 : modDirs;
@@ -147,7 +143,6 @@ namespace UMB.CLI.Services
             // Set the series filter so FolderMusicMod can read it during Init
             FolderMusicMod.SeriesFilterByMod = seriesFilters.Count > 0 ? seriesFilters : null;
 
-            // Load explicit series order from series-order.toml
             foreach (var modDir in activeMods)
             {
                 var orderPath = Path.Combine(modDir,
@@ -181,7 +176,6 @@ namespace UMB.CLI.Services
                 }
             }
 
-            // ── Pre-build validation ──────────────────────────────────────
             var warnings = ValidateSeries(activeMods, seriesFilters);
 
             if (warnings.Count > 0)
@@ -215,17 +209,13 @@ namespace UMB.CLI.Services
             {
                 await Task.Delay(1000);
 
-                //Init State Manager
                 _state.Init();
 
-                //Init workspace
                 if (!_workspace.Init())
                     return;
 
-                //Load Mods
                 var mods = _serviceProvider.GetServices<ISma5hMod>();
 
-                //Step that initialize a mod
                 _logger.LogInformation("--------------------");
                 var initMods = new List<ISma5hMod>();
                 foreach (var mod in mods)
@@ -235,7 +225,6 @@ namespace UMB.CLI.Services
                         initMods.Add(mod);
                 }
 
-                //Step to activate an eventual build step for a mod.
                 _logger.LogInformation("--------------------");
                 foreach (var mod in initMods)
                 {
@@ -243,7 +232,6 @@ namespace UMB.CLI.Services
                     mod.Build();
                 }
 
-                //Generate Output mod
                 _logger.LogInformation("--------------------");
                 _logger.LogInformation("Starting State Manager Mod Generation");
                 _state.WriteChanges();
@@ -252,7 +240,6 @@ namespace UMB.CLI.Services
             }
             finally
             {
-                // Clear filters
                 MusicModManagerService.ModFilter = null;
                 FolderMusicMod.SeriesFilterByMod = null;
                 Sma5hMusic.ExplicitSeriesOrder = null;
@@ -304,7 +291,6 @@ namespace UMB.CLI.Services
                     if (!File.Exists(csvPath))
                         continue;
 
-                    // Parse series.toml to get valid game IDs and playlist song refs
                     var validGameIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     var playlistSongRefs = new List<(string playlistId, string songRef)>();
                     FolderSeriesFileConfig seriesConfig = null;
@@ -334,7 +320,6 @@ namespace UMB.CLI.Services
                         }
                     }
 
-                    // Check: custom series should be listed in series-order.toml
                     if (seriesConfig?.Series != null
                         && !seriesConfig.Series.ExistingSeries
                         && !string.IsNullOrWhiteSpace(seriesConfig.Series.Id)
@@ -344,7 +329,6 @@ namespace UMB.CLI.Services
                         warnings.Add($"  {prefix}: custom series \"{seriesConfig.Series.Id}\" is not listed in series-order.toml. Its in-game position will be unpredictable. Run 'Scaffold' to append it, or use 'Order Series' to place it manually.");
                     }
 
-                    // Read tracks.csv with all columns (including order)
                     var csvFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     try
                     {
@@ -375,14 +359,12 @@ namespace UMB.CLI.Services
 
                             csvFilenames.Add(filename);
 
-                            // Check: game exists in series.toml
                             if (validGameIds.Count > 0 && !string.IsNullOrWhiteSpace(game)
                                 && !validGameIds.Contains(game))
                             {
                                 warnings.Add($"  {prefix}: \"{title}\" ({filename}) has game \"{game}\" not found in series.toml");
                             }
 
-                            // Check: order column exists and has a value
                             if (!hasOrderColumn)
                             {
                                 if (rowNum == 1) // only warn once per file
@@ -402,7 +384,6 @@ namespace UMB.CLI.Services
                         continue;
                     }
 
-                    // Check: .nus3audio files not in tracks.csv
                     var orphanedNus3 = Directory.GetFiles(seriesDir, "*.nus3audio")
                         .Select(Path.GetFileName)
                         .Where(f => !csvFilenames.Contains(f))
@@ -412,7 +393,6 @@ namespace UMB.CLI.Services
                     foreach (var file in orphanedNus3)
                         warnings.Add($"  {prefix}: {file} is not listed in tracks.csv");
 
-                    // Check: [[playlists]] songs[] references that don't match a track in tracks.csv.
                     // Matches by stem so "Destroyer" and "Destroyer.nus3audio" are both accepted.
                     if (playlistSongRefs.Count > 0)
                     {
