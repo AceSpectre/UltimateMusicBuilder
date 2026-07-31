@@ -141,45 +141,20 @@ namespace UMB.CLI.Services
                 {
                     Parallel.For(0, rows.Count, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
                     {
-                        var row = rows[i];
-                        var filename = row.GetValueOrDefault("filename", "");
-                        var title = row.GetValueOrDefault("title", filename);
-                        var sourcePath = string.IsNullOrEmpty(filename) ? "" : Path.Combine(seriesDir, filename);
-                        var userOverride = ParseVolume(row.GetValueOrDefault("volume", "1.0"));
-
-                        var vm = new VolumeRowViewModel
+                        var dto = AnalyzeRow(rows[i], i, seriesDir, target, maxMult, useCacheOnly: false);
+                        viewModels[i] = new VolumeRowViewModel
                         {
-                            OriginalIndex = i,
-                            Title = title,
-                            Filename = filename,
-                            SourcePath = sourcePath,
-                            UserOverride = userOverride,
+                            OriginalIndex = dto.OriginalIndex,
+                            Title = dto.Title,
+                            Filename = dto.Filename,
+                            SourcePath = string.IsNullOrEmpty(dto.Filename) ? "" : Path.Combine(seriesDir, dto.Filename),
+                            UserOverride = dto.UserOverride,
                             GlobalVolumeMultiplier = globalMult,
+                            MeasuredLufs = dto.MeasuredLufs,
+                            AutoGain = dto.AutoGain,
+                            WasClamped = dto.WasClamped,
+                            HasMeasurement = dto.HasMeasurement,
                         };
-
-                        if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
-                        {
-                            var measurement = _lufsService.Measure(sourcePath);
-                            if (measurement.IsValid)
-                            {
-                                var gain = _lufsService.CalculateGain(measurement, target, maxMult);
-                                vm.MeasuredLufs = measurement.IntegratedLufs;
-                                vm.AutoGain = gain.Multiplier;
-                                vm.WasClamped = gain.WasClamped;
-                                vm.HasMeasurement = true;
-                            }
-                            else
-                            {
-                                vm.AutoGain = 1.0f;
-                            }
-                        }
-                        else
-                        {
-                            vm.AutoGain = 1.0f;
-                            _logger.LogWarning("Source file missing for row {Index}: {Path}", i, sourcePath);
-                        }
-
-                        viewModels[i] = vm;
                     });
                 });
 
@@ -223,6 +198,46 @@ namespace UMB.CLI.Services
         }
 
         /// <summary>
+        /// Per-row LUFS measurement + auto-gain shared by the interactive window and
+        /// the batch path. useCacheOnly reads cached measurements without re-analysis.
+        /// </summary>
+        private VolumeRowDto AnalyzeRow(Dictionary<string, string> row, int index, string seriesDir,
+            float target, float maxMult, bool useCacheOnly)
+        {
+            var filename = row.GetValueOrDefault("filename", "");
+            var title = row.GetValueOrDefault("title", filename);
+            var sourcePath = string.IsNullOrEmpty(filename) ? "" : Path.Combine(seriesDir, filename);
+
+            var dto = new VolumeRowDto
+            {
+                OriginalIndex = index,
+                Title = title,
+                Filename = filename,
+                UserOverride = ParseVolume(row.GetValueOrDefault("volume", "1.0")),
+                AutoGain = 1.0f,
+            };
+
+            if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
+            {
+                var measurement = useCacheOnly ? _lufsService.MeasureCached(sourcePath) : _lufsService.Measure(sourcePath);
+                if (measurement.IsValid)
+                {
+                    var gain = _lufsService.CalculateGain(measurement, target, maxMult);
+                    dto.MeasuredLufs = measurement.IntegratedLufs;
+                    dto.AutoGain = gain.Multiplier;
+                    dto.WasClamped = gain.WasClamped;
+                    dto.HasMeasurement = true;
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Source file missing for row {Index}: {Path}", index, sourcePath);
+            }
+
+            return dto;
+        }
+
+        /// <summary>
         /// Non-interactive analysis for the desktop app. Reads
         /// { "seriesPath": "...", "outputPath": "..." }, measures every track's
         /// loudness + auto-gain (same as the interactive window) and writes a
@@ -262,45 +277,13 @@ namespace UMB.CLI.Services
             var completed = 0;
             Parallel.For(0, rows.Count, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
             {
-                var row = rows[i];
-                var filename = row.GetValueOrDefault("filename", "");
-                var title = row.GetValueOrDefault("title", filename);
-                var sourcePath = string.IsNullOrEmpty(filename) ? "" : Path.Combine(seriesDir, filename);
-
-                var dto = new VolumeRowDto
-                {
-                    OriginalIndex = i,
-                    Title = title,
-                    Filename = filename,
-                    UserOverride = ParseVolume(row.GetValueOrDefault("volume", "1.0")),
-                    AutoGain = 1.0f,
-                };
-
-                if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
-                {
-                    var measurement = input.Analyze
-                        ? _lufsService.Measure(sourcePath)
-                        : _lufsService.MeasureCached(sourcePath);
-                    if (measurement.IsValid)
-                    {
-                        var gain = _lufsService.CalculateGain(measurement, target, maxMult);
-                        dto.MeasuredLufs = measurement.IntegratedLufs;
-                        dto.AutoGain = gain.Multiplier;
-                        dto.WasClamped = gain.WasClamped;
-                        dto.HasMeasurement = true;
-                    }
-                }
-                else
-                {
-                    _logger.LogWarning("Source file missing for row {Index}: {Path}", i, sourcePath);
-                }
-
+                var dto = AnalyzeRow(rows[i], i, seriesDir, target, maxMult, useCacheOnly: !input.Analyze);
                 dtos[i] = dto;
 
                 if (input.Analyze)
                 {
                     var done = Interlocked.Increment(ref completed);
-                    Console.WriteLine($"__LUFS_PROGRESS__\t{done}\t{rows.Count}\t{filename}");
+                    Console.WriteLine($"__LUFS_PROGRESS__\t{done}\t{rows.Count}\t{dto.Filename}");
                 }
             });
 

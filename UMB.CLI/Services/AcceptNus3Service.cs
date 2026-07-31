@@ -43,18 +43,8 @@ namespace UMB.CLI.Services
             if (seriesDir == null)
                 return;
 
-            var validateDir = Path.Combine(seriesDir, CliUtil.ValidateFolder);
-            if (!Directory.Exists(validateDir))
-            {
-                _logger.LogWarning("No songs-to-validate folder found in {Dir}.", seriesDir);
+            if (!HasValidatedFiles(seriesDir))
                 return;
-            }
-
-            if (Directory.GetFiles(validateDir, "*.nus3audio").Length == 0)
-            {
-                _logger.LogWarning("No .nus3audio files found in {Dir}.", validateDir);
-                return;
-            }
 
             var deleteSources = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
@@ -90,20 +80,29 @@ namespace UMB.CLI.Services
             }
 
             var seriesDir = input.SeriesPath;
+            if (!HasValidatedFiles(seriesDir))
+                return;
+
+            AcceptCore(seriesDir, input.DeleteSources);
+        }
+
+        /// <summary>True when the series has a songs-to-validate folder with .nus3audio files.</summary>
+        private bool HasValidatedFiles(string seriesDir)
+        {
             var validateDir = Path.Combine(seriesDir, CliUtil.ValidateFolder);
             if (!Directory.Exists(validateDir))
             {
                 _logger.LogWarning("No songs-to-validate folder found in {Dir}.", seriesDir);
-                return;
+                return false;
             }
 
             if (Directory.GetFiles(validateDir, "*.nus3audio").Length == 0)
             {
                 _logger.LogWarning("No .nus3audio files found in {Dir}.", validateDir);
-                return;
+                return false;
             }
 
-            AcceptCore(seriesDir, input.DeleteSources);
+            return true;
         }
 
         private void AcceptCore(string seriesDir, bool shouldDeleteSources)
