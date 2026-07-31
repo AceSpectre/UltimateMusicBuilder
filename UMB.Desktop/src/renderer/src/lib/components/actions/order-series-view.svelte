@@ -1,8 +1,12 @@
 <script lang="ts">
-  import { ListOrdered, GripVertical, Gamepad2, Image, Plus, RefreshCw, Save, Settings2, Upload, X } from '@lucide/svelte'
+  import { ListOrdered, GripVertical, Gamepad2, Image, Plus, RefreshCw, Settings2, Upload, X } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
+  import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
+  import EmptyState from '$lib/components/ui/empty-state.svelte'
+  import IconButton from '$lib/components/ui/icon-button.svelte'
+  import SaveButton from '$lib/components/ui/save-button.svelte'
   import type { ModInfo, SeriesOrderData, SeriesOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
@@ -265,12 +269,9 @@
       <div class="gradient-strip h-[3px] shrink-0"></div>
       <div class="shrink-0 border-b border-border px-4 py-3 flex items-center justify-between gap-4">
         <div class="flex min-w-0 items-center gap-3">
-          <div
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-            style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-          >
+          <GradientIcon>
             <ListOrdered size={18} />
-          </div>
+          </GradientIcon>
           <div class="min-w-0">
             <h2 class="truncate text-sm font-semibold">{$_('orderSeries.title')}</h2>
             <p class="truncate text-[12.5px] text-muted-foreground">
@@ -284,13 +285,9 @@
         </div>
 
         <div class="flex items-center gap-2">
-          <button
-            onclick={handleReload}
-            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-input bg-background transition-colors hover:bg-muted"
-            title={$_('orderSeries.reload')}
-          >
+          <IconButton onclick={handleReload} title={$_('orderSeries.reload')}>
             <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
-          </button>
+          </IconButton>
 
           <button
             onclick={openNewSeries}
@@ -301,14 +298,14 @@
             {$_('orderSeries.newSeries')}
           </button>
 
-          <button
+          <SaveButton
+            {saveState}
             onclick={handleSave}
-            class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!orderData || !isDirty || saveState === 'saving'}
-          >
-            <Save size={14} />
-            {saveState === 'saving' ? $_('orderSeries.saving') : saveState === 'saved' ? $_('orderSeries.saved') : $_('orderSeries.save')}
-          </button>
+            save={$_('orderSeries.save')}
+            saving={$_('orderSeries.saving')}
+            saved={$_('orderSeries.saved')}
+          />
         </div>
       </div>
 
@@ -361,39 +358,13 @@
             {/each}
           </div>
         {:else if orderData && orderData.items.length === 0}
-          <div class="grid h-full min-h-[320px] place-items-center rounded-2xl border border-dashed border-border bg-background/60">
-            <div class="flex max-w-[340px] flex-col items-center gap-3 px-6 text-center">
-              <div
-                class="flex h-12 w-12 items-center justify-center rounded-2xl border border-border"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-              >
-                <ListOrdered size={20} />
-              </div>
-              <div>
-                <h3 class="text-sm font-semibold">{$_('orderSeries.emptyTitle')}</h3>
-                <p class="pt-1 text-[13px] text-muted-foreground">
-                  {$_('orderSeries.emptyBody')}
-                </p>
-              </div>
-            </div>
-          </div>
+          <EmptyState dashed title={$_('orderSeries.emptyTitle')} body={$_('orderSeries.emptyBody')}>
+            {#snippet icon()}<ListOrdered size={20} />{/snippet}
+          </EmptyState>
         {:else}
-          <div class="grid h-full min-h-[320px] place-items-center rounded-2xl border border-dashed border-border bg-background/60">
-            <div class="flex max-w-[340px] flex-col items-center gap-3 px-6 text-center">
-              <div
-                class="flex h-12 w-12 items-center justify-center rounded-2xl border border-border"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-              >
-                <ListOrdered size={20} />
-              </div>
-              <div>
-                <h3 class="text-sm font-semibold">{$_('orderSeries.chooseMod')}</h3>
-                <p class="pt-1 text-[13px] text-muted-foreground">
-                  {$_('orderSeries.chooseModBody')}
-                </p>
-              </div>
-            </div>
-          </div>
+          <EmptyState dashed title={$_('orderSeries.chooseMod')} body={$_('orderSeries.chooseModBody')}>
+            {#snippet icon()}<ListOrdered size={20} />{/snippet}
+          </EmptyState>
         {/if}
       </div>
     </section>
@@ -401,12 +372,9 @@
     <aside class="flex h-full min-h-0 w-[340px] shrink-0 flex-col border border-l-0 border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
       <div class="shrink-0 border-b border-border px-4 py-3 flex items-center gap-3">
-        <div
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-          style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-        >
+        <GradientIcon>
           <Settings2 size={18} />
-        </div>
+        </GradientIcon>
         <div class="min-w-0">
           <h2 class="truncate text-sm font-semibold">{$_('orderSeries.settingsHeading')}</h2>
           <p class="truncate text-[12.5px] text-muted-foreground">{selectedItem?.fields.name ?? $_('orderSeries.settingsHint')}</p>
@@ -436,12 +404,9 @@
         {#if !selectedItem}
           <div class="grid h-full min-h-[200px] place-items-center text-center">
             <div class="flex flex-col items-center gap-3 px-4">
-              <div
-                class="flex h-12 w-12 items-center justify-center rounded-2xl border border-border"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-              >
+              <GradientIcon size="lg">
                 <Settings2 size={20} />
-              </div>
+              </GradientIcon>
               <p class="text-[13px] text-muted-foreground">{$_('orderSeries.settingsHint')}</p>
             </div>
           </div>

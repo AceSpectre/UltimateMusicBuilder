@@ -1,9 +1,13 @@
 <script lang="ts">
-  import { ArrowUpDown, Folder, GripVertical, Lock, Music4, PanelLeftClose, PanelLeftOpen, RefreshCw, Save, Volume2, Wand2 } from '@lucide/svelte'
+  import { ArrowUpDown, GripVertical, Lock, Music4, Volume2, Wand2 } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
   import { modsStore } from '$lib/stores/mods.svelte'
+  import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
+  import EmptyState from '$lib/components/ui/empty-state.svelte'
+  import SaveButton from '$lib/components/ui/save-button.svelte'
+  import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import type { ModInfo, ModSeriesInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
@@ -23,7 +27,6 @@
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let pendingSeriesPath = $state<string | null>(null)
   let baselineSnapshot = $state('')
-  let seriesCollapsed = $state(false)
   let selectedItemId = $state<string | null>(null)
   let loadToken = 0
 
@@ -270,107 +273,31 @@
 
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
-    <section
-      class="flex h-full min-h-0 shrink-0 flex-col border border-border bg-card overflow-hidden transition-[width] duration-150 {seriesCollapsed ? 'w-[46px]' : 'w-[280px]'}"
-    >
-      <div class="gradient-strip h-[3px] shrink-0"></div>
-      {#if seriesCollapsed}
-        <div class="flex flex-1 flex-col items-center gap-2 py-3">
-          <button
-            onclick={() => (seriesCollapsed = false)}
-            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-input bg-background transition-colors hover:bg-muted"
-            title={$_('orderTracks.expandSeries')}
-          >
-            <PanelLeftOpen size={15} />
-          </button>
-          <div
-            class="flex h-8 w-8 items-center justify-center rounded-lg border border-border"
-            style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-          >
-            <Folder size={16} />
-          </div>
-          <span class="text-[11px] text-muted-foreground">{series.length}</span>
-        </div>
-      {:else}
-        <div class="shrink-0 border-b border-border px-4 py-3">
-          <div class="flex items-center gap-2">
-            <div
-              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-              style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-            >
-              <Folder size={18} />
-            </div>
-            <div class="min-w-0 flex-1">
-              <h2 class="text-sm font-semibold">{$_('orderTracks.seriesHeading')}</h2>
-              <p class="truncate text-[12.5px] text-muted-foreground">
-                {activeMod?.name ?? $_('orderTracks.selectModSubtitle')}
-              </p>
-            </div>
-            <span class="shrink-0 text-[12px] text-muted-foreground">{series.length}</span>
-            <button
-              onclick={handleReload}
-              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-input bg-background transition-colors hover:bg-muted"
-              title={$_('orderTracks.reload')}
-            >
-              <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
-            </button>
-            <button
-              onclick={() => (seriesCollapsed = true)}
-              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-input bg-background transition-colors hover:bg-muted"
-              title={$_('orderTracks.collapseSeries')}
-            >
-              <PanelLeftClose size={14} />
-            </button>
-          </div>
-        </div>
-
-        <div class="min-h-0 flex-1 overflow-auto p-2">
-          {#if !activeMod}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {$_('orderTracks.chooseMod')}
-          </div>
-        {:else if loading && series.length === 0}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {$_('orderTracks.loadingSeries')}
-          </div>
-        {:else if series.length === 0}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {$_('orderTracks.noSeries')}
-          </div>
-        {:else}
-          <div class="grid gap-1.5">
-            {#each series as item}
-              {@const isActive = modsStore.activeSeriesPath === item.path}
-              <button
-                onclick={() => requestSelectSeries(item.path)}
-                class="w-full rounded-lg border px-2 py-1.5 text-left transition-colors {isActive ? 'border-transparent' : 'border-border bg-background/70 hover:bg-muted'}"
-                style={isActive
-                  ? 'background: linear-gradient(135deg, hsl(var(--gradient-from) / .15), hsl(var(--gradient-to) / .18));'
-                  : ''}
-              >
-                <div class="flex items-start justify-between gap-3">
-                  <div class="flex flex-row justify-content-evenly gap-3">
-                    <div class="truncate text-[13.5px] font-semibold">{item.name}</div>
-                  </div>
-                </div>
-              </button>
-            {/each}
-          </div>
-          {/if}
-        </div>
-      {/if}
-    </section>
+    <SeriesPicker
+      {activeMod}
+      {series}
+      {loading}
+      activePath={modsStore.activeSeriesPath}
+      onSelect={requestSelectSeries}
+      onReload={handleReload}
+      heading={$_('orderTracks.seriesHeading')}
+      subtitleFallback={$_('orderTracks.selectModSubtitle')}
+      chooseModText={$_('orderTracks.chooseMod')}
+      loadingText={$_('orderTracks.loadingSeries')}
+      emptyText={$_('orderTracks.noSeries')}
+      reloadTitle={$_('orderTracks.reload')}
+      collapsible
+      collapseTitle={$_('orderTracks.collapseSeries')}
+      expandTitle={$_('orderTracks.expandSeries')}
+    />
 
     <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
       <div class="shrink-0 border-b border-border px-4 py-3 flex items-center justify-between gap-4">
         <div class="flex min-w-0 items-center gap-3">
-          <div
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-            style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-          >
+          <GradientIcon>
             <ArrowUpDown size={18} />
-          </div>
+          </GradientIcon>
           <div class="min-w-0">
             <h2 class="truncate text-sm font-semibold">{orderData?.seriesName ?? selectedSeries?.name ?? $_('orderTracks.title')}</h2>
             <p class="truncate text-[12.5px] text-muted-foreground">
@@ -404,14 +331,14 @@
             {$_('orderTracks.useDefaults')}
           </button>
 
-          <button
+          <SaveButton
+            {saveState}
             onclick={handleSave}
-            class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!orderData || !isDirty || saveState === 'saving'}
-          >
-            <Save size={14} />
-            {saveState === 'saving' ? $_('orderTracks.saving') : saveState === 'saved' ? $_('orderTracks.saved') : $_('orderTracks.save')}
-          </button>
+            save={$_('orderTracks.save')}
+            saving={$_('orderTracks.saving')}
+            saved={$_('orderTracks.saved')}
+          />
         </div>
       </div>
 
@@ -563,22 +490,9 @@
             </div>
           </div>
         {:else}
-          <div class="grid h-full min-h-[320px] place-items-center rounded-2xl border border-dashed border-border bg-background/60">
-            <div class="flex max-w-[340px] flex-col items-center gap-3 px-6 text-center">
-              <div
-                class="flex h-12 w-12 items-center justify-center rounded-2xl border border-border"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-              >
-                <Music4 size={20} />
-              </div>
-              <div>
-                <h3 class="text-sm font-semibold">{$_('orderTracks.emptyTitle')}</h3>
-                <p class="pt-1 text-[13px] text-muted-foreground">
-                  {$_('orderTracks.emptyBody')}
-                </p>
-              </div>
-            </div>
-          </div>
+          <EmptyState dashed title={$_('orderTracks.emptyTitle')} body={$_('orderTracks.emptyBody')}>
+            {#snippet icon()}<Music4 size={20} />{/snippet}
+          </EmptyState>
         {/if}
       </div>
     </section>

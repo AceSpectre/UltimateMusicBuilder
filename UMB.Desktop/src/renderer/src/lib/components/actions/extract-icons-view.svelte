@@ -2,6 +2,7 @@
   import { Image, FolderOpen, RefreshCw, Download, Check, AlertTriangle } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
+  import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import type { ModInfo, ExtractIconsAnalysis, ExtractIconsResult } from '$lib/types/electron'
 
   let { activeMod, mods }: { activeMod: ModInfo | null; mods: ModInfo[] } = $props()
@@ -19,10 +20,6 @@
     }
   })
 
-  function log(level: 'info' | 'warn' | 'error', message: string) {
-    logStore.push({ timestamp: new Date().toLocaleTimeString('en-GB', { hour12: false }), level, message })
-  }
-
   async function handleBrowse() {
     const folder = await window.electron.umb.selectFolder()
     if (folder) {
@@ -39,7 +36,7 @@
     try {
       analysis = await window.electron.umb.analyzeExtractIcons(compiledModPath, selectedMod.path)
     } catch (err) {
-      log('error', `Analysis failed: ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Analysis failed: ${err instanceof Error ? err.message : String(err)}`)
       analysis = null
     } finally {
       analyzing = false
@@ -52,7 +49,7 @@
     try {
       result = await window.electron.umb.extractIcons(compiledModPath, selectedMod.path, mode)
     } catch (err) {
-      log('error', `Extraction failed: ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Extraction failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       extracting = false
     }
@@ -76,12 +73,9 @@
       <div class="gradient-strip h-[3px] shrink-0"></div>
 
       <div class="shrink-0 border-b border-border px-5 py-3 flex items-center gap-3">
-        <div
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-          style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-        >
+        <GradientIcon>
           <Image size={18} />
-        </div>
+          </GradientIcon>
         <div class="min-w-0">
           <h2 class="truncate text-sm font-semibold">{$_('extractIcons.title')}</h2>
           <p class="truncate text-[12.5px] text-muted-foreground">{$_('extractIcons.subtitle')}</p>
