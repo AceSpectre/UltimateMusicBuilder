@@ -7,6 +7,7 @@
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import IconButton from '$lib/components/ui/icon-button.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
+  import Modal from '$lib/components/ui/modal.svelte'
   import type { ModInfo, SeriesOrderData, SeriesOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
@@ -527,9 +528,7 @@
 </div>
 
 {#if showAddGame}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-    <div class="w-full max-w-[400px] rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
-      <div class="gradient-strip h-[3px]"></div>
+  <Modal>
       <div class="flex flex-col gap-3 px-5 py-4">
         <h3 class="text-sm font-semibold">{$_('orderSeries.addGameTitle')}</h3>
         <label class="flex flex-col gap-1">
@@ -556,14 +555,11 @@
           {$_('orderSeries.add')}
         </button>
       </div>
-    </div>
-  </div>
+  </Modal>
 {/if}
 
 {#if showNewSeries}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-    <div class="flex max-h-[88vh] w-full max-w-[460px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
-      <div class="gradient-strip h-[3px] shrink-0"></div>
+  <Modal maxWidth="460px" maxHeight="88vh">
       <div class="min-h-0 flex-1 overflow-auto px-5 py-4">
         <h3 class="text-sm font-semibold">{$_('orderSeries.newSeriesTitle')}</h3>
 
@@ -684,6 +680,5 @@
           {nsCreating ? $_('orderSeries.creating') : $_('orderSeries.create')}
         </button>
       </div>
-    </div>
-  </div>
+  </Modal>
 {/if}

@@ -52,6 +52,35 @@ namespace UMB.CLI.Services
             return value?.Replace("\\", "\\\\").Replace("\"", "\\\"") ?? "";
         }
 
+        /// <summary>
+        /// Emits the [series] table (field order fixed: id, name, existing-series,
+        /// playlist-incidence, series-playlist) followed by a blank line. Null/empty
+        /// optional values are omitted.
+        /// </summary>
+        public static void AppendSeriesHeader(StringBuilder sb, string id, string name,
+            bool existingSeries = false, int? playlistIncidence = null, string seriesPlaylist = null)
+        {
+            sb.AppendLine("[series]");
+            sb.AppendLine($"id = \"{EscapeToml(id)}\"");
+            sb.AppendLine($"name = \"{EscapeToml(name)}\"");
+            if (existingSeries)
+                sb.AppendLine("existing-series = true");
+            if (playlistIncidence.HasValue)
+                sb.AppendLine($"playlist-incidence = {playlistIncidence.Value}");
+            if (!string.IsNullOrEmpty(seriesPlaylist))
+                sb.AppendLine($"series-playlist = \"{EscapeToml(seriesPlaylist)}\"");
+            sb.AppendLine();
+        }
+
+        /// <summary>Emits one [[games]] block (id + name) followed by a blank line.</summary>
+        public static void AppendGameBlock(StringBuilder sb, string id, string name)
+        {
+            sb.AppendLine("[[games]]");
+            sb.AppendLine($"id = \"{EscapeToml(id)}\"");
+            sb.AppendLine($"name = \"{EscapeToml(name)}\"");
+            sb.AppendLine();
+        }
+
         public static string MakeSafeFileName(string name)
         {
             var sb = new StringBuilder(name.Length);

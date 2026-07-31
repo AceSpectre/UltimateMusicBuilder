@@ -389,16 +389,9 @@ namespace UMB.CLI.Services
         private string BuildNewSeriesToml(string folderName)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("[series]");
-            sb.AppendLine($"id = \"{CliUtil.EscapeToml(folderName)}\"");
-            sb.AppendLine($"name = \"{CliUtil.EscapeToml(folderName)}\"");
-            sb.AppendLine("playlist-incidence = 100");
-            sb.AppendLine($"series-playlist = \"bgm_{CliUtil.EscapeToml(folderName)}\"");
-            sb.AppendLine();
-            sb.AppendLine("[[games]]");
-            sb.AppendLine($"id = \"{CliUtil.EscapeToml(folderName)}\"");
-            sb.AppendLine($"name = \"{CliUtil.EscapeToml(folderName)}\"");
-            sb.AppendLine();
+            CliUtil.AppendSeriesHeader(sb, folderName, folderName,
+                playlistIncidence: 100, seriesPlaylist: $"bgm_{folderName}");
+            CliUtil.AppendGameBlock(sb, folderName, folderName);
             AppendDefaultTrackData(sb, folderName);
             return sb.ToString();
         }
@@ -423,33 +416,20 @@ namespace UMB.CLI.Services
             }
 
             var sb = new StringBuilder();
-            sb.AppendLine("[series]");
-            sb.AppendLine($"id = \"{CliUtil.EscapeToml(seriesId)}\"");
-            sb.AppendLine($"name = \"{CliUtil.EscapeToml(seriesName)}\"");
-            sb.AppendLine("existing-series = true");
-            sb.AppendLine("playlist-incidence = 100");
-            if (!string.IsNullOrEmpty(seriesPlaylistId))
-                sb.AppendLine($"series-playlist = \"{CliUtil.EscapeToml(seriesPlaylistId)}\"");
-            sb.AppendLine();
+            CliUtil.AppendSeriesHeader(sb, seriesId, seriesName,
+                existingSeries: true, playlistIncidence: 100, seriesPlaylist: seriesPlaylistId);
 
             if (games.Count == 0)
             {
                 // Fallback: include at least one game block so downstream parsing succeeds.
-                sb.AppendLine("[[games]]");
-                sb.AppendLine($"id = \"{CliUtil.EscapeToml(seriesId)}\"");
-                sb.AppendLine($"name = \"{CliUtil.EscapeToml(seriesName)}\"");
-                sb.AppendLine();
+                CliUtil.AppendGameBlock(sb, seriesId, seriesName);
             }
             else
             {
                 foreach (var game in games)
                 {
                     var gameId = game.NameId ?? game.UiGameTitleId;
-                    var gameName = ResolveLocalizedName(game.MSBTTitle, gameId);
-                    sb.AppendLine("[[games]]");
-                    sb.AppendLine($"id = \"{CliUtil.EscapeToml(gameId)}\"");
-                    sb.AppendLine($"name = \"{CliUtil.EscapeToml(gameName)}\"");
-                    sb.AppendLine();
+                    CliUtil.AppendGameBlock(sb, gameId, ResolveLocalizedName(game.MSBTTitle, gameId));
                 }
             }
 

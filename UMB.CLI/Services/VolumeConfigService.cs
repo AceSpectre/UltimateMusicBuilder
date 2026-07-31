@@ -398,7 +398,7 @@ namespace UMB.CLI.Services
             File.WriteAllText(outputPath, json);
         }
 
-        private static float ParseVolume(string raw)
+        internal static float ParseVolume(string raw)
         {
             if (string.IsNullOrWhiteSpace(raw)) return 1.0f;
             return float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 1.0f;

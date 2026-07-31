@@ -229,7 +229,7 @@ namespace UMB.CLI.Services
             return result;
         }
 
-        private List<TrackViewModel> ComposeMergedList(
+        internal List<TrackViewModel> ComposeMergedList(
             List<TrackViewModel> vanillaRows,
             List<TrackViewModel> modRows,
             List<Dictionary<string, string>> rawRows,
@@ -308,7 +308,7 @@ namespace UMB.CLI.Services
             return modRows;
         }
 
-        private static int? ParseOrder(Dictionary<string, string> row)
+        internal static int? ParseOrder(Dictionary<string, string> row)
         {
             return row.TryGetValue("order", out var val)
                    && int.TryParse(val, NumberStyles.Integer, CultureInfo.InvariantCulture, out var o)

@@ -347,24 +347,14 @@ namespace UMB.CLI.Services
             bool isExisting, List<(string id, string name)> games)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("[series]");
-            sb.AppendLine($"id = \"{CliUtil.EscapeToml(seriesId)}\"");
-            sb.AppendLine($"name = \"{CliUtil.EscapeToml(seriesName)}\"");
-            if (isExisting)
-                sb.AppendLine("existing-series = true");
             // For existing series the scaffold maintenance pass will fill in `series-playlist`
             // from vanilla data after conversion finishes.
-            if (!isExisting)
-                sb.AppendLine($"series-playlist = \"bgm_{CliUtil.EscapeToml(seriesId)}\"");
-            sb.AppendLine();
+            CliUtil.AppendSeriesHeader(sb, seriesId, seriesName,
+                existingSeries: isExisting,
+                seriesPlaylist: isExisting ? null : $"bgm_{seriesId}");
 
             foreach (var (id, name) in games)
-            {
-                sb.AppendLine("[[games]]");
-                sb.AppendLine($"id = \"{CliUtil.EscapeToml(id)}\"");
-                sb.AppendLine($"name = \"{CliUtil.EscapeToml(name)}\"");
-                sb.AppendLine();
-            }
+                CliUtil.AppendGameBlock(sb, id, name);
 
             var tomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
             File.WriteAllText(tomlPath, sb.ToString());

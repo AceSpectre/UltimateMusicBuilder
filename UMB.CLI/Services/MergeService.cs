@@ -302,24 +302,14 @@ namespace UMB.CLI.Services
             List<(string id, string name)> games, List<(string id, int incidence, object songs)> playlists)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("[series]");
-            sb.AppendLine($"id = \"{CliUtil.EscapeToml(priorityConfig.Series.Id)}\"");
-            sb.AppendLine($"name = \"{CliUtil.EscapeToml(priorityConfig.Series.Name)}\"");
-            if (priorityConfig.Series.ExistingSeries)
-                sb.AppendLine("existing-series = true");
-            if (priorityConfig.Series.PlaylistIncidence != 100)
-                sb.AppendLine($"playlist-incidence = {priorityConfig.Series.PlaylistIncidence}");
-            if (!string.IsNullOrWhiteSpace(priorityConfig.Series.SeriesPlaylist))
-                sb.AppendLine($"series-playlist = \"{CliUtil.EscapeToml(priorityConfig.Series.SeriesPlaylist)}\"");
-            sb.AppendLine();
+            var series = priorityConfig.Series;
+            CliUtil.AppendSeriesHeader(sb, series.Id, series.Name,
+                existingSeries: series.ExistingSeries,
+                playlistIncidence: series.PlaylistIncidence != 100 ? series.PlaylistIncidence : null,
+                seriesPlaylist: string.IsNullOrWhiteSpace(series.SeriesPlaylist) ? null : series.SeriesPlaylist);
 
             foreach (var (id, name) in games)
-            {
-                sb.AppendLine("[[games]]");
-                sb.AppendLine($"id = \"{CliUtil.EscapeToml(id)}\"");
-                sb.AppendLine($"name = \"{CliUtil.EscapeToml(name)}\"");
-                sb.AppendLine();
-            }
+                CliUtil.AppendGameBlock(sb, id, name);
 
             foreach (var (id, incidence, songs) in playlists)
             {
@@ -350,7 +340,7 @@ namespace UMB.CLI.Services
                 sb.ToString());
         }
 
-        private static void AppendSongsField(StringBuilder sb, object songs)
+        internal static void AppendSongsField(StringBuilder sb, object songs)
         {
             if (songs == null || FolderMusicMod.IsWildcardSongs(songs))
             {

@@ -4,6 +4,7 @@
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
   import { modsStore } from '$lib/stores/mods.svelte'
+  import { createSeriesLoader } from '$lib/series-loader'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
@@ -23,7 +24,7 @@
   let rows = $state<VolumeRowItem[]>([])
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let baseline = new Map<number, number>()
-  let loadToken = 0
+  const seriesLoader = createSeriesLoader((v) => (loading = v))
 
   // Web Audio preview
   let audioCtx: AudioContext | null = null
@@ -46,26 +47,19 @@
   }
 
   async function loadSeries(modPath: string | null) {
-    loadToken += 1
-    const token = loadToken
-
     if (!modPath) {
+      seriesLoader.invalidate()
       series = []
       selectedPath = null
       return
     }
 
-    loading = true
-    try {
-      const next = await window.electron.umb.listModSeries(modPath)
-      if (token !== loadToken) return
-      series = next
-      // Deliberately do NOT auto-select a series — the user must pick one.
-      if (selectedPath && !next.some((e) => e.path === selectedPath)) {
-        selectedPath = null
-      }
-    } finally {
-      if (token === loadToken) loading = false
+    const next = await seriesLoader.load(modPath)
+    if (next === null) return
+    series = next
+    // Deliberately do NOT auto-select a series — the user must pick one.
+    if (selectedPath && !next.some((e) => e.path === selectedPath)) {
+      selectedPath = null
     }
   }
 

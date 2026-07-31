@@ -4,10 +4,12 @@
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
   import { modsStore } from '$lib/stores/mods.svelte'
+  import { createSeriesLoader } from '$lib/series-loader'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
+  import Modal from '$lib/components/ui/modal.svelte'
   import type { ModInfo, ModSeriesInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
@@ -28,7 +30,7 @@
   let pendingSeriesPath = $state<string | null>(null)
   let baselineSnapshot = $state('')
   let selectedItemId = $state<string | null>(null)
-  let loadToken = 0
+  const seriesLoader = createSeriesLoader((v) => (loading = v))
 
   function snapshot(items: TrackOrderItem[]): string {
     return JSON.stringify(items.map((item) => ({ id: item.id, fields: item.fields })))
@@ -147,31 +149,22 @@
   }
 
   async function loadSeries(modPath: string | null) {
-    loadToken += 1
-    const currentToken = loadToken
-
     if (!modPath) {
+      seriesLoader.invalidate()
       series = []
       modsStore.activeSeriesPath = null
       orderData = null
       return
     }
 
-    loading = true
-    try {
-      const nextSeries = await window.electron.umb.listModSeries(modPath)
-      if (currentToken !== loadToken) {
-        return
-      }
+    const nextSeries = await seriesLoader.load(modPath)
+    if (nextSeries === null) {
+      return
+    }
 
-      series = nextSeries
-      if (!nextSeries.some((entry) => entry.path === modsStore.activeSeriesPath)) {
-        modsStore.activeSeriesPath = nextSeries[0]?.path ?? null
-      }
-    } finally {
-      if (currentToken === loadToken) {
-        loading = false
-      }
+    series = nextSeries
+    if (!nextSeries.some((entry) => entry.path === modsStore.activeSeriesPath)) {
+      modsStore.activeSeriesPath = nextSeries[0]?.path ?? null
     }
   }
 
@@ -500,9 +493,7 @@
 </div>
 
 {#if pendingSeriesPath}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6">
-    <div class="w-full max-w-[400px] rounded-2xl border border-border bg-card shadow-xl overflow-hidden">
-      <div class="gradient-strip h-[3px]"></div>
+  <Modal>
       <div class="px-5 py-4">
         <h3 class="text-sm font-semibold">{$_('orderTracks.unsavedTitle')}</h3>
         <p class="pt-1.5 text-[13px] text-muted-foreground">
@@ -530,6 +521,5 @@
           {$_('orderTracks.continue')}
         </button>
       </div>
-    </div>
-  </div>
+  </Modal>
 {/if}

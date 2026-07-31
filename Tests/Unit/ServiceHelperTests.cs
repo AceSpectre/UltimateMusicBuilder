@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
-using Tests.Helpers;
 using UMB.CLI.Services;
 using UMB.CLI.Views;
 using Xunit;
@@ -10,9 +9,9 @@ namespace Tests.Unit
 {
     /// <summary>
     /// Pure helpers behind the CLI services: the shared CliUtil statics plus the
-    /// remaining private helpers reached via reflection so production visibility
-    /// stays untouched (VolumeConfigService.ParseVolume,
-    /// TrackOrderService.ParseOrder/ComposeMergedList, MergeService.AppendSongsField).
+    /// internal helpers exposed to this assembly via InternalsVisibleTo
+    /// (VolumeConfigService.ParseVolume, TrackOrderService.ParseOrder/ComposeMergedList,
+    /// MergeService.AppendSongsField).
     /// </summary>
     public class ServiceHelperTests
     {
@@ -72,8 +71,7 @@ namespace Tests.Unit
         [InlineData(null, 1.0f)]
         public void ParseVolume_FallsBackToUnity(string input, float expected)
         {
-            Assert.Equal(expected,
-                Reflect.InvokeStatic<float>(typeof(VolumeConfigService), "ParseVolume", input));
+            Assert.Equal(expected, VolumeConfigService.ParseVolume(input));
         }
 
         // ── CliUtil.MakeSafeFileName ────────────────────────────────────────
@@ -98,16 +96,14 @@ namespace Tests.Unit
         public void ParseOrder_ReturnsIntWhenPresentAndNumeric()
         {
             var row = new Dictionary<string, string> { ["order"] = "7" };
-            Assert.Equal(7, Reflect.InvokeStatic<int?>(typeof(TrackOrderService), "ParseOrder", row));
+            Assert.Equal(7, TrackOrderService.ParseOrder(row));
         }
 
         [Fact]
         public void ParseOrder_NullWhenMissingOrNonNumeric()
         {
-            Assert.Null(Reflect.InvokeStatic<int?>(typeof(TrackOrderService), "ParseOrder",
-                new Dictionary<string, string>()));
-            Assert.Null(Reflect.InvokeStatic<int?>(typeof(TrackOrderService), "ParseOrder",
-                new Dictionary<string, string> { ["order"] = "abc" }));
+            Assert.Null(TrackOrderService.ParseOrder(new Dictionary<string, string>()));
+            Assert.Null(TrackOrderService.ParseOrder(new Dictionary<string, string> { ["order"] = "abc" }));
         }
 
         // ── TrackOrderService.ComposeMergedList ─────────────────────────────
@@ -123,8 +119,7 @@ namespace Tests.Unit
             var svc = (TrackOrderService)FormatterServices.GetUninitializedObject(typeof(TrackOrderService));
             var noSuchFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
                 "no-song-order-" + System.Guid.NewGuid().ToString("N") + ".toml");
-            return Reflect.InvokeInstance<List<TrackViewModel>>(
-                svc, "ComposeMergedList", vanilla, mods, rawRows, headers, noSuchFile);
+            return svc.ComposeMergedList(vanilla, mods, rawRows, headers, noSuchFile);
         }
 
         [Fact]
@@ -189,11 +184,11 @@ namespace Tests.Unit
         public void AppendSongsField_NullOrWildcardWritesStar()
         {
             var sbNull = new StringBuilder();
-            Reflect.InvokeStaticVoid(typeof(MergeService), "AppendSongsField", sbNull, null);
+            MergeService.AppendSongsField(sbNull, null);
             Assert.Contains("songs = \"*\"", sbNull.ToString());
 
             var sbStar = new StringBuilder();
-            Reflect.InvokeStaticVoid(typeof(MergeService), "AppendSongsField", sbStar, "*");
+            MergeService.AppendSongsField(sbStar, "*");
             Assert.Contains("songs = \"*\"", sbStar.ToString());
         }
 
@@ -202,7 +197,7 @@ namespace Tests.Unit
         {
             var sb = new StringBuilder();
             var songs = new List<object> { "a.nus3audio", "b.nus3audio" };
-            Reflect.InvokeStaticVoid(typeof(MergeService), "AppendSongsField", sb, songs);
+            MergeService.AppendSongsField(sb, songs);
 
             var output = sb.ToString();
             Assert.Contains("a.nus3audio", output);

@@ -7,6 +7,7 @@
   import { _ } from 'svelte-i18n'
   import { modsStore } from '$lib/stores/mods.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
+  import { createSeriesLoader } from '$lib/series-loader'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import IconButton from '$lib/components/ui/icon-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
@@ -39,7 +40,7 @@
   // pymusiclooper tuning (applied via the settings panel, used by manual recalc).
   let minLoopDuration = $state(0) // seconds; 0 = pymusiclooper default multiplier
   let disablePruning = $state(false)
-  let loadToken = 0
+  const seriesLoader = createSeriesLoader((v) => (loading = v))
   let analysisToken = 0
   let waveformPeaks = $state<Map<string, number[]>>(new Map())
   let previewAudio = $state<HTMLAudioElement | null>(null)
@@ -81,25 +82,18 @@
   )
 
   async function loadSeries(modPath: string | null) {
-    loadToken += 1
-    const token = loadToken
-
     if (!modPath) {
+      seriesLoader.invalidate()
       series = []
       modsStore.activeSeriesPath = null
       return
     }
 
-    loading = true
-    try {
-      const nextSeries = await window.electron.umb.listModSeries(modPath)
-      if (token !== loadToken) return
-      series = nextSeries
-      if (!nextSeries.some((e) => e.path === modsStore.activeSeriesPath)) {
-        modsStore.activeSeriesPath = nextSeries[0]?.path ?? null
-      }
-    } finally {
-      if (token === loadToken) loading = false
+    const nextSeries = await seriesLoader.load(modPath)
+    if (nextSeries === null) return
+    series = nextSeries
+    if (!nextSeries.some((e) => e.path === modsStore.activeSeriesPath)) {
+      modsStore.activeSeriesPath = nextSeries[0]?.path ?? null
     }
   }
 
