@@ -102,10 +102,10 @@ namespace UMB.CLI.Services
 
             var modName = json["name"]?.ToString() ?? Path.GetFileName(oldModPath);
             var outputModName = !string.IsNullOrWhiteSpace(outputName)
-                ? SanitizeFolderName(outputName)
+                ? CliUtil.SanitizeFolderName(outputName)
                 : AnsiConsole.Prompt(
                     new TextPrompt<string>("Name for the new UMB mod folder:")
-                        .DefaultValue(SanitizeFolderName(modName)));
+                        .DefaultValue(CliUtil.SanitizeFolderName(modName)));
 
             var outputModDir = Path.Combine(modPath, outputModName);
 
@@ -284,7 +284,7 @@ namespace UMB.CLI.Services
                 foreach (var id in customSeriesOrder)
                 {
                     orderSb.AppendLine();
-                    orderSb.Append($"    \"{EscapeTomlString(id)}\",");
+                    orderSb.Append($"    \"{CliUtil.EscapeToml(id)}\",");
                 }
                 orderSb.AppendLine();
                 orderSb.AppendLine("]");
@@ -347,24 +347,14 @@ namespace UMB.CLI.Services
             bool isExisting, List<(string id, string name)> games)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("[series]");
-            sb.AppendLine($"id = \"{EscapeTomlString(seriesId)}\"");
-            sb.AppendLine($"name = \"{EscapeTomlString(seriesName)}\"");
-            if (isExisting)
-                sb.AppendLine("existing-series = true");
             // For existing series the scaffold maintenance pass will fill in `series-playlist`
             // from vanilla data after conversion finishes.
-            if (!isExisting)
-                sb.AppendLine($"series-playlist = \"bgm_{EscapeTomlString(seriesId)}\"");
-            sb.AppendLine();
+            CliUtil.AppendSeriesHeader(sb, seriesId, seriesName,
+                existingSeries: isExisting,
+                seriesPlaylist: isExisting ? null : $"bgm_{seriesId}");
 
             foreach (var (id, name) in games)
-            {
-                sb.AppendLine("[[games]]");
-                sb.AppendLine($"id = \"{EscapeTomlString(id)}\"");
-                sb.AppendLine($"name = \"{EscapeTomlString(name)}\"");
-                sb.AppendLine();
-            }
+                CliUtil.AppendGameBlock(sb, id, name);
 
             var tomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
             File.WriteAllText(tomlPath, sb.ToString());
@@ -374,10 +364,7 @@ namespace UMB.CLI.Services
         {
             var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
             using var writer = new StreamWriter(csvPath);
-            using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true
-            });
+            using var csv = new CsvWriter(writer, CliUtil.CsvWrite());
 
             csv.WriteField("filename");
             csv.WriteField("game");
@@ -408,24 +395,6 @@ namespace UMB.CLI.Services
                 csv.WriteField(i);
                 csv.NextRecord();
             }
-        }
-
-        private static string EscapeTomlString(string value)
-        {
-            return value?.Replace("\\", "\\\\").Replace("\"", "\\\"") ?? "";
-        }
-
-        private static string SanitizeFolderName(string name)
-        {
-            var sb = new StringBuilder(name.Length);
-            foreach (var c in name)
-            {
-                if (Path.GetInvalidFileNameChars().Contains(c))
-                    sb.Append('_');
-                else
-                    sb.Append(c);
-            }
-            return sb.ToString().Trim().ToLowerInvariant().Replace(' ', '-');
         }
 
         private class ConvertTrackRow

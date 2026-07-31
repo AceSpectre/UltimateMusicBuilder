@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Text;
-using Tests.Helpers;
 using UMB.CLI.Services;
 using UMB.CLI.Views;
 using Xunit;
@@ -9,15 +8,14 @@ using Xunit;
 namespace Tests.Unit
 {
     /// <summary>
-    /// Pure private helpers scattered across the CLI services, reached via
-    /// reflection so production visibility stays untouched:
-    /// ConvertService.SanitizeFolderName/EscapeTomlString, VolumeConfigService.ParseVolume,
-    /// AudioPreviewDecoder.MakeSafeFileName, TrackOrderService.ParseOrder/ComposeMergedList,
-    /// MergeService.AppendSongsField.
+    /// Pure helpers behind the CLI services: the shared CliUtil statics plus the
+    /// internal helpers exposed to this assembly via InternalsVisibleTo
+    /// (VolumeConfigService.ParseVolume, TrackOrderService.ParseOrder/ComposeMergedList,
+    /// MergeService.AppendSongsField).
     /// </summary>
     public class ServiceHelperTests
     {
-        // ── ConvertService.SanitizeFolderName ───────────────────────────────
+        // ── CliUtil.SanitizeFolderName ──────────────────────────────────────
 
         [Theory]
         [InlineData("My Series", "my-series")]
@@ -26,31 +24,40 @@ namespace Tests.Unit
         [InlineData("multi word name", "multi-word-name")]
         public void SanitizeFolderName_LowercasesTrimsAndDashesSpaces(string input, string expected)
         {
-            Assert.Equal(expected,
-                Reflect.InvokeStatic<string>(typeof(ConvertService), "SanitizeFolderName", input));
+            Assert.Equal(expected, CliUtil.SanitizeFolderName(input));
         }
 
         [Fact]
         public void SanitizeFolderName_ReplacesInvalidPathChars()
         {
-            var result = Reflect.InvokeStatic<string>(
-                typeof(ConvertService), "SanitizeFolderName", "a/b:c?");
+            var result = CliUtil.SanitizeFolderName("a/b:c?");
             foreach (var c in System.IO.Path.GetInvalidFileNameChars())
                 Assert.DoesNotContain(c, result);
             Assert.StartsWith("a_b", result);
         }
 
-        // ── ConvertService.EscapeTomlString ─────────────────────────────────
+        // ── CliUtil.EscapeToml ──────────────────────────────────────────────
 
         [Theory]
         [InlineData("plain", "plain")]
         [InlineData("say \"hi\"", "say \\\"hi\\\"")]
         [InlineData("back\\slash", "back\\\\slash")]
         [InlineData(null, "")]
-        public void EscapeTomlString_EscapesQuotesAndBackslashes(string input, string expected)
+        public void EscapeToml_EscapesQuotesAndBackslashes(string input, string expected)
         {
-            Assert.Equal(expected,
-                Reflect.InvokeStatic<string>(typeof(ConvertService), "EscapeTomlString", input));
+            Assert.Equal(expected, CliUtil.EscapeToml(input));
+        }
+
+        // ── CliUtil.ToKebabCase ─────────────────────────────────────────────
+
+        [Theory]
+        [InlineData("ExistingSeries", "existing-series")]
+        [InlineData("Name", "name")]
+        [InlineData("already-kebab", "already-kebab")]
+        [InlineData("SeriesPlaylist", "series-playlist")]
+        public void ToKebabCase_InsertsDashesBeforeInnerCapitals(string input, string expected)
+        {
+            Assert.Equal(expected, CliUtil.ToKebabCase(input));
         }
 
         // ── VolumeConfigService.ParseVolume ─────────────────────────────────
@@ -64,17 +71,15 @@ namespace Tests.Unit
         [InlineData(null, 1.0f)]
         public void ParseVolume_FallsBackToUnity(string input, float expected)
         {
-            Assert.Equal(expected,
-                Reflect.InvokeStatic<float>(typeof(VolumeConfigService), "ParseVolume", input));
+            Assert.Equal(expected, VolumeConfigService.ParseVolume(input));
         }
 
-        // ── AudioPreviewDecoder.MakeSafeFileName ────────────────────────────
+        // ── CliUtil.MakeSafeFileName ────────────────────────────────────────
 
         [Fact]
         public void MakeSafeFileName_ReplacesInvalidChars()
         {
-            var result = Reflect.InvokeStatic<string>(
-                typeof(AudioPreviewDecoder), "MakeSafeFileName", "a/b\\c");
+            var result = CliUtil.MakeSafeFileName("a/b\\c");
             foreach (var c in System.IO.Path.GetInvalidFileNameChars())
                 Assert.DoesNotContain(c, result);
         }
@@ -82,8 +87,7 @@ namespace Tests.Unit
         [Fact]
         public void MakeSafeFileName_LeavesCleanNameUntouched()
         {
-            Assert.Equal("clean_name",
-                Reflect.InvokeStatic<string>(typeof(AudioPreviewDecoder), "MakeSafeFileName", "clean_name"));
+            Assert.Equal("clean_name", CliUtil.MakeSafeFileName("clean_name"));
         }
 
         // ── TrackOrderService.ParseOrder ────────────────────────────────────
@@ -92,16 +96,14 @@ namespace Tests.Unit
         public void ParseOrder_ReturnsIntWhenPresentAndNumeric()
         {
             var row = new Dictionary<string, string> { ["order"] = "7" };
-            Assert.Equal(7, Reflect.InvokeStatic<int?>(typeof(TrackOrderService), "ParseOrder", row));
+            Assert.Equal(7, TrackOrderService.ParseOrder(row));
         }
 
         [Fact]
         public void ParseOrder_NullWhenMissingOrNonNumeric()
         {
-            Assert.Null(Reflect.InvokeStatic<int?>(typeof(TrackOrderService), "ParseOrder",
-                new Dictionary<string, string>()));
-            Assert.Null(Reflect.InvokeStatic<int?>(typeof(TrackOrderService), "ParseOrder",
-                new Dictionary<string, string> { ["order"] = "abc" }));
+            Assert.Null(TrackOrderService.ParseOrder(new Dictionary<string, string>()));
+            Assert.Null(TrackOrderService.ParseOrder(new Dictionary<string, string> { ["order"] = "abc" }));
         }
 
         // ── TrackOrderService.ComposeMergedList ─────────────────────────────
@@ -117,8 +119,7 @@ namespace Tests.Unit
             var svc = (TrackOrderService)FormatterServices.GetUninitializedObject(typeof(TrackOrderService));
             var noSuchFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(),
                 "no-song-order-" + System.Guid.NewGuid().ToString("N") + ".toml");
-            return Reflect.InvokeInstance<List<TrackViewModel>>(
-                svc, "ComposeMergedList", vanilla, mods, rawRows, headers, noSuchFile);
+            return svc.ComposeMergedList(vanilla, mods, rawRows, headers, noSuchFile);
         }
 
         [Fact]
@@ -183,11 +184,11 @@ namespace Tests.Unit
         public void AppendSongsField_NullOrWildcardWritesStar()
         {
             var sbNull = new StringBuilder();
-            Reflect.InvokeStaticVoid(typeof(MergeService), "AppendSongsField", sbNull, null);
+            MergeService.AppendSongsField(sbNull, null);
             Assert.Contains("songs = \"*\"", sbNull.ToString());
 
             var sbStar = new StringBuilder();
-            Reflect.InvokeStaticVoid(typeof(MergeService), "AppendSongsField", sbStar, "*");
+            MergeService.AppendSongsField(sbStar, "*");
             Assert.Contains("songs = \"*\"", sbStar.ToString());
         }
 
@@ -196,7 +197,7 @@ namespace Tests.Unit
         {
             var sb = new StringBuilder();
             var songs = new List<object> { "a.nus3audio", "b.nus3audio" };
-            Reflect.InvokeStaticVoid(typeof(MergeService), "AppendSongsField", sb, songs);
+            MergeService.AppendSongsField(sb, songs);
 
             var output = sb.ToString();
             Assert.Contains("a.nus3audio", output);

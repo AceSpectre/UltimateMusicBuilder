@@ -1,9 +1,14 @@
 <script lang="ts">
-  import { Volume2, Folder, RefreshCw, Save, Play, Square, AlertTriangle, Activity } from '@lucide/svelte'
+  import { Volume2, RefreshCw, Play, Square, AlertTriangle, Activity } from '@lucide/svelte'
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
   import { modsStore } from '$lib/stores/mods.svelte'
+  import { createSeriesLoader } from '$lib/series-loader'
+  import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
+  import EmptyState from '$lib/components/ui/empty-state.svelte'
+  import SaveButton from '$lib/components/ui/save-button.svelte'
+  import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import type { ModInfo, ModSeriesInfo, VolumeConfigData, VolumeRowItem, VolumeProgress } from '$lib/types/electron'
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
@@ -19,7 +24,7 @@
   let rows = $state<VolumeRowItem[]>([])
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let baseline = new Map<number, number>()
-  let loadToken = 0
+  const seriesLoader = createSeriesLoader((v) => (loading = v))
 
   // Web Audio preview
   let audioCtx: AudioContext | null = null
@@ -41,31 +46,20 @@
     return global * row.autoGain * row.userOverride
   }
 
-  function log(level: 'info' | 'warn' | 'error', message: string) {
-    logStore.push({ timestamp: new Date().toLocaleTimeString('en-GB', { hour12: false }), level, message })
-  }
-
   async function loadSeries(modPath: string | null) {
-    loadToken += 1
-    const token = loadToken
-
     if (!modPath) {
+      seriesLoader.invalidate()
       series = []
       selectedPath = null
       return
     }
 
-    loading = true
-    try {
-      const next = await window.electron.umb.listModSeries(modPath)
-      if (token !== loadToken) return
-      series = next
-      // Deliberately do NOT auto-select a series — the user must pick one.
-      if (selectedPath && !next.some((e) => e.path === selectedPath)) {
-        selectedPath = null
-      }
-    } finally {
-      if (token === loadToken) loading = false
+    const next = await seriesLoader.load(modPath)
+    if (next === null) return
+    series = next
+    // Deliberately do NOT auto-select a series — the user must pick one.
+    if (selectedPath && !next.some((e) => e.path === selectedPath)) {
+      selectedPath = null
     }
   }
 
@@ -88,7 +82,7 @@
       rows = result.items.map((item) => ({ ...item }))
       baseline = new Map(result.items.map((item) => [item.originalIndex, item.userOverride]))
     } catch (err) {
-      log('error', `Volume analysis failed: ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Volume analysis failed: ${err instanceof Error ? err.message : String(err)}`)
       data = null
       rows = []
     } finally {
@@ -139,7 +133,7 @@
       baseline = new Map(rows.map((r) => [r.originalIndex, r.userOverride]))
       saveState = 'saved'
     } catch (err) {
-      log('error', `Save failed: ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Save failed: ${err instanceof Error ? err.message : String(err)}`)
       saveState = 'idle'
     }
   }
@@ -173,7 +167,7 @@
       if (!buffer) {
         const dataUrl = await window.electron.umb.decodeTrackPreview(seriesPath, row.filename)
         if (!dataUrl) {
-          log('warn', `Could not decode "${row.title}" for preview.`)
+          logStore.log('warn', `Could not decode "${row.title}" for preview.`)
           return
         }
         const arrayBuf = await (await fetch(dataUrl)).arrayBuffer()
@@ -196,7 +190,7 @@
       sourceNode.start()
       playingIndex = row.originalIndex
     } catch (err) {
-      log('error', `Preview failed: ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Preview failed: ${err instanceof Error ? err.message : String(err)}`)
       stopPreview()
     } finally {
       previewLoadingIndex = null
@@ -245,76 +239,30 @@
 
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
-    <section class="flex h-full min-h-0 w-[280px] shrink-0 flex-col border border-border bg-card overflow-hidden">
-      <div class="gradient-strip h-[3px] shrink-0"></div>
-      <div class="shrink-0 border-b border-border px-4 py-3">
-        <div class="flex items-center gap-2">
-          <div
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-            style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-          >
-            <Folder size={18} />
-          </div>
-          <div class="min-w-0 flex-1">
-            <h2 class="text-sm font-semibold">{$_('configVolume.seriesHeading')}</h2>
-            <p class="truncate text-[12.5px] text-muted-foreground">
-              {activeMod?.name ?? $_('configVolume.selectModSubtitle')}
-            </p>
-          </div>
-          <span class="shrink-0 text-[12px] text-muted-foreground">{series.length}</span>
-          <button
-            onclick={handleReload}
-            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-input bg-background transition-colors hover:bg-muted"
-            title={$_('configVolume.reload')}
-          >
-            <RefreshCw size={14} class={loading || analyzing || loadingConfig ? 'animate-spin' : ''} />
-          </button>
-        </div>
-      </div>
-
-      <div class="min-h-0 flex-1 overflow-auto p-2">
-        {#if !activeMod}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {$_('configVolume.chooseMod')}
-          </div>
-        {:else if loading && series.length === 0}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {$_('configVolume.loadingSeries')}
-          </div>
-        {:else if series.length === 0}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {$_('configVolume.noSeries')}
-          </div>
-        {:else}
-          <div class="grid gap-1.5">
-            {#each series as item}
-              {@const isActive = selectedPath === item.path}
-              <button
-                onclick={() => selectSeries(item.path)}
-                class="w-full rounded-lg border px-2 py-1.5 text-left transition-colors {isActive ? 'border-transparent' : 'border-border bg-background/70 hover:bg-muted'}"
-                style={isActive
-                  ? 'background: linear-gradient(135deg, hsl(var(--gradient-from) / .15), hsl(var(--gradient-to) / .18));'
-                  : ''}
-              >
-                <div class="truncate text-[13.5px] font-semibold">{item.name}</div>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </section>
+    <SeriesPicker
+      {activeMod}
+      {series}
+      {loading}
+      spinning={loading || analyzing || loadingConfig}
+      activePath={selectedPath}
+      onSelect={selectSeries}
+      onReload={handleReload}
+      heading={$_('configVolume.seriesHeading')}
+      subtitleFallback={$_('configVolume.selectModSubtitle')}
+      chooseModText={$_('configVolume.chooseMod')}
+      loadingText={$_('configVolume.loadingSeries')}
+      emptyText={$_('configVolume.noSeries')}
+      reloadTitle={$_('configVolume.reload')}
+    />
 
     <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
 
       <div class="shrink-0 border-b border-border px-5 py-3 flex items-center justify-between gap-4">
         <div class="flex min-w-0 items-center gap-3">
-          <div
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-            style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-          >
+          <GradientIcon>
             <Volume2 size={18} />
-          </div>
+          </GradientIcon>
           <div class="min-w-0">
             <h2 class="truncate text-sm font-semibold">{$_('configVolume.title')}</h2>
             <p class="truncate text-[12.5px] text-muted-foreground">{selectedSeries?.name ?? ''}</p>
@@ -345,14 +293,14 @@
               {needsAnalysis ? $_('configVolume.analyze') : $_('configVolume.reanalyze')}
             </button>
           {/if}
-          <button
+          <SaveButton
+            {saveState}
             onclick={handleSave}
-            class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!data || rows.length === 0 || !isDirty || saveState === 'saving'}
-          >
-            <Save size={14} />
-            {saveState === 'saving' ? $_('configVolume.saving') : saveState === 'saved' ? $_('configVolume.saved') : $_('configVolume.save')}
-          </button>
+            save={$_('configVolume.save')}
+            saving={$_('configVolume.saving')}
+            saved={$_('configVolume.saved')}
+          />
         </div>
       </div>
 
@@ -383,17 +331,9 @@
           </div>
         </div>
       {:else if !selectedSeries}
-        <div class="grid h-full min-h-[320px] place-items-center">
-          <div class="flex max-w-[340px] flex-col items-center gap-3 px-6 text-center">
-            <div
-              class="flex h-12 w-12 items-center justify-center rounded-2xl border border-border"
-              style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-            >
-              <Volume2 size={20} />
-            </div>
-            <p class="text-[13px] text-muted-foreground">{$_('configVolume.chooseSeries')}</p>
-          </div>
-        </div>
+        <EmptyState body={$_('configVolume.chooseSeries')}>
+          {#snippet icon()}<Volume2 size={20} />{/snippet}
+        </EmptyState>
       {:else if loadingConfig}
         <div class="grid h-full min-h-[320px] place-items-center">
           <div class="flex flex-col items-center gap-4 text-center">

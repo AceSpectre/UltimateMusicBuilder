@@ -2,6 +2,7 @@
   import { GitMerge, RefreshCw, Check, AlertTriangle } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
+  import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import type { ModInfo, MergeAnalysis, MergeResult } from '$lib/types/electron'
 
   let { mods }: { mods: ModInfo[] } = $props()
@@ -25,10 +26,6 @@
     outputName.trim().length > 0 &&
     (!hasConflicts || priorityPath)
   )
-
-  function log(level: 'info' | 'warn' | 'error', message: string) {
-    logStore.push({ timestamp: new Date().toLocaleTimeString('en-GB', { hour12: false }), level, message })
-  }
 
   function toggleMod(modPath: string) {
     const next = new Set(selected)
@@ -79,7 +76,7 @@
         priorityPath = selectedMods[0]?.path ?? null
       }
     } catch (err) {
-      log('error', `Analysis failed: ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Analysis failed: ${err instanceof Error ? err.message : String(err)}`)
       analysis = null
     } finally {
       analyzing = false
@@ -96,7 +93,7 @@
         priorityPath
       )
     } catch (err) {
-      log('error', `Merge failed: ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Merge failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       merging = false
     }
@@ -118,12 +115,9 @@
       <div class="gradient-strip h-[3px] shrink-0"></div>
 
       <div class="shrink-0 border-b border-border px-5 py-3 flex items-center gap-3">
-        <div
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-          style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-        >
+        <GradientIcon>
           <GitMerge size={18} />
-        </div>
+          </GradientIcon>
         <div class="min-w-0">
           <h2 class="truncate text-sm font-semibold">{$_('merge.title')}</h2>
           <p class="truncate text-[12.5px] text-muted-foreground">{$_('merge.subtitle')}</p>

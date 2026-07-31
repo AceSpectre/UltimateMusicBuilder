@@ -1,54 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'fs'
-import { join, relative, resolve, isAbsolute, basename } from 'path'
+import { join, basename } from 'path'
+import { resolveUnderMods } from './utils'
+import { tomlEscape, tableSection, tomlString, parseGamesBlocks, readTomlIdList } from './toml-utils'
+import type { CreateSeriesInput, SaveSeriesItem, SeriesFields, SeriesGame, SeriesOrderData, SeriesOrderItem } from '../shared/types'
 
-export interface SeriesGame {
-  id: string
-  name: string
-}
-
-// Editable series.toml fields (series id stays read-only — it is the identity). Covers the
-// [series] table, the [[games]] array, and the [default-track-data] table (song defaults).
-export interface SeriesFields {
-  name: string
-  seriesPlaylist: string
-  playlistIncidence: number
-  games: SeriesGame[]
-  defaultGame: string
-  defaultAuthor: string
-  defaultCopyright: string
-  defaultRecordType: string
-  defaultVolume: number
-}
-
-export interface SeriesOrderItem {
-  id: string
-  name: string
-  seriesId: string
-  iconDataUrl: string | null
-  originalIndex: number
-  fields: SeriesFields
-}
-
-export interface SaveSeriesItem {
-  id: string
-  fields: SeriesFields | null
-}
-
-export interface SeriesOrderData {
-  modName: string
-  modPath: string
-  hasSeriesOrder: boolean
-  items: SeriesOrderItem[]
-}
-
-// Payload for creating a brand-new custom series folder.
-export interface CreateSeriesInput {
-  seriesId: string
-  name: string
-  seriesPlaylist: string
-  games: SeriesGame[]
-  iconDataUrl?: string | null
-}
+export type { CreateSeriesInput, SaveSeriesItem, SeriesFields, SeriesGame, SeriesOrderData, SeriesOrderItem } from '../shared/types'
 
 // Series icons are stored verbatim as icon.png; the app has no transcoder, so only PNG is accepted.
 const PNG_DATA_URL_RE = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/
@@ -67,28 +23,11 @@ const SERIES_ID_RE = /^[a-z0-9_]+$/
 const TRACKS_CSV_HEADER =
   'filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\n'
 
-function isChildOf(parentPath: string, childPath: string): boolean {
-  const rel = relative(parentPath, childPath)
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
-}
-
-function getMusicModsRoot(workspace: string): string {
-  return resolve(workspace, 'Mods', 'MusicMods')
-}
-
 interface ParsedSeriesToml {
   id: string | null
   name: string | null
   existingSeries: boolean
   fields: SeriesFields
-}
-
-// Returns the body of a table (up to the next table header) so field matches don't bleed
-// across tables ([[games]] / [default-track-data] reuse keys like `name` and `game`).
-function tableSection(text: string, header: string): string | null {
-  const after = text.split(new RegExp(`^\\s*\\[${header}\\]\\s*$`, 'm'))[1]
-  if (after === undefined) return null
-  return after.split(/^\s*\[/m)[0]
 }
 
 function parseSeriesToml(seriesTomlPath: string): ParsedSeriesToml {
@@ -110,8 +49,6 @@ function parseSeriesToml(seriesTomlPath: string): ParsedSeriesToml {
   const text = readFileSync(seriesTomlPath, 'utf8')
   const series = tableSection(text, 'series') ?? text
   const defaults = tableSection(text, 'default-track-data') ?? ''
-  const str = (section: string, key: string): string =>
-    section.match(new RegExp(`^\\s*${key}\\s*=\\s*"([^"]*)"`, 'm'))?.[1] ?? ''
 
   const id = series.match(/^\s*id\s*=\s*"([^"]+)"/m)?.[1] ?? null
   const name = series.match(/^\s*name\s*=\s*"([^"]+)"/m)?.[1] ?? null
@@ -124,31 +61,17 @@ function parseSeriesToml(seriesTomlPath: string): ParsedSeriesToml {
     existingSeries: series.match(/^\s*existing-series\s*=\s*(true|false)/m)?.[1] === 'true',
     fields: {
       name: name ?? id ?? '',
-      seriesPlaylist: str(series, 'series-playlist'),
+      seriesPlaylist: tomlString(series, 'series-playlist'),
       playlistIncidence: incidence ? Number.parseInt(incidence[1], 10) : 100,
-      games: parseGames(text),
-      defaultGame: str(defaults, 'game'),
-      defaultAuthor: str(defaults, 'author'),
-      defaultCopyright: str(defaults, 'copyright'),
-      defaultRecordType: str(defaults, 'record-type') || 'original',
+      games: parseGamesBlocks(text),
+      defaultGame: tomlString(defaults, 'game'),
+      defaultAuthor: tomlString(defaults, 'author'),
+      defaultCopyright: tomlString(defaults, 'copyright'),
+      defaultRecordType: tomlString(defaults, 'record-type') || 'original',
       defaultVolume: volume ? Number.parseFloat(volume[1]) : 1
     }
   }
 }
-
-// Parses the repeating [[games]] array-of-tables (id + name per block).
-function parseGames(text: string): SeriesGame[] {
-  const games: SeriesGame[] = []
-  for (const block of text.split(/^\s*\[\[games\]\]\s*$/m).slice(1)) {
-    const scoped = block.split(/^\s*\[/m)[0]
-    const id = scoped.match(/^\s*id\s*=\s*"([^"]+)"/m)?.[1]
-    if (!id) continue
-    games.push({ id, name: scoped.match(/^\s*name\s*=\s*"([^"]*)"/m)?.[1] ?? id })
-  }
-  return games
-}
-
-const tomlEscape = (value: string): string => value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 
 interface TomlEntry {
   key: string
@@ -290,15 +213,6 @@ function writeSeriesTomlFields(seriesTomlPath: string, fields: SeriesFields): vo
   writeFileSync(seriesTomlPath, lines.join('\n'), 'utf8')
 }
 
-function loadSeriesOrder(orderPath: string): string[] {
-  if (!existsSync(orderPath)) {
-    return []
-  }
-
-  const text = readFileSync(orderPath, 'utf8')
-  return Array.from(text.matchAll(/"([^"]+)"/g), (match) => match[1].trim()).filter(Boolean)
-}
-
 interface ScannedSeries {
   dirName: string
   id: string
@@ -352,15 +266,11 @@ function scanCustomSeries(modPath: string): ScannedSeries[] {
 }
 
 export function loadSeriesOrderData(workspace: string, modPath: string): SeriesOrderData {
-  const modsDir = getMusicModsRoot(workspace)
-  const resolvedModPath = resolve(modPath)
-  if (!isChildOf(modsDir, resolvedModPath)) {
-    throw new Error('Invalid mod path.')
-  }
+  const resolvedModPath = resolveUnderMods(workspace, modPath)
 
   const customSeries = scanCustomSeries(resolvedModPath)
   const orderPath = join(resolvedModPath, 'series-order.toml')
-  const existingOrder = loadSeriesOrder(orderPath)
+  const existingOrder = readTomlIdList(orderPath)
 
   const orderedIds = existingOrder
   const sorted = [...customSeries].sort((a, b) => {
@@ -392,11 +302,7 @@ export function loadSeriesOrderData(workspace: string, modPath: string): SeriesO
 // Creates a new custom series folder (series.toml + header-only tracks.csv) under the mod and
 // returns the reloaded series list. The first game becomes the [default-track-data] game.
 export function createSeries(workspace: string, modPath: string, input: CreateSeriesInput): SeriesOrderData {
-  const modsDir = getMusicModsRoot(workspace)
-  const resolvedModPath = resolve(modPath)
-  if (!isChildOf(modsDir, resolvedModPath)) {
-    throw new Error('Invalid mod path.')
-  }
+  const resolvedModPath = resolveUnderMods(workspace, modPath)
 
   const seriesId = input.seriesId.trim()
   if (!SERIES_ID_RE.test(seriesId)) {
@@ -442,11 +348,7 @@ export function createSeries(workspace: string, modPath: string, input: CreateSe
 
 // Writes (or replaces) icon.png for an existing custom series and returns the new data URL.
 export function setSeriesIcon(workspace: string, modPath: string, seriesId: string, iconDataUrl: string): string {
-  const modsDir = getMusicModsRoot(workspace)
-  const resolvedModPath = resolve(modPath)
-  if (!isChildOf(modsDir, resolvedModPath)) {
-    throw new Error('Invalid mod path.')
-  }
+  const resolvedModPath = resolveUnderMods(workspace, modPath)
 
   const dirName = scanCustomSeries(resolvedModPath).find((s) => s.id === seriesId)?.dirName
   if (!dirName) {
@@ -460,11 +362,7 @@ export function setSeriesIcon(workspace: string, modPath: string, seriesId: stri
 }
 
 export function saveSeriesOrderData(workspace: string, modPath: string, items: SaveSeriesItem[]): SeriesOrderData {
-  const modsDir = getMusicModsRoot(workspace)
-  const resolvedModPath = resolve(modPath)
-  if (!isChildOf(modsDir, resolvedModPath)) {
-    throw new Error('Invalid mod path.')
-  }
+  const resolvedModPath = resolveUnderMods(workspace, modPath)
 
   const data = loadSeriesOrderData(workspace, resolvedModPath)
   const itemById = new Map(data.items.map((item) => [item.id, item]))

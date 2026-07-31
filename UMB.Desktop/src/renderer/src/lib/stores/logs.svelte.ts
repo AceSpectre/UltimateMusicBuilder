@@ -51,6 +51,11 @@ export const logStore = $state({
     scheduleFlush()
   },
 
+  /** Convenience push that stamps the timestamp, for renderer-originated lines. */
+  log(level: LogLine['level'], message: string) {
+    logStore.push({ timestamp: new Date().toLocaleTimeString('en-GB', { hour12: false }), level, message })
+  },
+
   clear() {
     pending = []
     logStore.entries = []

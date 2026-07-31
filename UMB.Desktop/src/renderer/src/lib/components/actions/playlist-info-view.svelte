@@ -2,6 +2,7 @@
   import { ListMusic, RefreshCw, Search, AlertTriangle } from '@lucide/svelte'
   import { onMount } from 'svelte'
   import { _ } from 'svelte-i18n'
+  import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import type { PlaylistInfoData, StageInfo } from '$lib/types/electron'
 
   let data = $state<PlaylistInfoData | null>(null)
@@ -47,12 +48,9 @@
       <div class="gradient-strip h-[3px] shrink-0"></div>
 
       <div class="shrink-0 border-b border-border px-5 py-3 flex items-center gap-3">
-        <div
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-          style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-        >
+        <GradientIcon>
           <ListMusic size={18} />
-        </div>
+          </GradientIcon>
         <div class="min-w-0">
           <h2 class="truncate text-sm font-semibold">{$_('playlistInfo.title')}</h2>
           <p class="truncate text-[12.5px] text-muted-foreground">{$_('playlistInfo.subtitle')}</p>

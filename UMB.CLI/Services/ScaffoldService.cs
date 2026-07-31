@@ -110,7 +110,7 @@ namespace UMB.CLI.Services
                         _logger.LogInformation("Added songs = \"*\" to {Count} [[playlists]] block(s) in {Path}", addedSongs, tomlPath);
 
                     var tomlText = File.ReadAllText(tomlPath);
-                    var tomlOptions = new TomlModelOptions { ConvertPropertyName = ToKebabCase };
+                    var tomlOptions = CliUtil.KebabTomlOptions();
                     FolderSeriesFileConfig seriesFile;
                     try
                     {
@@ -229,7 +229,7 @@ namespace UMB.CLI.Services
                 {
                     var tomlText = File.ReadAllText(tomlPath);
                     config = Toml.ToModel<FolderSeriesFileConfig>(tomlText,
-                        options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
+                        options: CliUtil.KebabTomlOptions());
                 }
                 catch
                 {
@@ -368,7 +368,7 @@ namespace UMB.CLI.Services
                 var uiBgmId = orderedIds[i];
                 var tag = vanillaIds.Contains(uiBgmId) ? "vanilla" : "mod";
                 var comma = i < orderedIds.Count - 1 ? "," : "";
-                sb.AppendLine($"  \"{EscapeTomlString(uiBgmId)}\"{comma} # {tag}");
+                sb.AppendLine($"  \"{CliUtil.EscapeToml(uiBgmId)}\"{comma} # {tag}");
             }
             sb.AppendLine("]");
             File.WriteAllText(tomlPath, sb.ToString());
@@ -389,16 +389,9 @@ namespace UMB.CLI.Services
         private string BuildNewSeriesToml(string folderName)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("[series]");
-            sb.AppendLine($"id = \"{EscapeTomlString(folderName)}\"");
-            sb.AppendLine($"name = \"{EscapeTomlString(folderName)}\"");
-            sb.AppendLine("playlist-incidence = 100");
-            sb.AppendLine($"series-playlist = \"bgm_{EscapeTomlString(folderName)}\"");
-            sb.AppendLine();
-            sb.AppendLine("[[games]]");
-            sb.AppendLine($"id = \"{EscapeTomlString(folderName)}\"");
-            sb.AppendLine($"name = \"{EscapeTomlString(folderName)}\"");
-            sb.AppendLine();
+            CliUtil.AppendSeriesHeader(sb, folderName, folderName,
+                playlistIncidence: 100, seriesPlaylist: $"bgm_{folderName}");
+            CliUtil.AppendGameBlock(sb, folderName, folderName);
             AppendDefaultTrackData(sb, folderName);
             return sb.ToString();
         }
@@ -423,33 +416,20 @@ namespace UMB.CLI.Services
             }
 
             var sb = new StringBuilder();
-            sb.AppendLine("[series]");
-            sb.AppendLine($"id = \"{EscapeTomlString(seriesId)}\"");
-            sb.AppendLine($"name = \"{EscapeTomlString(seriesName)}\"");
-            sb.AppendLine("existing-series = true");
-            sb.AppendLine("playlist-incidence = 100");
-            if (!string.IsNullOrEmpty(seriesPlaylistId))
-                sb.AppendLine($"series-playlist = \"{EscapeTomlString(seriesPlaylistId)}\"");
-            sb.AppendLine();
+            CliUtil.AppendSeriesHeader(sb, seriesId, seriesName,
+                existingSeries: true, playlistIncidence: 100, seriesPlaylist: seriesPlaylistId);
 
             if (games.Count == 0)
             {
                 // Fallback: include at least one game block so downstream parsing succeeds.
-                sb.AppendLine("[[games]]");
-                sb.AppendLine($"id = \"{EscapeTomlString(seriesId)}\"");
-                sb.AppendLine($"name = \"{EscapeTomlString(seriesName)}\"");
-                sb.AppendLine();
+                CliUtil.AppendGameBlock(sb, seriesId, seriesName);
             }
             else
             {
                 foreach (var game in games)
                 {
                     var gameId = game.NameId ?? game.UiGameTitleId;
-                    var gameName = ResolveLocalizedName(game.MSBTTitle, gameId);
-                    sb.AppendLine("[[games]]");
-                    sb.AppendLine($"id = \"{EscapeTomlString(gameId)}\"");
-                    sb.AppendLine($"name = \"{EscapeTomlString(gameName)}\"");
-                    sb.AppendLine();
+                    CliUtil.AppendGameBlock(sb, gameId, ResolveLocalizedName(game.MSBTTitle, gameId));
                 }
             }
 
@@ -461,7 +441,7 @@ namespace UMB.CLI.Services
         private static void AppendDefaultTrackData(StringBuilder sb, string defaultGameId)
         {
             sb.AppendLine("[default-track-data]");
-            sb.AppendLine($"game = \"{EscapeTomlString(defaultGameId)}\"");
+            sb.AppendLine($"game = \"{CliUtil.EscapeToml(defaultGameId)}\"");
             sb.AppendLine("author = \"\"");
             sb.AppendLine("copyright = \"\"");
             sb.AppendLine("record-type = \"original\"");
@@ -482,7 +462,7 @@ namespace UMB.CLI.Services
             string defaultGameId = null;
             try
             {
-                var parsed = Toml.ToModel<FolderSeriesFileConfig>(text, options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
+                var parsed = Toml.ToModel<FolderSeriesFileConfig>(text, options: CliUtil.KebabTomlOptions());
                 if (parsed.Games != null && parsed.Games.Count > 0 && !string.IsNullOrWhiteSpace(parsed.Games[0].Id))
                     defaultGameId = parsed.Games[0].Id;
                 else if (!string.IsNullOrWhiteSpace(parsed.Series?.Id))
@@ -523,7 +503,7 @@ namespace UMB.CLI.Services
             FolderSeriesFileConfig parsed;
             try
             {
-                parsed = Toml.ToModel<FolderSeriesFileConfig>(text, options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
+                parsed = Toml.ToModel<FolderSeriesFileConfig>(text, options: CliUtil.KebabTomlOptions());
             }
             catch
             {
@@ -565,7 +545,7 @@ namespace UMB.CLI.Services
             var after = text.Substring(blockEnd);
             var inserted = before
                 + Environment.NewLine
-                + $"series-playlist = \"{EscapeTomlString(playlistId)}\""
+                + $"series-playlist = \"{CliUtil.EscapeToml(playlistId)}\""
                 + Environment.NewLine
                 + Environment.NewLine
                 + after.TrimStart('\r', '\n');
@@ -675,13 +655,7 @@ namespace UMB.CLI.Services
 
         private static (List<Dictionary<string, string>> rows, string[] headers) ReadCsvRows(string csvPath)
         {
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-                TrimOptions = TrimOptions.Trim,
-                MissingFieldFound = null,
-                BadDataFound = null,
-            };
+            var config = CliUtil.CsvReadLenient();
 
             using var reader = new StreamReader(csvPath);
             using var csv = new CsvReader(reader, config);
@@ -703,10 +677,7 @@ namespace UMB.CLI.Services
 
         private static void WriteCsvRows(string csvPath, List<Dictionary<string, string>> rows, string[] headers)
         {
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-            };
+            var config = CliUtil.CsvWrite();
 
             using var writer = new StreamWriter(csvPath);
             using var csv = new CsvWriter(writer, config);
@@ -721,30 +692,6 @@ namespace UMB.CLI.Services
                     csv.WriteField(row.GetValueOrDefault(h, ""));
                 csv.NextRecord();
             }
-        }
-
-        private static string EscapeTomlString(string value)
-        {
-            return value?.Replace("\\", "\\\\").Replace("\"", "\\\"") ?? "";
-        }
-
-        private static string ToKebabCase(string name)
-        {
-            var sb = new StringBuilder(name.Length + 4);
-            for (int i = 0; i < name.Length; i++)
-            {
-                var c = name[i];
-                if (char.IsUpper(c))
-                {
-                    if (i > 0) sb.Append('-');
-                    sb.Append(char.ToLowerInvariant(c));
-                }
-                else
-                {
-                    sb.Append(c);
-                }
-            }
-            return sb.ToString();
         }
     }
 }

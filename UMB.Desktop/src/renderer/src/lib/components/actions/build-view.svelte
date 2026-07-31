@@ -2,6 +2,7 @@
   import { Hammer, FolderTree, Wand2, ArrowLeftRight, Folder, AlertTriangle } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
+  import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import type { ModInfo } from '$lib/types/electron'
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
@@ -118,12 +119,9 @@
     <section class="flex h-full min-h-0 flex-1 flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
       <div class="shrink-0 border-b border-border px-4 py-3 flex items-center gap-3">
-        <div
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-          style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-        >
+        <GradientIcon>
           <Hammer size={18} />
-        </div>
+          </GradientIcon>
         <div class="min-w-0">
           <h2 class="truncate text-sm font-semibold">{$_('build.title')}</h2>
           <p class="truncate text-[12.5px] text-muted-foreground">{$_('build.subtitle')}</p>
@@ -134,12 +132,9 @@
         <div class="flex flex-col gap-4 max-w-[520px]">
           <div class="rounded-xl border border-border bg-background/75 p-4">
             <div class="flex items-center gap-3">
-              <div
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .10), hsl(var(--gradient-to) / .14)); color: hsl(var(--gradient-from));"
-              >
+              <GradientIcon size="card">
                 <Hammer size={18} />
-              </div>
+                </GradientIcon>
               <div class="flex-1 min-w-0">
                 <h3 class="text-[13.5px] font-semibold">{$_('build.buildButton')}</h3>
                 <p class="text-[12px] text-muted-foreground">{$_('build.buildDescription')}</p>
@@ -158,12 +153,9 @@
 
           <div class="rounded-xl border border-border bg-background/75 p-4">
             <div class="flex items-center gap-3">
-              <div
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .10), hsl(var(--gradient-to) / .14)); color: hsl(var(--gradient-from));"
-              >
+              <GradientIcon size="card">
                 <FolderTree size={18} />
-              </div>
+                </GradientIcon>
               <div class="flex-1 min-w-0">
                 <h3 class="text-[13.5px] font-semibold">{$_('build.scaffoldButton')}</h3>
                 <p class="text-[12px] text-muted-foreground">{$_('build.scaffoldDescription')}</p>
@@ -181,12 +173,9 @@
 
           <div class="rounded-xl border border-border bg-background/75 p-4">
             <div class="flex items-center gap-3">
-              <div
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .10), hsl(var(--gradient-to) / .14)); color: hsl(var(--gradient-from));"
-              >
+              <GradientIcon size="card">
                 <Wand2 size={18} />
-              </div>
+                </GradientIcon>
               <div class="flex-1 min-w-0">
                 <h3 class="text-[13.5px] font-semibold">{$_('build.cleanupButton')}</h3>
                 <p class="text-[12px] text-muted-foreground">{$_('build.cleanupDescription')}</p>
@@ -204,12 +193,9 @@
 
           <div class="rounded-xl border border-border bg-background/75 p-4">
             <div class="flex items-center gap-3">
-              <div
-                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .10), hsl(var(--gradient-to) / .14)); color: hsl(var(--gradient-from));"
-              >
+              <GradientIcon size="card">
                 <ArrowLeftRight size={18} />
-              </div>
+                </GradientIcon>
               <div class="flex-1 min-w-0">
                 <h3 class="text-[13.5px] font-semibold">{$_('build.importButton')}</h3>
                 <p class="text-[12px] text-muted-foreground">{$_('build.importDescription')}</p>
@@ -245,12 +231,9 @@
     >
       <div class="gradient-strip h-[3px] shrink-0"></div>
       <div class="border-b border-border px-5 py-4 flex items-center gap-3">
-        <div
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-          style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-        >
+        <GradientIcon>
           <ArrowLeftRight size={18} />
-        </div>
+          </GradientIcon>
         <div class="min-w-0">
           <h2 class="truncate text-sm font-semibold">{$_('build.importModal.title')}</h2>
           <p class="truncate text-[12.5px] text-muted-foreground">{$_('build.importModal.subtitle')}</p>

@@ -171,7 +171,7 @@ namespace UMB.CLI.Services
 
         private int MergeSeriesFolders(List<string> orderedSourceDirs, string outputDir, string seriesName)
         {
-            var tomlOptions = new TomlModelOptions { ConvertPropertyName = ToKebabCase };
+            var tomlOptions = CliUtil.KebabTomlOptions();
 
             FolderSeriesFileConfig priorityConfig = null;
             var mergedGames = new List<(string id, string name)>();
@@ -258,12 +258,7 @@ namespace UMB.CLI.Services
         private List<MergeTrackRow> ReadTracksCsv(string csvPath)
         {
             var rows = new List<MergeTrackRow>();
-            var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-                TrimOptions = TrimOptions.Trim,
-                MissingFieldFound = null
-            };
+            var csvConfig = CliUtil.CsvRead();
 
             using var reader = new StreamReader(csvPath);
             using var csv = new CsvReader(reader, csvConfig);
@@ -307,29 +302,19 @@ namespace UMB.CLI.Services
             List<(string id, string name)> games, List<(string id, int incidence, object songs)> playlists)
         {
             var sb = new StringBuilder();
-            sb.AppendLine("[series]");
-            sb.AppendLine($"id = \"{EscapeToml(priorityConfig.Series.Id)}\"");
-            sb.AppendLine($"name = \"{EscapeToml(priorityConfig.Series.Name)}\"");
-            if (priorityConfig.Series.ExistingSeries)
-                sb.AppendLine("existing-series = true");
-            if (priorityConfig.Series.PlaylistIncidence != 100)
-                sb.AppendLine($"playlist-incidence = {priorityConfig.Series.PlaylistIncidence}");
-            if (!string.IsNullOrWhiteSpace(priorityConfig.Series.SeriesPlaylist))
-                sb.AppendLine($"series-playlist = \"{EscapeToml(priorityConfig.Series.SeriesPlaylist)}\"");
-            sb.AppendLine();
+            var series = priorityConfig.Series;
+            CliUtil.AppendSeriesHeader(sb, series.Id, series.Name,
+                existingSeries: series.ExistingSeries,
+                playlistIncidence: series.PlaylistIncidence != 100 ? series.PlaylistIncidence : null,
+                seriesPlaylist: string.IsNullOrWhiteSpace(series.SeriesPlaylist) ? null : series.SeriesPlaylist);
 
             foreach (var (id, name) in games)
-            {
-                sb.AppendLine("[[games]]");
-                sb.AppendLine($"id = \"{EscapeToml(id)}\"");
-                sb.AppendLine($"name = \"{EscapeToml(name)}\"");
-                sb.AppendLine();
-            }
+                CliUtil.AppendGameBlock(sb, id, name);
 
             foreach (var (id, incidence, songs) in playlists)
             {
                 sb.AppendLine("[[playlists]]");
-                sb.AppendLine($"id = \"{EscapeToml(id)}\"");
+                sb.AppendLine($"id = \"{CliUtil.EscapeToml(id)}\"");
                 sb.AppendLine($"incidence = {incidence}");
                 AppendSongsField(sb, songs);
                 sb.AppendLine();
@@ -340,12 +325,12 @@ namespace UMB.CLI.Services
                 var d = priorityConfig.DefaultTrackData;
                 sb.AppendLine("[default-track-data]");
                 if (!string.IsNullOrEmpty(d.Game))
-                    sb.AppendLine($"game = \"{EscapeToml(d.Game)}\"");
+                    sb.AppendLine($"game = \"{CliUtil.EscapeToml(d.Game)}\"");
                 if (!string.IsNullOrEmpty(d.Author))
-                    sb.AppendLine($"author = \"{EscapeToml(d.Author)}\"");
+                    sb.AppendLine($"author = \"{CliUtil.EscapeToml(d.Author)}\"");
                 if (!string.IsNullOrEmpty(d.Copyright))
-                    sb.AppendLine($"copyright = \"{EscapeToml(d.Copyright)}\"");
-                sb.AppendLine($"record-type = \"{EscapeToml(d.RecordType ?? "original")}\"");
+                    sb.AppendLine($"copyright = \"{CliUtil.EscapeToml(d.Copyright)}\"");
+                sb.AppendLine($"record-type = \"{CliUtil.EscapeToml(d.RecordType ?? "original")}\"");
                 sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "volume = {0}", d.Volume));
                 sb.AppendLine();
             }
@@ -355,7 +340,7 @@ namespace UMB.CLI.Services
                 sb.ToString());
         }
 
-        private static void AppendSongsField(StringBuilder sb, object songs)
+        internal static void AppendSongsField(StringBuilder sb, object songs)
         {
             if (songs == null || FolderMusicMod.IsWildcardSongs(songs))
             {
@@ -374,7 +359,7 @@ namespace UMB.CLI.Services
             for (int i = 0; i < explicitSongs.Count; i++)
             {
                 var comma = i < explicitSongs.Count - 1 ? "," : "";
-                sb.AppendLine($"    \"{EscapeToml(explicitSongs[i])}\"{comma}");
+                sb.AppendLine($"    \"{CliUtil.EscapeToml(explicitSongs[i])}\"{comma}");
             }
             sb.AppendLine("]");
         }
@@ -383,10 +368,7 @@ namespace UMB.CLI.Services
         {
             var csvPath = Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
             using var writer = new StreamWriter(csvPath);
-            using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true
-            });
+            using var csv = new CsvWriter(writer, CliUtil.CsvWrite());
 
             csv.WriteField("filename");
             csv.WriteField("game");
@@ -462,7 +444,7 @@ namespace UMB.CLI.Services
             foreach (var id in mergedOrder)
             {
                 sb.AppendLine();
-                sb.Append($"    \"{EscapeToml(id)}\",");
+                sb.Append($"    \"{CliUtil.EscapeToml(id)}\",");
             }
             sb.AppendLine();
             sb.AppendLine("]");
@@ -479,30 +461,6 @@ namespace UMB.CLI.Services
         {
             if (!File.Exists(csvPath)) return 0;
             return Math.Max(0, File.ReadLines(csvPath).Count() - 1);
-        }
-
-        private static string EscapeToml(string value)
-        {
-            return value?.Replace("\\", "\\\\").Replace("\"", "\\\"") ?? "";
-        }
-
-        private static string ToKebabCase(string name)
-        {
-            var sb = new StringBuilder(name.Length + 4);
-            for (int i = 0; i < name.Length; i++)
-            {
-                var c = name[i];
-                if (char.IsUpper(c))
-                {
-                    if (i > 0) sb.Append('-');
-                    sb.Append(char.ToLowerInvariant(c));
-                }
-                else
-                {
-                    sb.Append(c);
-                }
-            }
-            return sb.ToString();
         }
 
         private class MergeTrackRow

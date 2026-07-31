@@ -69,6 +69,9 @@ function createWindow(): void {
 
 function registerIpcHandlers(): void {
   const workspace = getWorkspacePath()
+  const sendLog = (line: unknown): void => {
+    mainWindow?.webContents.send(IPC.LOG_STREAM, line)
+  }
 
   ipcMain.handle(IPC.GET_WORKSPACE, () => workspace)
   ipcMain.handle(IPC.DEBUG_PING, () => ({ ok: true, workspace }))
@@ -114,9 +117,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.LOAD_NUS3_CONVERSIONS, (_event, seriesPath: string) => loadConversions(seriesPath))
 
   ipcMain.handle(IPC.CONVERT_NUS3_TRACK, (_event, seriesPath: string, decision: Nus3TrackDecision) =>
-    convertNus3Track(workspace, seriesPath, decision, (line) => {
-      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
-    })
+    convertNus3Track(workspace, seriesPath, decision, sendLog)
   )
 
   ipcMain.handle(IPC.REJECT_NUS3_TRACK, (_event, seriesPath: string, trackId: string) =>
@@ -124,9 +125,7 @@ function registerIpcHandlers(): void {
   )
 
   ipcMain.handle(IPC.ACCEPT_NUS3_FILES, (_event, seriesPath: string, deleteSources: boolean) =>
-    acceptNus3Files(workspace, seriesPath, deleteSources, (line) => {
-      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
-    })
+    acceptNus3Files(workspace, seriesPath, deleteSources, sendLog)
   )
 
   ipcMain.handle(IPC.LOAD_VOLUME_CONFIG, (_event, seriesPath: string, analyze: boolean) =>
@@ -140,20 +139,16 @@ function registerIpcHandlers(): void {
         })
         return
       }
-      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
+      sendLog(line)
     })
   )
 
   ipcMain.handle(IPC.SAVE_VOLUME_CONFIG, (_event, seriesPath: string, overrides: VolumeOverride[]) =>
-    saveVolumeConfig(workspace, seriesPath, overrides, (line) => {
-      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
-    })
+    saveVolumeConfig(workspace, seriesPath, overrides, sendLog)
   )
 
   ipcMain.handle(IPC.DECODE_TRACK_PREVIEW, (_event, seriesPath: string, filename: string) =>
-    decodeTrackPreview(workspace, seriesPath, filename, (line) => {
-      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
-    })
+    decodeTrackPreview(workspace, seriesPath, filename, sendLog)
   )
 
   ipcMain.handle(IPC.ANALYZE_EXTRACT_ICONS, (_event, compiledModPath: string, modPath: string) =>
@@ -161,9 +156,7 @@ function registerIpcHandlers(): void {
   )
 
   ipcMain.handle(IPC.EXTRACT_ICONS, (_event, compiledModPath: string, modPath: string, mode: 'all' | 'missing-only') =>
-    extractIcons(workspace, compiledModPath, modPath, mode, (line) => {
-      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
-    })
+    extractIcons(workspace, compiledModPath, modPath, mode, sendLog)
   )
 
   ipcMain.handle(IPC.ANALYZE_MERGE, (_event, modPaths: string[]) =>
@@ -175,9 +168,7 @@ function registerIpcHandlers(): void {
   )
 
   ipcMain.handle(IPC.EXECUTE_MERGE, (_event, modPaths: string[], outputName: string, priorityModPath: string | null) =>
-    executeMerge(workspace, modPaths, outputName, priorityModPath, (line) => {
-      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
-    })
+    executeMerge(workspace, modPaths, outputName, priorityModPath, sendLog)
   )
 
   ipcMain.handle(IPC.GET_PLAYLIST_INFO, () => getPlaylistInfo(workspace))
@@ -197,9 +188,7 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.RUN_ACTION, (_event, action: string, args?: string[]) => {
     if (!mainWindow) return
-    return spawnCliAction(workspace, action, args || [], (line) => {
-      mainWindow?.webContents.send(IPC.LOG_STREAM, line)
-    })
+    return spawnCliAction(workspace, action, args || [], sendLog)
   })
 
   ipcMain.handle(IPC.SELECT_FOLDER, async () => {

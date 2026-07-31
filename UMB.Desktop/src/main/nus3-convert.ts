@@ -4,58 +4,19 @@ import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { tmpdir } from 'os'
 import { spawnCliAction, type LogLine } from './cli'
+import { readJson, statSafe, tempPath, writeJson } from './utils'
+import type {
+  LoopAnalysisOptions, LoopCandidate, Nus3AnalysisResult, Nus3ConversionMeta, Nus3SourceTrack, Nus3TrackDecision
+} from '../shared/types'
+
+export type {
+  LoopAnalysisOptions, LoopCandidate, Nus3AnalysisResult, Nus3ConversionMeta, Nus3SourceTrack, Nus3TrackDecision
+} from '../shared/types'
 
 const execFileAsync = promisify(execFile)
 
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.flac', '.ogg'])
 const VALIDATE_FOLDER = 'songs-to-validate'
-
-export interface Nus3SourceTrack {
-  id: string
-  name: string
-  src: string
-  duration: string
-  durationSeconds: number
-  /** true when a matching .nus3audio already exists in songs-to-validate */
-  converted: boolean
-}
-
-export interface LoopCandidate {
-  rank: number
-  score: number
-  loopStart: number
-  loopEnd: number
-  loopLength: number
-  loopStartStr: string
-  loopEndStr: string
-  loopLengthStr: string
-  beatAligned: boolean
-  bars: number | null
-  tempo: number
-  key: string
-  noteDistance: number
-  spectralSim: number
-  rmsDelta: number
-  seam: 'smooth' | 'good' | 'audible' | 'click'
-  note: string
-}
-
-export interface Nus3AnalysisResult {
-  track: Nus3SourceTrack
-  candidates: LoopCandidate[]
-}
-
-/** pymusiclooper tuning passed from the convert view's settings panel. */
-export interface LoopAnalysisOptions {
-  /** --min-loop-duration (seconds). Overrides the duration multiplier when > 0. */
-  minLoopDuration?: number
-  /** --min-duration-multiplier (0<x<1). pymusiclooper default is 0.35. */
-  minDurationMultiplier?: number
-  /** --disable-pruning: keep loop points the initial pass would discard. */
-  disablePruning?: boolean
-  /** Bypass the analysis cache and re-run pymusiclooper. */
-  force?: boolean
-}
 
 /**
  * Relaxed fallback used automatically when the default pass finds nothing:
@@ -65,19 +26,6 @@ export interface LoopAnalysisOptions {
 const RELAXED_OPTIONS: LoopAnalysisOptions = {
   minLoopDuration: 2,
   disablePruning: true
-}
-
-export interface Nus3TrackDecision {
-  trackId: string
-  mode: 'loop' | 'end-to-end'
-  candidate?: LoopCandidate
-  status: 'accepted' | 'rejected' | 'skipped' | 'pending'
-}
-
-/** Persisted per-track conversion metadata, keyed by source filename (track id). */
-export interface Nus3ConversionMeta {
-  mode: 'loop' | 'end-to-end'
-  candidate?: LoopCandidate
 }
 
 /** Cache entry for pymusiclooper analysis + waveform peaks, keyed by source filename. */
@@ -111,34 +59,6 @@ function prettifyName(filename: string): string {
 
 function validateDirOf(seriesPath: string): string {
   return join(seriesPath, VALIDATE_FOLDER)
-}
-
-function readJson<T>(path: string): T | null {
-  try {
-    if (!existsSync(path)) return null
-    return JSON.parse(readFileSync(path, 'utf-8')) as T
-  } catch {
-    return null
-  }
-}
-
-function writeJson(path: string, value: unknown): void {
-  try {
-    const dir = dirname(path)
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
-    writeFileSync(path, JSON.stringify(value, null, 2), 'utf-8')
-  } catch {
-    /* best-effort cache; ignore failures */
-  }
-}
-
-function statSafe(path: string): { mtimeMs: number; size: number } | null {
-  try {
-    const s = statSync(path)
-    return { mtimeMs: s.mtimeMs, size: s.size }
-  } catch {
-    return null
-  }
 }
 
 function cachePath(seriesPath: string): string {
@@ -538,7 +458,7 @@ export async function convertNus3Track(
     ]
   }
 
-  const jsonPath = join(tmpdir(), `umb-nus3-batch-${Date.now()}.json`)
+  const jsonPath = tempPath('umb-nus3-batch', 'json')
   writeFileSync(jsonPath, JSON.stringify(batchInput, null, 2), 'utf-8')
 
   try {
@@ -578,7 +498,7 @@ export async function acceptNus3Files(
   deleteSources: boolean,
   onLine: (line: LogLine) => void
 ): Promise<number> {
-  const jsonPath = join(tmpdir(), `umb-nus3-accept-${Date.now()}.json`)
+  const jsonPath = tempPath('umb-nus3-accept', 'json')
   writeFileSync(jsonPath, JSON.stringify({ seriesPath, deleteSources }, null, 2), 'utf-8')
 
   try {

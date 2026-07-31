@@ -1,53 +1,14 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync, unlinkSync } from 'fs'
-import { join, resolve, relative, isAbsolute, basename } from 'path'
+import { join, resolve, basename } from 'path'
 import { execFile } from 'child_process'
 import { tmpdir } from 'os'
 import { randomUUID } from 'crypto'
+import { log, resolveUnderMods } from './utils'
+import type { ExtractIconMatch, ExtractIconsAnalysis, ExtractIconsResult, LogLine } from '../shared/types'
 
-export interface ExtractIconsAnalysis {
-  compiledModPath: string
-  modPath: string
-  modName: string
-  matched: ExtractIconMatch[]
-  unmatched: string[]
-}
-
-export interface ExtractIconMatch {
-  seriesId: string
-  bntxPath: string
-  hasExistingIcon: boolean
-}
-
-export interface ExtractIconsResult {
-  extracted: number
-  skipped: number
-  failed: number
-}
-
-interface LogLine {
-  timestamp: string
-  level: 'info' | 'warn' | 'error'
-  message: string
-}
+export type { ExtractIconMatch, ExtractIconsAnalysis, ExtractIconsResult } from '../shared/types'
 
 const BNTX_PREFIX = 'series_0_'
-
-function nowTs(): string {
-  return new Date().toLocaleTimeString('en-GB', { hour12: false })
-}
-
-function log(level: LogLine['level'], message: string): LogLine {
-  return { timestamp: nowTs(), level, message }
-}
-
-function isChildOf(parentPath: string, childPath: string): boolean {
-  const rel = relative(parentPath, childPath)
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
-}
-
-function getMusicModsRoot(workspace: string): string {
-  return resolve(workspace, 'Mods', 'MusicMods')
-}
 
 function resolveUltimateTexCli(workspace: string): string | null {
   // Tools/ lives in the shared workspace root in both dev and packaged builds
@@ -99,11 +60,7 @@ function tryFixOverMipmapBntx(sourceBytes: Buffer): { patched: Buffer; oldMip: n
 }
 
 export function analyzeExtractIcons(workspace: string, compiledModPath: string, modPath: string): ExtractIconsAnalysis {
-  const modsDir = getMusicModsRoot(workspace)
-  const resolvedModPath = resolve(modPath)
-  if (!isChildOf(modsDir, resolvedModPath)) {
-    throw new Error('Invalid mod path.')
-  }
+  const resolvedModPath = resolveUnderMods(workspace, modPath)
 
   const series0Dir = join(compiledModPath, 'ui', 'replace', 'series', 'series_0')
   if (!existsSync(series0Dir)) {
@@ -161,11 +118,7 @@ export async function extractIcons(
   mode: 'all' | 'missing-only',
   onLine: (line: LogLine) => void
 ): Promise<ExtractIconsResult> {
-  const modsDir = getMusicModsRoot(workspace)
-  const resolvedModPath = resolve(modPath)
-  if (!isChildOf(modsDir, resolvedModPath)) {
-    throw new Error('Invalid mod path.')
-  }
+  const resolvedModPath = resolveUnderMods(workspace, modPath)
 
   const toolPath = resolveUltimateTexCli(workspace)
   if (!toolPath) {

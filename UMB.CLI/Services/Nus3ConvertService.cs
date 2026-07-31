@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Sma5h.Helpers;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
+using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using Spectre.Console;
 using System;
 using System.Collections.Generic;
@@ -10,7 +11,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using VGAudio.Cli;
 
@@ -35,13 +35,6 @@ namespace UMB.CLI.Services
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
 
-        private static readonly HashSet<string> SOURCE_AUDIO_EXTENSIONS = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ".mp3", ".flac", ".wav", ".ogg"
-        };
-
-        private const string VALIDATE_FOLDER = "songs-to-validate";
-
         public Nus3ConvertService(IOptionsMonitor<Sma5hMusicOptions> musicConfig, ILogger<Nus3ConvertService> logger)
         {
             _musicConfig = musicConfig;
@@ -56,6 +49,149 @@ namespace UMB.CLI.Services
         private string ResolvePymusiclooper() =>
             ToolPathResolver.Resolve(null, null, "pymusiclooper") ?? "pymusiclooper";
 
+        /// <summary>
+        /// Runs a console tool to completion. Returns stdout when captureStdout,
+        /// otherwise drains and returns stderr (ffmpeg-family tools log there).
+        /// </summary>
+        private static string RunProcess(string fileName, string arguments, bool captureStdout = false)
+        {
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                }
+            };
+            process.Start();
+            var output = captureStdout ? process.StandardOutput.ReadToEnd() : process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            return output;
+        }
+
+        private (string nus3AudioExe, string validateDir, string tempDir)? PrepareConversion(string seriesDir)
+        {
+            var nus3AudioExe = ToolPathResolver.Resolve(_musicConfig.CurrentValue.ToolsPath, MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
+            if (nus3AudioExe == null)
+            {
+                _logger.LogError("nus3audio binary not found under Tools/{Rel}. Run scripts/fetch-tools to install.", MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
+                return null;
+            }
+
+            var validateDir = Path.Combine(seriesDir, CliUtil.ValidateFolder);
+            Directory.CreateDirectory(validateDir);
+
+            var tempDir = Path.Combine(_musicConfig.CurrentValue.TempPath, "nus3convert");
+            Directory.CreateDirectory(tempDir);
+
+            return (nus3AudioExe, validateDir, tempDir);
+        }
+
+        // Namco Opus accepts only 8/12/16/24/48 kHz, so anything that isn't a 48 kHz .wav
+        // (including .wav at other rates) is resampled to a temp WAV first.
+        private (string wavFile, bool isTemp)? PrepareWav48k(string sourceFile, string basename, string tempDir)
+        {
+            var isWav = sourceFile.EndsWith(".wav", StringComparison.OrdinalIgnoreCase);
+            if (isWav && GetSourceSampleRate(sourceFile) == 48000)
+                return (sourceFile, false);
+
+            var wavFile = Path.Combine(tempDir, basename + ".wav");
+            if (!RunFfmpeg(sourceFile, wavFile))
+            {
+                _logger.LogError("  ffmpeg conversion failed for '{Basename}', skipping.", basename);
+                return null;
+            }
+            return (wavFile, true);
+        }
+
+        /// <summary>Full-song loop end = last sample of the (48 kHz) WAV.</summary>
+        private bool TryGetFullSongLoopEnd(string wavFile, string basename, out long loopEnd)
+        {
+            loopEnd = GetWavSampleCount(wavFile) - 1;
+            if (loopEnd < 0)
+            {
+                _logger.LogError("  Could not determine sample count for '{Basename}', skipping.", basename);
+                return false;
+            }
+            _logger.LogInformation("  Full-song loop: 0-{End}", loopEnd);
+            return true;
+        }
+
+        /// <summary>
+        /// Encodes a prepared WAV to Namco lopus (VGAudio) and wraps it into outputNus3
+        /// via nus3audio. Returns true when the output exists and is non-empty.
+        /// </summary>
+        private bool ConvertWavToNus3(string wavFile, string basename, long loopStart, long loopEnd,
+            string tempDir, string nus3AudioExe, string outputNus3)
+        {
+            var lopusFile = Path.Combine(tempDir, basename + ".lopus");
+            try
+            {
+                string vgOutput;
+                try
+                {
+                    var oldOut = Console.Out;
+                    using var writer = new StringWriter();
+                    try
+                    {
+                        Console.SetOut(writer);
+                        Converter.RunConverterCli(new string[]
+                        {
+                            "-i", wavFile,
+                            "-o", lopusFile,
+                            "--opusheader", "Namco",
+                            "--cbr",
+                            "-l", $"{loopStart}-{loopEnd}"
+                        });
+                    }
+                    finally
+                    {
+                        Console.SetOut(oldOut);
+                    }
+                    vgOutput = writer.ToString();
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "  VGAudioCli conversion failed for '{Basename}'.", basename);
+                    return false;
+                }
+
+                if (!File.Exists(lopusFile) || new FileInfo(lopusFile).Length == 0)
+                {
+                    _logger.LogError("  VGAudioCli produced no output for '{Basename}', skipping. VGAudio said: {Msg}",
+                        basename, string.IsNullOrWhiteSpace(vgOutput) ? "(no message)" : vgOutput.Trim());
+                    return false;
+                }
+
+                var toneId = FolderMusicMod.DeriveToneId(basename);
+                try
+                {
+                    RunProcess(nus3AudioExe, $"-n -w \"{outputNus3}\"");
+                    RunProcess(nus3AudioExe, $"-A {toneId} \"{lopusFile}\" -w \"{outputNus3}\"");
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "  nus3audio wrapping failed for '{Basename}'.", basename);
+                    return false;
+                }
+
+                if (File.Exists(outputNus3) && new FileInfo(outputNus3).Length > 0)
+                    return true;
+
+                _logger.LogError("  nus3audio output was empty for '{Basename}'.", basename);
+                return false;
+            }
+            finally
+            {
+                if (File.Exists(lopusFile))
+                    File.Delete(lopusFile);
+            }
+        }
+
         public void Run()
         {
             Script.PrintBanner(_logger);
@@ -66,7 +202,7 @@ namespace UMB.CLI.Services
 
             // Find source audio files that aren't already game formats
             var sourceFiles = Directory.GetFiles(seriesDir)
-                .Where(f => SOURCE_AUDIO_EXTENSIONS.Contains(Path.GetExtension(f)))
+                .Where(f => CliUtil.SourceAudioExtensions.Contains(Path.GetExtension(f)))
                 .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -88,18 +224,10 @@ namespace UMB.CLI.Services
                 new TextPrompt<float>("Loop preview length in seconds (total, split evenly before/after loop point):")
                     .DefaultValue(5f));
 
-            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
-            Directory.CreateDirectory(validateDir);
-
-            var tempDir = Path.Combine(_musicConfig.CurrentValue.TempPath, "nus3convert");
-            Directory.CreateDirectory(tempDir);
-
-            var nus3AudioExe = ToolPathResolver.Resolve(_musicConfig.CurrentValue.ToolsPath, MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
-            if (nus3AudioExe == null)
-            {
-                _logger.LogError("nus3audio binary not found under Tools/{Rel}. Run scripts/fetch-tools to install.", MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
+            var prep = PrepareConversion(seriesDir);
+            if (prep == null)
                 return;
-            }
+            var (nus3AudioExe, validateDir, tempDir) = prep.Value;
 
             int converted = 0;
             int goodLoops = 0;
@@ -183,112 +311,19 @@ namespace UMB.CLI.Services
                     fullLoops++;
                 }
 
-                // Namco Opus accepts only 8/12/16/24/48 kHz, so non-48k .wav still needs resampling.
-                var wavFile = sourceFile;
-                bool tempWav = false;
-                bool isWav = sourceFile.EndsWith(".wav", StringComparison.OrdinalIgnoreCase);
-                if (!isWav || GetSourceSampleRate(sourceFile) != 48000)
-                {
-                    wavFile = Path.Combine(tempDir, basename + ".wav");
-                    if (!RunFfmpeg(sourceFile, wavFile))
-                    {
-                        _logger.LogError("  ffmpeg conversion failed for '{Basename}', skipping.", basename);
-                        continue;
-                    }
-                    tempWav = true;
-                }
+                var wav = PrepareWav48k(sourceFile, basename, tempDir);
+                if (wav == null)
+                    continue;
+                var (wavFile, tempWav) = wav.Value;
 
                 // For full-song loops, get exact sample count from the converted WAV
-                if (isFullSongLoop)
+                if (isFullSongLoop && !TryGetFullSongLoopEnd(wavFile, basename, out loopEnd))
                 {
-                    var wavSamples = GetWavSampleCount(wavFile);
-                    if (wavSamples <= 0)
-                    {
-                        _logger.LogError("  Could not determine sample count for '{Basename}', skipping.", basename);
-                        if (tempWav && File.Exists(wavFile)) File.Delete(wavFile);
-                        continue;
-                    }
-                    loopEnd = wavSamples - 1;
-                    _logger.LogInformation("  Full-song loop: 0-{End}", loopEnd);
-                }
-
-                var lopusFile = Path.Combine(tempDir, basename + ".lopus");
-                string vgOutput;
-                try
-                {
-                    var oldOut = Console.Out;
-                    using var writer = new StringWriter();
-                    try
-                    {
-                        Console.SetOut(writer);
-                        Converter.RunConverterCli(new string[]
-                        {
-                            "-i", wavFile,
-                            "-o", lopusFile,
-                            "--opusheader", "Namco",
-                            "--cbr",
-                            "-l", $"{loopStart}-{loopEnd}"
-                        });
-                    }
-                    finally
-                    {
-                        Console.SetOut(oldOut);
-                    }
-                    vgOutput = writer.ToString();
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "  VGAudioCli conversion failed for '{Basename}'.", basename);
+                    if (tempWav && File.Exists(wavFile)) File.Delete(wavFile);
                     continue;
                 }
 
-                if (!File.Exists(lopusFile) || new FileInfo(lopusFile).Length == 0)
-                {
-                    _logger.LogError("  VGAudioCli produced no output for '{Basename}', skipping. VGAudio said: {Msg}",
-                        basename, string.IsNullOrWhiteSpace(vgOutput) ? "(no message)" : vgOutput.Trim());
-                    continue;
-                }
-
-                var toneId = DeriveToneId(basename);
-                try
-                {
-                    var process = new Process
-                    {
-                        StartInfo = new ProcessStartInfo
-                        {
-                            FileName = nus3AudioExe,
-                            Arguments = $"-n -w \"{outputNus3}\"",
-                            UseShellExecute = false,
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            CreateNoWindow = true
-                        }
-                    };
-                    process.Start();
-                    process.WaitForExit();
-
-                    process = new Process
-                    {
-                        StartInfo = new ProcessStartInfo
-                        {
-                            FileName = nus3AudioExe,
-                            Arguments = $"-A {toneId} \"{lopusFile}\" -w \"{outputNus3}\"",
-                            UseShellExecute = false,
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            CreateNoWindow = true
-                        }
-                    };
-                    process.Start();
-                    process.WaitForExit();
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "  nus3audio wrapping failed for '{Basename}'.", basename);
-                    continue;
-                }
-
-                if (File.Exists(outputNus3) && new FileInfo(outputNus3).Length > 0)
+                if (ConvertWavToNus3(wavFile, basename, loopStart, loopEnd, tempDir, nus3AudioExe, outputNus3))
                 {
                     _logger.LogInformation("  → {OutputPath}", outputNus3);
                     converted++;
@@ -302,15 +337,9 @@ namespace UMB.CLI.Services
                         CreateLoopPreview(sourceFile, loopStart, loopEnd, previewPath, previewLength / 2);
                     }
                 }
-                else
-                {
-                    _logger.LogError("  nus3audio output was empty for '{Basename}'.", basename);
-                }
 
                 if (tempWav && File.Exists(wavFile))
                     File.Delete(wavFile);
-                if (File.Exists(lopusFile))
-                    File.Delete(lopusFile);
             }
 
             try { Directory.Delete(tempDir, recursive: false); } catch { }
@@ -339,7 +368,7 @@ namespace UMB.CLI.Services
 
             var jsonText = File.ReadAllText(jsonPath);
             var input = JsonSerializer.Deserialize<Nus3BatchInput>(jsonText,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                CliUtil.JsonCaseInsensitive);
 
             if (input == null || input.Decisions == null || input.Decisions.Count == 0)
             {
@@ -354,18 +383,10 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            var nus3AudioExe = ToolPathResolver.Resolve(_musicConfig.CurrentValue.ToolsPath, MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
-            if (nus3AudioExe == null)
-            {
-                _logger.LogError("nus3audio binary not found under Tools/{Rel}. Run scripts/fetch-tools to install.", MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
+            var prep = PrepareConversion(seriesDir);
+            if (prep == null)
                 return;
-            }
-
-            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
-            Directory.CreateDirectory(validateDir);
-
-            var tempDir = Path.Combine(_musicConfig.CurrentValue.TempPath, "nus3convert");
-            Directory.CreateDirectory(tempDir);
+            var (nus3AudioExe, validateDir, tempDir) = prep.Value;
 
             int converted = 0;
 
@@ -389,20 +410,10 @@ namespace UMB.CLI.Services
 
                 _logger.LogInformation("Processing '{Basename}' (mode: {Mode})...", basename, decision.Mode);
 
-                // Namco Opus accepts only 8/12/16/24/48 kHz, so non-48k .wav still needs resampling.
-                var wavFile = sourceFile;
-                bool tempWav = false;
-                bool isWav = sourceFile.EndsWith(".wav", StringComparison.OrdinalIgnoreCase);
-                if (!isWav || GetSourceSampleRate(sourceFile) != 48000)
-                {
-                    wavFile = Path.Combine(tempDir, basename + ".wav");
-                    if (!RunFfmpeg(sourceFile, wavFile))
-                    {
-                        _logger.LogError("  ffmpeg conversion failed for '{Basename}', skipping.", basename);
-                        continue;
-                    }
-                    tempWav = true;
-                }
+                var wav = PrepareWav48k(sourceFile, basename, tempDir);
+                if (wav == null)
+                    continue;
+                var (wavFile, tempWav) = wav.Value;
 
                 long loopStart, loopEnd;
                 if (string.Equals(decision.Mode, "loop", StringComparison.OrdinalIgnoreCase))
@@ -414,107 +425,21 @@ namespace UMB.CLI.Services
                 else
                 {
                     loopStart = 0;
-                    var wavSamples = GetWavSampleCount(wavFile);
-                    if (wavSamples <= 0)
+                    if (!TryGetFullSongLoopEnd(wavFile, basename, out loopEnd))
                     {
-                        _logger.LogError("  Could not determine sample count for '{Basename}', skipping.", basename);
                         if (tempWav && File.Exists(wavFile)) File.Delete(wavFile);
                         continue;
                     }
-                    loopEnd = wavSamples - 1;
-                    _logger.LogInformation("  Full-song loop: 0-{End}", loopEnd);
                 }
 
-                var lopusFile = Path.Combine(tempDir, basename + ".lopus");
-                string vgOutput;
-                try
-                {
-                    var oldOut = Console.Out;
-                    using var writer = new StringWriter();
-                    try
-                    {
-                        Console.SetOut(writer);
-                        Converter.RunConverterCli(new string[]
-                        {
-                            "-i", wavFile,
-                            "-o", lopusFile,
-                            "--opusheader", "Namco",
-                            "--cbr",
-                            "-l", $"{loopStart}-{loopEnd}"
-                        });
-                    }
-                    finally
-                    {
-                        Console.SetOut(oldOut);
-                    }
-                    vgOutput = writer.ToString();
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "  VGAudioCli conversion failed for '{Basename}'.", basename);
-                    continue;
-                }
-
-                if (!File.Exists(lopusFile) || new FileInfo(lopusFile).Length == 0)
-                {
-                    _logger.LogError("  VGAudioCli produced no output for '{Basename}', skipping. VGAudio said: {Msg}",
-                        basename, string.IsNullOrWhiteSpace(vgOutput) ? "(no message)" : vgOutput.Trim());
-                    continue;
-                }
-
-                var toneId = DeriveToneId(basename);
-                try
-                {
-                    var process = new Process
-                    {
-                        StartInfo = new ProcessStartInfo
-                        {
-                            FileName = nus3AudioExe,
-                            Arguments = $"-n -w \"{outputNus3}\"",
-                            UseShellExecute = false,
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            CreateNoWindow = true
-                        }
-                    };
-                    process.Start();
-                    process.WaitForExit();
-
-                    process = new Process
-                    {
-                        StartInfo = new ProcessStartInfo
-                        {
-                            FileName = nus3AudioExe,
-                            Arguments = $"-A {toneId} \"{lopusFile}\" -w \"{outputNus3}\"",
-                            UseShellExecute = false,
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            CreateNoWindow = true
-                        }
-                    };
-                    process.Start();
-                    process.WaitForExit();
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "  nus3audio wrapping failed for '{Basename}'.", basename);
-                    continue;
-                }
-
-                if (File.Exists(outputNus3) && new FileInfo(outputNus3).Length > 0)
+                if (ConvertWavToNus3(wavFile, basename, loopStart, loopEnd, tempDir, nus3AudioExe, outputNus3))
                 {
                     _logger.LogInformation("  -> {OutputPath}", outputNus3);
                     converted++;
                 }
-                else
-                {
-                    _logger.LogError("  nus3audio output was empty for '{Basename}'.", basename);
-                }
 
                 if (tempWav && File.Exists(wavFile))
                     File.Delete(wavFile);
-                if (File.Exists(lopusFile))
-                    File.Delete(lopusFile);
             }
 
             try { Directory.Delete(tempDir, recursive: false); } catch { }
@@ -532,13 +457,14 @@ namespace UMB.CLI.Services
             string sourceFile,
             double previewLength)
         {
+            string FormatTime(long samples) =>
+                sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)samples / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
+
             var choices = new List<string>();
             for (int i = 0; i < loopCandidates.Count; i++)
             {
                 var c = loopCandidates[i];
-                var startTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopStart / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
-                var endTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopEnd / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
-                choices.Add($"#{i + 1}  {c.score:P1}  {startTime} ({c.loopStart})  {endTime} ({c.loopEnd})  {c.noteDistance:F4}  {c.loudnessDiff:F4} dB");
+                choices.Add($"#{i + 1}  {c.score:P1}  {FormatTime(c.loopStart)} ({c.loopStart})  {FormatTime(c.loopEnd)} ({c.loopEnd})  {c.noteDistance:F4}  {c.loudnessDiff:F4} dB");
                 choices.Add($"#{i + 1}  Preview loop");
             }
             choices.Add("Reject all (use full-song loop)");
@@ -557,13 +483,11 @@ namespace UMB.CLI.Services
                 for (int i = 0; i < loopCandidates.Count; i++)
                 {
                     var c = loopCandidates[i];
-                    var startTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopStart / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
-                    var endTime = sourceSampleRate > 0 ? TimeSpan.FromSeconds((double)c.loopEnd / sourceSampleRate).ToString(@"mm\:ss\.ff") : "??";
                     table.AddRow(
                         (i + 1).ToString(),
                         $"{c.score:P1}",
-                        $"{startTime} ({c.loopStart})",
-                        $"{endTime} ({c.loopEnd})",
+                        $"{FormatTime(c.loopStart)} ({c.loopStart})",
+                        $"{FormatTime(c.loopEnd)} ({c.loopEnd})",
                         $"{c.noteDistance:F4}",
                         $"{c.loudnessDiff:F4} dB");
                 }
@@ -598,21 +522,9 @@ namespace UMB.CLI.Services
             var results = new List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)>();
             try
             {
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = ResolvePymusiclooper(),
-                        Arguments = $"export-points --path \"{filePath}\" --alt-export-top 10 --fmt samples --export-to stdout",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    }
-                };
-                process.Start();
-                var output = process.StandardOutput.ReadToEnd();
-                process.WaitForExit();
+                var output = RunProcess(ResolvePymusiclooper(),
+                    $"export-points --path \"{filePath}\" --alt-export-top 10 --fmt samples --export-to stdout",
+                    captureStdout: true);
 
                 // Format: loop_start loop_end note_distance loudness_difference score
                 foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
@@ -643,21 +555,9 @@ namespace UMB.CLI.Services
         {
             try
             {
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = ResolveFfTool("ffprobe"),
-                        Arguments = $"-v error -select_streams a:0 -show_entries stream=sample_rate:stream=duration -of csv=p=0 \"{filePath}\"",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    }
-                };
-                process.Start();
-                var output = process.StandardOutput.ReadToEnd().Trim();
-                process.WaitForExit();
+                var output = RunProcess(ResolveFfTool("ffprobe"),
+                    $"-v error -select_streams a:0 -show_entries stream=sample_rate:stream=duration -of csv=p=0 \"{filePath}\"",
+                    captureStdout: true).Trim();
 
                 // Output format: "sample_rate,duration" e.g. "48000,185.365979"
                 var parts = output.Split(',');
@@ -679,21 +579,9 @@ namespace UMB.CLI.Services
         {
             try
             {
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = ResolveFfTool("ffprobe"),
-                        Arguments = $"-v error -select_streams a:0 -show_entries stream=sample_rate -of csv=p=0 \"{filePath}\"",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    }
-                };
-                process.Start();
-                var output = process.StandardOutput.ReadToEnd().Trim();
-                process.WaitForExit();
+                var output = RunProcess(ResolveFfTool("ffprobe"),
+                    $"-v error -select_streams a:0 -show_entries stream=sample_rate -of csv=p=0 \"{filePath}\"",
+                    captureStdout: true).Trim();
 
                 if (int.TryParse(output, out var rate))
                     return rate;
@@ -734,21 +622,7 @@ namespace UMB.CLI.Services
                              $"[0:a]atrim=start={s2s}:end={s2e},asetpts=PTS-STARTPTS[b];" +
                              $"[a][b]concat=n=2:v=0:a=1";
 
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = ResolveFfTool("ffmpeg"),
-                        Arguments = $"-i \"{sourceFile}\" -filter_complex \"{filter}\" \"{outputPath}\" -y",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    }
-                };
-                process.Start();
-                process.StandardError.ReadToEnd();
-                process.WaitForExit();
+                RunProcess(ResolveFfTool("ffmpeg"), $"-i \"{sourceFile}\" -filter_complex \"{filter}\" \"{outputPath}\" -y");
 
                 if (File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
                     _logger.LogInformation("  Loop preview: {Path}", outputPath);
@@ -784,21 +658,7 @@ namespace UMB.CLI.Services
                 }
 
                 AnsiConsole.MarkupLine("[yellow]Playing loop preview... press Q to stop.[/]");
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = ResolveFfTool("ffplay"),
-                        Arguments = $"-nodisp -autoexit \"{tempPreview}\"",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    }
-                };
-                process.Start();
-                process.StandardError.ReadToEnd();
-                process.WaitForExit();
+                RunProcess(ResolveFfTool("ffplay"), $"-nodisp -autoexit \"{tempPreview}\"");
             }
             catch (Exception e)
             {
@@ -817,21 +677,7 @@ namespace UMB.CLI.Services
         {
             try
             {
-                var process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = ResolveFfTool("ffmpeg"),
-                        Arguments = $"-i \"{inputFile}\" -ar 48000 -ac 2 \"{outputWav}\" -y",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        CreateNoWindow = true
-                    }
-                };
-                process.Start();
-                process.StandardError.ReadToEnd(); // ffmpeg outputs to stderr
-                process.WaitForExit();
+                RunProcess(ResolveFfTool("ffmpeg"), $"-i \"{inputFile}\" -ar 48000 -ac 2 \"{outputWav}\" -y");
                 return File.Exists(outputWav) && new FileInfo(outputWav).Length > 0;
             }
             catch (Exception e)
@@ -839,18 +685,6 @@ namespace UMB.CLI.Services
                 _logger.LogError(e, "ffmpeg failed converting {File}.", inputFile);
                 return false;
             }
-        }
-
-        private static string DeriveToneId(string filename)
-        {
-            var nameOnly = Path.GetFileNameWithoutExtension(filename).ToLowerInvariant();
-            var sb = new StringBuilder(nameOnly.Length);
-            foreach (var c in nameOnly)
-                sb.Append(char.IsAsciiLetterOrDigit(c) || c == '_' ? c : '_');
-            var toneId = sb.ToString().Trim('_');
-            if (toneId.Length > MusicConstants.GameResources.ToneIdMaximumSize)
-                toneId = toneId[..MusicConstants.GameResources.ToneIdMaximumSize];
-            return toneId;
         }
     }
 }

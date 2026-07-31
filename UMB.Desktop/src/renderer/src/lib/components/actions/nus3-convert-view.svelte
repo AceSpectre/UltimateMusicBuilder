@@ -1,12 +1,18 @@
 <script lang="ts">
   import {
-    AudioWaveform, Folder, CheckCircle, X, Play,
+    AudioWaveform, CheckCircle, X, Play,
     Trash2, RefreshCw, Settings
   } from '@lucide/svelte'
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
   import { modsStore } from '$lib/stores/mods.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
+  import { createSeriesLoader } from '$lib/series-loader'
+  import EmptyState from '$lib/components/ui/empty-state.svelte'
+  import IconButton from '$lib/components/ui/icon-button.svelte'
+  import SeriesPicker from '$lib/components/ui/series-picker.svelte'
+  import Nus3SettingsModal from './nus3-settings-modal.svelte'
+  import Nus3AcceptModal from './nus3-accept-modal.svelte'
   import type {
     ModInfo, ModSeriesInfo,
     LoopCandidate, Nus3SourceTrack, Nus3TrackDecision, Nus3ConversionMeta,
@@ -34,11 +40,7 @@
   // pymusiclooper tuning (applied via the settings panel, used by manual recalc).
   let minLoopDuration = $state(0) // seconds; 0 = pymusiclooper default multiplier
   let disablePruning = $state(false)
-  let settingsMinScore = $state(94.5)
-  let settingsPreviewLen = $state(5)
-  let settingsMinLoopDuration = $state(0)
-  let settingsDisablePruning = $state(false)
-  let loadToken = 0
+  const seriesLoader = createSeriesLoader((v) => (loading = v))
   let analysisToken = 0
   let waveformPeaks = $state<Map<string, number[]>>(new Map())
   let previewAudio = $state<HTMLAudioElement | null>(null)
@@ -80,34 +82,19 @@
   )
 
   async function loadSeries(modPath: string | null) {
-    loadToken += 1
-    const token = loadToken
-
     if (!modPath) {
+      seriesLoader.invalidate()
       series = []
       modsStore.activeSeriesPath = null
       return
     }
 
-    loading = true
-    try {
-      const nextSeries = await window.electron.umb.listModSeries(modPath)
-      if (token !== loadToken) return
-      series = nextSeries
-      if (!nextSeries.some((e) => e.path === modsStore.activeSeriesPath)) {
-        modsStore.activeSeriesPath = nextSeries[0]?.path ?? null
-      }
-    } finally {
-      if (token === loadToken) loading = false
+    const nextSeries = await seriesLoader.load(modPath)
+    if (nextSeries === null) return
+    series = nextSeries
+    if (!nextSeries.some((e) => e.path === modsStore.activeSeriesPath)) {
+      modsStore.activeSeriesPath = nextSeries[0]?.path ?? null
     }
-  }
-
-  function log(level: 'info' | 'warn' | 'error', message: string) {
-    logStore.push({
-      timestamp: new Date().toLocaleTimeString('en-GB', { hour12: false }),
-      level,
-      message
-    })
   }
 
   async function loadSources(path: string | null) {
@@ -128,7 +115,7 @@
     waveformPeaks = new Map()
 
     try {
-      log('info', `Scanning series folder for audio files...`)
+      logStore.log('info', `Scanning series folder for audio files...`)
       const tracks = await window.electron.umb.listNus3Sources(path)
       if (token !== analysisToken) return
 
@@ -137,21 +124,21 @@
       if (token !== analysisToken) return
 
       if (tracks.length === 0) {
-        log('warn', 'No source audio files found in series folder.')
+        logStore.log('warn', 'No source audio files found in series folder.')
         return
       }
 
       const pending = tracks.filter((t) => !t.converted)
       const already = tracks.length - pending.length
       if (already > 0) {
-        log('info', `${already} song(s) already converted.`)
+        logStore.log('info', `${already} song(s) already converted.`)
         if (pending.length === 0) tab = 'review'
       }
 
-      log('info', `${pending.length} song(s) to convert. Loop points are calculated per song as you open them.`)
+      logStore.log('info', `${pending.length} song(s) to convert. Loop points are calculated per song as you open them.`)
     } catch (err) {
       if (token !== analysisToken) return
-      log('error', `Scan failed: ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Scan failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       if (token === analysisToken) analyzing = false
     }
@@ -171,7 +158,7 @@
       )
       analysisResults.set(track.id, result.candidates)
       analysisResults = new Map(analysisResults)
-      log('info', `"${track.name}" (${result.track.duration}): ${result.candidates.length} loop point(s) found.`)
+      logStore.log('info', `"${track.name}" (${result.track.duration}): ${result.candidates.length} loop point(s) found.`)
       if (!waveformPeaks.has(track.id)) {
         const peaks = await window.electron.umb.extractWaveform(path, track.src, 140)
         if (peaks.length > 0) {
@@ -182,7 +169,7 @@
     } catch (err) {
       analysisResults.set(track.id, [])
       analysisResults = new Map(analysisResults)
-      log('error', `Analysis failed for "${track.name}": ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Analysis failed for "${track.name}": ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -208,9 +195,9 @@
       analysisResults.set(track.id, result.candidates)
       analysisResults = new Map(analysisResults)
       selectedRank = 1
-      log('info', `Recalculated "${track.name}": ${result.candidates.length} loop point(s) found.`)
+      logStore.log('info', `Recalculated "${track.name}": ${result.candidates.length} loop point(s) found.`)
     } catch (err) {
-      log('error', `Recalculate failed for "${track.name}": ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Recalculate failed for "${track.name}": ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       reanalyzing = false
     }
@@ -265,7 +252,7 @@
         previewLength
       )
       if (!dataUrl) {
-        log('warn', 'Failed to generate loop preview.')
+        logStore.log('warn', 'Failed to generate loop preview.')
         return
       }
 
@@ -275,7 +262,7 @@
       await audio.play()
       previewPlaying = true
     } catch (err) {
-      log('error', `Preview failed: ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Preview failed: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       previewLoading = false
     }
@@ -315,7 +302,7 @@
         previewLength
       )
       if (!dataUrl) {
-        log('warn', `Failed to generate loop preview for "${track.name}".`)
+        logStore.log('warn', `Failed to generate loop preview for "${track.name}".`)
         return
       }
 
@@ -325,7 +312,7 @@
       reviewPlayingId = track.id
       await audio.play()
     } catch (err) {
-      log('error', `Preview failed: ${err instanceof Error ? err.message : String(err)}`)
+      logStore.log('error', `Preview failed: ${err instanceof Error ? err.message : String(err)}`)
       reviewPlayingId = null
     } finally {
       reviewLoadingId = null
@@ -360,9 +347,9 @@
           t.id === track.id ? { ...t, converted: true } : t
         )
         selectedRank = 1
-        log('info', `Converted "${track.name}".`)
+        logStore.log('info', `Converted "${track.name}".`)
       } else {
-        log('error', `Conversion failed for "${track.name}".`)
+        logStore.log('error', `Conversion failed for "${track.name}".`)
       }
     } finally {
       converting = false
@@ -417,18 +404,14 @@
   }
 
   function openSettings() {
-    settingsMinScore = minScoreThreshold
-    settingsPreviewLen = previewLength
-    settingsMinLoopDuration = minLoopDuration
-    settingsDisablePruning = disablePruning
     settingsOpen = true
   }
 
-  function applySettings() {
-    minScoreThreshold = settingsMinScore
-    previewLength = settingsPreviewLen
-    minLoopDuration = settingsMinLoopDuration
-    disablePruning = settingsDisablePruning
+  function applySettings(next: { minScoreThreshold: number; previewLength: number; minLoopDuration: number; disablePruning: boolean }) {
+    minScoreThreshold = next.minScoreThreshold
+    previewLength = next.previewLength
+    minLoopDuration = next.minLoopDuration
+    disablePruning = next.disablePruning
     settingsOpen = false
   }
 
@@ -525,100 +508,41 @@
 
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
-    <section class="flex h-full min-h-0 w-[280px] shrink-0 flex-col border border-border bg-card overflow-hidden">
-      <div class="gradient-strip h-[3px] shrink-0"></div>
-      <div class="shrink-0 border-b border-border px-4 py-3">
-        <div class="flex items-center gap-2">
-          <div
-            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-            style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-          >
-            <Folder size={18} />
-          </div>
-          <div class="min-w-0 flex-1">
-            <h2 class="text-sm font-semibold">{$_('orderTracks.seriesHeading')}</h2>
-            <p class="truncate text-[12.5px] text-muted-foreground">
-              {activeMod?.name ?? $_('orderTracks.selectModSubtitle')}
-            </p>
-          </div>
-          <span class="shrink-0 text-[12px] text-muted-foreground">{series.length}</span>
-          <button
-            onclick={openSettings}
-            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-input bg-background transition-colors hover:bg-muted"
-            title={$_('nus3Convert.settingsTitle')}
-          >
-            <Settings size={14} />
-          </button>
-          <button
-            onclick={handleReload}
-            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-input bg-background transition-colors hover:bg-muted"
-            title={$_('orderTracks.reload')}
-          >
-            <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
-          </button>
-        </div>
-      </div>
-
-      <div class="min-h-0 flex-1 overflow-auto p-2">
-        {#if !activeMod}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {$_('orderTracks.chooseMod')}
-          </div>
-        {:else if loading && series.length === 0}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {$_('orderTracks.loadingSeries')}
-          </div>
-        {:else if series.length === 0}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {$_('orderTracks.noSeries')}
-          </div>
-        {:else}
-          <div class="grid gap-1.5">
-            {#each series as item}
-              {@const isActive = modsStore.activeSeriesPath === item.path}
-              <button
-                onclick={() => { modsStore.activeSeriesPath = item.path; void loadSources(item.path) }}
-                class="w-full rounded-lg border px-2 py-1.5 text-left transition-colors {isActive ? 'border-transparent' : 'border-border bg-background/70 hover:bg-muted'}"
-                style={isActive
-                  ? 'background: linear-gradient(135deg, hsl(var(--gradient-from) / .15), hsl(var(--gradient-to) / .18));'
-                  : ''}
-              >
-                <div class="truncate text-[13.5px] font-semibold">{item.name}</div>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
-    </section>
+    <SeriesPicker
+      {activeMod}
+      {series}
+      {loading}
+      activePath={modsStore.activeSeriesPath}
+      onSelect={(path) => { modsStore.activeSeriesPath = path; void loadSources(path) }}
+      onReload={handleReload}
+      heading={$_('orderTracks.seriesHeading')}
+      subtitleFallback={$_('orderTracks.selectModSubtitle')}
+      chooseModText={$_('orderTracks.chooseMod')}
+      loadingText={$_('orderTracks.loadingSeries')}
+      emptyText={$_('orderTracks.noSeries')}
+      reloadTitle={$_('nus3Convert.reload')}
+    >
+      {#snippet actions()}
+        <IconButton onclick={openSettings} title={$_('nus3Convert.settingsTitle')}>
+          <Settings size={14} />
+        </IconButton>
+      {/snippet}
+    </SeriesPicker>
 
     <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
 
       {#if !selectedSeries || sourcesTracks.length === 0}
-        <div class="grid h-full min-h-[320px] place-items-center">
-          <div class="flex max-w-[340px] flex-col items-center gap-3 px-6 text-center">
-            <div
-              class="flex h-12 w-12 items-center justify-center rounded-2xl border border-border"
-              style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-            >
-              <AudioWaveform size={20} />
-            </div>
-            <div>
-              <h3 class="text-sm font-semibold">
-                {analyzing
-                  ? $_('nus3Convert.loading')
-                  : selectedSeries
-                    ? $_('nus3Convert.noConvertableTitle')
-                    : $_('nus3Convert.chooseSeries')}
-              </h3>
-              {#if analyzing}
-                <p class="pt-1 text-[13px] text-muted-foreground">{$_('nus3Convert.loading')}</p>
-              {:else if selectedSeries}
-                <p class="pt-1 text-[13px] text-muted-foreground">{$_('nus3Convert.noConvertableHint')}</p>
-              {/if}
-            </div>
-          </div>
-        </div>
+        <EmptyState
+          title={analyzing
+            ? $_('nus3Convert.loading')
+            : selectedSeries
+              ? $_('nus3Convert.noConvertableTitle')
+              : $_('nus3Convert.chooseSeries')}
+          body={analyzing ? $_('nus3Convert.loading') : selectedSeries ? $_('nus3Convert.noConvertableHint') : ''}
+        >
+          {#snippet icon()}<AudioWaveform size={20} />{/snippet}
+        </EmptyState>
       {:else}
         <div class="shrink-0 flex items-center gap-1 border-b border-border bg-card px-4 pt-1">
           <button
@@ -645,27 +569,16 @@
         <!-- ── Convert tab ── -->
         {#if allConverted}
           <!-- Everything converted: nudge the user toward Review & Save -->
-          <div class="grid h-full min-h-[320px] place-items-center">
-            <div class="flex max-w-[400px] flex-col items-center gap-3 px-6 text-center">
-              <div
-                class="flex h-12 w-12 items-center justify-center rounded-2xl border border-border"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-              >
-                <CheckCircle size={20} />
-              </div>
-              <div>
-                <h3 class="text-sm font-semibold">{$_('nus3Convert.allConvertedTitle')}</h3>
-                <p class="pt-1 text-[13px] text-muted-foreground">{$_('nus3Convert.allConvertedHint')}</p>
-              </div>
-              <button
-                onclick={() => (tab = 'review')}
-                class="inline-flex h-8 items-center gap-1.5 rounded-md border-0 px-3 text-[12.5px] font-medium text-white transition-colors"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 4px 14px -2px hsl(var(--gradient-from) / .35);"
-              >
-                {$_('nus3Convert.tabReview')}
-              </button>
-            </div>
-          </div>
+          <EmptyState title={$_('nus3Convert.allConvertedTitle')} body={$_('nus3Convert.allConvertedHint')}>
+            {#snippet icon()}<CheckCircle size={20} />{/snippet}
+            <button
+              onclick={() => (tab = 'review')}
+              class="inline-flex h-8 items-center gap-1.5 rounded-md border-0 px-3 text-[12.5px] font-medium text-white transition-colors"
+              style="background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 4px 14px -2px hsl(var(--gradient-from) / .35);"
+            >
+              {$_('nus3Convert.tabReview')}
+            </button>
+          </EmptyState>
         {:else}
         <div class="shrink-0 border-b border-border bg-card px-5 py-3">
           <div class="flex flex-col gap-2">
@@ -1143,143 +1056,13 @@
 </div>
 
 {#if settingsOpen}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-    onkeydown={(e) => { if (e.key === 'Escape') settingsOpen = false }}
-    onclick={(e) => { if (e.target === e.currentTarget) settingsOpen = false }}
-  >
-    <div class="w-[400px] rounded-xl border border-border bg-card shadow-2xl">
-      <div class="gradient-strip h-[3px] rounded-t-xl"></div>
-      <div class="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 class="text-sm font-semibold">{$_('nus3Convert.settingsTitle')}</h2>
-        <button
-          onclick={() => settingsOpen = false}
-          class="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-accent transition-colors"
-        >
-          <X size={14} />
-        </button>
-      </div>
-      <div class="flex flex-col gap-4 px-5 py-4">
-        <div class="flex flex-col gap-1.5">
-          <label for="nus3-min-score" class="text-[13px] font-medium">
-            {$_('nus3Convert.settingsMinScore')}
-          </label>
-          <input
-            id="nus3-min-score"
-            type="number"
-            step="0.5"
-            min="0"
-            max="100"
-            bind:value={settingsMinScore}
-            class="h-9 rounded-lg border border-input bg-background px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <p class="text-[11px] text-muted-foreground">{$_('nus3Convert.settingsMinScoreHint')}</p>
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label for="nus3-preview-len" class="text-[13px] font-medium">
-            {$_('nus3Convert.settingsPreviewLength')}
-          </label>
-          <input
-            id="nus3-preview-len"
-            type="number"
-            step="1"
-            min="1"
-            max="30"
-            bind:value={settingsPreviewLen}
-            class="h-9 rounded-lg border border-input bg-background px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <p class="text-[11px] text-muted-foreground">{$_('nus3Convert.settingsPreviewLengthHint')}</p>
-        </div>
-        <div class="flex flex-col gap-1.5">
-          <label for="nus3-min-loop" class="text-[13px] font-medium">
-            {$_('nus3Convert.settingsMinLoopDuration')}
-          </label>
-          <input
-            id="nus3-min-loop"
-            type="number"
-            step="0.5"
-            min="0"
-            bind:value={settingsMinLoopDuration}
-            class="h-9 rounded-lg border border-input bg-background px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-          <p class="text-[11px] text-muted-foreground">{$_('nus3Convert.settingsMinLoopDurationHint')}</p>
-        </div>
-        <label class="flex items-start gap-2.5">
-          <input
-            type="checkbox"
-            bind:checked={settingsDisablePruning}
-            class="mt-0.5 h-4 w-4 shrink-0 rounded border-input"
-          />
-          <span class="flex flex-col gap-0.5">
-            <span class="text-[13px] font-medium">{$_('nus3Convert.settingsDisablePruning')}</span>
-            <span class="text-[11px] text-muted-foreground">{$_('nus3Convert.settingsDisablePruningHint')}</span>
-          </span>
-        </label>
-      </div>
-      <div class="flex justify-end gap-2 border-t border-border px-5 py-3">
-        <button
-          onclick={() => settingsOpen = false}
-          class="inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-[12.5px] font-medium transition-colors hover:bg-muted"
-        >
-          {$_('nus3Convert.settingsClose')}
-        </button>
-        <button
-          onclick={applySettings}
-          class="inline-flex h-8 items-center rounded-md border-0 px-3 text-[12.5px] font-medium text-white transition-colors"
-          style="background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 4px 14px -2px hsl(var(--gradient-from) / .35);"
-        >
-          {$_('nus3Convert.settingsSave')}
-        </button>
-      </div>
-    </div>
-  </div>
+  <Nus3SettingsModal
+    initial={{ minScoreThreshold, previewLength, minLoopDuration, disablePruning }}
+    onApply={applySettings}
+    onClose={() => (settingsOpen = false)}
+  />
 {/if}
 
-<!-- Accept & save modal: ask whether to delete source files -->
 {#if acceptModalOpen}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-    onkeydown={(e) => { if (e.key === 'Escape') acceptModalOpen = false }}
-    onclick={(e) => { if (e.target === e.currentTarget) acceptModalOpen = false }}
-  >
-    <div class="w-[460px] rounded-xl border border-border bg-card shadow-2xl">
-      <div class="gradient-strip h-[3px] rounded-t-xl"></div>
-      <div class="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 class="text-sm font-semibold">{$_('nus3Convert.acceptModalTitle')}</h2>
-        <button
-          onclick={() => acceptModalOpen = false}
-          class="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-accent transition-colors"
-        >
-          <X size={14} />
-        </button>
-      </div>
-      <div class="px-5 py-4">
-        <p class="text-[13px] text-muted-foreground">{$_('nus3Convert.acceptModalBody')}</p>
-      </div>
-      <div class="flex justify-end gap-2 border-t border-border px-5 py-3">
-        <button
-          onclick={() => acceptModalOpen = false}
-          class="inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-[12.5px] font-medium transition-colors hover:bg-muted"
-        >
-          {$_('nus3Convert.acceptModalCancel')}
-        </button>
-        <button
-          onclick={() => runAccept(false)}
-          class="inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-[12.5px] font-medium transition-colors hover:bg-muted"
-        >
-          {$_('nus3Convert.acceptModalKeep')}
-        </button>
-        <button
-          onclick={() => runAccept(true)}
-          class="inline-flex h-8 items-center gap-1.5 rounded-md border-0 px-3 text-[12.5px] font-medium text-destructive-foreground transition-colors"
-          style="background: hsl(var(--destructive));"
-        >
-          <Trash2 size={13} />
-          {$_('nus3Convert.acceptModalDelete')}
-        </button>
-      </div>
-    </div>
-  </div>
+  <Nus3AcceptModal onClose={() => (acceptModalOpen = false)} onAccept={runAccept} />
 {/if}

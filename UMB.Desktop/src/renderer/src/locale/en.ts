@@ -170,6 +170,7 @@ export default {
     iconNotPng: 'Please choose a PNG image.'
   },
   nus3Convert: {
+    reload: 'Reload series',
     kicker1: 'NUS3 CONVERT · STEP 1 of 2 · SELECTING LOOP POINTS',
     kicker2: 'NUS3 CONVERT · STEP 2 of 2 · REVIEWING CONVERTED LOOPS',
     tabConvert: 'Convert',

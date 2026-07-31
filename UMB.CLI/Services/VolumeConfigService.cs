@@ -1,5 +1,4 @@
 using CsvHelper;
-using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using UMB.CLI.Views;
@@ -13,7 +12,6 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
@@ -143,45 +141,20 @@ namespace UMB.CLI.Services
                 {
                     Parallel.For(0, rows.Count, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
                     {
-                        var row = rows[i];
-                        var filename = row.GetValueOrDefault("filename", "");
-                        var title = row.GetValueOrDefault("title", filename);
-                        var sourcePath = string.IsNullOrEmpty(filename) ? "" : Path.Combine(seriesDir, filename);
-                        var userOverride = ParseVolume(row.GetValueOrDefault("volume", "1.0"));
-
-                        var vm = new VolumeRowViewModel
+                        var dto = AnalyzeRow(rows[i], i, seriesDir, target, maxMult, useCacheOnly: false);
+                        viewModels[i] = new VolumeRowViewModel
                         {
-                            OriginalIndex = i,
-                            Title = title,
-                            Filename = filename,
-                            SourcePath = sourcePath,
-                            UserOverride = userOverride,
+                            OriginalIndex = dto.OriginalIndex,
+                            Title = dto.Title,
+                            Filename = dto.Filename,
+                            SourcePath = string.IsNullOrEmpty(dto.Filename) ? "" : Path.Combine(seriesDir, dto.Filename),
+                            UserOverride = dto.UserOverride,
                             GlobalVolumeMultiplier = globalMult,
+                            MeasuredLufs = dto.MeasuredLufs,
+                            AutoGain = dto.AutoGain,
+                            WasClamped = dto.WasClamped,
+                            HasMeasurement = dto.HasMeasurement,
                         };
-
-                        if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
-                        {
-                            var measurement = _lufsService.Measure(sourcePath);
-                            if (measurement.IsValid)
-                            {
-                                var gain = _lufsService.CalculateGain(measurement, target, maxMult);
-                                vm.MeasuredLufs = measurement.IntegratedLufs;
-                                vm.AutoGain = gain.Multiplier;
-                                vm.WasClamped = gain.WasClamped;
-                                vm.HasMeasurement = true;
-                            }
-                            else
-                            {
-                                vm.AutoGain = 1.0f;
-                            }
-                        }
-                        else
-                        {
-                            vm.AutoGain = 1.0f;
-                            _logger.LogWarning("Source file missing for row {Index}: {Path}", i, sourcePath);
-                        }
-
-                        viewModels[i] = vm;
                     });
                 });
 
@@ -225,6 +198,46 @@ namespace UMB.CLI.Services
         }
 
         /// <summary>
+        /// Per-row LUFS measurement + auto-gain shared by the interactive window and
+        /// the batch path. useCacheOnly reads cached measurements without re-analysis.
+        /// </summary>
+        private VolumeRowDto AnalyzeRow(Dictionary<string, string> row, int index, string seriesDir,
+            float target, float maxMult, bool useCacheOnly)
+        {
+            var filename = row.GetValueOrDefault("filename", "");
+            var title = row.GetValueOrDefault("title", filename);
+            var sourcePath = string.IsNullOrEmpty(filename) ? "" : Path.Combine(seriesDir, filename);
+
+            var dto = new VolumeRowDto
+            {
+                OriginalIndex = index,
+                Title = title,
+                Filename = filename,
+                UserOverride = ParseVolume(row.GetValueOrDefault("volume", "1.0")),
+                AutoGain = 1.0f,
+            };
+
+            if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
+            {
+                var measurement = useCacheOnly ? _lufsService.MeasureCached(sourcePath) : _lufsService.Measure(sourcePath);
+                if (measurement.IsValid)
+                {
+                    var gain = _lufsService.CalculateGain(measurement, target, maxMult);
+                    dto.MeasuredLufs = measurement.IntegratedLufs;
+                    dto.AutoGain = gain.Multiplier;
+                    dto.WasClamped = gain.WasClamped;
+                    dto.HasMeasurement = true;
+                }
+            }
+            else
+            {
+                _logger.LogWarning("Source file missing for row {Index}: {Path}", index, sourcePath);
+            }
+
+            return dto;
+        }
+
+        /// <summary>
         /// Non-interactive analysis for the desktop app. Reads
         /// { "seriesPath": "...", "outputPath": "..." }, measures every track's
         /// loudness + auto-gain (same as the interactive window) and writes a
@@ -264,45 +277,13 @@ namespace UMB.CLI.Services
             var completed = 0;
             Parallel.For(0, rows.Count, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
             {
-                var row = rows[i];
-                var filename = row.GetValueOrDefault("filename", "");
-                var title = row.GetValueOrDefault("title", filename);
-                var sourcePath = string.IsNullOrEmpty(filename) ? "" : Path.Combine(seriesDir, filename);
-
-                var dto = new VolumeRowDto
-                {
-                    OriginalIndex = i,
-                    Title = title,
-                    Filename = filename,
-                    UserOverride = ParseVolume(row.GetValueOrDefault("volume", "1.0")),
-                    AutoGain = 1.0f,
-                };
-
-                if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
-                {
-                    var measurement = input.Analyze
-                        ? _lufsService.Measure(sourcePath)
-                        : _lufsService.MeasureCached(sourcePath);
-                    if (measurement.IsValid)
-                    {
-                        var gain = _lufsService.CalculateGain(measurement, target, maxMult);
-                        dto.MeasuredLufs = measurement.IntegratedLufs;
-                        dto.AutoGain = gain.Multiplier;
-                        dto.WasClamped = gain.WasClamped;
-                        dto.HasMeasurement = true;
-                    }
-                }
-                else
-                {
-                    _logger.LogWarning("Source file missing for row {Index}: {Path}", i, sourcePath);
-                }
-
+                var dto = AnalyzeRow(rows[i], i, seriesDir, target, maxMult, useCacheOnly: !input.Analyze);
                 dtos[i] = dto;
 
                 if (input.Analyze)
                 {
                     var done = Interlocked.Increment(ref completed);
-                    Console.WriteLine($"__LUFS_PROGRESS__\t{done}\t{rows.Count}\t{filename}");
+                    Console.WriteLine($"__LUFS_PROGRESS__\t{done}\t{rows.Count}\t{dto.Filename}");
                 }
             });
 
@@ -401,7 +382,7 @@ namespace UMB.CLI.Services
             {
                 return JsonSerializer.Deserialize<T>(
                     File.ReadAllText(jsonPath),
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                    CliUtil.JsonCaseInsensitive);
             }
             catch (Exception ex)
             {
@@ -417,7 +398,7 @@ namespace UMB.CLI.Services
             File.WriteAllText(outputPath, json);
         }
 
-        private static float ParseVolume(string raw)
+        internal static float ParseVolume(string raw)
         {
             if (string.IsNullOrWhiteSpace(raw)) return 1.0f;
             return float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 1.0f;
@@ -425,13 +406,7 @@ namespace UMB.CLI.Services
 
         private (List<Dictionary<string, string>> rows, string[] headers) ReadCsvRows(string csvPath)
         {
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-                TrimOptions = TrimOptions.Trim,
-                MissingFieldFound = null,
-                BadDataFound = null,
-            };
+            var config = CliUtil.CsvReadLenient();
 
             using var reader = new StreamReader(csvPath);
             using var csv = new CsvReader(reader, config);
@@ -453,10 +428,7 @@ namespace UMB.CLI.Services
 
         private void WriteCsvRows(string csvPath, List<Dictionary<string, string>> rows, string[] headers)
         {
-            var config = new CsvConfiguration(CultureInfo.InvariantCulture)
-            {
-                HasHeaderRecord = true,
-            };
+            var config = CliUtil.CsvWrite();
 
             using var writer = new StreamWriter(csvPath);
             using var csv = new CsvWriter(writer, config);
@@ -515,7 +487,7 @@ namespace UMB.CLI.Services
                 try
                 {
                     Directory.CreateDirectory(_tempDir);
-                    var safeName = MakeSafeFileName(Path.GetFileNameWithoutExtension(sourcePath));
+                    var safeName = CliUtil.MakeSafeFileName(Path.GetFileNameWithoutExtension(sourcePath));
                     var outPath = Path.Combine(_tempDir, $"preview_{safeName}_{Guid.NewGuid():N}.wav");
                     if (_decodeService.DecodeToWav(sourcePath, outPath))
                     {
@@ -545,13 +517,5 @@ namespace UMB.CLI.Services
             }
         }
 
-        private static string MakeSafeFileName(string name)
-        {
-            var invalid = Path.GetInvalidFileNameChars();
-            var sb = new StringBuilder(name.Length);
-            foreach (var c in name)
-                sb.Append(invalid.Contains(c) ? '_' : c);
-            return sb.ToString();
-        }
     }
 }

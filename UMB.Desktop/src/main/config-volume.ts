@@ -1,35 +1,10 @@
 import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs'
-import { join, basename } from 'path'
-import { tmpdir } from 'os'
+import { basename } from 'path'
 import { spawnCliAction, type LogLine } from './cli'
+import { tempPath } from './utils'
+import type { VolumeConfigData, VolumeOverride, VolumeRowItem } from '../shared/types'
 
-/** One track row mirroring the Avalonia VolumeRowViewModel. */
-export interface VolumeRowItem {
-  originalIndex: number
-  title: string
-  filename: string
-  hasMeasurement: boolean
-  measuredLufs: number
-  autoGain: number
-  wasClamped: boolean
-  userOverride: number
-}
-
-export interface VolumeConfigData {
-  seriesName: string
-  seriesPath: string
-  globalVolumeMultiplier: number
-  targetLufs: number
-  maxMultiplier: number
-  ffmpegAvailable: boolean
-  lufsCacheExists: boolean
-  items: VolumeRowItem[]
-}
-
-export interface VolumeOverride {
-  originalIndex: number
-  volume: number
-}
+export type { VolumeConfigData, VolumeOverride, VolumeRowItem } from '../shared/types'
 
 /** What the CLI config-volume-analyze action writes to its output file. */
 interface VolumeAnalyzeResult {
@@ -40,10 +15,6 @@ interface VolumeAnalyzeResult {
   ffmpegAvailable: boolean
   lufsCacheExists: boolean
   items: VolumeRowItem[]
-}
-
-function tempPath(prefix: string, ext: string): string {
-  return join(tmpdir(), `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1e6)}.${ext}`)
 }
 
 /**

@@ -413,35 +413,9 @@ function readMsbt(path: string): Record<string, string> {
   return out
 }
 
-export interface PlaylistInfo {
-  id: string
-  name: string
-  series: string[]
-  songCount: number
-}
+import type { PlaylistInfo, PlaylistInfoData, StageInfo, StageSong } from '../shared/types'
 
-export interface StageSong {
-  order: number
-  bgmId: string
-  name: string
-}
-
-export interface StageInfo {
-  uiStageId: string
-  name: string
-  hidden: boolean
-  seriesId: string
-  seriesName: string
-  playlistId: string
-  playlistName: string
-  order: number
-  songs: StageSong[]
-}
-
-export interface PlaylistInfoData {
-  playlists: PlaylistInfo[]
-  stages: StageInfo[]
-}
+export type { PlaylistInfo, PlaylistInfoData, StageInfo, StageSong } from '../shared/types'
 
 let dataCache: { workspace: string; data: PlaylistInfoData } | null = null
 let bgmTitleCache: { workspace: string; map: Map<string, string> } | null = null

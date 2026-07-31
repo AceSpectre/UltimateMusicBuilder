@@ -21,13 +21,6 @@ namespace UMB.CLI.Services
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
         private readonly ScaffoldService _scaffold;
 
-        private static readonly HashSet<string> SOURCE_AUDIO_EXTENSIONS = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ".mp3", ".flac", ".wav", ".ogg"
-        };
-
-        private const string VALIDATE_FOLDER = "songs-to-validate";
-
         public AcceptNus3Service(IOptionsMonitor<Sma5hMusicOptions> musicConfig,
             ILogger<AcceptNus3Service> logger, ScaffoldService scaffold)
         {
@@ -50,18 +43,8 @@ namespace UMB.CLI.Services
             if (seriesDir == null)
                 return;
 
-            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
-            if (!Directory.Exists(validateDir))
-            {
-                _logger.LogWarning("No songs-to-validate folder found in {Dir}.", seriesDir);
+            if (!HasValidatedFiles(seriesDir))
                 return;
-            }
-
-            if (Directory.GetFiles(validateDir, "*.nus3audio").Length == 0)
-            {
-                _logger.LogWarning("No .nus3audio files found in {Dir}.", validateDir);
-                return;
-            }
 
             var deleteSources = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
@@ -88,7 +71,7 @@ namespace UMB.CLI.Services
 
             var input = JsonSerializer.Deserialize<AcceptBatchInput>(
                 File.ReadAllText(jsonPath),
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                CliUtil.JsonCaseInsensitive);
 
             if (input == null || string.IsNullOrWhiteSpace(input.SeriesPath))
             {
@@ -97,25 +80,34 @@ namespace UMB.CLI.Services
             }
 
             var seriesDir = input.SeriesPath;
-            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
+            if (!HasValidatedFiles(seriesDir))
+                return;
+
+            AcceptCore(seriesDir, input.DeleteSources);
+        }
+
+        /// <summary>True when the series has a songs-to-validate folder with .nus3audio files.</summary>
+        private bool HasValidatedFiles(string seriesDir)
+        {
+            var validateDir = Path.Combine(seriesDir, CliUtil.ValidateFolder);
             if (!Directory.Exists(validateDir))
             {
                 _logger.LogWarning("No songs-to-validate folder found in {Dir}.", seriesDir);
-                return;
+                return false;
             }
 
             if (Directory.GetFiles(validateDir, "*.nus3audio").Length == 0)
             {
                 _logger.LogWarning("No .nus3audio files found in {Dir}.", validateDir);
-                return;
+                return false;
             }
 
-            AcceptCore(seriesDir, input.DeleteSources);
+            return true;
         }
 
         private void AcceptCore(string seriesDir, bool shouldDeleteSources)
         {
-            var validateDir = Path.Combine(seriesDir, VALIDATE_FOLDER);
+            var validateDir = Path.Combine(seriesDir, CliUtil.ValidateFolder);
             var nus3Files = Directory.GetFiles(validateDir, "*.nus3audio").ToList();
 
             int accepted = 0;
@@ -126,12 +118,7 @@ namespace UMB.CLI.Services
             List<FolderTrackCsvRow> csvRows = null;
             if (File.Exists(csvPath))
             {
-                var csvConfig = new CsvConfiguration(CultureInfo.InvariantCulture)
-                {
-                    HasHeaderRecord = true,
-                    TrimOptions = TrimOptions.Trim,
-                    MissingFieldFound = null
-                };
+                var csvConfig = CliUtil.CsvRead();
                 using var reader = new StreamReader(csvPath);
                 using var csv = new CsvReader(reader, csvConfig);
                 csv.Context.RegisterClassMap<FolderTrackCsvRowMap>();
@@ -150,7 +137,7 @@ namespace UMB.CLI.Services
                 accepted++;
 
                 // Handle original source file(s) with matching basename
-                foreach (var ext in SOURCE_AUDIO_EXTENSIONS)
+                foreach (var ext in CliUtil.SourceAudioExtensions)
                 {
                     var sourceFile = Path.Combine(seriesDir, basename + ext);
                     if (File.Exists(sourceFile))
@@ -181,10 +168,7 @@ namespace UMB.CLI.Services
             if (csvUpdated > 0 && csvRows != null)
             {
                 using var writer = new StreamWriter(csvPath);
-                using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
-                {
-                    HasHeaderRecord = true
-                });
+                using var csv = new CsvWriter(writer, CliUtil.CsvWrite());
                 csv.Context.RegisterClassMap<FolderTrackCsvRowMap>();
                 csv.WriteRecords(csvRows);
                 _logger.LogInformation("Updated {Count} filename(s) in tracks.csv.", csvUpdated);
