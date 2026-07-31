@@ -2,64 +2,19 @@ import {
   existsSync, readdirSync, readFileSync, writeFileSync,
   copyFileSync, mkdirSync, statSync
 } from 'fs'
-import { join, resolve, relative, isAbsolute, basename } from 'path'
+import { join, resolve, basename } from 'path'
 import { parse as parseToml } from 'smol-toml'
-import { parse as parseCsv } from 'csv-parse/sync'
 import { stringify as stringifyCsv } from 'csv-stringify/sync'
+import { isChildOf, getMusicModsRoot, log } from './utils'
+import { tomlEscape } from './toml-utils'
+import { readCsvLenient, countCsvDataRows } from './csv-utils'
+import type { LogLine, MergeAnalysis, MergeConflict, MergeResult, MergeSeriesSource } from '../shared/types'
+
+export type { MergeAnalysis, MergeConflict, MergeResult, MergeSeriesSource } from '../shared/types'
 
 const SERIES_TOML = 'series.toml'
 const TRACKS_CSV = 'tracks.csv'
 const SERIES_ORDER_TOML = 'series-order.toml'
-
-interface LogLine {
-  timestamp: string
-  level: 'info' | 'warn' | 'error'
-  message: string
-}
-
-export interface MergeSeriesSource {
-  modName: string
-  modPath: string
-  seriesPath: string
-}
-
-export interface MergeConflict {
-  seriesName: string
-  mods: string[]
-}
-
-export interface MergeAnalysis {
-  modNames: string[]
-  modPaths: string[]
-  series: { name: string; sources: MergeSeriesSource[] }[]
-  conflicts: MergeConflict[]
-  totalSeries: number
-}
-
-export interface MergeResult {
-  outputPath: string
-  outputName: string
-  totalSeries: number
-  totalTracks: number
-  conflictsResolved: number
-}
-
-function nowTs(): string {
-  return new Date().toLocaleTimeString('en-GB', { hour12: false })
-}
-
-function log(level: LogLine['level'], message: string): LogLine {
-  return { timestamp: nowTs(), level, message }
-}
-
-function isChildOf(parentPath: string, childPath: string): boolean {
-  const rel = relative(parentPath, childPath)
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
-}
-
-function getMusicModsRoot(workspace: string): string {
-  return resolve(workspace, 'Mods', 'MusicMods')
-}
 
 export function analyzeMerge(workspace: string, modPaths: string[]): MergeAnalysis {
   const modsDir = getMusicModsRoot(workspace)
@@ -146,7 +101,7 @@ export async function executeMerge(
 
     if (sources.length === 1) {
       copySeriesFolder(sources[0].seriesPath, outputSeriesDir)
-      const trackCount = countTracksInCsv(join(outputSeriesDir, TRACKS_CSV))
+      const trackCount = countCsvDataRows(join(outputSeriesDir, TRACKS_CSV))
       totalTracks += trackCount
       onLine(log('info', `Copied series '${seriesName}' from ${sources[0].modName} (${trackCount} tracks)`))
     } else {
@@ -188,12 +143,6 @@ function copySeriesFolder(sourceDir: string, outputDir: string): void {
   }
 }
 
-function countTracksInCsv(csvPath: string): number {
-  if (!existsSync(csvPath)) return 0
-  const lines = readFileSync(csvPath, 'utf-8').split(/\r?\n/).filter(l => l.trim().length > 0)
-  return Math.max(0, lines.length - 1)
-}
-
 interface SeriesTomlData {
   series: Record<string, unknown>
   games: Record<string, unknown>[]
@@ -216,15 +165,11 @@ function parseSeriesToml(filePath: string): SeriesTomlData | null {
   }
 }
 
-function escapeToml(value: string): string {
-  return (value ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-}
-
 function formatSongsField(songs: unknown): string {
   if (songs == null || songs === '*') return 'songs = "*"'
   if (Array.isArray(songs)) {
     if (songs.length === 0) return 'songs = "*"'
-    const items = songs.map((s: unknown) => `    "${escapeToml(String(s))}"`)
+    const items = songs.map((s: unknown) => `    "${tomlEscape(String(s))}"`)
     return `songs = [\n${items.join(',\n')}\n]`
   }
   return 'songs = "*"'
@@ -239,25 +184,25 @@ function writeMergedSeriesToml(
 ): void {
   const lines: string[] = []
   lines.push('[series]')
-  lines.push(`id = "${escapeToml(String(prioritySeries['id'] ?? ''))}"`)
-  lines.push(`name = "${escapeToml(String(prioritySeries['name'] ?? ''))}"`)
+  lines.push(`id = "${tomlEscape(String(prioritySeries['id'] ?? ''))}"`)
+  lines.push(`name = "${tomlEscape(String(prioritySeries['name'] ?? ''))}"`)
   if (prioritySeries['existing-series']) lines.push('existing-series = true')
   const incidence = prioritySeries['playlist-incidence']
   if (incidence != null && incidence !== 100) lines.push(`playlist-incidence = ${incidence}`)
   const seriesPlaylist = prioritySeries['series-playlist']
-  if (seriesPlaylist) lines.push(`series-playlist = "${escapeToml(String(seriesPlaylist))}"`)
+  if (seriesPlaylist) lines.push(`series-playlist = "${tomlEscape(String(seriesPlaylist))}"`)
   lines.push('')
 
   for (const g of games) {
     lines.push('[[games]]')
-    lines.push(`id = "${escapeToml(g.id)}"`)
-    lines.push(`name = "${escapeToml(g.name)}"`)
+    lines.push(`id = "${tomlEscape(g.id)}"`)
+    lines.push(`name = "${tomlEscape(g.name)}"`)
     lines.push('')
   }
 
   for (const p of playlists) {
     lines.push('[[playlists]]')
-    lines.push(`id = "${escapeToml(p.id)}"`)
+    lines.push(`id = "${tomlEscape(p.id)}"`)
     lines.push(`incidence = ${p.incidence}`)
     lines.push(formatSongsField(p.songs))
     lines.push('')
@@ -265,10 +210,10 @@ function writeMergedSeriesToml(
 
   if (defaultTrackData) {
     lines.push('[default-track-data]')
-    if (defaultTrackData['game']) lines.push(`game = "${escapeToml(String(defaultTrackData['game']))}"`)
-    if (defaultTrackData['author']) lines.push(`author = "${escapeToml(String(defaultTrackData['author']))}"`)
-    if (defaultTrackData['copyright']) lines.push(`copyright = "${escapeToml(String(defaultTrackData['copyright']))}"`)
-    lines.push(`record-type = "${escapeToml(String(defaultTrackData['record-type'] ?? 'original'))}"`)
+    if (defaultTrackData['game']) lines.push(`game = "${tomlEscape(String(defaultTrackData['game']))}"`)
+    if (defaultTrackData['author']) lines.push(`author = "${tomlEscape(String(defaultTrackData['author']))}"`)
+    if (defaultTrackData['copyright']) lines.push(`copyright = "${tomlEscape(String(defaultTrackData['copyright']))}"`)
+    lines.push(`record-type = "${tomlEscape(String(defaultTrackData['record-type'] ?? 'original'))}"`)
     lines.push(`volume = ${defaultTrackData['volume'] ?? 1}`)
     lines.push('')
   }
@@ -287,21 +232,6 @@ interface TrackRow {
   volume: string
   info1: string
   in_soundtest: string
-}
-
-function readTracksCsv(csvPath: string): TrackRow[] {
-  if (!existsSync(csvPath)) return []
-  try {
-    const content = readFileSync(csvPath, 'utf-8')
-    return parseCsv(content, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-      relax_column_count: true
-    }) as TrackRow[]
-  } catch {
-    return []
-  }
 }
 
 function writeTracksCsv(outputDir: string, tracks: TrackRow[]): void {
@@ -373,7 +303,7 @@ function mergeSeriesFolders(
   const seenFilenames = new Set<string>()
 
   for (const srcDir of orderedSourceDirs) {
-    const tracks = readTracksCsv(join(srcDir, TRACKS_CSV))
+    const tracks = readCsvLenient(join(srcDir, TRACKS_CSV)) as unknown as TrackRow[]
     for (const track of tracks) {
       const key = (track.filename ?? '').toLowerCase()
       if (key && !seenFilenames.has(key)) {
@@ -451,7 +381,7 @@ function mergeSeriesOrderToml(
     'order = ['
   ]
   for (const id of mergedOrder) {
-    lines.push(`    "${escapeToml(id)}",`)
+    lines.push(`    "${tomlEscape(id)}",`)
   }
   lines.push(']')
   lines.push('')

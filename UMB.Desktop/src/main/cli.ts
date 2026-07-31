@@ -1,18 +1,12 @@
 import { spawn, type ChildProcess } from 'child_process'
 import { join } from 'path'
 import { app } from 'electron'
+import { lineSplitter, nowTs } from './utils'
+import type { LogLine } from '../shared/types'
+
+export type { LogLine } from '../shared/types'
 
 let currentProcess: ChildProcess | null = null
-
-export interface LogLine {
-  timestamp: string
-  level: 'info' | 'warn' | 'error'
-  message: string
-}
-
-function nowTs(): string {
-  return new Date().toLocaleTimeString('en-GB', { hour12: false })
-}
 
 function parseLogLine(raw: string): LogLine {
   const timestamp = nowTs()
@@ -91,30 +85,19 @@ function spawnOneShot(
 
     currentProcess = proc
 
-    let stdoutBuffer = ''
-    let stderrBuffer = ''
-
-    proc.stdout?.on('data', (data: Buffer) => {
-      stdoutBuffer += data.toString()
-      const lines = stdoutBuffer.split('\n')
-      stdoutBuffer = lines.pop() || ''
-      for (const line of lines) {
-        if (line.trim()) onLine(parseLogLine(line))
-      }
+    const stdout = lineSplitter((line) => {
+      if (line.trim()) onLine(parseLogLine(line))
+    })
+    const stderr = lineSplitter((line) => {
+      if (line.trim()) onLine({ ...parseLogLine(line), level: 'error' })
     })
 
-    proc.stderr?.on('data', (data: Buffer) => {
-      stderrBuffer += data.toString()
-      const lines = stderrBuffer.split('\n')
-      stderrBuffer = lines.pop() || ''
-      for (const line of lines) {
-        if (line.trim()) onLine({ ...parseLogLine(line), level: 'error' })
-      }
-    })
+    proc.stdout?.on('data', stdout.push)
+    proc.stderr?.on('data', stderr.push)
 
     proc.on('close', (code, signal) => {
-      if (stdoutBuffer.trim()) onLine(parseLogLine(stdoutBuffer))
-      if (stderrBuffer.trim()) onLine({ ...parseLogLine(stderrBuffer), level: 'error' })
+      stdout.flush()
+      stderr.flush()
       onLine({
         timestamp: nowTs(),
         level: code === 0 ? 'info' : code === null ? 'warn' : 'error',
@@ -136,8 +119,6 @@ export function cancelCurrentAction(): void {
 }
 
 let daemonProcess: ChildProcess | null = null
-let daemonStdout = ''
-let daemonStderr = ''
 let nextReqId = 1
 
 // The single in-flight request. Requests are serialized through `daemonQueue`,
@@ -172,24 +153,13 @@ function ensureDaemon(workspace: string): ChildProcess | null {
     stdio: ['pipe', 'pipe', 'pipe']
   })
   daemonProcess = proc
-  daemonStdout = ''
-  daemonStderr = ''
 
-  proc.stdout?.on('data', (data: Buffer) => {
-    daemonStdout += data.toString()
-    const lines = daemonStdout.split('\n')
-    daemonStdout = lines.pop() || ''
-    for (const line of lines) handleDaemonLine(line)
+  const stdout = lineSplitter(handleDaemonLine)
+  const stderr = lineSplitter((line) => {
+    if (line.trim() && activeReq) activeReq.onLine({ ...parseLogLine(line), level: 'error' })
   })
-
-  proc.stderr?.on('data', (data: Buffer) => {
-    daemonStderr += data.toString()
-    const lines = daemonStderr.split('\n')
-    daemonStderr = lines.pop() || ''
-    for (const line of lines) {
-      if (line.trim() && activeReq) activeReq.onLine({ ...parseLogLine(line), level: 'error' })
-    }
-  })
+  proc.stdout?.on('data', stdout.push)
+  proc.stderr?.on('data', stderr.push)
 
   const onExit = (code: number | null): void => {
     daemonProcess = null

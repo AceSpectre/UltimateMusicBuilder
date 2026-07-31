@@ -1,25 +1,10 @@
-import { existsSync, readdirSync, readFileSync, statSync } from 'fs'
-import { isAbsolute, join, relative, resolve } from 'path'
+import { existsSync, readdirSync, statSync } from 'fs'
+import { join, resolve } from 'path'
+import { isChildOf } from './utils'
+import { countCsvDataRows } from './csv-utils'
+import type { ModInfo, ModSeriesInfo, ModStats } from '../shared/types'
 
-export interface ModInfo {
-  name: string
-  path: string
-}
-
-export interface ModSeriesInfo {
-  name: string
-  path: string
-}
-
-export interface ModStats {
-  seriesCount: number
-  trackCount: number
-}
-
-function isChildOf(parentPath: string, childPath: string): boolean {
-  const rel = relative(parentPath, childPath)
-  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
-}
+export type { ModInfo, ModSeriesInfo, ModStats } from '../shared/types'
 
 export function listMods(workspace: string): ModInfo[] {
   const modsDir = join(workspace, 'Mods', 'MusicMods')
@@ -65,23 +50,11 @@ export function listModSeries(workspace: string, modPath: string): ModSeriesInfo
   }
 }
 
-/** Counts data rows (non-empty, excluding the header) in a tracks.csv. */
-function countCsvTracks(csvPath: string): number {
-  try {
-    const lines = readFileSync(csvPath, 'utf-8')
-      .split(/\r?\n/)
-      .filter((l) => l.trim().length > 0)
-    return Math.max(0, lines.length - 1)
-  } catch {
-    return 0
-  }
-}
-
 export function getModStats(workspace: string, modPath: string): ModStats {
   const series = listModSeries(workspace, modPath)
   let trackCount = 0
   for (const s of series) {
-    trackCount += countCsvTracks(join(s.path, 'tracks.csv'))
+    trackCount += countCsvDataRows(join(s.path, 'tracks.csv'))
   }
   return { seriesCount: series.length, trackCount }
 }

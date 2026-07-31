@@ -1,325 +1,39 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipc-channels'
+import type {
+  CreateSeriesInput,
+  DebugPingResult,
+  ExtractIconsAnalysis,
+  ExtractIconsResult,
+  LogLine,
+  LoopAnalysisOptions,
+  ManagePlaylistsData,
+  MergeAnalysis,
+  MergeResult,
+  ModInfo,
+  ModSeriesInfo,
+  ModStats,
+  Nus3AnalysisResult,
+  Nus3ConversionMeta,
+  Nus3SourceTrack,
+  Nus3TrackDecision,
+  PlaylistAssignmentInput,
+  PlaylistInfoData,
+  SaveSeriesItem,
+  SaveTrackItem,
+  SeriesOrderData,
+  TrackOrderData,
+  VolumeConfigData,
+  VolumeOverride,
+  VolumeProgress,
+  WindowActionResult
+} from '../shared/types'
 
-export interface LogLine {
-  timestamp: string
-  level: 'info' | 'warn' | 'error'
-  message: string
-}
-
-export interface ModInfo {
-  name: string
-  path: string
-}
-
-export interface ModSeriesInfo {
-  name: string
-  path: string
-}
-
-export interface ModStats {
-  seriesCount: number
-  trackCount: number
-}
-
-export interface TrackFields {
-  title: string
-  game: string
-  author: string
-  copyright: string
-  record_type: string
-  special_category: string
-  info1: string
-  in_soundtest: string
-}
-
-export interface TrackOrderItem {
-  id: string
-  title: string
-  subtitle: string
-  bgmId: string
-  filename: string
-  isLocked: boolean
-  originalIndex: number | null
-  fields: TrackFields | null
-  isPinchTarget: boolean
-}
-
-export interface SeriesGame {
-  id: string
-  name: string
-}
-
-export interface SaveTrackItem {
-  id: string
-  fields: TrackFields | null
-}
-
-export interface VanillaSongOption {
-  infoId: string
-  name: string
-}
-
-export interface DefaultTrackData {
-  game: string
-  author: string
-  copyright: string
-  record_type: string
-}
-
-export interface TrackOrderData {
-  seriesName: string
-  seriesPath: string
-  isExistingSeries: boolean
-  hasSongOrder: boolean
-  games: SeriesGame[]
-  vanillaSongs: VanillaSongOption[]
-  defaultTrackData: DefaultTrackData | null
-  items: TrackOrderItem[]
-}
-
-export interface SeriesFields {
-  name: string
-  seriesPlaylist: string
-  playlistIncidence: number
-  games: SeriesGame[]
-  defaultGame: string
-  defaultAuthor: string
-  defaultCopyright: string
-  defaultRecordType: string
-  defaultVolume: number
-}
-
-export interface SeriesOrderItem {
-  id: string
-  name: string
-  seriesId: string
-  iconDataUrl: string | null
-  originalIndex: number
-  fields: SeriesFields
-}
-
-export interface SaveSeriesItem {
-  id: string
-  fields: SeriesFields | null
-}
-
-export interface CreateSeriesInput {
-  seriesId: string
-  name: string
-  seriesPlaylist: string
-  games: SeriesGame[]
-  iconDataUrl?: string | null
-}
-
-export interface SeriesOrderData {
-  modName: string
-  modPath: string
-  hasSeriesOrder: boolean
-  items: SeriesOrderItem[]
-}
-
-export interface LoopCandidate {
-  rank: number
-  score: number
-  loopStart: number
-  loopEnd: number
-  loopLength: number
-  loopStartStr: string
-  loopEndStr: string
-  loopLengthStr: string
-  beatAligned: boolean
-  bars: number | null
-  tempo: number
-  key: string
-  noteDistance: number
-  spectralSim: number
-  rmsDelta: number
-  seam: 'smooth' | 'good' | 'audible' | 'click'
-  note: string
-}
-
-export interface Nus3SourceTrack {
-  id: string
-  name: string
-  src: string
-  duration: string
-  durationSeconds: number
-  converted: boolean
-}
-
-export interface Nus3TrackDecision {
-  trackId: string
-  mode: 'loop' | 'end-to-end'
-  candidate?: LoopCandidate
-  status: 'accepted' | 'rejected' | 'skipped' | 'pending'
-}
-
-export interface Nus3ConversionMeta {
-  mode: 'loop' | 'end-to-end'
-  candidate?: LoopCandidate
-}
-
-export interface Nus3AnalysisResult {
-  track: Nus3SourceTrack
-  candidates: LoopCandidate[]
-}
-
-export interface LoopAnalysisOptions {
-  minLoopDuration?: number
-  minDurationMultiplier?: number
-  disablePruning?: boolean
-  force?: boolean
-}
-
-export interface VolumeRowItem {
-  originalIndex: number
-  title: string
-  filename: string
-  hasMeasurement: boolean
-  measuredLufs: number
-  autoGain: number
-  wasClamped: boolean
-  userOverride: number
-}
-
-export interface VolumeConfigData {
-  seriesName: string
-  seriesPath: string
-  globalVolumeMultiplier: number
-  targetLufs: number
-  maxMultiplier: number
-  ffmpegAvailable: boolean
-  items: VolumeRowItem[]
-}
-
-export interface VolumeOverride {
-  originalIndex: number
-  volume: number
-}
-
-export interface ExtractIconMatch {
-  seriesId: string
-  bntxPath: string
-  hasExistingIcon: boolean
-}
-
-export interface ExtractIconsAnalysis {
-  compiledModPath: string
-  modPath: string
-  modName: string
-  matched: ExtractIconMatch[]
-  unmatched: string[]
-}
-
-export interface ExtractIconsResult {
-  extracted: number
-  skipped: number
-  failed: number
-}
-
-export interface MergeSeriesSource {
-  modName: string
-  modPath: string
-  seriesPath: string
-}
-
-export interface MergeConflict {
-  seriesName: string
-  mods: string[]
-}
-
-export interface MergeAnalysis {
-  modNames: string[]
-  modPaths: string[]
-  series: { name: string; sources: MergeSeriesSource[] }[]
-  conflicts: MergeConflict[]
-  totalSeries: number
-}
-
-export interface MergeResult {
-  outputPath: string
-  outputName: string
-  totalSeries: number
-  totalTracks: number
-  conflictsResolved: number
-}
-
-export interface PlaylistInfo {
-  id: string
-  name: string
-  series: string[]
-  songCount: number
-}
-
-export interface StageSong {
-  order: number
-  bgmId: string
-  name: string
-}
-
-export interface StageInfo {
-  uiStageId: string
-  name: string
-  hidden: boolean
-  seriesId: string
-  seriesName: string
-  playlistId: string
-  playlistName: string
-  order: number
-  songs: StageSong[]
-}
-
-export interface PlaylistInfoData {
-  playlists: PlaylistInfo[]
-  stages: StageInfo[]
-}
-
-export interface PlaylistSongAssignment {
-  seriesId: string
-  seriesName: string
-  filename: string
-  title: string
-  incidence: number
-}
-
-export interface PlaylistTarget {
-  id: string
-  name: string
-  assignedCount: number
-  assignments: PlaylistSongAssignment[]
-}
-
-export interface ModSong {
-  seriesId: string
-  seriesName: string
-  filename: string
-  title: string
-}
-
-export interface ManagePlaylistsData {
-  modName: string
-  modPath: string
-  playlists: PlaylistTarget[]
-  songs: ModSong[]
-}
-
-export interface PlaylistAssignmentInput {
-  playlistId: string
-  seriesId: string
-  filename: string
-  incidence: number
-}
-
-export interface DebugPingResult {
-  ok: boolean
-  workspace: string
-}
-
-export interface WindowActionResult {
-  ok: boolean
-  action: 'minimize' | 'fullscreen' | 'close'
-  fullScreen?: boolean
+/** Subscribes to a broadcast channel; returns the unsubscribe function. */
+const subscribe = <T>(channel: string) => (cb: (value: T) => void): (() => void) => {
+  const handler = (_event: unknown, value: T): void => cb(value)
+  ipcRenderer.on(channel, handler)
+  return () => { ipcRenderer.removeListener(channel, handler) }
 }
 
 const api = {
@@ -368,16 +82,8 @@ const api = {
   getAppSettings: (): Promise<{ globalVolumeMultiplier: number }> => ipcRenderer.invoke(IPC.GET_APP_SETTINGS),
   saveAppSettings: (settings: { globalVolumeMultiplier: number }): Promise<void> => ipcRenderer.invoke(IPC.SAVE_APP_SETTINGS, settings),
   cancelAction: () => { ipcRenderer.send(IPC.CANCEL_ACTION) },
-  subscribeLogs: (cb: (line: LogLine) => void): (() => void) => {
-    const handler = (_event: unknown, line: LogLine): void => cb(line)
-    ipcRenderer.on(IPC.LOG_STREAM, handler)
-    return () => { ipcRenderer.removeListener(IPC.LOG_STREAM, handler) }
-  },
-  subscribeVolumeProgress: (cb: (progress: { completed: number; total: number; currentFile: string }) => void): (() => void) => {
-    const handler = (_event: unknown, progress: { completed: number; total: number; currentFile: string }): void => cb(progress)
-    ipcRenderer.on(IPC.VOLUME_PROGRESS, handler)
-    return () => { ipcRenderer.removeListener(IPC.VOLUME_PROGRESS, handler) }
-  },
+  subscribeLogs: subscribe<LogLine>(IPC.LOG_STREAM),
+  subscribeVolumeProgress: subscribe<VolumeProgress>(IPC.VOLUME_PROGRESS),
   windowMinimize: (): Promise<WindowActionResult> => ipcRenderer.invoke(IPC.WINDOW_MINIMIZE),
   windowFullscreen: (): Promise<WindowActionResult> => ipcRenderer.invoke(IPC.WINDOW_FULLSCREEN),
   windowClose: (): Promise<WindowActionResult> => ipcRenderer.invoke(IPC.WINDOW_CLOSE)

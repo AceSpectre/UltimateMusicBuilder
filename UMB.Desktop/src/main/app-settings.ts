@@ -1,10 +1,9 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
+import type { AppSettings } from '../shared/types'
 
-export interface AppSettings {
-  globalVolumeMultiplier: number
-}
+export type { AppSettings } from '../shared/types'
 
 const DEFAULTS: AppSettings = {
   globalVolumeMultiplier: 1.5
