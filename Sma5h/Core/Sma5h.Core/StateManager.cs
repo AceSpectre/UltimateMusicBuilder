@@ -91,7 +91,7 @@ namespace Sma5h
 
             foreach (var resource in _resources)
             {
-                var outputKey = StripMsbtLocale(resource.Key);
+                var outputKey = resource.Key;
                 var outputResourceFile = Path.Combine(outputPath, outputKey);
                 var inputResourceFile = Path.Combine(gameResourcesPath, resource.Key);
                 Directory.CreateDirectory(Path.GetDirectoryName(outputResourceFile));
