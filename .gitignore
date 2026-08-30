@@ -351,6 +351,7 @@ MigrationBackup/
 
 Temp/
 Cache/
+.DS_Store
 *.msbt
 *.bin
 *.prc
