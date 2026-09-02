@@ -3,7 +3,7 @@ import { _electron as electron } from '@playwright/test'
 import { readdirSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { firstWindow, repoRoot, copyConfiguredSeries, hasTool } from './e2e-utils'
+import { firstWindow, closeApp, repoRoot, copyConfiguredSeries, hasTool } from './e2e-utils'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 let app: ElectronApplication
@@ -27,7 +27,7 @@ test.beforeAll(async () => {
 })
 
 test.afterAll(async () => {
-  await app?.close()
+  await closeApp(app)
   series?.cleanup()
 })
 

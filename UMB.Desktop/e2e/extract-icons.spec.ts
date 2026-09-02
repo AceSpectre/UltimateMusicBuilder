@@ -1,12 +1,18 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
 import { mkdirSync, existsSync, statSync, openSync, readSync, closeSync } from 'fs'
 import { join } from 'path'
-import { createWorkspace, launchApp, firstWindow, seedTool, repoRoot, type E2EWorkspace } from './e2e-utils'
+import { createWorkspace, launchApp, firstWindow, closeApp, seedTool, repoRoot, type E2EWorkspace } from './e2e-utils'
 
 let ws: E2EWorkspace
 let app: ElectronApplication
 let modDir: string
 const compiled = () => join(repoRoot(), 'Tests', 'TestData', 'baselines', 'extract-icons-source')
+const nativeTool = () => join(
+  repoRoot(),
+  'Tools',
+  'UltimateTexCli',
+  process.platform === 'win32' ? 'ultimate_tex_cli.exe' : 'ultimate_tex_cli'
+)
 
 function pngDims(file: string): { w: number; h: number } {
   const fd = openSync(file, 'r')
@@ -27,7 +33,7 @@ test.beforeAll(async () => {
   mkdirSync(join(modDir, 'dev'), { recursive: true })
   app = await launchApp(ws)
 })
-test.afterAll(async () => { await app?.close(); ws?.cleanup() })
+test.afterAll(async () => { await closeApp(app); ws?.cleanup() })
 
 test('analyze matches series_0_dev.bntx to the dev series', async () => {
   const page = await firstWindow(app)
@@ -40,6 +46,7 @@ test('analyze matches series_0_dev.bntx to the dev series', async () => {
 })
 
 test('extract produces icon.png whose dimensions match the source icon', async () => {
+  test.skip(!existsSync(nativeTool()), `native ultimate_tex_cli missing: ${nativeTool()}`)
   const page = await firstWindow(app)
   const result = await page.evaluate(
     ([c, m]) => window.electron.umb.extractIcons(c as string, m as string, 'all'),

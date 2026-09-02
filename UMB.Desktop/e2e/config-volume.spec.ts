@@ -3,7 +3,7 @@ import { _electron as electron } from '@playwright/test'
 import { readFileSync } from 'fs'
 import { resolve, join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { firstWindow, repoRoot, copyConfiguredSeries, hasGameResources, hasTool } from './e2e-utils'
+import { firstWindow, closeApp, repoRoot, copyConfiguredSeries, hasGameResources, hasTool } from './e2e-utils'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 let app: ElectronApplication
@@ -19,7 +19,7 @@ test.beforeAll(async () => {
     env: { ...process.env, UMB_WORKSPACE: repoRoot(), NODE_ENV: 'test' }
   })
 })
-test.afterAll(async () => { await app?.close(); series?.cleanup() })
+test.afterAll(async () => { await closeApp(app); series?.cleanup() })
 
 test('analyze returns per-track LUFS + auto-gain matching the CLI gain formula', async () => {
   test.skip(

@@ -125,6 +125,7 @@
 
 <div class="h-screen w-screen flex flex-col overflow-hidden bg-background text-foreground">
   <AppBar
+    platform={window.electron.umb.platform}
     mods={mods}
     activeMod={activeMod}
     loading={modsLoading}

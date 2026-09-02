@@ -1,5 +1,5 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { createWorkspace, seedTestDataMod, launchApp, firstWindow, type E2EWorkspace } from './e2e-utils'
+import { createWorkspace, seedTestDataMod, launchApp, firstWindow, closeApp, type E2EWorkspace } from './e2e-utils'
 
 let ws: E2EWorkspace
 let app: ElectronApplication
@@ -13,15 +13,19 @@ test.beforeAll(async () => {
 })
 
 test.afterAll(async () => {
-  await app?.close()
+  await closeApp(app)
   ws?.cleanup()
 })
 
 /** Undo a minimize so later tests still interact with a visible window. */
 async function restoreWindow(): Promise<void> {
-  await app.evaluate(({ BrowserWindow }) => {
+  await app.evaluate(async ({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0]
-    if (win?.isMinimized()) win.restore()
+    if (!win?.isMinimized()) return
+    await new Promise<void>((resolveRestore) => {
+      win.once('restore', resolveRestore)
+      win.restore()
+    })
   })
 }
 
@@ -55,6 +59,7 @@ test('windowFullscreen toggles the flag and reports the new state', async () => 
 })
 
 test('app bar minimize button is wired to the IPC handler', async () => {
+  test.skip(process.platform === 'darwin', 'macOS uses native traffic-light controls')
   const page = await firstWindow(app)
 
   await page.getByLabel('Minimize window').click()
@@ -67,6 +72,7 @@ test('app bar minimize button is wired to the IPC handler', async () => {
 })
 
 test('app bar fullscreen button is wired to the IPC handler', async () => {
+  test.skip(process.platform === 'darwin', 'macOS uses native traffic-light controls')
   const page = await firstWindow(app)
 
   const before = await app.evaluate(({ BrowserWindow }) =>
@@ -82,6 +88,18 @@ test('app bar fullscreen button is wired to the IPC handler', async () => {
   await expect
     .poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isFullScreen()))
     .toBe(before)
+})
+
+test('app bar uses native window controls on macOS', async () => {
+  test.skip(process.platform !== 'darwin', 'native traffic-light controls are macOS-only')
+  const page = await firstWindow(app)
+
+  await expect(page.getByLabel('Minimize window')).toHaveCount(0)
+  await expect(page.getByLabel('Toggle fullscreen')).toHaveCount(0)
+  await expect(page.getByLabel('Close window')).toHaveCount(0)
+  expect(await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0]?.getWindowButtonPosition()
+  )).toEqual({ x: 14, y: 20 })
 })
 
 // Must be last in the file: closing the window quits the app via `window-all-closed`.

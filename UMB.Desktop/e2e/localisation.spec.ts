@@ -1,5 +1,5 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { createWorkspace, seedMod, launchApp, firstWindow, type E2EWorkspace } from './e2e-utils'
+import { createWorkspace, seedMod, launchApp, firstWindow, closeApp, type E2EWorkspace } from './e2e-utils'
 
 let ws: E2EWorkspace
 let app: ElectronApplication
@@ -13,7 +13,7 @@ test.beforeAll(async () => {
 })
 
 test.afterAll(async () => {
-  await app?.close()
+  await closeApp(app)
   ws?.cleanup()
 })
 

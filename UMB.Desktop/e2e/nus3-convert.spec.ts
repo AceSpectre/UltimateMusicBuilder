@@ -3,7 +3,7 @@ import { _electron as electron } from '@playwright/test'
 import { existsSync, statSync } from 'fs'
 import { resolve, join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { firstWindow, repoRoot, copyConfiguredSeries, hasTool } from './e2e-utils'
+import { firstWindow, closeApp, repoRoot, copyConfiguredSeries, hasTool } from './e2e-utils'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const FLAC = 'flowerhead - Somewhat Good- Karts - 13 Time Trials.flac'
@@ -27,7 +27,7 @@ test.beforeAll(async () => {
     env: { ...process.env, UMB_WORKSPACE: repoRoot(), NODE_ENV: 'test' }
   })
 })
-test.afterAll(async () => { await app?.close(); series?.cleanup() })
+test.afterAll(async () => { await closeApp(app); series?.cleanup() })
 
 test('analyze + convert produces a non-empty nus3audio and persists the decision', async () => {
   test.skip(ENCODE_DEPS_MISSING, 'requires ffmpeg + pymusiclooper + dotnet')

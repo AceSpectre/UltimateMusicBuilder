@@ -4,7 +4,7 @@ import { join } from 'path'
 // Stub electron's app (hoisted above the imports).
 vi.mock('electron', () => ({ app: { isPackaged: false } }))
 
-import { analyzeExtractIcons, extractIcons } from './extract-icons'
+import { analyzeExtractIcons, extractIcons, resolveUltimateTexCli } from './extract-icons'
 import { makeWorkspace, makeDir, writeFile, type Workspace } from './test-utils'
 
 let ws: Workspace
@@ -76,5 +76,20 @@ describe('extractIcons', () => {
     expect(lines.some((l) => l.level === 'error' && /ultimate_tex_cli not found/.test(l.message))).toBe(
       true
     )
+  })
+
+  it('selects only the executable for the requested platform', () => {
+    writeFile(join(ws.root, 'Tools', 'UltimateTexCli'), 'ultimate_tex_cli.exe', 'windows')
+    writeFile(join(ws.root, 'Tools', 'UltimateTexCli'), 'ultimate_tex_cli', 'unix')
+
+    expect(resolveUltimateTexCli(ws.root, 'win32')).toMatch(/ultimate_tex_cli\.exe$/)
+    expect(resolveUltimateTexCli(ws.root, 'darwin')).toMatch(/ultimate_tex_cli$/)
+    expect(resolveUltimateTexCli(ws.root, 'linux')).toMatch(/ultimate_tex_cli$/)
+  })
+
+  it('does not fall back to a Windows executable on macOS', () => {
+    writeFile(join(ws.root, 'Tools', 'UltimateTexCli'), 'ultimate_tex_cli.exe', 'windows')
+
+    expect(resolveUltimateTexCli(ws.root, 'darwin')).toBeNull()
   })
 })

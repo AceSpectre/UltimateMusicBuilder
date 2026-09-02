@@ -1,5 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'path'
+import { tmpdir } from 'os'
 import { listModSeries, listMods, getModStats } from './mods'
 import { loadTrackOrderData, saveTrackOrderData, type SaveTrackItem } from './order-tracks'
 import { createSeries, loadSeriesOrderData, saveSeriesOrderData, setSeriesIcon, type CreateSeriesInput, type SaveSeriesItem } from './order-series'
@@ -19,6 +20,10 @@ import { IPC } from '../shared/ipc-channels'
 
 let mainWindow: BrowserWindow | null = null
 
+if (process.env['NODE_ENV'] === 'test') {
+  app.setPath('userData', join(tmpdir(), `umb-electron-test-${process.pid}`))
+}
+
 function getWorkspacePath(): string {
   if (process.env['UMB_WORKSPACE']) {
     return resolve(process.env['UMB_WORKSPACE'])
@@ -34,13 +39,20 @@ function getWorkspacePath(): string {
 }
 
 function createWindow(): void {
+  const isMac = process.platform === 'darwin'
+
   mainWindow = new BrowserWindow({
     width: 1320,
     height: 820,
     minWidth: 900,
     minHeight: 600,
-    frame: false,
-    titleBarStyle: 'hidden',
+    ...(isMac
+      ? {
+          frame: true,
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 14, y: 20 }
+        }
+      : { frame: false }),
     backgroundColor: '#09090b',
     show: false,
     webPreferences: {
@@ -65,6 +77,28 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '..', 'renderer', 'index.html'))
   }
+}
+
+async function applyWindowState(
+  window: BrowserWindow,
+  event: 'minimize' | 'enter-full-screen' | 'leave-full-screen',
+  apply: () => void,
+  isApplied: () => boolean
+): Promise<boolean> {
+  if (isApplied()) return true
+
+  return new Promise((resolveState) => {
+    const finish = (): void => {
+      clearTimeout(timeout)
+      window.removeListener(event, finish)
+      resolveState(isApplied())
+    }
+    const timeout = setTimeout(finish, 5_000)
+
+    window.once(event, finish)
+    apply()
+    if (isApplied()) finish()
+  })
 }
 
 function registerIpcHandlers(): void {
@@ -204,18 +238,31 @@ function registerIpcHandlers(): void {
     cancelCurrentAction()
   })
 
-  ipcMain.handle(IPC.WINDOW_MINIMIZE, () => {
-    mainWindow?.minimize()
-    return { ok: true, action: 'minimize' }
+  ipcMain.handle(IPC.WINDOW_MINIMIZE, async () => {
+    if (!mainWindow) return { ok: false, action: 'minimize' }
+
+    const minimized = await applyWindowState(
+      mainWindow,
+      'minimize',
+      () => mainWindow?.minimize(),
+      () => mainWindow?.isMinimized() ?? false
+    )
+    return { ok: minimized, action: 'minimize' }
   })
 
-  ipcMain.handle(IPC.WINDOW_FULLSCREEN, () => {
+  ipcMain.handle(IPC.WINDOW_FULLSCREEN, async () => {
     if (!mainWindow) {
       return { ok: false, action: 'fullscreen' }
     }
 
-    mainWindow.setFullScreen(!mainWindow.isFullScreen())
-    return { ok: true, action: 'fullscreen', fullScreen: mainWindow.isFullScreen() }
+    const fullScreen = !mainWindow.isFullScreen()
+    const applied = await applyWindowState(
+      mainWindow,
+      fullScreen ? 'enter-full-screen' : 'leave-full-screen',
+      () => mainWindow?.setFullScreen(fullScreen),
+      () => mainWindow?.isFullScreen() === fullScreen
+    )
+    return { ok: applied, action: 'fullscreen', fullScreen: mainWindow.isFullScreen() }
   })
 
   ipcMain.handle(IPC.WINDOW_CLOSE, () => {

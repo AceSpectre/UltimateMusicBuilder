@@ -1,7 +1,7 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
-import { createWorkspace, seedTestDataMod, launchApp, firstWindow, type E2EWorkspace } from './e2e-utils'
+import { createWorkspace, seedTestDataMod, launchApp, firstWindow, closeApp, type E2EWorkspace } from './e2e-utils'
 
 let ws: E2EWorkspace
 let app: ElectronApplication
@@ -16,7 +16,7 @@ test.beforeAll(async () => {
   writeFileSync(join(gamma, 'tracks.csv'), 'filename,title,game\ng.flac,G,Gamma\n', 'utf8')
   app = await launchApp(ws)
 })
-test.afterAll(async () => { await app?.close(); ws?.cleanup() })
+test.afterAll(async () => { await closeApp(app); ws?.cleanup() })
 
 test('loadSeriesOrder lists custom series; dev pre-ordered by series-order.toml', async () => {
   const page = await firstWindow(app)

@@ -376,6 +376,7 @@ stages_dump.csv
 # UMB.Desktop (Electron)
 UMB.Desktop/dist/
 UMB.Desktop/out/
+UMB.Desktop/design-mockups/
 
 # Generated test/coverage output
 UMB.Desktop/coverage/

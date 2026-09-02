@@ -26,12 +26,16 @@ jobs:
       - run: npm run test
 
   e2e:
-    name: Playwright E2E
+    name: Playwright E2E (${{ matrix.os }})
     # Heavy specs (build-differential, playlist-info, config-volume LUFS, nus3-convert)
     # auto-skip here: they need un-committed game resources + ffmpeg/pymusiclooper that
     # aren't on the runner. The portable subset (order/merge/extract-icons/boot/locale)
-    # runs for real. Full suite runs locally on Windows with resources + tools present.
-    runs-on: windows-latest
+    # runs for real. Full suite runs locally with resources + tools present.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
     if: github.event_name == 'push' || github.event.pull_request.draft == false
     defaults:
       run:
@@ -46,6 +50,23 @@ jobs:
           cache-dependency-path: UMB.Desktop/package-lock.json
 
       - run: npm ci
+
+      - name: Install native icon extraction tool (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          case "$(uname -m)" in
+            arm64) asset=ultimate_tex_cli_macos_apple_silicon.zip ;;
+            x86_64) asset=ultimate_tex_cli_macos_intel.zip ;;
+            *) echo "Unsupported macOS architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          mkdir -p ../Tools/UltimateTexCli
+          curl -fL --retry 3 \
+            "https://github.com/ScanMountGoat/ultimate_tex/releases/download/0.3.1/$asset" \
+            -o "$RUNNER_TEMP/ultimate_tex_cli.zip"
+          unzip -qo "$RUNNER_TEMP/ultimate_tex_cli.zip" -d ../Tools/UltimateTexCli
+          chmod +x ../Tools/UltimateTexCli/ultimate_tex_cli
+
       # test:e2e builds first via the pretest hook, so the suite can never run
       # against a stale dist/. A globalSetup staleness check backs this up.
       - run: npm run test:e2e

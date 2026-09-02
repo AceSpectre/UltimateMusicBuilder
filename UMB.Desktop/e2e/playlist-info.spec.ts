@@ -1,6 +1,6 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
 import { _electron as electron } from '@playwright/test'
-import { firstWindow, repoRoot, hasGameResources } from './e2e-utils'
+import { firstWindow, closeApp, repoRoot, hasGameResources } from './e2e-utils'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -15,7 +15,7 @@ test.beforeAll(async () => {
     env: { ...process.env, UMB_WORKSPACE: repoRoot(), NODE_ENV: 'test' }
   })
 })
-test.afterAll(async () => { await app?.close() })
+test.afterAll(async () => { await closeApp(app) })
 
 test('getPlaylistInfo parses vanilla playlists and stages', async () => {
   const page = await firstWindow(app)

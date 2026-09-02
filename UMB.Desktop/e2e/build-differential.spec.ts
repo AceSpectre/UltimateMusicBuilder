@@ -3,7 +3,7 @@ import { _electron as electron } from '@playwright/test'
 import { rmSync, existsSync } from 'fs'
 import { resolve, join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { firstWindow, hasGameResources, hasTool } from './e2e-utils'
+import { firstWindow, closeApp, hasGameResources, hasTool } from './e2e-utils'
 import { prepareIsolatedBuild, runCliBuild, snapshot, type IsolatedBuild } from './build-harness'
 import { compareDirs, formatReport } from './baseline-compare'
 
@@ -32,7 +32,7 @@ test.beforeAll(async () => {
 })
 
 test.afterAll(async () => {
-  await app?.close()
+  await closeApp(app)
   // retry once: dotnet may still lock the temp dir
   try {
     build?.cleanup()

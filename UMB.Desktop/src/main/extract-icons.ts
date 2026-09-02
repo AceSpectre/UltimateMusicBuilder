@@ -10,20 +10,17 @@ export type { ExtractIconMatch, ExtractIconsAnalysis, ExtractIconsResult } from 
 
 const BNTX_PREFIX = 'series_0_'
 
-function resolveUltimateTexCli(workspace: string): string | null {
+export function resolveUltimateTexCli(
+  workspace: string,
+  platform: NodeJS.Platform = process.platform
+): string | null {
   // Tools/ lives in the shared workspace root in both dev and packaged builds
   // (the release archive ships Tools/ next to the standalone CLI at <root>).
   const toolsDir = resolve(workspace, 'Tools')
 
-  const candidates = [
-    join(toolsDir, 'UltimateTexCli', 'ultimate_tex_cli.exe'),
-    join(toolsDir, 'UltimateTexCli', 'ultimate_tex_cli')
-  ]
-
-  for (const c of candidates) {
-    if (existsSync(c)) return c
-  }
-  return null
+  const filename = platform === 'win32' ? 'ultimate_tex_cli.exe' : 'ultimate_tex_cli'
+  const candidate = join(toolsDir, 'UltimateTexCli', filename)
+  return existsSync(candidate) ? candidate : null
 }
 
 function tryFixOverMipmapBntx(sourceBytes: Buffer): { patched: Buffer; oldMip: number; newMip: number } | null {

@@ -6,6 +6,8 @@ import { join, resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+const initialPages = new WeakMap<ElectronApplication, Page>()
+const FIRST_WINDOW_TIMEOUT = process.platform === 'darwin' ? 60_000 : 30_000
 
 export interface E2EWorkspace {
   root: string
@@ -40,7 +42,7 @@ export function seedMod(
 
 export async function launchApp(workspace: E2EWorkspace): Promise<ElectronApplication> {
   const mainPath = resolve(__dirname, '..', 'dist', 'main', 'index.js')
-  return electron.launch({
+  const app = await electron.launch({
     args: [mainPath],
     env: {
       ...process.env,
@@ -48,12 +50,46 @@ export async function launchApp(workspace: E2EWorkspace): Promise<ElectronApplic
       NODE_ENV: 'test'
     }
   })
+
+  try {
+    const page = await app.firstWindow({ timeout: FIRST_WINDOW_TIMEOUT })
+    await page.waitForLoadState('domcontentloaded')
+    initialPages.set(app, page)
+    return app
+  } catch (error) {
+    await closeApp(app)
+    throw error
+  }
 }
 
 export async function firstWindow(app: ElectronApplication): Promise<Page> {
-  const page = await app.firstWindow()
+  const existing = initialPages.get(app)
+  if (existing) return existing
+
+  const page = await app.firstWindow({ timeout: FIRST_WINDOW_TIMEOUT })
   await page.waitForLoadState('domcontentloaded')
+  initialPages.set(app, page)
   return page
+}
+
+export async function closeApp(app: ElectronApplication | undefined): Promise<void> {
+  if (!app) return
+
+  const process = app.process()
+  const exited = process.exitCode !== null
+    ? Promise.resolve()
+    : new Promise<void>((resolveExit) => { process.once('exit', () => resolveExit()) })
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timedOut = new Promise<boolean>((resolveTimeout) => {
+    timer = setTimeout(() => resolveTimeout(true), 10_000)
+  })
+  void app.evaluate(({ app: electronApp }) => electronApp.quit()).catch(() => undefined)
+  const didTimeOut = await Promise.race([exited.then(() => false), timedOut])
+  if (timer) clearTimeout(timer)
+  if (didTimeOut) {
+    process.kill('SIGKILL')
+    await exited
+  }
 }
 
 /** Walks up from this file to the UltimateMusicBuilder working tree (contains Sma5h.sln). */

@@ -27,9 +27,16 @@ function parseLogLine(raw: string): LogLine {
 }
 
 /** Resolves the CLI command + arg list for the current package mode. */
+export function packagedCliPath(
+  resourcesPath: string,
+  platform: NodeJS.Platform = process.platform
+): string {
+  return join(resourcesPath, 'cli', platform === 'win32' ? 'UMB.CLI.exe' : 'UMB.CLI')
+}
+
 function cliInvocation(workspace: string, trailing: string[]): { command: string; args: string[] } {
   if (app.isPackaged) {
-    return { command: join(process.resourcesPath, 'cli', 'UMB.CLI.exe'), args: trailing }
+    return { command: packagedCliPath(process.resourcesPath), args: trailing }
   }
   return {
     command: 'dotnet',
