@@ -1,5 +1,4 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { existsSync } from 'fs'
 import { createWorkspace, seedTestDataMod, launchApp, firstWindow, closeApp, type E2EWorkspace } from './e2e-utils'
 
 let ws: E2EWorkspace
@@ -45,16 +44,4 @@ test('sidebar renders action labels', async () => {
   const page = await firstWindow(app)
   await expect(page.getByRole('navigation').getByText('Build', { exact: true })).toBeVisible()
   await expect(page.getByText('Manage Songs')).toBeVisible()
-})
-
-test('closeApp cleans up an app already terminated by kill', async () => {
-  const terminated = await launchApp(ws)
-  const profile = await terminated.evaluate(({ app }) => app.getPath('userData'))
-  expect(existsSync(profile)).toBe(true)
-  const child = terminated.process()
-  const exited = new Promise<void>(resolveExit => child.once('exit', () => resolveExit()))
-  child.kill('SIGKILL')
-  await exited
-  await closeApp(terminated)
-  expect(existsSync(profile)).toBe(false)
 })

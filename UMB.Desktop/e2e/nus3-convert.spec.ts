@@ -1,11 +1,8 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { _electron as electron } from '@playwright/test'
 import { existsSync, statSync } from 'fs'
-import { resolve, join, dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { firstWindow, closeApp, repoRoot, copyConfiguredSeries, hasTool } from './e2e-utils'
+import { join } from 'path'
+import { launchApp, firstWindow, closeApp, repoRoot, copyConfiguredSeries, hasTool } from './e2e-utils'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
 const FLAC = 'flowerhead - Somewhat Good- Karts - 13 Time Trials.flac'
 const NUS3 = 'flowerhead - Somewhat Good- Karts - 13 Time Trials.nus3audio'
 const BASELINE_SIZE = 855544
@@ -21,11 +18,7 @@ test.describe.configure({ timeout: 240_000 }) // pymusiclooper + VGAudio + daemo
 
 test.beforeAll(async () => {
   series = copyConfiguredSeries('dev')
-  const mainPath = resolve(__dirname, '..', 'dist', 'main', 'index.js')
-  app = await electron.launch({
-    args: [mainPath],
-    env: { ...process.env, UMB_WORKSPACE: repoRoot(), NODE_ENV: 'test' }
-  })
+  app = await launchApp(repoRoot())
 })
 test.afterAll(async () => { await closeApp(app); series?.cleanup() })
 

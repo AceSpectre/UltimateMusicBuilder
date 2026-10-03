@@ -58,11 +58,9 @@ namespace Tests.Unit.Desktop
             Assert.Empty(_service.ListModSeries(Path.Combine(_ws.Root, "elsewhere")));
         }
 
-        [Fact]
+        [UnixFact]
         public void ListModSeries_AcceptsASymlinkToTheModsFolder()
         {
-            if (OperatingSystem.IsWindows()) return;
-
             _ws.WriteSeries("persona", "persona", Csv);
             var alias = Path.Combine(_ws.Root, "mods-alias");
             Directory.CreateSymbolicLink(alias, _ws.ModsRoot);
@@ -70,11 +68,9 @@ namespace Tests.Unit.Desktop
             Assert.Equal(new[] { "persona" }, _service.ListModSeries(Path.Combine(alias, "persona")).Select(s => s.Name));
         }
 
-        [Fact]
+        [UnixFact]
         public void ListModSeries_RejectsASymlinkOutsideTheModsFolder()
         {
-            if (OperatingSystem.IsWindows()) return;
-
             var outside = Path.Combine(_ws.Root, "elsewhere");
             DesktopWorkspace.WriteFile(Path.Combine(outside, "persona"), "tracks.csv", Csv);
             var alias = Path.Combine(_ws.ModsRoot, "escaped");

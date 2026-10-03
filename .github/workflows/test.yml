@@ -116,5 +116,6 @@ jobs:
           unzip -qo "$RUNNER_TEMP/ultimate_tex_cli.zip" -d ../Tools/UltimateTexCli
           chmod +x ../Tools/UltimateTexCli/ultimate_tex_cli
 
-      # Build the CLI and desktop before E2E.
+      # test:e2e builds the CLI and the app first via the pretest hook, so the suite can never
+      # run against a stale dist/. A globalSetup staleness check backs this up.
       - run: npm run test:e2e

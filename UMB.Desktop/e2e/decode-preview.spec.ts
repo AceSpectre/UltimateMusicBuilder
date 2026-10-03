@@ -1,11 +1,7 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { _electron as electron } from '@playwright/test'
 import { readdirSync } from 'fs'
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { firstWindow, closeApp, repoRoot, copyConfiguredSeries, hasTool } from './e2e-utils'
+import { launchApp, firstWindow, closeApp, repoRoot, copyConfiguredSeries, hasTool } from './e2e-utils'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
 let app: ElectronApplication
 let series: { dir: string; cleanup(): void }
 
@@ -18,12 +14,8 @@ test.describe.configure({ timeout: 240_000 }) // dotnet run + daemon bootstrap
 
 test.beforeAll(async () => {
   series = copyConfiguredSeries('dev')
-  const mainPath = resolve(__dirname, '..', 'dist', 'main', 'index.js')
-  app = await electron.launch({
-    args: [mainPath],
-    // repoRoot: daemon spawns dotnet run --project <workspace>/UMB.CLI
-    env: { ...process.env, UMB_WORKSPACE: repoRoot(), NODE_ENV: 'test' }
-  })
+  // repoRoot: daemon spawns dotnet run --project <workspace>/UMB.CLI
+  app = await launchApp(repoRoot())
 })
 
 test.afterAll(async () => {

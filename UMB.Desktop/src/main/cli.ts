@@ -34,6 +34,11 @@ export function packagedCliPath(
   return join(resourcesPath, 'cli', platform === 'win32' ? 'UMB.CLI.exe' : 'UMB.CLI')
 }
 
+/**
+ * Resolves the CLI command + arg list for the current package mode. In dev it runs the CLI
+ * built by `npm run build:cli`: the workspace's own UMB.CLI when it has one (as the repo
+ * does), otherwise the app's repo (dist/main → repo root), so any folder can be the workspace.
+ */
 function cliInvocation(workspace: string, trailing: string[]): { command: string; args: string[] } {
   if (app.isPackaged) {
     return { command: packagedCliPath(process.resourcesPath), args: trailing }

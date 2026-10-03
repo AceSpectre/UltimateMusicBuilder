@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const initialPages = new WeakMap<ElectronApplication, Page>()
+/** Each app's temp userData dir (see index.ts), read at launch so closeApp can delete it. */
+const profiles = new WeakMap<ElectronApplication, string>()
 const FIRST_WINDOW_TIMEOUT = process.platform === 'darwin' ? 60_000 : 30_000
 
 export interface E2EWorkspace {
@@ -40,18 +42,19 @@ export function seedMod(
   return dir
 }
 
-export async function launchApp(workspace: E2EWorkspace): Promise<ElectronApplication> {
+export async function launchApp(workspace: E2EWorkspace | string): Promise<ElectronApplication> {
   const mainPath = resolve(__dirname, '..', 'dist', 'main', 'index.js')
   const app = await electron.launch({
     args: [mainPath],
     env: {
       ...process.env,
-      UMB_WORKSPACE: workspace.root,
+      UMB_WORKSPACE: typeof workspace === 'string' ? workspace : workspace.root,
       NODE_ENV: 'test'
     }
   })
 
   try {
+    profiles.set(app, await app.evaluate(({ app: electronApp }) => electronApp.getPath('userData')))
     await firstWindow(app)
     return app
   } catch (error) {
@@ -73,10 +76,10 @@ export async function firstWindow(app: ElectronApplication): Promise<Page> {
 export async function closeApp(app: ElectronApplication | undefined): Promise<void> {
   if (!app) return
 
-  const process = app.process()
-  const exited = process.exitCode !== null || process.signalCode !== null
+  const child = app.process()
+  const exited = child.exitCode !== null || child.signalCode !== null
     ? Promise.resolve()
-    : new Promise<void>((resolveExit) => { process.once('exit', () => resolveExit()) })
+    : new Promise<void>((resolveExit) => { child.once('exit', () => resolveExit()) })
   let timer: ReturnType<typeof setTimeout> | undefined
   const timedOut = new Promise<boolean>((resolveTimeout) => {
     timer = setTimeout(() => resolveTimeout(true), 10_000)
@@ -85,13 +88,23 @@ export async function closeApp(app: ElectronApplication | undefined): Promise<vo
   const didTimeOut = await Promise.race([exited.then(() => false), timedOut])
   if (timer) clearTimeout(timer)
   if (didTimeOut) {
-    process.kill('SIGKILL')
+    child.kill('SIGKILL')
     await exited
   }
   initialPages.delete(app)
-  rmSync(join(tmpdir(), `umb-electron-test-${process.pid}`), {
-    recursive: true, force: true, maxRetries: 3, retryDelay: 100
-  })
+
+  const profile = profiles.get(app)
+  if (!profile) return
+  // Chromium helpers (e.g. crashpad) can outlive the main process on Windows and keep
+  // writing to the profile, so retry until it stays gone.
+  for (let attempt = 0; attempt < 20 && existsSync(profile); attempt++) {
+    if (attempt > 0) await new Promise((resolveDelay) => setTimeout(resolveDelay, 250))
+    try {
+      rmSync(profile, { recursive: true, force: true })
+    } catch {
+      // Still locked; retry.
+    }
+  }
 }
 
 /** Walks up from this file to the UltimateMusicBuilder working tree (contains Sma5h.sln). */

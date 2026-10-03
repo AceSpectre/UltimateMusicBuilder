@@ -30,6 +30,8 @@ EOF
 done
 
 have() { command -v "$1" >/dev/null 2>&1; }
+# pipx < 1.1 (e.g. Ubuntu 22.04) has no `environment --value`.
+pipx_bin_dir() { pipx environment --value PIPX_BIN_DIR 2>/dev/null || printf '%s\n' "${PIPX_BIN_DIR:-$HOME/.local/bin}"; }
 fail() { printf 'Setup failed: %s\n' "$*" >&2; exit 1; }
 run() {
     printf '  '
@@ -115,13 +117,13 @@ else
 fi
 
 if have pipx; then
-    export PATH="$(pipx environment --value PIPX_BIN_DIR):$PATH"
+    PATH="$(pipx_bin_dir):$PATH"
 fi
 if ! have pymusiclooper; then
     if ! have pipx; then install_package pipx; fi
     if (( ! DRY_RUN )); then
         have pipx || fail 'pipx was installed but is not on PATH. Open a new terminal and rerun setup.'
-        export PATH="$(pipx environment --value PIPX_BIN_DIR):$PATH"
+        PATH="$(pipx_bin_dir):$PATH"
     fi
     if ! have pymusiclooper; then run pipx install pymusiclooper; fi
     run pipx ensurepath

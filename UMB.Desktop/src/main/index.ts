@@ -26,6 +26,8 @@ function getWorkspacePath(): string {
     return resolve(process.env['UMB_WORKSPACE'])
   }
   if (app.isPackaged) {
+    // Workspace is the release root holding both the desktop/ subfolder and the standalone
+    // CLI, so the GUI and the CLI share the same Resources/, Mods/, ArcOutput/.
     return packagedWorkspacePath(process.resourcesPath)
   }
   return resolve(__dirname, '..', '..', '..')
@@ -73,25 +75,26 @@ function createWindow(): void {
 }
 
 async function applyWindowState(
-  window: BrowserWindow,
+  window: NodeJS.EventEmitter,
   event: 'minimize' | 'enter-full-screen' | 'leave-full-screen',
   apply: () => void,
   isApplied: () => boolean
 ): Promise<boolean> {
   if (isApplied()) return true
 
-  return new Promise((resolveState) => {
-    const finish = (): void => {
-      clearTimeout(timeout)
-      window.removeListener(event, finish)
-      resolveState(isApplied())
-    }
-    const timeout = setTimeout(finish, 5_000)
-
-    window.once(event, finish)
+  // Windows applies the change synchronously; macOS animates it, so wait for the event there.
+  let changed!: () => void
+  const settled = new Promise<void>((resolveChange) => { changed = resolveChange })
+  const timeout = setTimeout(changed, 5_000)
+  window.on(event, changed)
+  try {
     apply()
-    if (isApplied()) finish()
-  })
+    if (!isApplied()) await settled
+    return isApplied()
+  } finally {
+    clearTimeout(timeout)
+    window.removeListener(event, changed)
+  }
 }
 
 function registerIpcHandlers(): void {
