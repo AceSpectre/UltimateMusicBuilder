@@ -40,13 +40,13 @@ namespace UMB.CLI.Desktop
     // ── Track order ────────────────────────────────────────────────────────
     public class TrackFields
     {
-        [JsonPropertyName("title")] public string Title { get; set; } = "";
-        [JsonPropertyName("game")] public string Game { get; set; } = "";
-        [JsonPropertyName("author")] public string Author { get; set; } = "";
-        [JsonPropertyName("copyright")] public string Copyright { get; set; } = "";
+        public string Title { get; set; } = "";
+        public string Game { get; set; } = "";
+        public string Author { get; set; } = "";
+        public string Copyright { get; set; } = "";
         [JsonPropertyName("record_type")] public string RecordType { get; set; } = "original";
         [JsonPropertyName("special_category")] public string SpecialCategory { get; set; } = "";
-        [JsonPropertyName("info1")] public string Info1 { get; set; } = "";
+        public string Info1 { get; set; } = "";
         [JsonPropertyName("in_soundtest")] public string InSoundtest { get; set; } = "True";
     }
 
@@ -57,9 +57,9 @@ namespace UMB.CLI.Desktop
 
     public class DefaultTrackData
     {
-        [JsonPropertyName("game")] public string Game { get; set; } = "";
-        [JsonPropertyName("author")] public string Author { get; set; } = "";
-        [JsonPropertyName("copyright")] public string Copyright { get; set; } = "";
+        public string Game { get; set; } = "";
+        public string Author { get; set; } = "";
+        public string Copyright { get; set; } = "";
         [JsonPropertyName("record_type")] public string RecordType { get; set; } = "original";
     }
 

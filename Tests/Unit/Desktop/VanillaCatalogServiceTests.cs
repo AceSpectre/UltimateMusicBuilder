@@ -19,18 +19,10 @@ namespace Tests.Unit.Desktop
 
         public void Dispose() => _ws.Dispose();
 
-        private static string RepoRoot()
-        {
-            var dir = new DirectoryInfo(AppContext.BaseDirectory);
-            while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Sma5h.sln")))
-                dir = dir.Parent;
-            return dir?.FullName;
-        }
-
         /// <summary>A catalog over the repo's game files, or null when they aren't there.</summary>
         private VanillaCatalogService RepoCatalog()
         {
-            var root = RepoRoot();
+            var root = SuiteEnvironmentCheck.RepoRoot;
             if (root == null || !File.Exists(Path.Combine(root, "Resources", "Game", "ui", "param", "database", "ui_bgm_db.prc")))
                 return null;
 
@@ -103,7 +95,6 @@ namespace Tests.Unit.Desktop
             Assert.Equal("Battlefield", battlefield.Name);
             Assert.NotEmpty(battlefield.Songs);
             Assert.Equal(battlefield.Songs.OrderBy(s => s.Order).Select(s => s.BgmId), battlefield.Songs.Select(s => s.BgmId));
-            // Hidden "(H)" stages sort last.
             Assert.Equal(info.Stages.OrderBy(s => s.Hidden).Select(s => s.UiStageId), info.Stages.Select(s => s.UiStageId));
         }
     }

@@ -180,14 +180,8 @@ namespace UMB.CLI
                     case "nus3-convert":
                         entry.RunNus3Convert();
                         break;
-                    case "nus3-convert-batch":
-                        entry.RunNus3ConvertBatch(extraArgs?.Length > 0 ? extraArgs[0] : null);
-                        break;
                     case "accept-nus3":
                         entry.RunAcceptValidatedNus3();
-                        break;
-                    case "accept-nus3-batch":
-                        entry.RunAcceptValidatedNus3Batch(extraArgs?.Length > 0 ? extraArgs[0] : null);
                         break;
                     case "cleanup":
                         entry.RunCleanup();
@@ -215,7 +209,7 @@ namespace UMB.CLI
                         break;
                     default:
                         Console.WriteLine($"Unknown command: {action}");
-                        Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|nus3-convert-batch|accept-nus3|accept-nus3-batch|cleanup|order-series|order-tracks|config-volume|config-volume-analyze|config-volume-save|config-volume-preview|dump-stages]");
+                        Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|accept-nus3|cleanup|order-series|order-tracks|config-volume|config-volume-analyze|config-volume-save|config-volume-preview|dump-stages]");
                         return ExitUsage;
                 }
             }

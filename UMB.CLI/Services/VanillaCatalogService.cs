@@ -36,8 +36,7 @@ namespace UMB.CLI.Services
         private readonly IOptionsMonitor<Sma5hOptions> _config;
         private readonly IServiceProvider _services;
 
-        // Resource providers are resolved only when the game files exist: the PRC provider needs
-        // Resources/ParamLabels.csv, which a workspace without game resources lacks.
+        // Providers are resolved on first load, and only when the game files exist.
         public VanillaCatalogService(IOptionsMonitor<Sma5hOptions> config, IServiceProvider services)
         {
             _config = config;
@@ -90,7 +89,7 @@ namespace UMB.CLI.Services
             foreach (var entry in bgmDb.DbRootEntries.Values)
             {
                 if (!string.IsNullOrEmpty(entry.UiBgmId))
-                    bgmTitles[entry.UiBgmId] = NonEmpty(bgmMsbt.GetValueOrDefault("bgm_title_" + entry.NameId), entry.UiBgmId);
+                    bgmTitles[entry.UiBgmId] = CliUtil.FirstNonEmpty(bgmMsbt.GetValueOrDefault("bgm_title_" + entry.NameId), entry.UiBgmId);
             }
 
             var gameTitles = gameTitleDb.DbRootEntries.Values
@@ -100,7 +99,7 @@ namespace UMB.CLI.Services
                     var id = g.UiGameTitleId.StartsWith(MusicConstants.InternalIds.GAME_TITLE_ID_PREFIX)
                         ? g.UiGameTitleId[MusicConstants.InternalIds.GAME_TITLE_ID_PREFIX.Length..]
                         : g.UiGameTitleId;
-                    return new GameTitle(id, NonEmpty(titleMsbt.GetValueOrDefault("tit_" + g.NameId), id), g.UiSeriesId ?? "");
+                    return new GameTitle(id, CliUtil.FirstNonEmpty(titleMsbt.GetValueOrDefault("tit_" + g.NameId), id), g.UiSeriesId ?? "");
                 })
                 .ToList();
 
@@ -174,8 +173,6 @@ namespace UMB.CLI.Services
 
             return new PlaylistInfoData(playlists, stageInfos);
         }
-
-        private static string NonEmpty(string value, string fallback) => string.IsNullOrEmpty(value) ? fallback : value;
 
         private static PropertyInfo[] PlaylistProperties(string prefix) =>
             Enumerable.Range(0, 16).Select(i => typeof(PrcBgmPlaylistEntry).GetProperty(prefix + i)).ToArray();

@@ -25,6 +25,14 @@ namespace UMB.CLI.Services
         private static readonly string[] TrackColumns =
             { "filename", "game", "title", "author", "copyright", "record_type", "special_category", "volume", "info1", "in_soundtest", "order" };
 
+        // Values for columns a source tracks.csv doesn't have (others default to "").
+        private static readonly Dictionary<string, string> ColumnDefaults = new()
+        {
+            ["record_type"] = "original",
+            ["volume"] = "1",
+            ["in_soundtest"] = "True"
+        };
+
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
 
@@ -318,17 +326,11 @@ namespace UMB.CLI.Services
 
         private static void WriteMergedTracksCsv(string outputDir, List<CsvRow> tracks)
         {
-            static string ValueOr(CsvRow row, string column, string fallback) =>
-                row.TryGetValue(column, out var value) ? value : fallback;
-
             var rows = tracks.Select((t, i) =>
             {
                 var row = new CsvRow();
                 foreach (var column in TrackColumns)
-                    row[column] = ValueOr(t, column, "");
-                row["record_type"] = ValueOr(t, "record_type", "original");
-                row["volume"] = ValueOr(t, "volume", "1");
-                row["in_soundtest"] = ValueOr(t, "in_soundtest", "True");
+                    row[column] = t.TryGetValue(column, out var value) ? value : ColumnDefaults.GetValueOrDefault(column, "");
                 row["order"] = i.ToString(CultureInfo.InvariantCulture);
                 return row;
             });

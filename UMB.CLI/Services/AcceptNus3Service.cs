@@ -10,7 +10,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 using Spectre.Console;
 
 namespace UMB.CLI.Services
@@ -27,12 +26,6 @@ namespace UMB.CLI.Services
             _musicConfig = musicConfig;
             _logger = logger;
             _scaffold = scaffold;
-        }
-
-        public class AcceptBatchInput
-        {
-            public string SeriesPath { get; set; }
-            public bool DeleteSources { get; set; }
         }
 
         public void Run()
@@ -54,32 +47,6 @@ namespace UMB.CLI.Services
                     .AddChoices("Yes - delete source files", "No - keep source files"));
 
             AcceptCore(seriesDir, deleteSources.StartsWith("Yes"));
-        }
-
-        /// <summary>
-        /// Non-interactive entry point used by the desktop app. Reads a JSON file
-        /// of the form { "seriesPath": "...", "deleteSources": true } and accepts
-        /// every validated nus3audio in that series' songs-to-validate folder.
-        /// </summary>
-        public void RunBatch(string jsonPath)
-        {
-            if (string.IsNullOrWhiteSpace(jsonPath) || !File.Exists(jsonPath))
-            {
-                _logger.LogError("Usage: dotnet run accept-nus3-batch <input.json>");
-                return;
-            }
-
-            var input = JsonSerializer.Deserialize<AcceptBatchInput>(
-                File.ReadAllText(jsonPath),
-                CliUtil.JsonCaseInsensitive);
-
-            if (input == null || string.IsNullOrWhiteSpace(input.SeriesPath))
-            {
-                _logger.LogError("No seriesPath found in {Path}.", jsonPath);
-                return;
-            }
-
-            Accept(input.SeriesPath, input.DeleteSources);
         }
 
         /// <summary>Moves the validated .nus3audio files into the series, optionally deleting their sources.</summary>

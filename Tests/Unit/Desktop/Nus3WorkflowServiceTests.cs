@@ -14,7 +14,7 @@ namespace Tests.Unit.Desktop
         public Nus3WorkflowServiceTests()
         {
             var converter = new Nus3ConvertService(_ws.MusicOptions(), TestEnvironment.CreateLogger<Nus3ConvertService>());
-            _service = new Nus3WorkflowService(converter, TestEnvironment.CreateLogger<Nus3WorkflowService>());
+            _service = new Nus3WorkflowService(converter);
             _seriesDir = _ws.ModDir("mod", "series");
         }
 
@@ -123,7 +123,6 @@ namespace Tests.Unit.Desktop
 
             Assert.False(File.Exists(Path.Combine(ValidateDir, "w.nus3audio")));
             Assert.Equal(new[] { "k.flac" }, _service.LoadConversions(_seriesDir).Keys);
-            // Records without a loop candidate are written back without one.
             Assert.Equal("{\"k.flac\":{\"mode\":\"loop\"}}", File.ReadAllText(Path.Combine(ValidateDir, ".conversions.json")));
         }
     }

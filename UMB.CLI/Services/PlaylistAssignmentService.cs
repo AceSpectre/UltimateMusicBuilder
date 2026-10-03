@@ -124,10 +124,8 @@ namespace UMB.CLI.Services
                 if (!File.Exists(tomlPath) || !File.Exists(csvPath)) continue;
 
                 var text = File.ReadAllText(tomlPath);
-                var series = SeriesToml.TableSection(text, "series") ?? text;
-                var seriesId = SeriesToml.NonEmptyString(series, "id");
-                if (seriesId == null) continue;
-                var seriesName = SeriesToml.NonEmptyString(series, "name") ?? seriesId;
+                var header = SeriesToml.ReadHeader(text);
+                if (header.Id == null) continue;
 
                 var tracks = TracksCsv.ReadLenient(csvPath)
                     .Where(r => r.Get("filename").Length > 0)
@@ -135,7 +133,7 @@ namespace UMB.CLI.Services
                         r.Get("title").Length > 0 ? r.Get("title") : Path.GetFileNameWithoutExtension(r.Get("filename"))))
                     .ToList();
 
-                results.Add(new ModSeries(dir, seriesId, seriesName, tracks, ParsePlaylistBlocks(text)));
+                results.Add(new ModSeries(dir, header.Id, header.Name ?? header.Id, tracks, ParsePlaylistBlocks(text)));
             }
             return results;
         }

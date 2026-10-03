@@ -21,8 +21,13 @@ namespace UMB.CLI.Services
     /// </summary>
     public class TrackOrderService
     {
-        private static readonly string[] EditableColumns =
-            { "title", "game", "author", "copyright", "record_type", "special_category", "info1", "in_soundtest" };
+        // tracks.csv columns the desktop edits, and the field each one is written from.
+        private static readonly (string Column, Func<TrackFields, string> Value)[] EditableColumns =
+        {
+            ("title", f => f.Title), ("game", f => f.Game), ("author", f => f.Author), ("copyright", f => f.Copyright),
+            ("record_type", f => f.RecordType), ("special_category", f => f.SpecialCategory), ("info1", f => f.Info1),
+            ("in_soundtest", f => f.InSoundtest)
+        };
 
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
@@ -124,19 +129,12 @@ namespace UMB.CLI.Services
             foreach (var item in finalItems)
             {
                 if (item.OriginalIndex is not int index || !fieldsById.TryGetValue(item.Id, out var fields)) continue;
-                var row = rows[index];
-                row["title"] = fields.Title ?? "";
-                row["game"] = fields.Game ?? "";
-                row["author"] = fields.Author ?? "";
-                row["copyright"] = fields.Copyright ?? "";
-                row["record_type"] = fields.RecordType ?? "";
-                row["special_category"] = fields.SpecialCategory ?? "";
-                row["info1"] = fields.Info1 ?? "";
-                row["in_soundtest"] = fields.InSoundtest ?? "";
+                foreach (var (column, value) in EditableColumns)
+                    rows[index][column] = value(fields) ?? "";
             }
 
             var nextHeaders = headers.ToList();
-            foreach (var column in EditableColumns.Append("order"))
+            foreach (var column in EditableColumns.Select(c => c.Column).Append("order"))
             {
                 if (!nextHeaders.Contains(column)) nextHeaders.Add(column);
             }
@@ -216,25 +214,11 @@ namespace UMB.CLI.Services
                 return new SeriesInfo(null, false, new List<SeriesGame>(), null);
 
             var text = File.ReadAllText(path);
-            var id = Regex.Match(text, @"^id\s*=\s*""([^""]+)""", RegexOptions.Multiline);
-            var existing = Regex.Match(text, @"^existing-series\s*=\s*(true|false)", RegexOptions.Multiline);
-
-            DefaultTrackData defaults = null;
-            var section = SeriesToml.TableSection(text, "default-track-data");
-            if (section != null)
-            {
-                var recordType = SeriesToml.String(section, "record-type");
-                defaults = new DefaultTrackData
-                {
-                    Game = SeriesToml.String(section, "game"),
-                    Author = SeriesToml.String(section, "author"),
-                    Copyright = SeriesToml.String(section, "copyright"),
-                    RecordType = recordType.Length > 0 ? recordType : "original"
-                };
-            }
-
-            return new SeriesInfo(id.Success ? id.Groups[1].Value : null,
-                existing.Success && existing.Groups[1].Value == "true", SeriesToml.Games(text), defaults);
+            var header = SeriesToml.ReadHeader(text);
+            var defaults = SeriesToml.ReadDefaults(text) is { } d
+                ? new DefaultTrackData { Game = d.Game, Author = d.Author, Copyright = d.Copyright, RecordType = d.RecordType }
+                : null;
+            return new SeriesInfo(header.Id, header.ExistingSeries, SeriesToml.Games(text), defaults);
         }
 
         /// <summary>Appends [[games]] blocks for known game ids used by rows but not yet declared.</summary>
@@ -265,7 +249,7 @@ namespace UMB.CLI.Services
             return rows.Select((row, index) =>
             {
                 var filename = row.Get("filename");
-                var title = FirstNonEmpty(row.Get("title"), filename, $"Track {index + 1}");
+                var title = CliUtil.FirstNonEmpty(row.Get("title"), filename, $"Track {index + 1}");
                 var game = row.Get("game");
                 var bgmId = filename.Length > 0
                     ? MusicConstants.InternalIds.UI_BGM_ID_PREFIX + FolderMusicMod.DeriveToneId(filename)
@@ -281,10 +265,10 @@ namespace UMB.CLI.Services
             Game = row.Get("game"),
             Author = row.Get("author"),
             Copyright = row.Get("copyright"),
-            RecordType = FirstNonEmpty(row.Get("record_type"), "original"),
+            RecordType = CliUtil.FirstNonEmpty(row.Get("record_type"), "original"),
             SpecialCategory = row.Get("special_category"),
             Info1 = row.Get("info1"),
-            InSoundtest = FirstNonEmpty(row.Get("in_soundtest"), "True")
+            InSoundtest = CliUtil.FirstNonEmpty(row.Get("in_soundtest"), "True")
         };
 
         /// <summary>
@@ -331,7 +315,5 @@ namespace UMB.CLI.Services
             string.Join(" ", Regex.Replace(bgmId, "^ui_bgm_", "")
                 .Split('_', StringSplitOptions.RemoveEmptyEntries)
                 .Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
-
-        private static string FirstNonEmpty(params string[] values) => values.First(v => !string.IsNullOrEmpty(v));
     }
 }

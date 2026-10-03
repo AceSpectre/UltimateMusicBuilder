@@ -19,6 +19,8 @@ namespace UMB.CLI.Services
     /// <summary>Reads and writes tracks.csv with every column and cell preserved.</summary>
     public static class TracksCsv
     {
+        private static readonly char[] CharsNeedingQuotes = { ',', '"', '\r', '\n' };
+
         /// <summary>Untrimmed read for lossless round-trips, with the header order.</summary>
         public static (List<CsvRow> rows, string[] headers) Read(string csvPath) => Read(csvPath, TrimOptions.None);
 
@@ -35,7 +37,7 @@ namespace UMB.CLI.Services
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
             {
                 NewLine = "\n",
-                ShouldQuote = args => args.Field != null && args.Field.IndexOfAny(new[] { ',', '"', '\r', '\n' }) >= 0
+                ShouldQuote = args => args.Field != null && args.Field.IndexOfAny(CharsNeedingQuotes) >= 0
             };
             using var writer = new StreamWriter(csvPath);
             using var csv = new CsvWriter(writer, config);

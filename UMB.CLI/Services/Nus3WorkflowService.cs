@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using Sma5h.Helpers;
 using System;
 using System.Collections.Generic;
@@ -25,12 +24,10 @@ namespace UMB.CLI.Services
         private static readonly LoopAnalysisOptions RelaxedOptions = new() { MinLoopDuration = 2, DisablePruning = true };
 
         private readonly Nus3ConvertService _converter;
-        private readonly ILogger _logger;
 
-        public Nus3WorkflowService(Nus3ConvertService converter, ILogger<Nus3WorkflowService> logger)
+        public Nus3WorkflowService(Nus3ConvertService converter)
         {
             _converter = converter;
-            _logger = logger;
         }
 
         /// <summary>Source audio files in the series that haven't been accepted yet.</summary>
@@ -59,7 +56,7 @@ namespace UMB.CLI.Services
             if (options.Force != true && CacheEntryFor(seriesDir, filename) is { Candidates.Count: > 0 } cached)
                 return new Nus3AnalysisResult(SourceTrack(seriesDir, filename, cached.Duration, cached.DurationSeconds), cached.Candidates);
 
-            var (sampleRate, duration) = ProbeQuietly(filePath);
+            var (sampleRate, duration) = AudioTools.Probe(filePath);
             var track = SourceTrack(seriesDir, filename, duration > 0 ? FormatDuration(duration) : "0:00", duration);
 
             var candidates = FindCandidates(filePath, sampleRate, options);
@@ -83,7 +80,7 @@ namespace UMB.CLI.Services
             if (CacheEntryFor(seriesDir, filename) is { DurationSeconds: > 0 } cached)
                 return cached.DurationSeconds;
 
-            var duration = ProbeQuietly(filePath).Duration;
+            var duration = AudioTools.Probe(filePath).Duration;
             if (duration > 0)
                 UpdateCacheEntry(seriesDir, filename, e => { e.Duration = FormatDuration(duration); e.DurationSeconds = duration; });
             return duration;
@@ -131,7 +128,6 @@ namespace UMB.CLI.Services
         /// </summary>
         public string GenerateLoopPreview(string filePath, double loopStartSec, double loopEndSec, double previewLength)
         {
-            Track(filePath);
             var outputWav = Path.Combine(Path.GetTempPath(), $"umb-preview-{Guid.NewGuid():N}.wav");
             try
             {
@@ -196,19 +192,9 @@ namespace UMB.CLI.Services
                 WriteJson(ConversionsPath(seriesDir), conversions);
         }
 
-        private List<LoopCandidate> FindCandidates(string filePath, int sampleRate, LoopAnalysisOptions options)
+        private static List<LoopCandidate> FindCandidates(string filePath, int sampleRate, LoopAnalysisOptions options)
         {
-            List<AudioTools.RawLoop> loops;
-            try
-            {
-                loops = AudioTools.FindLoops(filePath, options);
-            }
-            catch (Exception ex) when (ex is TimeoutException or System.ComponentModel.Win32Exception)
-            {
-                _logger.LogWarning("pymusiclooper failed for {File}: {Message}", filePath, ex.Message);
-                return new List<LoopCandidate>();
-            }
-
+            var loops = AudioTools.FindLoops(filePath, options);
             var rate = sampleRate > 0 ? sampleRate : ConversionSampleRate;
             return loops.Select((loop, i) =>
             {
@@ -231,12 +217,6 @@ namespace UMB.CLI.Services
                     Note = i == 0 ? "best match" : ""
                 };
             }).ToList();
-        }
-
-        private static (int SampleRate, double Duration) ProbeQuietly(string filePath)
-        {
-            try { return AudioTools.Probe(filePath); }
-            catch (Exception ex) when (ex is TimeoutException or System.ComponentModel.Win32Exception) { return (0, 0); }
         }
 
         private (string seriesDir, string filename) Track(string filePath)

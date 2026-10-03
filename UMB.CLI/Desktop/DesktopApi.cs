@@ -25,8 +25,7 @@ namespace UMB.CLI.Desktop
         private readonly Dictionary<string, Func<JsonElement, object>> _handlers;
         private readonly ILogger _logger;
 
-        // Services are resolved per call, so an action only constructs what it needs (some services,
-        // e.g. scaffolding, need game resources that a fresh workspace doesn't have).
+        // Services are resolved per call so an action constructs only what it uses.
         public DesktopApi(IServiceProvider services, ILogger<DesktopApi> logger)
         {
             _logger = logger;

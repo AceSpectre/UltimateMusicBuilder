@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using Tomlyn;
@@ -88,6 +89,9 @@ namespace UMB.CLI.Services
                 sb.Append(InvalidFileNameChars.Contains(c) ? '_' : c);
             return sb.ToString();
         }
+
+        /// <summary>The first value that isn't null or empty (the last one is the fallback).</summary>
+        public static string FirstNonEmpty(params string[] values) => values.FirstOrDefault(v => !string.IsNullOrEmpty(v)) ?? values[^1];
 
         public static string SanitizeFolderName(string name)
         {

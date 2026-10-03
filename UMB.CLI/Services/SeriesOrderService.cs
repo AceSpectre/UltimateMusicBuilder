@@ -114,10 +114,13 @@ namespace UMB.CLI.Services
             }
         }
 
-        public SeriesOrderData Load(string modPath)
+        public SeriesOrderData Load(string modPath) => Load(ModPaths.ResolveUnderMods(_musicConfig, modPath), out _);
+
+        /// <param name="series">The scanned series, indexed like the returned items.</param>
+        private SeriesOrderData Load(string resolvedModPath, out List<CustomSeries> series)
         {
-            var resolvedModPath = ModPaths.ResolveUnderMods(_musicConfig, modPath);
-            var items = SortedCustomSeries(resolvedModPath)
+            series = SortedCustomSeries(resolvedModPath);
+            var items = series
                 .Select((s, index) => new SeriesOrderItem($"series:{index}", s.Name, s.Id, s.IconDataUrl, index, s.Fields))
                 .ToList();
             var hasSeriesOrder = SeriesToml.ReadIdList(SeriesOrderPath(resolvedModPath)).Count > 0;
@@ -131,7 +134,7 @@ namespace UMB.CLI.Services
         public SeriesOrderData Save(string modPath, List<SaveSeriesItem> items)
         {
             var resolvedModPath = ModPaths.ResolveUnderMods(_musicConfig, modPath);
-            var data = Load(resolvedModPath);
+            var data = Load(resolvedModPath, out var series);
             var itemById = data.Items.ToDictionary(i => i.Id);
             var orderedIds = items.Select(i => i.Id).ToList();
             var finalItems = orderedIds.Where(itemById.ContainsKey).Select(id => itemById[id])
@@ -139,11 +142,10 @@ namespace UMB.CLI.Services
                 .ToList();
 
             var fieldsById = items.Where(i => i.Fields != null).ToDictionary(i => i.Id, i => i.Fields);
-            var dirBySeriesId = ScanCustomSeries(resolvedModPath).ToDictionary(s => s.Id, s => s.Dir);
             foreach (var item in finalItems)
             {
-                if (fieldsById.TryGetValue(item.Id, out var fields) && dirBySeriesId.TryGetValue(item.SeriesId, out var dir))
-                    WriteSeriesTomlFields(Path.Combine(dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
+                if (fieldsById.TryGetValue(item.Id, out var fields))
+                    WriteSeriesTomlFields(Path.Combine(series[item.OriginalIndex].Dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
             }
 
             WriteSeriesOrder(resolvedModPath, finalItems.Select(i => i.SeriesId));
@@ -217,8 +219,9 @@ namespace UMB.CLI.Services
         private List<CustomSeries> SortedCustomSeries(string modPath)
         {
             var order = SeriesToml.ReadIdList(SeriesOrderPath(modPath));
+            int OrderIndex(string id) => order.Contains(id) ? order.IndexOf(id) : int.MaxValue;
             return ScanCustomSeries(modPath)
-                .OrderBy(s => order.IndexOf(s.Id) is var i && i >= 0 ? i : int.MaxValue)
+                .OrderBy(s => OrderIndex(s.Id))
                 .ThenBy(s => s.Name, StringComparer.InvariantCulture)
                 .ToList();
         }
@@ -234,43 +237,35 @@ namespace UMB.CLI.Services
                 var tomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
                 if (!File.Exists(tomlPath)) continue;
 
-                var config = ParseSeriesToml(File.ReadAllText(tomlPath));
-                if (config.Id == null || config.ExistingSeries) continue;
-                if (string.Equals(config.Id, "etc", StringComparison.OrdinalIgnoreCase)) continue;
+                var text = File.ReadAllText(tomlPath);
+                var header = SeriesToml.ReadHeader(text);
+                if (header.Id == null || header.ExistingSeries) continue;
+                if (string.Equals(header.Id, "etc", StringComparison.OrdinalIgnoreCase)) continue;
 
                 var iconPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
-                results.Add(new CustomSeries(seriesDir, config.Id, config.Name ?? config.Id,
-                    File.Exists(iconPath) ? iconPath : null, config.Fields));
+                results.Add(new CustomSeries(seriesDir, header.Id, header.Name ?? header.Id,
+                    File.Exists(iconPath) ? iconPath : null, ReadFields(text, header)));
             }
             return results;
         }
 
-        private record ParsedSeriesToml(string Id, string Name, bool ExistingSeries, SeriesFields Fields);
-
-        private static ParsedSeriesToml ParseSeriesToml(string text)
+        private static SeriesFields ReadFields(string text, SeriesToml.SeriesHeader header)
         {
             var series = SeriesToml.TableSection(text, "series") ?? text;
-            var defaults = SeriesToml.TableSection(text, "default-track-data") ?? "";
-
-            var id = SeriesToml.NonEmptyString(series, "id");
-            var name = SeriesToml.NonEmptyString(series, "name");
             var incidence = Regex.Match(series, @"^\s*playlist-incidence\s*=\s*(\d+)", RegexOptions.Multiline);
-            var volume = Regex.Match(defaults, @"^\s*volume\s*=\s*([0-9.]+)", RegexOptions.Multiline);
-            var existing = Regex.Match(series, @"^\s*existing-series\s*=\s*(true|false)", RegexOptions.Multiline);
-
-            var recordType = SeriesToml.String(defaults, "record-type");
-            return new ParsedSeriesToml(id, name, existing.Success && existing.Groups[1].Value == "true", new SeriesFields
+            var defaults = SeriesToml.ReadDefaults(text);
+            return new SeriesFields
             {
-                Name = name ?? id ?? "",
+                Name = header.Name ?? header.Id ?? "",
                 SeriesPlaylist = SeriesToml.String(series, "series-playlist"),
                 PlaylistIncidence = incidence.Success ? int.Parse(incidence.Groups[1].Value, CultureInfo.InvariantCulture) : 100,
                 Games = SeriesToml.Games(text),
-                DefaultGame = SeriesToml.String(defaults, "game"),
-                DefaultAuthor = SeriesToml.String(defaults, "author"),
-                DefaultCopyright = SeriesToml.String(defaults, "copyright"),
-                DefaultRecordType = recordType.Length > 0 ? recordType : "original",
-                DefaultVolume = volume.Success && double.TryParse(volume.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 1
-            });
+                DefaultGame = defaults?.Game ?? "",
+                DefaultAuthor = defaults?.Author ?? "",
+                DefaultCopyright = defaults?.Copyright ?? "",
+                DefaultRecordType = defaults?.RecordType ?? "original",
+                DefaultVolume = defaults?.Volume ?? 1
+            };
         }
 
         /// <summary>

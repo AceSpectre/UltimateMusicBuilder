@@ -66,7 +66,7 @@ Adding songs to existing series (Final Fantasy, Persona, etc.) required two fixe
 1. **Sample rate** (`Nus3ConvertService.cs`): the Namco Opus encoder only accepts
    8/12/16/24/48 kHz. Source `.wav` files were passed straight through (ffmpeg skipped),
    so a 44.1 kHz `.wav` made VGAudio print "Sample rate is invalid" and write nothing →
-   "VGAudioCli produced no output". Both `Run()` and `RunBatch()` now also run ffmpeg when a
+   "VGAudioCli produced no output". Both `Run()` and `ConvertBatch()` now also run ffmpeg when a
    `.wav` isn't already 48 kHz. VGAudio's swallowed stdout is now surfaced in the error, and a
    `Console.Out` restore leak on exception was fixed.
 2. **VGAudioCli in the release build** (`Program.cs` + `UMB.CLI.csproj`): `VGAudioCli.exe` is a

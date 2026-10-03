@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -38,10 +39,31 @@ namespace UMB.CLI.Services
         }
 
         /// <summary>Like <see cref="String"/> but null when the key is absent or empty.</summary>
-        public static string NonEmptyString(string section, string key)
+        public static string NonEmptyString(string section, string key) =>
+            String(section, key) is { Length: > 0 } value ? value : null;
+
+        public record SeriesHeader(string Id, string Name, bool ExistingSeries);
+
+        /// <summary>The [series] id, name and existing-series flag (the whole file when there is no [series] header).</summary>
+        public static SeriesHeader ReadHeader(string text)
         {
-            var match = Regex.Match(section ?? "", $@"^\s*{Regex.Escape(key)}\s*=\s*""([^""]+)""", RegexOptions.Multiline);
-            return match.Success ? match.Groups[1].Value : null;
+            var series = TableSection(text, "series") ?? text;
+            var existing = Regex.Match(series, @"^\s*existing-series\s*=\s*(true|false)", RegexOptions.Multiline);
+            return new SeriesHeader(NonEmptyString(series, "id"), NonEmptyString(series, "name"),
+                existing.Success && existing.Groups[1].Value == "true");
+        }
+
+        public record TrackDefaults(string Game, string Author, string Copyright, string RecordType, double Volume);
+
+        /// <summary>The [default-track-data] table, or null when absent.</summary>
+        public static TrackDefaults ReadDefaults(string text)
+        {
+            var section = TableSection(text, "default-track-data");
+            if (section == null) return null;
+            var volume = Regex.Match(section, @"^\s*volume\s*=\s*([0-9.]+)", RegexOptions.Multiline);
+            return new TrackDefaults(String(section, "game"), String(section, "author"), String(section, "copyright"),
+                CliUtil.FirstNonEmpty(String(section, "record-type"), "original"),
+                volume.Success && double.TryParse(volume.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 1);
         }
 
         /// <summary>The [[games]] blocks (name defaults to id).</summary>

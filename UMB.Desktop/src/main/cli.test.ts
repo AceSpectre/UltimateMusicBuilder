@@ -365,14 +365,22 @@ describe('daemon routing', () => {
 })
 
 describe('callCli', () => {
-  /** Answers each daemon request by writing `response` to the request's output file. */
-  function answerWith(response: unknown, code = 0): void {
+  /**
+   * Answers each daemon request by writing `response` to the request's output file;
+   * `onRequest` sees the parsed request first.
+   */
+  function answerWith(
+    response: unknown,
+    code = 0,
+    onRequest: (req: { action: string; args: string[] }) => void = () => {}
+  ): void {
     mocks.spawn.mockImplementation(() => {
       const proc = new FakeProc()
       proc.stdin.write.mockImplementation((line: string) => {
-        const { id, args } = JSON.parse(line)
-        if (response !== undefined) writeFileSync(args[1], JSON.stringify(response), 'utf-8')
-        setImmediate(() => proc.out(`__DONE__\t${id}\t${code}\n`))
+        const req = JSON.parse(line)
+        onRequest(req)
+        if (response !== undefined) writeFileSync(req.args[1], JSON.stringify(response), 'utf-8')
+        setImmediate(() => proc.out(`__DONE__\t${req.id}\t${code}\n`))
       })
       procs.push(proc)
       return proc
@@ -380,22 +388,13 @@ describe('callCli', () => {
   }
 
   it('sends the input as a JSON file and returns the result', async () => {
-    let input: unknown
-    mocks.spawn.mockImplementation(() => {
-      const proc = new FakeProc()
-      proc.stdin.write.mockImplementation((line: string) => {
-        const { id, action, args } = JSON.parse(line)
-        expect(action).toBe('mods-list')
-        input = JSON.parse(readFileSync(args[0], 'utf-8'))
-        writeFileSync(args[1], JSON.stringify({ result: [{ name: 'a' }] }), 'utf-8')
-        setImmediate(() => proc.out(`__DONE__\t${id}\t0\n`))
-      })
-      procs.push(proc)
-      return proc
+    let request: { action: string; input: unknown } | undefined
+    answerWith({ result: [{ name: 'a' }] }, 0, ({ action, args }) => {
+      request = { action, input: JSON.parse(readFileSync(args[0], 'utf-8')) }
     })
 
     expect(await cli.callCli(WS, 'mods-list', { modPath: 'x' })).toEqual([{ name: 'a' }])
-    expect(input).toEqual({ modPath: 'x' })
+    expect(request).toEqual({ action: 'mods-list', input: { modPath: 'x' } })
   })
 
   it('throws the error reported by the CLI', async () => {
@@ -415,16 +414,8 @@ describe('callCli', () => {
 
   it('removes its temp files', async () => {
     let paths: string[] = []
-    mocks.spawn.mockImplementation(() => {
-      const proc = new FakeProc()
-      proc.stdin.write.mockImplementation((line: string) => {
-        const { id, args } = JSON.parse(line)
-        paths = args
-        writeFileSync(args[1], JSON.stringify({ result: true }), 'utf-8')
-        setImmediate(() => proc.out(`__DONE__\t${id}\t0\n`))
-      })
-      procs.push(proc)
-      return proc
+    answerWith({ result: true }, 0, ({ args }) => {
+      paths = args
     })
 
     await cli.callCli(WS, 'nus3-reject', {})

@@ -7,10 +7,8 @@ using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using Spectre.Console;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
 
 namespace UMB.CLI.Services
 {
@@ -307,36 +305,15 @@ namespace UMB.CLI.Services
             _logger.LogInformation("Delete any files you don't like, then run 'Accept Validated Nus3'.");
         }
 
-        public void RunBatch(string jsonPath)
-        {
-            if (string.IsNullOrWhiteSpace(jsonPath))
-            {
-                _logger.LogError("Usage: dotnet run nus3-convert-batch <decisions.json>");
-                return;
-            }
-
-            if (!File.Exists(jsonPath))
-            {
-                _logger.LogError("JSON file not found: {Path}", jsonPath);
-                return;
-            }
-
-            var jsonText = File.ReadAllText(jsonPath);
-            var input = JsonSerializer.Deserialize<Nus3BatchInput>(jsonText,
-                CliUtil.JsonCaseInsensitive);
-
-            if (input == null || input.Decisions == null || input.Decisions.Count == 0)
-            {
-                _logger.LogError("No decisions found in {Path}.", jsonPath);
-                return;
-            }
-
-            ConvertBatch(input);
-        }
-
         /// <summary>Converts each decision's source track into songs-to-validate.</summary>
         public void ConvertBatch(Nus3BatchInput input)
         {
+            if (input.Decisions is not { Count: > 0 })
+            {
+                _logger.LogError("No conversion decisions given.");
+                return;
+            }
+
             var seriesDir = input.SeriesPath;
             if (!Directory.Exists(seriesDir))
             {
@@ -478,43 +455,18 @@ namespace UMB.CLI.Services
             }
         }
 
-        private List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)> RunPymusiclooper(string filePath)
-        {
-            try
-            {
-                return AudioTools.FindLoops(filePath)
-                    .Select(l => (l.Start, l.End, l.NoteDistance, l.LoudnessDiff, l.Score))
-                    .ToList();
-            }
-            catch (Exception e)
-            {
-                _logger.LogWarning(e, "pymusiclooper failed for {File}. Falling back to full-song loop.", filePath);
-                return new List<(long, long, double, double, double)>();
-            }
-        }
-
-        private (int SampleRate, double Duration) ProbeOrWarn(string filePath)
-        {
-            try
-            {
-                return AudioTools.Probe(filePath);
-            }
-            catch (Exception e)
-            {
-                _logger.LogWarning(e, "ffprobe failed for {File}.", filePath);
-                return (0, 0);
-            }
-        }
+        private static List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)> RunPymusiclooper(string filePath) =>
+            AudioTools.FindLoops(filePath).Select(l => (l.Start, l.End, l.NoteDistance, l.LoudnessDiff, l.Score)).ToList();
 
         private long GetWavSampleCount(string filePath)
         {
-            var (sampleRate, duration) = ProbeOrWarn(filePath);
+            var (sampleRate, duration) = AudioTools.Probe(filePath);
             return sampleRate > 0 && duration > 0 ? (long)(duration * sampleRate) : -1;
         }
 
         private int GetSourceSampleRate(string filePath)
         {
-            var sampleRate = ProbeOrWarn(filePath).SampleRate;
+            var sampleRate = AudioTools.Probe(filePath).SampleRate;
             return sampleRate > 0 ? sampleRate : -1;
         }
 

@@ -1,6 +1,7 @@
 using Sma5h.Helpers;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using UMB.CLI.Desktop;
@@ -19,19 +20,19 @@ namespace UMB.CLI.Services
 
         public static string Tool(string name) => ToolPathResolver.Resolve(null, null, name) ?? name;
 
-        /// <summary>Sample rate and duration (seconds) of the first audio stream; each 0 when unknown.</summary>
+        /// <summary>Sample rate and duration (seconds) of the first audio stream; each 0 when unknown or ffprobe fails.</summary>
         public static (int SampleRate, double Duration) Probe(string filePath)
         {
+            var output = TryRun(Tool("ffprobe"),
+                $"-v error -select_streams a:0 -show_entries stream=sample_rate:stream=duration -of csv=p=0 \"{filePath}\"");
             // Output format: "sample_rate,duration" e.g. "48000,185.365979"
-            var parts = ProcessRunner.Run(Tool("ffprobe"),
-                $"-v error -select_streams a:0 -show_entries stream=sample_rate:stream=duration -of csv=p=0 \"{filePath}\"")
-                .StandardOutput.Trim().Split(',');
+            var parts = output.Trim().Split(',');
             var rate = int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var r) ? r : 0;
             var duration = parts.Length > 1 && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0;
             return (rate, duration);
         }
 
-        /// <summary>pymusiclooper's top loop candidates, best score first.</summary>
+        /// <summary>pymusiclooper's top loop candidates, best score first; empty when it finds none or fails.</summary>
         public static List<RawLoop> FindLoops(string filePath, LoopAnalysisOptions options = null)
         {
             var args = $"export-points --path \"{filePath}\" --alt-export-top 10 --fmt samples --export-to stdout";
@@ -44,7 +45,7 @@ namespace UMB.CLI.Services
 
             var loops = new List<RawLoop>();
             // Format: loop_start loop_end note_distance loudness_difference score
-            foreach (var line in ProcessRunner.Run(Tool("pymusiclooper"), args, PymusiclooperTimeout).StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var line in TryRun(Tool("pymusiclooper"), args, PymusiclooperTimeout).Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length >= 5
@@ -60,6 +61,13 @@ namespace UMB.CLI.Services
             // pymusiclooper usually emits sorted output; re-sort defensively.
             loops.Sort((a, b) => b.Score.CompareTo(a.Score));
             return loops;
+        }
+
+        /// <summary>A tool's stdout, or "" when it can't be started or times out.</summary>
+        private static string TryRun(string tool, string arguments, TimeSpan? timeout = null)
+        {
+            try { return ProcessRunner.Run(tool, arguments, timeout).StandardOutput; }
+            catch (Exception ex) when (ex is TimeoutException or Win32Exception) { return ""; }
         }
 
         /// <summary>
