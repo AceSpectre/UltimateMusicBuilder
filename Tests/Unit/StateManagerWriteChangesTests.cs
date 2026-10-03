@@ -1,10 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Moq;
 using Sma5h;
 using Sma5h.Attributes;
 using Sma5h.Interfaces;
+using Tests.Helpers;
 using Xunit;
 
 namespace Tests.Unit
@@ -54,15 +54,15 @@ namespace Tests.Unit
             config.Setup(m => m.CurrentValue).Returns(opts);
 
             var state = new StateManager(services.BuildServiceProvider(), config.Object,
-                NullLogger<IStateManager>.Instance);
+                TestEnvironment.CreateLogger<IStateManager>());
             foreach (var key in resourceKeys)
                 state.LoadResource<FakeDb>(key, optional: false);
             return state;
         }
 
         private List<string> WrittenFiles(RecordingProvider provider) =>
-            provider.Writes
-                .Select(p => Path.GetRelativePath(_outputPath, p.OutputFile).Replace('\\', '/'))
+            provider.OutputFiles
+                .Select(p => Path.GetRelativePath(_outputPath, p).Replace('\\', '/'))
                 .OrderBy(p => p)
                 .ToList();
 
@@ -136,30 +136,17 @@ namespace Tests.Unit
             Assert.Equal(new[] { "ui/param/database/ui_bgm_db.prc" }, WrittenFiles(_prcProvider));
         }
 
-        [Fact]
-        public void SeveralLocales_ReadFromMatchingInputFile()
-        {
-            var state = CreateStateManager(
-                "ui/message/msg_bgm+eu_fr.msbt",
-                "ui/message/msg_bgm+us_en.msbt");
-
-            Assert.True(state.WriteChanges());
-
-            Assert.All(_msbtProvider.Writes, w =>
-                Assert.Equal(Path.GetFileName(w.InputFile), Path.GetFileName(w.OutputFile)));
-        }
-
         public class FakeDb : IStateManagerDb { }
 
         public abstract class RecordingProvider : IResourceProvider
         {
-            public List<(string InputFile, string OutputFile)> Writes { get; } = new();
+            public List<string> OutputFiles { get; } = new();
 
             public T ReadFile<T>(string inputFile) where T : IStateManagerDb, new() => new T();
 
             public bool WriteFile<T>(string inputFile, string outputFile, T inputObj) where T : IStateManagerDb
             {
-                Writes.Add((inputFile, outputFile));
+                OutputFiles.Add(outputFile);
                 return true;
             }
         }

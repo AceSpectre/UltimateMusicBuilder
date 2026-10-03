@@ -89,9 +89,7 @@ namespace Sma5h
 
             _logger.LogDebug("Write State Changes to {OutputPath}", _config.CurrentValue.OutputPath);
 
-            // How many loaded resources share each locale-stripped key. Only MSBTs loaded
-            // for several locales share one, and those must keep their +locale suffix or
-            // every locale would be written to the same file.
+            // MSBTs loaded for several locales keep their +locale suffix so they don't overwrite each other.
             var strippedKeyCounts = _resources.Keys
                 .GroupBy(StripMsbtLocale)
                 .ToDictionary(p => p.Key, p => p.Count());

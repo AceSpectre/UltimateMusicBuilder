@@ -80,8 +80,7 @@ Adding songs to existing series (Final Fantasy, Persona, etc.) required two fixe
 `StateManager.WriteChanges()` writes `msg_bgm` / `msg_title` MSBTs locale-less (`msg_bgm.msbt`)
 when only one locale is in `Resources/Game` (the normal setup). When several locales are present
 (e.g. `+eu_fr` and `+us_en`), each keeps its `+locale` suffix — previously they all collapsed onto
-one path, so only one locale survived. Mod text is English-only (`en_us`), so every locale gets
-the same mod song names.
+one path, so only one locale survived.
 
 ## Testing
 Test on Nintendo Switch by copying ArcOutput to the SD card mod folder.
