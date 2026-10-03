@@ -7,8 +7,8 @@ using Xunit.Abstractions;
 namespace Tests.Integration
 {
     /// <summary>
-    /// Drives <see cref="Nus3ConvertService.RunBatch(string)"/> — the non-interactive
-    /// entry point the desktop app shells out to. Validation/early-return branches run
+    /// Drives <see cref="Nus3ConvertService.ConvertBatch"/> — the conversion behind the
+    /// desktop app's per-track convert. Validation/early-return branches run
     /// tool-free; the happy paths ("end-to-end" and "loop" modes) invoke the real
     /// ffmpeg / VGAudioCli / nus3audio chain (present because SuiteEnvironmentCheck
     /// requires them).
@@ -52,58 +52,39 @@ namespace Tests.Integration
             return dst;
         }
 
-        /// <summary>Serialises a batch-input object to a temp JSON file and returns its path.</summary>
-        private string WriteJson(object input)
-        {
-            var path = Path.Combine(_env.TempDir, "nus3-batch-" + Guid.NewGuid().ToString("N")[..8] + ".json");
-            File.WriteAllText(path, JsonSerializer.Serialize(input));
-            return path;
-        }
+        /// <summary>Builds a batch input from an anonymous object shaped like the JSON input.</summary>
+        private static Nus3BatchInput Input(object input) =>
+            JsonSerializer.Deserialize<Nus3BatchInput>(JsonSerializer.Serialize(input), CliUtil.JsonCaseInsensitive);
 
         // ── Validation / early-return branches (tool-free) ──────────────────
 
         [Fact]
-        public void RunBatch_NullPath_ReturnsWithoutThrowing()
-        {
-            var ex = Record.Exception(() => CreateService().RunBatch(null));
-            Assert.Null(ex);
-        }
-
-        [Fact]
-        public void RunBatch_MissingJsonFile_ReturnsWithoutThrowing()
-        {
-            var missing = Path.Combine(_env.TempDir, "does-not-exist.json");
-            var ex = Record.Exception(() => CreateService().RunBatch(missing));
-            Assert.Null(ex);
-        }
-
-        [Fact]
-        public void RunBatch_EmptyDecisions_CreatesNoValidateFolder()
+        public void ConvertBatch_EmptyDecisions_CreatesNoValidateFolder()
         {
             var seriesDir = SetupSeriesDir();
-            var json = WriteJson(new { seriesPath = seriesDir, decisions = Array.Empty<object>() });
+            var input = Input(new { seriesPath = seriesDir, decisions = Array.Empty<object>() });
 
-            CreateService().RunBatch(json);
+            CreateService().ConvertBatch(input);
 
             Assert.False(Directory.Exists(Path.Combine(seriesDir, "songs-to-validate")),
                 "Empty-decisions input should short-circuit before creating the validate folder");
         }
 
         [Fact]
-        public void RunBatch_SeriesPathMissing_ReturnsWithoutThrowing()
+        public void ConvertBatch_SeriesPathMissing_ReturnsWithoutThrowing()
         {
-            var json = WriteJson(new
+            var input = Input(new
             {
                 seriesPath = Path.Combine(_env.TempDir, "no-such-series"),
                 decisions = new[] { new { filename = "x.flac", mode = "end-to-end" } }
             });
 
-            var ex = Record.Exception(() => CreateService().RunBatch(json));
+            var ex = Record.Exception(() => CreateService().ConvertBatch(input));
             Assert.Null(ex);
         }
 
         [Fact]
-        public void RunBatch_SkipsWhenOutputAlreadyExists()
+        public void ConvertBatch_SkipsWhenOutputAlreadyExists()
         {
             var seriesDir = SetupSeriesDir();
             CopyRealFlac(seriesDir);
@@ -117,28 +98,28 @@ namespace Tests.Integration
             var marker = new byte[] { 0xDE, 0xAD, 0xBE, 0xEF };
             File.WriteAllBytes(outputNus3, marker);
 
-            var json = WriteJson(new
+            var input = Input(new
             {
                 seriesPath = seriesDir,
                 decisions = new[] { new { filename = OneTrackFlac, mode = "end-to-end" } }
             });
 
-            CreateService().RunBatch(json);
+            CreateService().ConvertBatch(input);
 
             Assert.Equal(marker, File.ReadAllBytes(outputNus3));
         }
 
         [Fact]
-        public void RunBatch_SkipsMissingSourceFile()
+        public void ConvertBatch_SkipsMissingSourceFile()
         {
             var seriesDir = SetupSeriesDir();
-            var json = WriteJson(new
+            var input = Input(new
             {
                 seriesPath = seriesDir,
                 decisions = new[] { new { filename = "not-on-disk.flac", mode = "end-to-end" } }
             });
 
-            CreateService().RunBatch(json);
+            CreateService().ConvertBatch(input);
 
             var outputNus3 = Path.Combine(seriesDir, "songs-to-validate", "not-on-disk.nus3audio");
             Assert.False(File.Exists(outputNus3),
@@ -148,17 +129,17 @@ namespace Tests.Integration
         // ── Happy paths (real ffmpeg / VGAudioCli / nus3audio) ──────────────
 
         [Fact]
-        public void RunBatch_EndToEndMode_ProducesNus3Audio()
+        public void ConvertBatch_EndToEndMode_ProducesNus3Audio()
         {
             var seriesDir = SetupSeriesDir();
             CopyRealFlac(seriesDir);
-            var json = WriteJson(new
+            var input = Input(new
             {
                 seriesPath = seriesDir,
                 decisions = new[] { new { filename = OneTrackFlac, mode = "end-to-end" } }
             });
 
-            CreateService().RunBatch(json);
+            CreateService().ConvertBatch(input);
 
             var basename = Path.GetFileNameWithoutExtension(OneTrackFlac);
             var outputNus3 = Path.Combine(seriesDir, "songs-to-validate", basename + ".nus3audio");
@@ -168,11 +149,11 @@ namespace Tests.Integration
         }
 
         [Fact]
-        public void RunBatch_LoopMode_ProducesNus3Audio()
+        public void ConvertBatch_LoopMode_ProducesNus3Audio()
         {
             var seriesDir = SetupSeriesDir();
             CopyRealFlac(seriesDir);
-            var json = WriteJson(new
+            var input = Input(new
             {
                 seriesPath = seriesDir,
                 decisions = new[]
@@ -181,7 +162,7 @@ namespace Tests.Integration
                 }
             });
 
-            CreateService().RunBatch(json);
+            CreateService().ConvertBatch(input);
 
             var basename = Path.GetFileNameWithoutExtension(OneTrackFlac);
             var outputNus3 = Path.Combine(seriesDir, "songs-to-validate", basename + ".nus3audio");

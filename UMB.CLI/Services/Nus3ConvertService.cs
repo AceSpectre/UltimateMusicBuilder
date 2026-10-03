@@ -7,12 +7,8 @@ using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using Spectre.Console;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
-using VGAudio.Cli;
 
 namespace UMB.CLI.Services
 {
@@ -41,37 +37,7 @@ namespace UMB.CLI.Services
             _logger = logger;
         }
 
-        // ffmpeg/ffprobe/ffplay and pymusiclooper are expected on the system PATH
-        // (install via choco/brew/apt/pipx — see scripts/fetch-tools for hints).
-        private string ResolveFfTool(string name) =>
-            ToolPathResolver.Resolve(null, null, name) ?? name;
-
-        private string ResolvePymusiclooper() =>
-            ToolPathResolver.Resolve(null, null, "pymusiclooper") ?? "pymusiclooper";
-
-        /// <summary>
-        /// Runs a console tool to completion. Returns stdout when captureStdout,
-        /// otherwise drains and returns stderr (ffmpeg-family tools log there).
-        /// </summary>
-        private static string RunProcess(string fileName, string arguments, bool captureStdout = false)
-        {
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = fileName,
-                    Arguments = arguments,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                }
-            };
-            process.Start();
-            var output = captureStdout ? process.StandardOutput.ReadToEnd() : process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            return output;
-        }
+        private static void RunProcess(string fileName, string arguments) => ProcessRunner.Run(fileName, arguments);
 
         private (string nus3AudioExe, string validateDir, string tempDir)? PrepareConversion(string seriesDir)
         {
@@ -134,25 +100,12 @@ namespace UMB.CLI.Services
                 string vgOutput;
                 try
                 {
-                    var oldOut = Console.Out;
-                    using var writer = new StringWriter();
-                    try
-                    {
-                        Console.SetOut(writer);
-                        Converter.RunConverterCli(new string[]
-                        {
-                            "-i", wavFile,
-                            "-o", lopusFile,
-                            "--opusheader", "Namco",
-                            "--cbr",
-                            "-l", $"{loopStart}-{loopEnd}"
-                        });
-                    }
-                    finally
-                    {
-                        Console.SetOut(oldOut);
-                    }
-                    vgOutput = writer.ToString();
+                    vgOutput = VGAudioRunner.Run(
+                        "-i", wavFile,
+                        "-o", lopusFile,
+                        "--opusheader", "Namco",
+                        "--cbr",
+                        "-l", $"{loopStart}-{loopEnd}");
                 }
                 catch (Exception e)
                 {
@@ -352,27 +305,12 @@ namespace UMB.CLI.Services
             _logger.LogInformation("Delete any files you don't like, then run 'Accept Validated Nus3'.");
         }
 
-        public void RunBatch(string jsonPath)
+        /// <summary>Converts each decision's source track into songs-to-validate.</summary>
+        public void ConvertBatch(Nus3BatchInput input)
         {
-            if (string.IsNullOrWhiteSpace(jsonPath))
+            if (input.Decisions is not { Count: > 0 })
             {
-                _logger.LogError("Usage: dotnet run nus3-convert-batch <decisions.json>");
-                return;
-            }
-
-            if (!File.Exists(jsonPath))
-            {
-                _logger.LogError("JSON file not found: {Path}", jsonPath);
-                return;
-            }
-
-            var jsonText = File.ReadAllText(jsonPath);
-            var input = JsonSerializer.Deserialize<Nus3BatchInput>(jsonText,
-                CliUtil.JsonCaseInsensitive);
-
-            if (input == null || input.Decisions == null || input.Decisions.Count == 0)
-            {
-                _logger.LogError("No decisions found in {Path}.", jsonPath);
+                _logger.LogError("No conversion decisions given.");
                 return;
             }
 
@@ -517,80 +455,19 @@ namespace UMB.CLI.Services
             }
         }
 
-        private List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)> RunPymusiclooper(string filePath)
-        {
-            var results = new List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)>();
-            try
-            {
-                var output = RunProcess(ResolvePymusiclooper(),
-                    $"export-points --path \"{filePath}\" --alt-export-top 10 --fmt samples --export-to stdout",
-                    captureStdout: true);
-
-                // Format: loop_start loop_end note_distance loudness_difference score
-                foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 5
-                        && long.TryParse(parts[0], out var start)
-                        && long.TryParse(parts[1], out var end)
-                        && double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out var noteDist)
-                        && double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out var loudness)
-                        && double.TryParse(parts[4], NumberStyles.Float, CultureInfo.InvariantCulture, out var score))
-                    {
-                        results.Add((start, end, noteDist, loudness, score));
-                    }
-                }
-
-                // pymusiclooper usually emits sorted output; re-sort defensively.
-                results.Sort((a, b) => b.score.CompareTo(a.score));
-            }
-            catch (Exception e)
-            {
-                _logger.LogWarning(e, "pymusiclooper failed for {File}. Falling back to full-song loop.", filePath);
-            }
-            return results;
-        }
+        private static List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)> RunPymusiclooper(string filePath) =>
+            AudioTools.FindLoops(filePath).Select(l => (l.Start, l.End, l.NoteDistance, l.LoudnessDiff, l.Score)).ToList();
 
         private long GetWavSampleCount(string filePath)
         {
-            try
-            {
-                var output = RunProcess(ResolveFfTool("ffprobe"),
-                    $"-v error -select_streams a:0 -show_entries stream=sample_rate:stream=duration -of csv=p=0 \"{filePath}\"",
-                    captureStdout: true).Trim();
-
-                // Output format: "sample_rate,duration" e.g. "48000,185.365979"
-                var parts = output.Split(',');
-                if (parts.Length >= 2
-                    && int.TryParse(parts[0], out var sampleRate)
-                    && double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out var duration))
-                {
-                    return (long)(duration * sampleRate);
-                }
-            }
-            catch (Exception e)
-            {
-                _logger.LogWarning(e, "ffprobe failed for {File}.", filePath);
-            }
-            return -1;
+            var (sampleRate, duration) = AudioTools.Probe(filePath);
+            return sampleRate > 0 && duration > 0 ? (long)(duration * sampleRate) : -1;
         }
 
         private int GetSourceSampleRate(string filePath)
         {
-            try
-            {
-                var output = RunProcess(ResolveFfTool("ffprobe"),
-                    $"-v error -select_streams a:0 -show_entries stream=sample_rate -of csv=p=0 \"{filePath}\"",
-                    captureStdout: true).Trim();
-
-                if (int.TryParse(output, out var rate))
-                    return rate;
-            }
-            catch (Exception e)
-            {
-                _logger.LogWarning(e, "ffprobe failed for {File}.", filePath);
-            }
-            return -1;
+            var sampleRate = AudioTools.Probe(filePath).SampleRate;
+            return sampleRate > 0 ? sampleRate : -1;
         }
 
         private void CreateLoopPreview(string sourceFile, long loopStart, long loopEnd, string outputPath, double previewHalfLength = 5)
@@ -604,27 +481,7 @@ namespace UMB.CLI.Services
                     return;
                 }
 
-                double startSec = (double)loopStart / sampleRate;
-                double endSec = (double)loopEnd / sampleRate;
-
-                // Preview: N seconds before loop end → N seconds after loop start (simulates the loop transition)
-                double seg1Start = Math.Max(0, endSec - previewHalfLength);
-                double seg1End = endSec;
-                double seg2Start = startSec;
-                double seg2End = startSec + previewHalfLength;
-
-                var s1s = seg1Start.ToString("F4", CultureInfo.InvariantCulture);
-                var s1e = seg1End.ToString("F4", CultureInfo.InvariantCulture);
-                var s2s = seg2Start.ToString("F4", CultureInfo.InvariantCulture);
-                var s2e = seg2End.ToString("F4", CultureInfo.InvariantCulture);
-
-                var filter = $"[0:a]atrim=start={s1s}:end={s1e},asetpts=PTS-STARTPTS[a];" +
-                             $"[0:a]atrim=start={s2s}:end={s2e},asetpts=PTS-STARTPTS[b];" +
-                             $"[a][b]concat=n=2:v=0:a=1";
-
-                RunProcess(ResolveFfTool("ffmpeg"), $"-i \"{sourceFile}\" -filter_complex \"{filter}\" \"{outputPath}\" -y");
-
-                if (File.Exists(outputPath) && new FileInfo(outputPath).Length > 0)
+                if (AudioTools.RenderLoopPreview(sourceFile, (double)loopStart / sampleRate, (double)loopEnd / sampleRate, previewHalfLength, outputPath))
                     _logger.LogInformation("  Loop preview: {Path}", outputPath);
                 else
                     _logger.LogWarning("  Failed to create loop preview.");
@@ -658,7 +515,7 @@ namespace UMB.CLI.Services
                 }
 
                 AnsiConsole.MarkupLine("[yellow]Playing loop preview... press Q to stop.[/]");
-                RunProcess(ResolveFfTool("ffplay"), $"-nodisp -autoexit \"{tempPreview}\"");
+                RunProcess(AudioTools.Tool("ffplay"), $"-nodisp -autoexit \"{tempPreview}\"");
             }
             catch (Exception e)
             {
@@ -677,7 +534,7 @@ namespace UMB.CLI.Services
         {
             try
             {
-                RunProcess(ResolveFfTool("ffmpeg"), $"-i \"{inputFile}\" -ar 48000 -ac 2 \"{outputWav}\" -y");
+                RunProcess(AudioTools.Tool("ffmpeg"), $"-i \"{inputFile}\" -ar 48000 -ac 2 \"{outputWav}\" -y");
                 return File.Exists(outputWav) && new FileInfo(outputWav).Length > 0;
             }
             catch (Exception e)

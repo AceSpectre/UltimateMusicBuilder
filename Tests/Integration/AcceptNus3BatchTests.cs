@@ -1,5 +1,4 @@
 using System.Text;
-using System.Text.Json;
 using Tests.Helpers;
 using UMB.CLI.Services;
 using Xunit;
@@ -7,10 +6,8 @@ using Xunit;
 namespace Tests.Integration
 {
     /// <summary>
-    /// Drives <see cref="AcceptNus3Service.RunBatch(string)"/> — the non-interactive
-    /// entry point used by the desktop app. Reads
-    /// { "seriesPath": "...", "deleteSources": true } and runs the same AcceptCore
-    /// orchestration the interactive Run() does, so no Spectre console is needed.
+    /// Drives <see cref="AcceptNus3Service.Accept"/> — the non-interactive accept used by
+    /// the desktop app; it runs the same AcceptCore orchestration as the interactive Run().
     /// </summary>
     [Collection("CwdSensitive")]
     public class AcceptNus3BatchTests : IDisposable
@@ -35,13 +32,6 @@ namespace Tests.Integration
                 options,
                 TestEnvironment.CreateLogger<AcceptNus3Service>(),
                 scaffold);
-        }
-
-        private string WriteJson(object input)
-        {
-            var path = Path.Combine(_env.TempDir, "accept-batch-" + Guid.NewGuid().ToString("N")[..8] + ".json");
-            File.WriteAllText(path, JsonSerializer.Serialize(input));
-            return path;
         }
 
         private string SetupModWithValidateFolder(string seriesName = "dev",
@@ -79,15 +69,14 @@ namespace Tests.Integration
         // ── Happy paths ─────────────────────────────────────────────────────
 
         [Fact]
-        public void RunBatch_MovesNus3AudioFilesIntoSeriesFolder()
+        public void Accept_MovesNus3AudioFilesIntoSeriesFolder()
         {
             var modDir = SetupModWithValidateFolder("dev",
                 ("track1.nus3audio", ".flac"),
                 ("track2.nus3audio", ".flac"));
             var seriesDir = Path.Combine(modDir, "dev");
-            var json = WriteJson(new { seriesPath = seriesDir, deleteSources = false });
 
-            CreateService().RunBatch(json);
+            CreateService().Accept(seriesDir, false);
 
             Assert.True(File.Exists(Path.Combine(seriesDir, "track1.nus3audio")));
             Assert.True(File.Exists(Path.Combine(seriesDir, "track2.nus3audio")));
@@ -95,13 +84,12 @@ namespace Tests.Integration
         }
 
         [Fact]
-        public void RunBatch_DeletesSourceFilesWhenTrue()
+        public void Accept_DeletesSourceFilesWhenTrue()
         {
             var modDir = SetupModWithValidateFolder("dev", ("track1.nus3audio", ".flac"));
             var seriesDir = Path.Combine(modDir, "dev");
-            var json = WriteJson(new { seriesPath = seriesDir, deleteSources = true });
 
-            CreateService().RunBatch(json);
+            CreateService().Accept(seriesDir, true);
 
             Assert.True(File.Exists(Path.Combine(seriesDir, "track1.nus3audio")));
             Assert.False(File.Exists(Path.Combine(seriesDir, "track1.flac")),
@@ -109,13 +97,12 @@ namespace Tests.Integration
         }
 
         [Fact]
-        public void RunBatch_KeepsSourceFilesWhenFalse()
+        public void Accept_KeepsSourceFilesWhenFalse()
         {
             var modDir = SetupModWithValidateFolder("dev", ("track1.nus3audio", ".flac"));
             var seriesDir = Path.Combine(modDir, "dev");
-            var json = WriteJson(new { seriesPath = seriesDir, deleteSources = false });
 
-            CreateService().RunBatch(json);
+            CreateService().Accept(seriesDir, false);
 
             Assert.True(File.Exists(Path.Combine(seriesDir, "track1.nus3audio")));
             Assert.True(File.Exists(Path.Combine(seriesDir, "track1.flac")),
@@ -123,13 +110,12 @@ namespace Tests.Integration
         }
 
         [Fact]
-        public void RunBatch_UpdatesCsvFilenameExtension()
+        public void Accept_UpdatesCsvFilenameExtension()
         {
             var modDir = SetupModWithValidateFolder("dev", ("track1.nus3audio", ".flac"));
             var seriesDir = Path.Combine(modDir, "dev");
-            var json = WriteJson(new { seriesPath = seriesDir, deleteSources = false });
 
-            CreateService().RunBatch(json);
+            CreateService().Accept(seriesDir, false);
 
             var csv = File.ReadAllText(Path.Combine(seriesDir, "tracks.csv"));
             Assert.Contains("track1.nus3audio", csv);
@@ -137,15 +123,14 @@ namespace Tests.Integration
         }
 
         [Fact]
-        public void RunBatch_CleansUpValidateFolderAfterMove()
+        public void Accept_CleansUpValidateFolderAfterMove()
         {
             var modDir = SetupModWithValidateFolder("dev",
                 ("track1.nus3audio", ".flac"),
                 ("track2.nus3audio", ".flac"));
             var seriesDir = Path.Combine(modDir, "dev");
-            var json = WriteJson(new { seriesPath = seriesDir, deleteSources = false });
 
-            CreateService().RunBatch(json);
+            CreateService().Accept(seriesDir, false);
 
             Assert.False(Directory.Exists(Path.Combine(seriesDir, "songs-to-validate")));
         }
@@ -153,51 +138,25 @@ namespace Tests.Integration
         // ── Validation / early-return branches ──────────────────────────────
 
         [Fact]
-        public void RunBatch_NullPath_ReturnsWithoutThrowing()
-        {
-            var ex = Record.Exception(() => CreateService().RunBatch(null));
-            Assert.Null(ex);
-        }
-
-        [Fact]
-        public void RunBatch_MissingJsonFile_ReturnsWithoutThrowing()
-        {
-            var missing = Path.Combine(_env.TempDir, "nope.json");
-            var ex = Record.Exception(() => CreateService().RunBatch(missing));
-            Assert.Null(ex);
-        }
-
-        [Fact]
-        public void RunBatch_MissingSeriesPath_ReturnsWithoutThrowing()
-        {
-            var json = WriteJson(new { deleteSources = true });
-            var ex = Record.Exception(() => CreateService().RunBatch(json));
-            Assert.Null(ex);
-        }
-
-        [Fact]
-        public void RunBatch_NoValidateFolder_NoOp()
+        public void Accept_NoValidateFolder_NoOp()
         {
             var modDir = Path.Combine(_env.ModPath, "test-mod");
             var seriesDir = Path.Combine(modDir, "dev");
             Directory.CreateDirectory(seriesDir);
-            var json = WriteJson(new { seriesPath = seriesDir, deleteSources = false });
 
-            CreateService().RunBatch(json);
+            CreateService().Accept(seriesDir, false);
 
             Assert.False(Directory.Exists(Path.Combine(seriesDir, "songs-to-validate")));
         }
 
         [Fact]
-        public void RunBatch_ValidateFolderEmpty_LeavesSeriesUntouched()
+        public void Accept_ValidateFolderEmpty_LeavesSeriesUntouched()
         {
             var modDir = Path.Combine(_env.ModPath, "test-mod");
             var seriesDir = Path.Combine(modDir, "dev");
             var validateDir = Path.Combine(seriesDir, "songs-to-validate");
             Directory.CreateDirectory(validateDir); // exists but holds no .nus3audio
-            var json = WriteJson(new { seriesPath = seriesDir, deleteSources = false });
-
-            CreateService().RunBatch(json);
+            CreateService().Accept(seriesDir, false);
 
             // Guard warns and returns; the empty validate folder is left in place.
             Assert.True(Directory.Exists(validateDir));

@@ -59,7 +59,7 @@ namespace Sma5h.ResourceProviders
                 var msbtDb = (MsbtDatabase)(object)inputObj;
 
                 _logger.LogDebug("MSBT: {NrbEntries} entries, InputFile: {InputFile}, OutputFile: {OutputFile}", msbtDb.Entries.Count, inputFile, outputFile);
-                File.Copy(inputFile, outputFile);
+                File.Copy(inputFile, outputFile, overwrite: true);
 
                 var msbtFile = new MSBT(outputFile);
 
@@ -82,6 +82,7 @@ namespace Sma5h.ResourceProviders
             catch (Exception e)
             {
                 _logger.LogError(e, "MSBT Generation error");
+                return false;
             }
 
             return true;

@@ -56,14 +56,14 @@ test('existing series writes song_order.toml with derived bgmIds matching the CL
   const toml = readFileSync(join(marioPath(), 'song_order.toml'), 'utf8')
   expect(toml).toContain('song_order = [')
   expect(toml).toContain('ui_bgm_flowerhead___somewhat_good__lofi___01_summer')
-  expect(toml).toContain('ui_bgm_flowerhead___somewhat_good__lofi___03_brain_empty')
+  expect(toml).toContain('ui_bgm_flowerhead___somewhat_good__lofi___03_brain_emp')
 })
 
 test('pre-existing song_order.toml is loaded with vanilla entries locked', async () => {
   const page = await firstWindow(app)
   const songOrder =
     'song_order = [\n' +
-    '  "ui_bgm_flowerhead___somewhat_good__lofi___03_brain_empty",\n' +
+    '  "ui_bgm_flowerhead___somewhat_good__lofi___03_brain_emp",\n' +
     '  "ui_bgm_ps01",\n' +
     '  "ui_bgm_flowerhead___somewhat_good__lofi___01_summer",\n' +
     ']\n'
@@ -71,7 +71,7 @@ test('pre-existing song_order.toml is loaded with vanilla entries locked', async
 
   const data = await page.evaluate((sp) => window.electron.umb.loadTrackOrder(sp), marioPath())
   expect(data.hasSongOrder).toBe(true)
-  expect(data.items[0].bgmId).toBe('ui_bgm_flowerhead___somewhat_good__lofi___03_brain_empty')
+  expect(data.items[0].bgmId).toBe('ui_bgm_flowerhead___somewhat_good__lofi___03_brain_emp')
   const vanilla = data.items.find((i) => i.bgmId === 'ui_bgm_ps01')
   expect(vanilla?.isLocked).toBe(true)
 })
