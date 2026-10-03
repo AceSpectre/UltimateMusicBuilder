@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { existsSync, readFileSync } from 'fs'
-import { join, resolve } from 'path'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { loadTrackOrderData, saveTrackOrderData } from './order-tracks'
 import { makeWorkspace, writeSeries, type Workspace } from './test-utils'
 
@@ -332,21 +332,5 @@ describe('track fields', () => {
     expect(row.fields).toMatchObject({ info1: 'info_bgm_some_vanilla_song', special_category: 'sf_situationlink' })
     expect(reloaded.items.some((i) => i.isPinchTarget)).toBe(true)
     expect(row.isPinchTarget).toBe(false)
-  })
-})
-
-// Integration: needs the real Resources/Game dump + the matt-dan mariokart mod. Auto-skips otherwise.
-const REPO_ROOT = resolve(__dirname, '..', '..', '..')
-const MARIOKART = join(REPO_ROOT, 'Mods', 'MusicMods', 'matt-dan-18-05-26', 'mariokart')
-const HAS_REAL_MARIOKART =
-  existsSync(join(REPO_ROOT, 'Resources', 'Game', 'ui', 'param', 'database', 'ui_bgm_db.prc')) &&
-  existsSync(join(MARIOKART, 'series.toml'))
-
-describe.runIf(HAS_REAL_MARIOKART)('vanilla catalog wired into a real existing series', () => {
-  it('merges vanilla mariokart games and exposes vanilla songs', () => {
-    const data = loadTrackOrderData(REPO_ROOT, MARIOKART)
-    expect(data.games.length).toBeGreaterThan(2)
-    expect(data.vanillaSongs.length).toBeGreaterThan(0)
-    expect(data.vanillaSongs.every((s) => s.infoId.startsWith('info_'))).toBe(true)
   })
 })

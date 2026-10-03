@@ -24,6 +24,9 @@ namespace Tests.Integration
     [Collection("CwdSensitive")]
     public class ConvertServiceTests : IDisposable
     {
+        private const string LegacyAudioFileName = "flowerhead__somewhat_good_karts__01_karts.nus3audio";
+        // Import copies the payload verbatim; codec validation is covered by audio tests.
+        private static readonly byte[] LegacyAudioFixture = { 0x4E, 0x55, 0x53, 0x33, 0x01, 0x02, 0x03, 0x04 };
         private readonly TestEnvironment _env;
         private readonly IAnsiConsole _originalConsole;
         private readonly string _originalCwd;
@@ -58,6 +61,9 @@ namespace Tests.Integration
                 AppContext.BaseDirectory, "TestData", "old-mods", "sma5h-test-mod");
             foreach (var file in Directory.GetFiles(sourceDir))
                 File.Copy(file, Path.Combine(oldModDir, Path.GetFileName(file)), overwrite: true);
+
+            // Audio assets are gitignored, so construct the copy-test fixture locally.
+            File.WriteAllBytes(Path.Combine(oldModDir, LegacyAudioFileName), LegacyAudioFixture);
 
             return oldModDir;
         }
@@ -182,9 +188,9 @@ namespace Tests.Integration
             CreateService().Run();
 
             var audioPath = Path.Combine(_env.ModPath, "sma5h-test-mod", "doubutsu",
-                "flowerhead__somewhat_good_karts__01_karts.nus3audio");
+                LegacyAudioFileName);
             Assert.True(File.Exists(audioPath), $"Audio file should be copied to {audioPath}");
-            Assert.True(new FileInfo(audioPath).Length > 0, "Copied audio file should not be empty");
+            Assert.Equal(LegacyAudioFixture, File.ReadAllBytes(audioPath));
         }
 
         [Fact]

@@ -7,6 +7,37 @@ on:
     branches: [master]
 
 jobs:
+  setup:
+    name: Setup scripts (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test Unix setup without installing packages
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          bash -n setup.sh scripts/fetch-tools.sh scripts/build-vgmstream-macos.sh
+          python3 scripts/test-setup.py
+          python3 scripts/test-fetch-tools.py
+      - name: Validate Windows setup and dry run
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "$PWD/setup.ps1", [ref]$tokens, [ref]$parseErrors
+          ) | Out-Null
+          if ($parseErrors.Count) { throw ($parseErrors | Out-String) }
+          # Dry runs must never call installers, even when dependencies are missing.
+          function winget { throw 'Dry run invoked winget.' }
+          function py { throw 'Dry run invoked Python.' }
+          & ./setup.ps1 -DryRun
+
   unit:
     name: Vitest unit tests
     runs-on: ubuntu-latest

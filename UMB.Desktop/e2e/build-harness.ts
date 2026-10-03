@@ -1,6 +1,6 @@
-import { cpSync, mkdirSync, readFileSync, writeFileSync, rmSync, mkdtempSync, existsSync } from 'fs'
+import { cpSync, mkdirSync, readFileSync, writeFileSync, rmSync, mkdtempSync, existsSync, realpathSync } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { join, relative, resolve } from 'path'
 import { execFileSync } from 'child_process'
 import { repoRoot, configuredModSource } from './e2e-utils'
 
@@ -17,18 +17,24 @@ export interface IsolatedBuild {
  */
 export function prepareIsolatedBuild(): IsolatedBuild {
   const repo = repoRoot()
-  const wsRoot = mkdtempSync(join(tmpdir(), 'umb-e2e-build-'))
+  // NuGet makes transitive project paths relative to this directory. On macOS,
+  // /var is a symlink to /private/var; resolve it before computing those paths.
+  const wsRoot = mkdtempSync(join(realpathSync(tmpdir()), 'umb-e2e-build-'))
   const cliProjectDir = join(wsRoot, 'UMB.CLI')
 
   cpSync(join(repo, 'UMB.CLI'), cliProjectDir, {
     recursive: true,
-    filter: (src) => !/[\\/](bin|obj)[\\/]/.test(src) && !src.endsWith(`${'\\'}bin`) && !src.endsWith(`${'\\'}obj`)
+    filter: (src) => !relative(join(repo, 'UMB.CLI'), src).split(/[\\/]/).some(part => part === 'bin' || part === 'obj')
   })
 
   const csprojPath = join(cliProjectDir, 'UMB.CLI.csproj')
   let csproj = readFileSync(csprojPath, 'utf8')
-  csproj = csproj.replace('Include="..\\Sma5h\\', `Include="${repo}\\Sma5h\\`)
-  csproj = csproj.replace('<HintPath>..\\Tools\\', `<HintPath>${repo}\\Tools\\`)
+  const projectPath = (p: string): string => resolve(repo, 'UMB.CLI', p.replace(/\\/g, '/'))
+    .replace(/\\/g, '/').replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+  csproj = csproj.replace(/(<ProjectReference\s+Include=")([^"]+)(")/g,
+    (_match, start, path, end) => `${start}${projectPath(path)}${end}`)
+  csproj = csproj.replace(/(<HintPath>)([^<]+)(<\/HintPath>)/g,
+    (_match, start, path, end) => `${start}${projectPath(path)}${end}`)
   writeFileSync(csprojPath, csproj, 'utf8')
 
   const fwd = (p: string): string => p.split('\\').join('/')

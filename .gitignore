@@ -382,3 +382,11 @@ UMB.Desktop/design-mockups/
 UMB.Desktop/coverage/
 UMB.Desktop/playwright-report/
 UMB.Desktop/test-results/
+
+# Native tools generated/downloaded by Unix setup; bundled during release builds.
+/Tools/BgmProperty/bgm-property
+/Tools/Nus3Audio/nus3audio
+/Tools/UltimateTexCli/ultimate_tex_cli
+/Tools/vgmstream-cli/vgmstream-cli
+/Tools/vgmstream-cli/COPYING-FFmpeg-GPLv2
+/Tools/vgmstream-cli/COPYING-vgmstream

@@ -75,14 +75,15 @@ namespace Tests.Helpers
             RequireFile(missing, Path.Combine(RepoRoot, "Resources", "template.nus3bank"));
 
             // ── External tools ─────────────────────────────────────────────
-            string tools = Path.Combine(RepoRoot, "tools");
-            RequireFile(missing, Path.Combine(tools, "Nus3Audio", "nus3audio.exe"));
-            RequireFile(missing, Path.Combine(tools, "BgmProperty", "bgm-property.exe"));
+            string tools = Path.Combine(RepoRoot, "Tools");
+            string suffix = OperatingSystem.IsWindows() ? ".exe" : "";
+            RequireFile(missing, Path.Combine(tools, "Nus3Audio", "nus3audio" + suffix));
+            RequireFile(missing, Path.Combine(tools, "BgmProperty", "bgm-property" + suffix));
             RequireFile(missing, Path.Combine(tools, "BgmProperty", "bgm_hashes.txt"));
             RequireFile(missing, Path.Combine(tools, "VGAudioCli.exe"));
-            RequireFile(missing, Path.Combine(tools, "UltimateTexCli", "ultimate_tex_cli.exe"));
+            RequireFile(missing, Path.Combine(tools, "UltimateTexCli", "ultimate_tex_cli" + suffix));
             RequireFile(missing, Path.Combine(tools, "paracobNET.dll"));
-            RequireDir(missing, Path.Combine(tools, "vgmstream-cli"));
+            RequireFile(missing, Path.Combine(tools, "vgmstream-cli", "vgmstream-cli" + suffix));
 
             // ── External tools on PATH (needed by nus3-convert) ────────────
             RequireOnPath(missing, "pymusiclooper");
@@ -110,7 +111,7 @@ namespace Tests.Helpers
                 sb.AppendLine("Setup checklist:");
                 sb.AppendLine("  1. Extract vanilla Smash Ultimate PRC/MSBT files into Resources/Game/");
                 sb.AppendLine("     (see Resources/Game/README.txt). These files are NOT redistributable.");
-                sb.AppendLine("  2. Confirm tools/ contains Nus3Audio, BgmProperty, VGAudioCli,");
+                sb.AppendLine("  2. Run setup.sh --dev (Windows: setup.ps1 -Dev), then confirm Tools/ contains Nus3Audio, BgmProperty, VGAudioCli,");
                 sb.AppendLine("     UltimateTexCli, vgmstream-cli, paracobNET.dll.");
                 sb.AppendLine("  3. Confirm Tests/TestData/configured-mod/{dev,mario}/ contain the real");
                 sb.AppendLine("     FLAC files (the build copies them to bin/Debug/net8.0/TestData/).");

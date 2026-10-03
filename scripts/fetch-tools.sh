@@ -6,13 +6,13 @@
 #   - nus3audio          (Rust, jam1garner/nus3audio-rs)
 #   - ultimate_tex_cli   (Rust, ScanMountGoat/ultimate_tex)
 #   - bgm-property       (Rust, jam1garner/smash-bgm-property — requires `cargo install` on non-Windows)
-#   - vgmstream-cli      (vgmstream/vgmstream, r2083 prebuilt)
+#   - vgmstream-cli      (vgmstream/vgmstream, r2083; static codec build on macOS)
 #
 # Tools that should be on PATH (script prints install hints; not bundled):
 #   - ffmpeg / ffprobe / ffplay   (Homebrew / apt / dnf)
 #   - pymusiclooper                (`pipx install pymusiclooper`)
 #
-# Re-running is safe: existing binaries are skipped unless --force is passed.
+# Re-running verifies existing binaries and repairs broken ones.
 
 set -euo pipefail
 
@@ -99,8 +99,10 @@ extract_tar_xz() {
 needs_install() {
     local target=$1
     if [[ -f "$target" && "$FORCE" -eq 0 ]]; then
-        echo "   ✓ already present: $target"
-        return 1
+        if verify "$target" "$(basename "$target")"; then
+            return 1
+        fi
+        echo "   Reinstalling unusable binary: $target"
     fi
     return 0
 }
@@ -111,12 +113,23 @@ verify() {
     if [[ ! -x "$bin" ]]; then
         chmod +x "$bin" 2>/dev/null || true
     fi
+    if [[ "$label" == vgmstream-cli ]]; then
+        local output status=0
+        output="$("$bin" -V 2>/dev/null)" || status=$?
+        if [[ "$status" -le 1 && "$output" == *'"version"'* && "$output" == *'"extensions"'* ]]; then
+            echo "   ✓ $label OK"
+            return 0
+        fi
+        echo "   ! $label cannot start; run setup again to repair it." >&2
+        return 1
+    fi
     if "$bin" --help >/dev/null 2>&1 \
        || "$bin" -h >/dev/null 2>&1 \
        || "$bin" --version >/dev/null 2>&1; then
         echo "   ✓ $label OK"
     else
-        echo "   ! $label installed but help/version probe failed (may still work)"
+        echo "   ! $label cannot start; run setup again to repair it." >&2
+        return 1
     fi
 }
 
@@ -184,11 +197,11 @@ install_bgm_property() {
        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    Then re-run this script.
 EOF
-        return 0
+        return 1
     fi
 
     # cargo install drops binaries in --root/bin; we point that at our dir and rename.
-    cargo install --git "$BGM_PROPERTY_REPO" --tag "$BGM_PROPERTY_TAG" --bin "$BGM_PROPERTY_BIN" --root "$dir" --quiet
+    cargo install --git "$BGM_PROPERTY_REPO" --tag "$BGM_PROPERTY_TAG" --locked --bin "$BGM_PROPERTY_BIN" --root "$dir" --quiet
     local built="$dir/bin/$BGM_PROPERTY_BIN"
     if [[ ! -f "$built" ]]; then
         echo "   ! cargo install did not produce $built"
@@ -206,7 +219,18 @@ install_vgmstream_cli() {
     local dir="$TOOLS_DIR/vgmstream-cli"
     local target="$dir/vgmstream-cli"
     mkdir -p "$dir"
-    needs_install "$target" || return 0
+    # A working Mac binary must also be independent of Homebrew's codec ABI.
+    if [[ "$OS" == mac && -f "$target" ]] && otool -L "$target" | grep -q '/\(opt/homebrew\|usr/local\)/'; then
+        echo "   Rebuilding binary with nonportable Homebrew dependencies."
+    else
+        needs_install "$target" || return 0
+    fi
+
+    if [[ "$OS" == mac ]]; then
+        bash "$SCRIPT_DIR/build-vgmstream-macos.sh" "$VGMSTREAM_TAG" "$target"
+        verify "$target" "vgmstream-cli"
+        return
+    fi
 
     local asset
     case "$OS" in
