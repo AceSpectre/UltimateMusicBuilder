@@ -59,7 +59,7 @@ namespace Sma5h.ResourceProviders
                 var msbtDb = (MsbtDatabase)(object)inputObj;
 
                 _logger.LogDebug("MSBT: {NrbEntries} entries, InputFile: {InputFile}, OutputFile: {OutputFile}", msbtDb.Entries.Count, inputFile, outputFile);
-                File.Copy(inputFile, outputFile);
+                File.Copy(inputFile, outputFile, overwrite: true);
 
                 var msbtFile = new MSBT(outputFile);
 
