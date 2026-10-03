@@ -66,7 +66,7 @@ Adding songs to existing series (Final Fantasy, Persona, etc.) required two fixe
 1. **Sample rate** (`Nus3ConvertService.cs`): the Namco Opus encoder only accepts
    8/12/16/24/48 kHz. Source `.wav` files were passed straight through (ffmpeg skipped),
    so a 44.1 kHz `.wav` made VGAudio print "Sample rate is invalid" and write nothing →
-   "VGAudioCli produced no output". Both `Run()` and `RunBatch()` now also run ffmpeg when a
+   "VGAudioCli produced no output". Both `Run()` and `ConvertBatch()` now also run ffmpeg when a
    `.wav` isn't already 48 kHz. VGAudio's swallowed stdout is now surfaced in the error, and a
    `Console.Out` restore leak on exception was fixed.
 2. **VGAudioCli in the release build** (`Program.cs` + `UMB.CLI.csproj`): `VGAudioCli.exe` is a
@@ -95,6 +95,15 @@ stdin line, `__DONE__\t<id>\t<code>` reply). Rules the CLI side now guarantees:
 - **VGAudio** goes through `VGAudioRunner` (it writes to the global `Console.Out`, including from a
   timer after returning — never dispose or race the capture writer).
 
+**All mod data logic lives in C#.** The desktop's data actions (mods, series/track order, merge,
+extract icons, nus3 workflow, playlist info, playlist assignment) are JSON actions in
+`UMB.CLI/Desktop/DesktopApi.cs`: `<action> <input.json> <output.json>`, writing `{"result": …}` or
+`{"error": "…"}` (a `DesktopApiException` message is shown to the user). `Desktop/Models.cs`
+mirrors `UMB.Desktop/src/shared/types.ts` — change both together. The services behind them are
+shared with the CLI's interactive commands/Avalonia windows, so don't re-implement mod logic in
+TypeScript. The desktop runs these through two daemons (`cli.ts`): long-running actions
+(`BACKGROUND_ACTIONS`) get their own so quick UI calls aren't queued behind them.
+
 ## Testing
 Test on Nintendo Switch by copying ArcOutput to the SD card mod folder.
 
@@ -105,7 +114,7 @@ Electron app wrapping the same mod-build logic. Stack: Electron + Svelte 5 (rune
 ```bash
 cd UMB.Desktop
 npm install
-npm run dev      # electron-vite dev (hot reload)
+npm run dev      # builds the CLI (build:cli), then electron-vite dev (hot reload)
 npm run build    # compile to dist/
 npm run package  # electron-builder installer
 ```
@@ -114,8 +123,10 @@ npm run package  # electron-builder installer
 - `src/main/` — Electron main process (Node). Action handlers invoked over IPC:
   - `index.ts` — app entry, window + IPC wiring
   - `preload.ts` — contextBridge exposing the IPC API to the renderer
-  - `cli.ts` — drives the UMB build
-  - `mods.ts`, `order-series.ts`, `order-tracks.ts`, `nus3-convert.ts`, `config-volume.ts` — one module per action
+  - `cli.ts` — runs the C# CLI: one-shot actions, the daemons and `callCli` (JSON actions)
+  - `config-volume.ts`, `app-settings.ts` — the remaining main-process modules; everything else
+    forwards to the CLI. In dev the CLI is `<workspace>/UMB.CLI` if present, else the repo's,
+    run from its `bin/Debug/net8.0` build.
 - `src/renderer/src/` — Svelte 5 UI
   - `lib/components/actions/` — one view per action (build, config-volume, nus3-convert, order-series, order-tracks)
   - `lib/components/` — shared UI (app-bar, sidebar, command-palette, log-drawer, bottom-panel)
@@ -125,7 +136,8 @@ npm run package  # electron-builder installer
 - `src/shared/ipc-channels.ts` — IPC channel name constants shared by main + renderer
 
 ### Testing
-- `npm test` — Vitest unit tests (colocated `*.test.ts` in `src/main/`)
+- `npm test` — Vitest unit tests (colocated `*.test.ts` in `src/main/`); the mod logic's own
+  tests are xUnit (`Tests/Unit/Desktop/`)
 - `npm run test:e2e` — Playwright E2E against the built Electron app (`e2e/`)
 - E2E (`npm run test:e2e`) drives every action against `Tests/TestData` and compares output to the CLI:
   Tier 1 (order-tracks/order-series/merge) structural; Tier 2 (config-volume/nus3-convert/extract-icons/

@@ -1,5 +1,3 @@
-using CsvHelper;
-using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sma5h.Mods.Music;
@@ -13,11 +11,28 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Tomlyn;
+using UMB.CLI.Desktop;
 
 namespace UMB.CLI.Services
 {
+    /// <summary>
+    /// Merges two or more UMB mods into a new mod. Series found in several mods are merged, with
+    /// the priority mod's series.toml, tracks and files winning. Shared by the desktop app and
+    /// the interactive CLI.
+    /// </summary>
     public class MergeService
     {
+        private static readonly string[] TrackColumns =
+            { "filename", "game", "title", "author", "copyright", "record_type", "special_category", "volume", "info1", "in_soundtest", "order" };
+
+        // Values for columns a source tracks.csv doesn't have (others default to "").
+        private static readonly Dictionary<string, string> ColumnDefaults = new()
+        {
+            ["record_type"] = "original",
+            ["volume"] = "1",
+            ["in_soundtest"] = "True"
+        };
+
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
 
@@ -45,7 +60,6 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            var modNames = modDirs.Select(Path.GetFileName).ToList();
             var selectedNames = AnsiConsole.Prompt(
                 new MultiSelectionPrompt<string>()
                     .WrapAround()
@@ -53,7 +67,7 @@ namespace UMB.CLI.Services
                     .Required()
                     .HighlightStyle(new Style(Color.Cyan1))
                     .InstructionsText("[grey](Press [blue]<space>[/] to toggle, [green]<enter>[/] to accept)[/]")
-                    .AddChoices(modNames));
+                    .AddChoices(modDirs.Select(Path.GetFileName)));
 
             if (selectedNames.Count < 2)
             {
@@ -65,123 +79,133 @@ namespace UMB.CLI.Services
 
             var outputModName = AnsiConsole.Prompt(
                 new TextPrompt<string>("Name for the merged mod folder:")
-                    .Validate(name =>
-                    {
-                        if (string.IsNullOrWhiteSpace(name))
-                            return ValidationResult.Error("Name cannot be empty.");
-                        if (Directory.Exists(Path.Combine(modPath, name)))
-                            return ValidationResult.Error("A mod with that name already exists.");
-                        return ValidationResult.Success();
-                    }));
+                    .Validate(name => ValidateOutputName(name) is string error
+                        ? ValidationResult.Error(error)
+                        : ValidationResult.Success()));
 
-            var outputModDir = Path.Combine(modPath, outputModName);
-
-            var seriesMap = new Dictionary<string, List<(string modDir, string seriesDir)>>(StringComparer.OrdinalIgnoreCase);
-            foreach (var modDir in selectedDirs)
+            var analysis = Analyze(selectedDirs);
+            string priorityModPath = null;
+            if (analysis.Conflicts.Count > 0)
             {
-                foreach (var seriesDir in Directory.GetDirectories(modDir))
-                {
-                    var folderName = Path.GetFileName(seriesDir);
-                    if (folderName.StartsWith(".")) continue;
-                    if (!File.Exists(Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE)))
-                        continue;
+                _logger.LogInformation("Merge conflicts detected in {Count} series:", analysis.Conflicts.Count);
+                foreach (var conflict in analysis.Conflicts)
+                    _logger.LogInformation("  {Series}: found in {Mods}", conflict.SeriesName, string.Join(", ", conflict.Mods));
 
-                    if (!seriesMap.ContainsKey(folderName))
-                        seriesMap[folderName] = new List<(string, string)>();
-                    seriesMap[folderName].Add((modDir, seriesDir));
-                }
-            }
-
-            if (seriesMap.Count == 0)
-            {
-                _logger.LogError("No series folders found in the selected mods.");
-                return;
-            }
-
-            var conflicts = seriesMap.Where(kv => kv.Value.Count > 1).ToList();
-            string priorityMod = null;
-            if (conflicts.Count > 0)
-            {
-                _logger.LogInformation("Merge conflicts detected in {Count} series:", conflicts.Count);
-                foreach (var conflict in conflicts)
-                {
-                    var mods = string.Join(", ", conflict.Value.Select(v => Path.GetFileName(v.modDir)));
-                    _logger.LogInformation("  {Series}: found in {Mods}", conflict.Key, mods);
-                }
-
-                priorityMod = AnsiConsole.Prompt(
+                var priorityMod = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
                         .WrapAround()
                         .Title("Which mod should take priority for conflicts?")
                         .HighlightStyle(new Style(Color.Cyan1))
                         .AddChoices(selectedNames));
+                priorityModPath = selectedDirs.First(d => Path.GetFileName(d) == priorityMod);
             }
 
-            Directory.CreateDirectory(outputModDir);
+            var result = Execute(selectedDirs, outputModName, priorityModPath);
+            _logger.LogInformation("Output: {OutputDir}", result.OutputPath);
+        }
 
-            int totalSeries = 0;
-            int totalTracks = 0;
-
-            foreach (var (seriesName, sources) in seriesMap)
+        public MergeAnalysis Analyze(List<string> modPaths)
+        {
+            var resolvedPaths = (modPaths ?? new List<string>()).Select(Path.GetFullPath).ToList();
+            foreach (var path in resolvedPaths)
             {
-                var outputSeriesDir = Path.Combine(outputModDir, seriesName);
+                if (!ModPaths.IsUnderMods(_musicConfig, path)) throw new DesktopApiException($"Invalid mod path: {path}");
+                if (!Directory.Exists(path)) throw new DesktopApiException($"Mod not found: {path}");
+            }
+
+            var sourcesBySeries = new Dictionary<string, List<MergeSeriesSource>>();
+            foreach (var modPath in resolvedPaths)
+            {
+                foreach (var seriesDir in Directory.GetDirectories(modPath))
+                {
+                    var name = Path.GetFileName(seriesDir);
+                    if (name.StartsWith(".") || !File.Exists(Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE)))
+                        continue;
+                    if (!sourcesBySeries.TryGetValue(name, out var sources))
+                        sourcesBySeries[name] = sources = new List<MergeSeriesSource>();
+                    sources.Add(new MergeSeriesSource(Path.GetFileName(modPath), modPath, seriesDir));
+                }
+            }
+
+            var series = sourcesBySeries
+                .OrderBy(s => s.Key, StringComparer.InvariantCultureIgnoreCase)
+                .Select(s => new MergeSeries(s.Key, s.Value))
+                .ToList();
+            var conflicts = series
+                .Where(s => s.Sources.Count > 1)
+                .Select(s => new MergeConflict(s.Name, s.Sources.Select(src => src.ModName).ToList()))
+                .ToList();
+
+            return new MergeAnalysis(resolvedPaths.Select(Path.GetFileName).ToList(), resolvedPaths, series, conflicts, series.Count);
+        }
+
+        /// <summary>The problem with a merged mod name, or null when it can be used.</summary>
+        public string ValidateOutputName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return "Name cannot be empty.";
+            var trimmed = name.Trim();
+            if (trimmed.IndexOfAny("<>:\"/\\|?*".ToCharArray()) >= 0) return "Name contains invalid characters.";
+            if (Directory.Exists(Path.Combine(ModPaths.Root(_musicConfig), trimmed))) return "A mod with that name already exists.";
+            return null;
+        }
+
+        public MergeResult Execute(List<string> modPaths, string outputName, string priorityModPath)
+        {
+            if (ValidateOutputName(outputName) is string nameError)
+                throw new DesktopApiException(nameError);
+
+            var analysis = Analyze(modPaths);
+            if (analysis.TotalSeries == 0)
+                throw new DesktopApiException("No series folders found in the selected mods.");
+
+            var priority = string.IsNullOrEmpty(priorityModPath) ? null : Path.GetFullPath(priorityModPath);
+            var outputDir = Path.Combine(ModPaths.Root(_musicConfig), outputName.Trim());
+            Directory.CreateDirectory(outputDir);
+
+            int totalTracks = 0, conflictsResolved = 0;
+            foreach (var series in analysis.Series)
+            {
+                var outputSeriesDir = Path.Combine(outputDir, series.Name);
                 Directory.CreateDirectory(outputSeriesDir);
 
-                if (sources.Count == 1)
+                if (series.Sources.Count == 1)
                 {
-                    CopySeriesFolder(sources[0].seriesDir, outputSeriesDir);
-                    var trackCount = CountTracksInCsv(
-                        Path.Combine(outputSeriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE));
+                    var source = series.Sources[0];
+                    foreach (var file in Directory.GetFiles(source.SeriesPath))
+                        File.Copy(file, Path.Combine(outputSeriesDir, Path.GetFileName(file)), overwrite: true);
+                    var trackCount = TracksCsv.CountDataRows(Path.Combine(outputSeriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE));
                     totalTracks += trackCount;
-                    _logger.LogInformation("Copied series '{Series}' from {Mod} ({Tracks} tracks)",
-                        seriesName, Path.GetFileName(sources[0].modDir), trackCount);
+                    _logger.LogInformation("Copied series '{Series}' from {Mod} ({Tracks} tracks)", series.Name, source.ModName, trackCount);
                 }
                 else
                 {
-                    // Conflict — merge with priority mod first
-                    var orderedSources = sources
-                        .OrderByDescending(s => Path.GetFileName(s.modDir) == priorityMod)
-                        .Select(s => s.seriesDir)
+                    var orderedDirs = series.Sources
+                        .OrderByDescending(s => s.ModPath == priority)
+                        .Select(s => s.SeriesPath)
                         .ToList();
-
-                    var trackCount = MergeSeriesFolders(orderedSources, outputSeriesDir, seriesName);
+                    var trackCount = MergeSeriesFolders(orderedDirs, outputSeriesDir, series.Name);
                     totalTracks += trackCount;
-                    _logger.LogInformation("Merged series '{Series}' from {Count} mods ({Tracks} tracks)",
-                        seriesName, sources.Count, trackCount);
+                    conflictsResolved++;
+                    _logger.LogInformation("Merged series '{Series}' from {Count} mods ({Tracks} tracks)", series.Name, series.Sources.Count, trackCount);
                 }
-
-                totalSeries++;
             }
 
-            // Copy series-order.toml from priority mod if it exists, otherwise from first mod that has one
-            MergeSeriesOrderToml(selectedDirs, priorityMod, outputModDir);
+            MergeSeriesOrder(analysis.ModPaths, priority, outputDir);
 
-            _logger.LogInformation("--------------------");
-            _logger.LogInformation("Merge complete: {SeriesCount} series, {TrackCount} tracks → {OutputDir}",
-                totalSeries, totalTracks, outputModDir);
-        }
-
-        private void CopySeriesFolder(string sourceDir, string outputDir)
-        {
-            foreach (var file in Directory.GetFiles(sourceDir))
-            {
-                File.Copy(file, Path.Combine(outputDir, Path.GetFileName(file)), overwrite: false);
-            }
+            _logger.LogInformation("Merge complete: {SeriesCount} series, {TrackCount} tracks", analysis.TotalSeries, totalTracks);
+            return new MergeResult(outputDir, outputName.Trim(), analysis.TotalSeries, totalTracks, conflictsResolved);
         }
 
         private int MergeSeriesFolders(List<string> orderedSourceDirs, string outputDir, string seriesName)
         {
             var tomlOptions = CliUtil.KebabTomlOptions();
-
             FolderSeriesFileConfig priorityConfig = null;
-            var mergedGames = new List<(string id, string name)>();
-            var mergedPlaylists = new List<(string id, int incidence, object songs)>();
+            var mergedGames = new List<FolderGameConfig>();
+            var mergedPlaylists = new List<FolderPlaylistOverrideConfig>();
 
             foreach (var srcDir in orderedSourceDirs)
             {
                 var tomlPath = Path.Combine(srcDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
-                if (!File.Exists(tomlPath)) continue;
-
                 FolderSeriesFileConfig config;
                 try
                 {
@@ -193,19 +217,16 @@ namespace UMB.CLI.Services
                     continue;
                 }
 
-                if (priorityConfig == null)
-                    priorityConfig = config;
-
-                foreach (var game in config.Games)
+                priorityConfig ??= config;
+                foreach (var game in config.Games.Where(g => !string.IsNullOrEmpty(g.Id)))
                 {
-                    if (!mergedGames.Any(g => string.Equals(g.id, game.Id, StringComparison.OrdinalIgnoreCase)))
-                        mergedGames.Add((game.Id, game.Name));
+                    if (!mergedGames.Any(g => string.Equals(g.Id, game.Id, StringComparison.OrdinalIgnoreCase)))
+                        mergedGames.Add(game);
                 }
-
-                foreach (var pl in config.Playlists)
+                foreach (var playlist in config.Playlists.Where(p => !string.IsNullOrEmpty(p.Id)))
                 {
-                    if (!mergedPlaylists.Any(p => string.Equals(p.id, pl.Id, StringComparison.OrdinalIgnoreCase)))
-                        mergedPlaylists.Add((pl.Id, pl.Incidence, pl.Songs));
+                    if (!mergedPlaylists.Any(p => string.Equals(p.Id, playlist.Id, StringComparison.OrdinalIgnoreCase)))
+                        mergedPlaylists.Add(playlist);
                 }
             }
 
@@ -217,22 +238,17 @@ namespace UMB.CLI.Services
 
             WriteMergedSeriesToml(outputDir, priorityConfig, mergedGames, mergedPlaylists);
 
-            var allTracks = new List<MergeTrackRow>();
+            var allTracks = new List<CsvRow>();
             var seenFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
             foreach (var srcDir in orderedSourceDirs)
             {
-                var csvPath = Path.Combine(srcDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
-                if (!File.Exists(csvPath)) continue;
-
-                var tracks = ReadTracksCsv(csvPath);
-                foreach (var track in tracks)
+                foreach (var track in TracksCsv.ReadLenient(Path.Combine(srcDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE)))
                 {
-                    if (seenFilenames.Add(track.Filename))
+                    var filename = track.Get("filename");
+                    if (filename.Length > 0 && seenFilenames.Add(filename))
                         allTracks.Add(track);
                 }
             }
-
             WriteMergedTracksCsv(outputDir, allTracks);
 
             // Priority mod wins on duplicate filenames
@@ -242,64 +258,19 @@ namespace UMB.CLI.Services
                 foreach (var file in Directory.GetFiles(srcDir))
                 {
                     var fileName = Path.GetFileName(file);
-                    if (string.Equals(fileName, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE, StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(fileName, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(fileName, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE, StringComparison.OrdinalIgnoreCase))
                         continue;
-                    if (string.Equals(fileName, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE, StringComparison.OrdinalIgnoreCase))
-                        continue;
-
                     if (copiedFiles.Add(fileName))
-                        File.Copy(file, Path.Combine(outputDir, fileName), overwrite: false);
+                        File.Copy(file, Path.Combine(outputDir, fileName), overwrite: true);
                 }
             }
 
             return allTracks.Count;
         }
 
-        private List<MergeTrackRow> ReadTracksCsv(string csvPath)
-        {
-            var rows = new List<MergeTrackRow>();
-            var csvConfig = CliUtil.CsvRead();
-
-            using var reader = new StreamReader(csvPath);
-            using var csv = new CsvReader(reader, csvConfig);
-
-            csv.Read();
-            csv.ReadHeader();
-            var headers = csv.HeaderRecord;
-
-            while (csv.Read())
-            {
-                var row = new MergeTrackRow
-                {
-                    Filename = csv.GetField("filename") ?? "",
-                    Game = csv.GetField("game") ?? "",
-                    Title = csv.GetField("title") ?? "",
-                    Author = GetOptionalField(csv, headers, "author"),
-                    Copyright = GetOptionalField(csv, headers, "copyright"),
-                    RecordType = GetOptionalField(csv, headers, "record_type", "original"),
-                    SpecialCategory = GetOptionalField(csv, headers, "special_category"),
-                    Volume = float.TryParse(GetOptionalField(csv, headers, "volume", "1.0"),
-                        NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 1.0f,
-                    Info1 = GetOptionalField(csv, headers, "info1"),
-                    InSoundtest = !string.Equals(GetOptionalField(csv, headers, "in_soundtest", "True"), "False", StringComparison.OrdinalIgnoreCase)
-                };
-
-                if (!string.IsNullOrWhiteSpace(row.Filename))
-                    rows.Add(row);
-            }
-
-            return rows;
-        }
-
-        private static string GetOptionalField(CsvReader csv, string[] headers, string name, string defaultValue = "")
-        {
-            if (headers.Contains(name, StringComparer.OrdinalIgnoreCase))
-                return csv.GetField(name) ?? defaultValue;
-            return defaultValue;
-        }
-
-        private void WriteMergedSeriesToml(string outputDir, FolderSeriesFileConfig priorityConfig,
-            List<(string id, string name)> games, List<(string id, int incidence, object songs)> playlists)
+        private static void WriteMergedSeriesToml(string outputDir, FolderSeriesFileConfig priorityConfig,
+            List<FolderGameConfig> games, List<FolderPlaylistOverrideConfig> playlists)
         {
             var sb = new StringBuilder();
             var series = priorityConfig.Series;
@@ -308,21 +279,20 @@ namespace UMB.CLI.Services
                 playlistIncidence: series.PlaylistIncidence != 100 ? series.PlaylistIncidence : null,
                 seriesPlaylist: string.IsNullOrWhiteSpace(series.SeriesPlaylist) ? null : series.SeriesPlaylist);
 
-            foreach (var (id, name) in games)
-                CliUtil.AppendGameBlock(sb, id, name);
+            foreach (var game in games)
+                CliUtil.AppendGameBlock(sb, game.Id, game.Name ?? "");
 
-            foreach (var (id, incidence, songs) in playlists)
+            foreach (var playlist in playlists)
             {
                 sb.AppendLine("[[playlists]]");
-                sb.AppendLine($"id = \"{CliUtil.EscapeToml(id)}\"");
-                sb.AppendLine($"incidence = {incidence}");
-                AppendSongsField(sb, songs);
+                sb.AppendLine($"id = \"{CliUtil.EscapeToml(playlist.Id)}\"");
+                sb.AppendLine($"incidence = {playlist.Incidence}");
+                AppendSongsField(sb, playlist.Songs);
                 sb.AppendLine();
             }
 
-            if (priorityConfig.DefaultTrackData != null)
+            if (priorityConfig.DefaultTrackData is { } d)
             {
-                var d = priorityConfig.DefaultTrackData;
                 sb.AppendLine("[default-track-data]");
                 if (!string.IsNullOrEmpty(d.Game))
                     sb.AppendLine($"game = \"{CliUtil.EscapeToml(d.Game)}\"");
@@ -335,97 +305,53 @@ namespace UMB.CLI.Services
                 sb.AppendLine();
             }
 
-            File.WriteAllText(
-                Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE),
-                sb.ToString());
+            File.WriteAllText(Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), sb.ToString());
         }
 
         internal static void AppendSongsField(StringBuilder sb, object songs)
         {
-            if (songs == null || FolderMusicMod.IsWildcardSongs(songs))
-            {
-                sb.AppendLine("songs = \"*\"");
-                return;
-            }
-
-            var explicitSongs = FolderMusicMod.ExplicitSongs(songs);
+            var explicitSongs = songs == null || FolderMusicMod.IsWildcardSongs(songs)
+                ? new List<string>()
+                : FolderMusicMod.ExplicitSongs(songs);
             if (explicitSongs.Count == 0)
             {
                 sb.AppendLine("songs = \"*\"");
                 return;
             }
-
             sb.AppendLine("songs = [");
-            for (int i = 0; i < explicitSongs.Count; i++)
-            {
-                var comma = i < explicitSongs.Count - 1 ? "," : "";
-                sb.AppendLine($"    \"{CliUtil.EscapeToml(explicitSongs[i])}\"{comma}");
-            }
+            for (var i = 0; i < explicitSongs.Count; i++)
+                sb.AppendLine($"    \"{CliUtil.EscapeToml(explicitSongs[i])}\"{(i < explicitSongs.Count - 1 ? "," : "")}");
             sb.AppendLine("]");
         }
 
-        private void WriteMergedTracksCsv(string outputDir, List<MergeTrackRow> tracks)
+        private static void WriteMergedTracksCsv(string outputDir, List<CsvRow> tracks)
         {
-            var csvPath = Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
-            using var writer = new StreamWriter(csvPath);
-            using var csv = new CsvWriter(writer, CliUtil.CsvWrite());
-
-            csv.WriteField("filename");
-            csv.WriteField("game");
-            csv.WriteField("title");
-            csv.WriteField("author");
-            csv.WriteField("copyright");
-            csv.WriteField("record_type");
-            csv.WriteField("special_category");
-            csv.WriteField("volume");
-            csv.WriteField("info1");
-            csv.WriteField("in_soundtest");
-            csv.WriteField("order");
-            csv.NextRecord();
-
-            for (int i = 0; i < tracks.Count; i++)
+            var rows = tracks.Select((t, i) =>
             {
-                var t = tracks[i];
-                csv.WriteField(t.Filename);
-                csv.WriteField(t.Game);
-                csv.WriteField(t.Title);
-                csv.WriteField(t.Author);
-                csv.WriteField(t.Copyright);
-                csv.WriteField(t.RecordType);
-                csv.WriteField(t.SpecialCategory);
-                csv.WriteField(t.Volume);
-                csv.WriteField(t.Info1);
-                csv.WriteField(t.InSoundtest);
-                csv.WriteField(i);
-                csv.NextRecord();
-            }
+                var row = new CsvRow();
+                foreach (var column in TrackColumns)
+                    row[column] = t.TryGetValue(column, out var value) ? value : ColumnDefaults.GetValueOrDefault(column, "");
+                row["order"] = i.ToString(CultureInfo.InvariantCulture);
+                return row;
+            });
+            TracksCsv.Write(Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE), rows, TrackColumns);
         }
 
-        private void MergeSeriesOrderToml(List<string> selectedDirs, string priorityMod, string outputDir)
+        /// <summary>Combines the mods' series-order.toml lists, priority mod first, without duplicates.</summary>
+        private void MergeSeriesOrder(List<string> modPaths, string priorityModPath, string outputDir)
         {
-            var orderedDirs = priorityMod != null
-                ? selectedDirs.OrderByDescending(d => Path.GetFileName(d) == priorityMod).ToList()
-                : selectedDirs;
-
+            var orderedDirs = modPaths.OrderByDescending(d => d == priorityModPath).ToList();
             var mergedOrder = new List<string>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
             foreach (var modDir in orderedDirs)
             {
                 var orderFile = Path.Combine(modDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE);
                 if (!File.Exists(orderFile)) continue;
-
                 try
                 {
                     var model = Toml.ToModel(File.ReadAllText(orderFile));
-                    if (model.TryGetValue("order", out var val) && val is Tomlyn.Model.TomlArray arr)
-                    {
-                        foreach (var item in arr.OfType<string>())
-                        {
-                            if (seen.Add(item))
-                                mergedOrder.Add(item);
-                        }
-                    }
+                    if (model.TryGetValue("order", out var value) && value is Tomlyn.Model.TomlArray order)
+                        mergedOrder.AddRange(order.OfType<string>().Where(id => id.Length > 0 && seen.Add(id)));
                 }
                 catch (Exception e)
                 {
@@ -436,45 +362,8 @@ namespace UMB.CLI.Services
             if (mergedOrder.Count == 0)
                 return;
 
-            var sb = new StringBuilder();
-            sb.AppendLine("# Custom series display order");
-            sb.AppendLine("# Listed series appear after official series, before \"Other\"");
-            sb.AppendLine("# Unlisted custom series will be placed after these");
-            sb.Append("order = [");
-            foreach (var id in mergedOrder)
-            {
-                sb.AppendLine();
-                sb.Append($"    \"{CliUtil.EscapeToml(id)}\",");
-            }
-            sb.AppendLine();
-            sb.AppendLine("]");
-
-            File.WriteAllText(
-                Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE),
-                sb.ToString());
-            _logger.LogInformation("Merged series-order.toml with {Count} series from {ModCount} mod(s).",
-                mergedOrder.Count, orderedDirs.Count(d => File.Exists(
-                    Path.Combine(d, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE))));
-        }
-
-        private int CountTracksInCsv(string csvPath)
-        {
-            if (!File.Exists(csvPath)) return 0;
-            return Math.Max(0, File.ReadLines(csvPath).Count() - 1);
-        }
-
-        private class MergeTrackRow
-        {
-            public string Filename { get; set; }
-            public string Game { get; set; }
-            public string Title { get; set; }
-            public string Author { get; set; }
-            public string Copyright { get; set; }
-            public string RecordType { get; set; }
-            public string SpecialCategory { get; set; }
-            public float Volume { get; set; }
-            public string Info1 { get; set; }
-            public bool InSoundtest { get; set; } = true;
+            SeriesOrderService.WriteSeriesOrder(outputDir, mergedOrder);
+            _logger.LogInformation("Merged series-order.toml with {Count} series.", mergedOrder.Count);
         }
     }
 }

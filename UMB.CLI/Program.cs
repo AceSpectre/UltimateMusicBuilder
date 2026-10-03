@@ -74,8 +74,7 @@ namespace UMB.CLI
             if (args.Length > 0)
             {
                 using var scope = serviceProvider.CreateScope();
-                var entry = scope.ServiceProvider.GetService<Script>();
-                return await RunAction(args[0].ToLowerInvariant(), entry, args.Length > 1 ? args[1..] : null);
+                return await RunAction(args[0].ToLowerInvariant(), scope.ServiceProvider, args.Length > 1 ? args[1..] : null);
             }
 
             while (true)
@@ -85,10 +84,7 @@ namespace UMB.CLI
                     return ExitOk;
 
                 using (var scope = serviceProvider.CreateScope())
-                {
-                    var entry = scope.ServiceProvider.GetService<Script>();
-                    await RunAction(action, entry);
-                }
+                    await RunAction(action, scope.ServiceProvider);
 
                 AnsiConsole.WriteLine();
             }
@@ -135,10 +131,7 @@ namespace UMB.CLI
 
                 int code;
                 using (var scope = serviceProvider.CreateScope())
-                {
-                    var entry = scope.ServiceProvider.GetService<Script>();
-                    code = await RunAction(req.Action?.ToLowerInvariant() ?? "", entry, req.Args);
-                }
+                    code = await RunAction(req.Action?.ToLowerInvariant() ?? "", scope.ServiceProvider, req.Args);
 
                 CliOutput.WriteLine($"__DONE__\t{req.Id}\t{code}");
             }
@@ -148,11 +141,23 @@ namespace UMB.CLI
         /// Runs one action. Services report failure by logging an error, so the result is
         /// <see cref="ExitFailed"/> if the action threw or logged any error.
         /// </summary>
-        private static async Task<int> RunAction(string action, Script entry, string[] extraArgs = null)
+        private static async Task<int> RunAction(string action, IServiceProvider services, string[] extraArgs = null)
         {
+            // Desktop actions skip Script, whose build services need the game resources set up.
+            var desktop = services.GetRequiredService<Desktop.DesktopApi>();
+            var entry = desktop.Handles(action) ? null : services.GetRequiredService<Script>();
+
+            // Constructing services can log errors (e.g. StateManager without game resources);
+            // only the action's own errors count.
             ErrorCountingLoggerProvider.Reset();
             try
             {
+                if (entry == null)
+                {
+                    desktop.Run(action, extraArgs);
+                    return ErrorCountingLoggerProvider.ErrorCount > 0 ? ExitFailed : ExitOk;
+                }
+
                 switch (action)
                 {
                     case "build":
@@ -175,14 +180,8 @@ namespace UMB.CLI
                     case "nus3-convert":
                         entry.RunNus3Convert();
                         break;
-                    case "nus3-convert-batch":
-                        entry.RunNus3ConvertBatch(extraArgs?.Length > 0 ? extraArgs[0] : null);
-                        break;
                     case "accept-nus3":
                         entry.RunAcceptValidatedNus3();
-                        break;
-                    case "accept-nus3-batch":
-                        entry.RunAcceptValidatedNus3Batch(extraArgs?.Length > 0 ? extraArgs[0] : null);
                         break;
                     case "cleanup":
                         entry.RunCleanup();
@@ -210,13 +209,13 @@ namespace UMB.CLI
                         break;
                     default:
                         Console.WriteLine($"Unknown command: {action}");
-                        Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|nus3-convert-batch|accept-nus3|accept-nus3-batch|cleanup|order-series|order-tracks|config-volume|config-volume-analyze|config-volume-save|config-volume-preview|dump-stages]");
+                        Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|accept-nus3|cleanup|order-series|order-tracks|config-volume|config-volume-analyze|config-volume-save|config-volume-preview|dump-stages]");
                         return ExitUsage;
                 }
             }
             catch (Exception ex)
             {
-                entry.Logger.LogError(ex, "'{Action}' failed.", action);
+                services.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(Program)).LogError(ex, "'{Action}' failed.", action);
                 AnsiConsole.WriteLine();
                 AnsiConsole.MarkupLine($"[red]✗ '{action}' failed:[/] {ex.Message.EscapeMarkup()}");
                 AnsiConsole.MarkupLine("[dim]Full stack trace written to Log/log_*.txt[/]");
@@ -304,6 +303,11 @@ namespace UMB.CLI
             services.AddScoped<Services.TrackOrderService>();
             services.AddScoped<Services.VolumeConfigService>();
             services.AddScoped<Services.DumpStagesService>();
+            services.AddScoped<Services.ModsService>();
+            services.AddScoped<Services.VanillaCatalogService>();
+            services.AddScoped<Services.PlaylistAssignmentService>();
+            services.AddScoped<Services.Nus3WorkflowService>();
+            services.AddScoped<Desktop.DesktopApi>();
             services.AddScoped<Script>();
         }
     }
