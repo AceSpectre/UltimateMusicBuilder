@@ -5,7 +5,6 @@ using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Spectre.Console;
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -123,24 +122,9 @@ namespace UMB.CLI.Services
 
                 try
                 {
-                    var process = new Process
-                    {
-                        StartInfo = new ProcessStartInfo
-                        {
-                            FileName = ultimateTexCli,
-                            Arguments = $"\"{toolInput}\" \"{outputPng}\"",
-                            UseShellExecute = false,
-                            RedirectStandardOutput = true,
-                            RedirectStandardError = true,
-                            CreateNoWindow = true
-                        }
-                    };
-                    process.Start();
-                    var stdout = process.StandardOutput.ReadToEnd();
-                    var stderr = process.StandardError.ReadToEnd();
-                    process.WaitForExit();
+                    var result = ProcessRunner.Run(ultimateTexCli, $"\"{toolInput}\" \"{outputPng}\"");
 
-                    if (process.ExitCode == 0 && File.Exists(outputPng))
+                    if (result.ExitCode == 0 && File.Exists(outputPng))
                     {
                         _logger.LogInformation("Extracted icon for '{SeriesId}' → {OutputPath}", seriesId, outputPng);
                         totalExtracted++;
@@ -148,11 +132,11 @@ namespace UMB.CLI.Services
                     else
                     {
                         var diagnostic = string.Join(" | ",
-                            new[] { stderr, stdout }
+                            new[] { result.StandardError, result.StandardOutput }
                                 .Select(s => s?.Trim())
                                 .Where(s => !string.IsNullOrEmpty(s)));
                         if (string.IsNullOrEmpty(diagnostic))
-                            diagnostic = $"exit code {process.ExitCode}";
+                            diagnostic = $"exit code {result.ExitCode}";
                         _logger.LogError("Failed to extract icon for '{SeriesId}' from {BntxFile}: {Diagnostic}",
                             seriesId, bntxFile, diagnostic);
                     }

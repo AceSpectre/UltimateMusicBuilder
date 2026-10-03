@@ -283,7 +283,7 @@ namespace UMB.CLI.Services
                 if (input.Analyze)
                 {
                     var done = Interlocked.Increment(ref completed);
-                    Console.WriteLine($"__LUFS_PROGRESS__\t{done}\t{rows.Count}\t{dto.Filename}");
+                    CliOutput.WriteLine($"__LUFS_PROGRESS__\t{done}\t{rows.Count}\t{dto.Filename}");
                 }
             });
 

@@ -7,12 +7,10 @@ using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using Spectre.Console;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
-using VGAudio.Cli;
 
 namespace UMB.CLI.Services
 {
@@ -51,26 +49,12 @@ namespace UMB.CLI.Services
 
         /// <summary>
         /// Runs a console tool to completion. Returns stdout when captureStdout,
-        /// otherwise drains and returns stderr (ffmpeg-family tools log there).
+        /// otherwise stderr (ffmpeg-family tools log there).
         /// </summary>
         private static string RunProcess(string fileName, string arguments, bool captureStdout = false)
         {
-            var process = new Process
-            {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = fileName,
-                    Arguments = arguments,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                }
-            };
-            process.Start();
-            var output = captureStdout ? process.StandardOutput.ReadToEnd() : process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            return output;
+            var result = ProcessRunner.Run(fileName, arguments);
+            return captureStdout ? result.StandardOutput : result.StandardError;
         }
 
         private (string nus3AudioExe, string validateDir, string tempDir)? PrepareConversion(string seriesDir)
@@ -134,25 +118,12 @@ namespace UMB.CLI.Services
                 string vgOutput;
                 try
                 {
-                    var oldOut = Console.Out;
-                    using var writer = new StringWriter();
-                    try
-                    {
-                        Console.SetOut(writer);
-                        Converter.RunConverterCli(new string[]
-                        {
-                            "-i", wavFile,
-                            "-o", lopusFile,
-                            "--opusheader", "Namco",
-                            "--cbr",
-                            "-l", $"{loopStart}-{loopEnd}"
-                        });
-                    }
-                    finally
-                    {
-                        Console.SetOut(oldOut);
-                    }
-                    vgOutput = writer.ToString();
+                    vgOutput = VGAudioRunner.Run(
+                        "-i", wavFile,
+                        "-o", lopusFile,
+                        "--opusheader", "Namco",
+                        "--cbr",
+                        "-l", $"{loopStart}-{loopEnd}");
                 }
                 catch (Exception e)
                 {
