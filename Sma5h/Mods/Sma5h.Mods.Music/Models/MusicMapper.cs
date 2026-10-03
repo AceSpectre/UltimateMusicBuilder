@@ -18,24 +18,17 @@ namespace Sma5h.Mods.Music.Models
         // Game data -> entries
         [MapperIgnoreTarget(nameof(SeriesEntry.MSBTTitle))]
         [MapperIgnoreTarget(nameof(SeriesEntry.IconPath))]
-        [MapperIgnoreTarget(nameof(SeriesEntry.MusicMod))]
         public static partial void Map(PrcSeriesDbRootEntry source, [MappingTarget] SeriesEntry target);
         [MapperIgnoreTarget(nameof(GameTitleEntry.MSBTTitle))]
-        [MapperIgnoreTarget(nameof(GameTitleEntry.MusicMod))]
         public static partial void Map(PrcGameTitleDbRootEntry source, [MappingTarget] GameTitleEntry target);
         [MapperIgnoreTarget(nameof(BgmDbRootEntry.Title))]
         [MapperIgnoreTarget(nameof(BgmDbRootEntry.Author))]
         [MapperIgnoreTarget(nameof(BgmDbRootEntry.Copyright))]
-        [MapperIgnoreTarget(nameof(BgmDbRootEntry.MusicMod))]
         public static partial void Map(PrcBgmDbRootEntry source, [MappingTarget] BgmDbRootEntry target);
-        [MapperIgnoreTarget(nameof(BgmStreamSetEntry.MusicMod))]
         public static partial void Map(PrcBgmStreamSetEntry source, [MappingTarget] BgmStreamSetEntry target);
-        [MapperIgnoreTarget(nameof(BgmAssignedInfoEntry.MusicMod))]
         public static partial void Map(PrcBgmAssignedInfoEntry source, [MappingTarget] BgmAssignedInfoEntry target);
-        [MapperIgnoreTarget(nameof(BgmStreamPropertyEntry.MusicMod))]
         public static partial void Map(PrcBgmStreamPropertyEntry source, [MappingTarget] BgmStreamPropertyEntry target);
         [MapperIgnoreTarget(nameof(BgmPropertyEntry.AudioVolume))]
-        [MapperIgnoreTarget(nameof(BgmPropertyEntry.MusicMod))]
         public static partial void Map(BinBgmPropertyEntry source, [MappingTarget] BgmPropertyEntry target);
         public static partial PlaylistValueEntry ToEntry(PrcBgmPlaylistEntry source);
         public static partial StageEntry ToEntry(StageDbRootEntry source);
@@ -54,25 +47,18 @@ namespace Sma5h.Mods.Music.Models
         // Configs -> entries
         [MapProperty(nameof(SeriesConfig.Title), nameof(SeriesEntry.MSBTTitle))]
         [MapperIgnoreTarget(nameof(SeriesEntry.IconPath))]
-        [MapperIgnoreTarget(nameof(SeriesEntry.MusicMod))]
         public static partial void Map(SeriesConfig source, [MappingTarget] SeriesEntry target);
         [MapProperty(nameof(GameConfig.Title), nameof(GameTitleEntry.MSBTTitle))]
-        [MapperIgnoreTarget(nameof(GameTitleEntry.MusicMod))]
         public static partial void Map(GameConfig source, [MappingTarget] GameTitleEntry target);
         [MapperIgnoreTarget(nameof(BgmDbRootEntry.NameId))]
         [MapperIgnoreTarget(nameof(BgmDbRootEntry.SaveNo))]
         [MapperIgnoreTarget(nameof(BgmDbRootEntry.TestDispOrder))]
         [MapperIgnoreTarget(nameof(BgmDbRootEntry.MenuValue))]
-        [MapperIgnoreTarget(nameof(BgmDbRootEntry.MusicMod))]
         public static partial void Map(BgmDbRootConfig source, [MappingTarget] BgmDbRootEntry target);
-        [MapperIgnoreTarget(nameof(BgmStreamSetEntry.MusicMod))]
         public static partial void Map(BgmStreamSetConfig source, [MappingTarget] BgmStreamSetEntry target);
-        [MapperIgnoreTarget(nameof(BgmAssignedInfoEntry.MusicMod))]
         public static partial void Map(BgmAssignedInfoConfig source, [MappingTarget] BgmAssignedInfoEntry target);
-        [MapperIgnoreTarget(nameof(BgmStreamPropertyEntry.MusicMod))]
         public static partial void Map(BgmStreamPropertyConfig source, [MappingTarget] BgmStreamPropertyEntry target);
         [MapperIgnoreTarget(nameof(BgmPropertyEntry.AudioVolume))]
-        [MapperIgnoreTarget(nameof(BgmPropertyEntry.MusicMod))]
         public static partial void Map(BgmPropertyEntryConfig source, [MappingTarget] BgmPropertyEntry target);
         public static partial void Map(StageConfig source, [MappingTarget] StageEntry target);
         public static partial PlaylistValueEntry ToEntry(PlaylistValueConfig source);
