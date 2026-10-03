@@ -89,9 +89,17 @@ namespace Sma5h
 
             _logger.LogDebug("Write State Changes to {OutputPath}", _config.CurrentValue.OutputPath);
 
+            // How many loaded resources share each locale-stripped key. Only MSBTs loaded
+            // for several locales share one, and those must keep their +locale suffix or
+            // every locale would be written to the same file.
+            var strippedKeyCounts = _resources.Keys
+                .GroupBy(StripMsbtLocale)
+                .ToDictionary(p => p.Key, p => p.Count());
+
             foreach (var resource in _resources)
             {
-                var outputKey = StripMsbtLocale(resource.Key);
+                var strippedKey = StripMsbtLocale(resource.Key);
+                var outputKey = strippedKeyCounts[strippedKey] > 1 ? resource.Key : strippedKey;
                 var outputResourceFile = Path.Combine(outputPath, outputKey);
                 var inputResourceFile = Path.Combine(gameResourcesPath, resource.Key);
                 Directory.CreateDirectory(Path.GetDirectoryName(outputResourceFile));
