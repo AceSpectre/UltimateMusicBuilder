@@ -5,6 +5,7 @@ using UMB.CLI.Views;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
+using Sma5h.Mods.Music.Models;
 using Spectre.Console;
 using System;
 using System.Collections.Generic;
@@ -37,6 +38,7 @@ namespace UMB.CLI.Services
 
     public class VolumeOverride
     {
+        public string BgmId { get; set; }
         public int OriginalIndex { get; set; }
         public float Volume { get; set; }
     }
@@ -50,9 +52,11 @@ namespace UMB.CLI.Services
 
     public class VolumeRowDto
     {
+        public string BgmId { get; set; }
         public int OriginalIndex { get; set; }
         public string Title { get; set; }
         public string Filename { get; set; }
+        public bool HasVolumeOverride { get; set; }
         public bool HasMeasurement { get; set; }
         public float MeasuredLufs { get; set; }
         public float AutoGain { get; set; }
@@ -78,13 +82,15 @@ namespace UMB.CLI.Services
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
         private readonly ILufsAnalysisService _lufsService;
         private readonly IAudioDecodeService _decodeService;
+        private readonly VanillaCatalogService _catalog;
 
         public VolumeConfigService(
             IOptionsMonitor<Sma5hMusicOptions> musicConfig,
             ILufsAnalysisService lufsService,
             IAudioDecodeService decodeService,
-            ILogger<VolumeConfigService> logger)
+            ILogger<VolumeConfigService> logger, VanillaCatalogService catalog = null)
         {
+            _catalog = catalog;
             _musicConfig = musicConfig;
             _lufsService = lufsService;
             _decodeService = decodeService;
@@ -118,6 +124,7 @@ namespace UMB.CLI.Services
                 return;
             }
 
+            rows.AddRange(VanillaRows(seriesDir).Select(r => (Dictionary<string, string>)r));
             if (rows.Count == 0)
             {
                 _logger.LogWarning("No tracks found in {Path}.", csvPath);
@@ -134,6 +141,7 @@ namespace UMB.CLI.Services
                 _logger.LogWarning("FFmpeg is not available — auto-gain values cannot be calculated. You can still edit per-song overrides, but they will not be informed by measurement.");
             }
 
+            var dtoByIndex = new Dictionary<int, VolumeRowDto>();
             var viewModels = new VolumeRowViewModel[rows.Count];
             AnsiConsole.Status()
                 .Spinner(Spinner.Known.Dots)
@@ -142,6 +150,7 @@ namespace UMB.CLI.Services
                     Parallel.For(0, rows.Count, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
                     {
                         var dto = AnalyzeRow(rows[i], i, seriesDir, target, maxMult, useCacheOnly: false);
+                        lock (dtoByIndex) dtoByIndex[dto.OriginalIndex] = dto;
                         viewModels[i] = new VolumeRowViewModel
                         {
                             OriginalIndex = dto.OriginalIndex,
@@ -184,16 +193,10 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            if (!headers.Contains("volume"))
-                headers = headers.Append("volume").ToArray();
-
-            foreach (var vm in result)
+            SaveOverrides(seriesDir, result.Select(vm => new VolumeOverride
             {
-                if (vm.OriginalIndex < 0 || vm.OriginalIndex >= rows.Count) continue;
-                rows[vm.OriginalIndex]["volume"] = vm.UserOverride.ToString("0.###", CultureInfo.InvariantCulture);
-            }
-
-            WriteCsvRows(csvPath, rows, headers);
+                OriginalIndex = vm.OriginalIndex, BgmId = dtoByIndex[vm.OriginalIndex].BgmId, Volume = vm.UserOverride
+            }).ToList());
             _logger.LogInformation("Volume overrides saved to {Path}.", csvPath);
         }
 
@@ -210,11 +213,13 @@ namespace UMB.CLI.Services
 
             var dto = new VolumeRowDto
             {
-                OriginalIndex = index,
+                BgmId = row.GetValueOrDefault("bgm_id"),
+                HasVolumeOverride = row.GetValueOrDefault("has_volume_override", "True") == "True",
+                OriginalIndex = row.ContainsKey("vanilla_index") ? int.Parse(row["vanilla_index"], CultureInfo.InvariantCulture) : index,
                 Title = title,
                 Filename = filename,
                 UserOverride = ParseVolume(row.GetValueOrDefault("volume", "1.0")),
-                AutoGain = 1.0f,
+                AutoGain = ParseVolume(row.GetValueOrDefault("base_volume", "1")),
             };
 
             if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
@@ -262,6 +267,7 @@ namespace UMB.CLI.Services
             }
 
             var (rows, _) = ReadCsvRows(csvPath);
+            rows.AddRange(VanillaRows(seriesDir).Select(r => (Dictionary<string, string>)r));
 
             var globalMult = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
             var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization;
@@ -328,17 +334,7 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            var (rows, headers) = ReadCsvRows(csvPath);
-            if (!headers.Contains("volume"))
-                headers = headers.Append("volume").ToArray();
-
-            foreach (var ov in input.Overrides ?? new List<VolumeOverride>())
-            {
-                if (ov.OriginalIndex < 0 || ov.OriginalIndex >= rows.Count) continue;
-                rows[ov.OriginalIndex]["volume"] = ov.Volume.ToString("0.###", CultureInfo.InvariantCulture);
-            }
-
-            WriteCsvRows(csvPath, rows, headers);
+            SaveOverrides(input.SeriesPath, input.Overrides ?? new());
             _logger.LogInformation("Volume overrides saved to {Path}.", csvPath);
         }
 
@@ -357,7 +353,9 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            var sourcePath = Path.Combine(input.SeriesPath, input.Filename);
+            var sourcePath = Path.IsPathRooted(input.Filename)
+                ? VanillaRows(input.SeriesPath).SingleOrDefault(r => r.Get("filename") == input.Filename)?.Get("filename")
+                : Path.Combine(input.SeriesPath, input.Filename);
             if (!File.Exists(sourcePath))
             {
                 _logger.LogError("Source file not found: {Path}", sourcePath);
@@ -368,6 +366,49 @@ namespace UMB.CLI.Services
                 _logger.LogInformation("Decoded preview: {Path}", input.OutputPath);
             else
                 _logger.LogError("Failed to decode '{File}' for preview.", input.Filename);
+        }
+
+        private List<CsvRow> VanillaRows(string seriesPath)
+        {
+            var tomlPath = Path.Combine(seriesPath, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
+            if (!File.Exists(tomlPath)) return new();
+            var series = SeriesToml.ReadHeader(File.ReadAllText(tomlPath));
+            if (!series.ExistingSeries) return new();
+            var saved = VanillaSongOverride.Read(seriesPath).ToDictionary(o => o.BgmId);
+            return (_catalog?.Get()?.Songs ?? new()).Where(s => s.SeriesId == MusicConstants.InternalIds.SERIES_ID_PREFIX + series.Id)
+                .Select((song, index) => new CsvRow
+                {
+                    ["bgm_id"] = song.BgmId, ["vanilla_index"] = (-index - 1).ToString(CultureInfo.InvariantCulture),
+                    ["filename"] = song.AudioPath, ["title"] = saved.GetValueOrDefault(song.BgmId)?.Title ?? song.Name,
+                    ["volume"] = (saved.GetValueOrDefault(song.BgmId)?.Volume ?? 1).ToString(CultureInfo.InvariantCulture),
+                    ["has_volume_override"] = (saved.GetValueOrDefault(song.BgmId)?.Volume != null).ToString(),
+                    ["base_volume"] = song.BaseVolume.ToString(CultureInfo.InvariantCulture)
+                }).ToList();
+        }
+
+        private void SaveOverrides(string seriesPath, List<VolumeOverride> input)
+        {
+            if (input.Any(o => !float.IsFinite(o.Volume) || o.Volume < 0))
+                throw new InvalidDataException("Volume must be a finite non-negative multiplier.");
+            var csvPath = Path.Combine(seriesPath, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
+            var (rows, headers) = ReadCsvRows(csvPath);
+            if (!headers.Contains("volume")) headers = headers.Append("volume").ToArray();
+            var vanilla = VanillaRows(seriesPath).Select(r => r.Get("bgm_id")).ToHashSet();
+            var saved = VanillaSongOverride.Read(seriesPath).ToDictionary(o => o.BgmId);
+            foreach (var ov in input)
+            {
+                if (!string.IsNullOrEmpty(ov.BgmId))
+                {
+                    if (!vanilla.Contains(ov.BgmId)) throw new InvalidDataException("Invalid vanilla song for this series.");
+                    if (!saved.TryGetValue(ov.BgmId, out var song)) saved[ov.BgmId] = song = new() { BgmId = ov.BgmId };
+                    // An explicit 1 also opts this vanilla song into build-time normalization.
+                    song.Volume = ov.Volume;
+                }
+                else if (ov.OriginalIndex >= 0 && ov.OriginalIndex < rows.Count)
+                    rows[ov.OriginalIndex]["volume"] = ov.Volume.ToString("0.###", CultureInfo.InvariantCulture);
+            }
+            WriteCsvRows(csvPath, rows, headers);
+            if (saved.Count > 0) VanillaSongOverride.Write(seriesPath, saved.Values);
         }
 
         private T ReadBatchInput<T>(string jsonPath, string command) where T : class

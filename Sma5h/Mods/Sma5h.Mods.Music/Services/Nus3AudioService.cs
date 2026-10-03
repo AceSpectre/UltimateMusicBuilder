@@ -25,6 +25,7 @@ namespace Sma5h.Mods.Music.Services
         private readonly string _nus3AudioExeFile;
         private readonly string _nus3BankTemplateFile;
         private ushort _lastBankId;
+        private readonly Dictionary<string, ushort> _coreBankIds;
 
         public Nus3AudioService(IOptionsMonitor<Sma5hMusicOptions> config, IAudioMetadataService audioMetadataService, IProcessService processService, ILogger<INus3AudioService> logger)
         {
@@ -36,7 +37,7 @@ namespace Sma5h.Mods.Music.Services
                                 ?? Path.Combine(config.CurrentValue.ToolsPath, MusicConstants.Resources.NUS3AUDIO_EXE_FILE);
             _nus3BankTemplateFile = Path.Combine(config.CurrentValue.ResourcesPath, MusicConstants.Resources.NUS3BANK_TEMPLATE_FILE);
 
-            var nus3BankIds = GetCoreNus3BankIds();
+            var nus3BankIds = _coreBankIds = GetCoreNus3BankIds();
             _lastBankId = (ushort)(nus3BankIds.Count > 0 ? nus3BankIds.Values.OrderByDescending(p => p).First() : 0);
         }
 
@@ -154,7 +155,7 @@ namespace Sma5h.Mods.Music.Services
                 using (var w = new BinaryWriter(memoryStreamWrite))
                 {
                     w.BaseStream.Position = nameIdPosition; //NameId
-                    w.Write(GetNewNus3BankId());
+                    w.Write(_coreBankIds.TryGetValue("bgm_" + toneId, out var nativeId) ? nativeId : GetNewNus3BankId());
                     if (found.Length != 3)
                     {
                         _logger.LogError("Error while locating the volume offset in the nus3bank");

@@ -12,6 +12,7 @@ namespace Sma5h.Mods.Music.Models
         public List<GameTitleEntry> GameTitleEntries { get; }
         public List<SeriesEntry> SeriesEntries { get; }
         public List<PlaylistEntry> PlaylistEntries { get; }
+        public List<VanillaSongOverride> VanillaSongOverrides { get; } = new();
         public Dictionary<string, List<string>> SeriesSongOrderings { get; }
 
         public MusicModEntries()

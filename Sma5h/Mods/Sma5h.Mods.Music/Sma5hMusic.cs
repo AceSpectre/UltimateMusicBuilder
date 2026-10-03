@@ -33,6 +33,8 @@ namespace Sma5h.Mods.Music
         /// </summary>
         public static Dictionary<string, int> ExplicitSeriesOrder { get; set; }
 
+        private readonly Dictionary<string, VanillaSongOverride> _vanillaOverrides = new();
+
         public override string ModName => "Sma5hMusic";
 
         public Sma5hMusic(IOptionsMonitor<Sma5hMusicOptions> config, IMusicModManagerService musicModManagerService, IAudioStateService audioStateService,
@@ -65,6 +67,7 @@ namespace Sma5h.Mods.Music
             _logger.LogInformation("Loading Sma5hMusic Mods");
             var musicMods = _musicModManagerService.RefreshMusicMods();
 
+            _vanillaOverrides.Clear();
             foreach (var musicMod in musicMods)
             {
                 //Add to Audio State Service
@@ -85,6 +88,11 @@ namespace Sma5h.Mods.Music
                     _audioStateService.AddBgmPropertyEntry(bgmPropertiesEntry);
                 foreach (var playlistEntry in musicModEntries.PlaylistEntries)
                     _audioStateService.AddPlaylistEntry(playlistEntry);
+                foreach (var song in musicModEntries.VanillaSongOverrides)
+                {
+                    _audioStateService.ApplyVanillaSongOverride(song);
+                    _vanillaOverrides[song.BgmId] = song;
+                }
                 foreach (var ordering in musicModEntries.SeriesSongOrderings)
                     _audioStateService.RegisterSeriesSongOrdering(ordering.Key, ordering.Value);
             }
@@ -186,22 +194,7 @@ namespace Sma5h.Mods.Music
                 var nusBankOutputFile = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3BANK_FILE, bgmPropertyEntry.NameId));
                 var nusAudioOutputFile = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3AUDIO_FILE, bgmPropertyEntry.NameId));
 
-                var finalVolume = globalMult * bgmPropertyEntry.AudioVolume;
-                if (lufsEnabled && !string.IsNullOrEmpty(bgmPropertyEntry.Filename) && File.Exists(bgmPropertyEntry.Filename))
-                {
-                    var measurement = _lufsService.Measure(bgmPropertyEntry.Filename);
-                    if (measurement.IsValid)
-                    {
-                        var gain = _lufsService.CalculateGain(measurement, lufsOpts.TargetLufs, lufsOpts.MaxGainMultiplier);
-                        finalVolume = globalMult * gain.Multiplier * bgmPropertyEntry.AudioVolume;
-                        if (gain.WasClamped)
-                            _logger.LogWarning("Song {NameId}: LUFS gain clamped to {Max}x (source measured {Measured:F1} LUFS). Source is too quiet to reach target loudness — consider replacing with a louder master.",
-                                bgmPropertyEntry.NameId, lufsOpts.MaxGainMultiplier, measurement.IntegratedLufs);
-                        else
-                            _logger.LogDebug("Song {NameId}: measured {Measured:F1} LUFS, applying {Gain:F2}x gain (final bank volume {Final:F2}).",
-                                bgmPropertyEntry.NameId, measurement.IntegratedLufs, gain.Multiplier, finalVolume);
-                    }
-                }
+                var finalVolume = FinalVolume(bgmPropertyEntry, bgmPropertyEntry.AudioVolume, 1);
 
                 //We always generate a new Nus3Bank as the internal ID might change
                 _logger.LogInformation("Generating Nus3Bank for {NameId}", bgmPropertyEntry.NameId);
@@ -213,6 +206,18 @@ namespace Sma5h.Mods.Music
                     _logger.LogError("Error! The song with ToneId {NameId}, File {Filename} could not be processed.", bgmPropertyEntry.NameId, bgmPropertyEntry.Filename);
             }
 
+            foreach (var song in _vanillaOverrides.Values.Where(o => o.Volume != null))
+            {
+                var root = _audioStateService.GetBgmDbRootEntries().Single(e => e.UiBgmId == song.BgmId);
+                var set = _audioStateService.GetBgmStreamSetEntries().Single(e => e.StreamSetId == root.StreamSetId);
+                var info = _audioStateService.GetBgmAssignedInfoEntries().Single(e => e.InfoId == set.Info0);
+                var stream = _audioStateService.GetBgmStreamPropertyEntries().Single(e => e.StreamId == info.StreamId);
+                var property = _audioStateService.GetBgmPropertyEntries().Single(e => e.NameId == stream.DataName0);
+                var outputBank = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm",
+                    string.Format(MusicConstants.GameResources.NUS3BANK_FILE, property.NameId));
+                _nus3AudioService.GenerateNus3Bank(property.NameId, FinalVolume(property, song.Volume.Value, property.AudioVolume), outputBank);
+            }
+
             if (lufsEnabled)
                 _lufsService.SaveCache();
 
@@ -220,6 +225,24 @@ namespace Sma5h.Mods.Music
             ConvertSeriesIcons();
 
             return true;
+        }
+
+        private float FinalVolume(BgmPropertyEntry property, float userOverride, float fallbackGain)
+        {
+            var options = _config.CurrentValue.Sma5hMusic;
+            var gain = fallbackGain;
+            if (options.LufsNormalization is { Enabled: true } lufs && _lufsService.IsAvailable && File.Exists(property.Filename))
+            {
+                var measurement = _lufsService.Measure(property.Filename);
+                if (measurement.IsValid)
+                {
+                    var result = _lufsService.CalculateGain(measurement, lufs.TargetLufs, lufs.MaxGainMultiplier);
+                    gain = result.Multiplier;
+                    if (result.WasClamped)
+                        _logger.LogWarning("Song {NameId}: LUFS gain clamped to {Max}x (source measured {Measured:F1} LUFS).", property.NameId, lufs.MaxGainMultiplier, measurement.IntegratedLufs);
+                }
+            }
+            return options.GlobalVolumeMultiplier * gain * userOverride;
         }
 
         private bool ConvertNus3Audio(bool useCache, BgmPropertyEntry bgmPropertyEntry, string nusAudioOutputFile)

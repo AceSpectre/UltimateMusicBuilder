@@ -100,11 +100,14 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     _logger.LogError("series.toml in {Subfolder}: [series] id is required.", subfolder);
                     continue;
                 }
-                if (seriesFile.Games == null || seriesFile.Games.Count == 0)
+                if (!seriesFile.Series.ExistingSeries && (seriesFile.Games == null || seriesFile.Games.Count == 0))
                 {
                     _logger.LogError("series.toml in {Subfolder} has no [[games]] entries.", subfolder);
                     continue;
                 }
+
+                if (seriesFile.Series.ExistingSeries)
+                    output.VanillaSongOverrides.AddRange(VanillaSongOverride.Read(subfolder));
 
                 var uiSeriesId = MusicConstants.InternalIds.SERIES_ID_PREFIX + seriesFile.Series.Id;
                 var isExistingSeries = seriesFile.Series.ExistingSeries;
@@ -307,6 +310,13 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
 
                     playlistTracks.Add((uiBgmId, seriesFile.Series.PlaylistIncidence));
                     filenameByUiBgmId[uiBgmId] = row.Filename;
+                }
+
+                foreach (var song in output.VanillaSongOverrides.Where(o => !string.IsNullOrEmpty(o.Info1) && !o.Info1.StartsWith("info_")))
+                {
+                    if (!filenameToInfoId.TryGetValue(song.Info1, out var infoId))
+                        throw new InvalidDataException($"Vanilla song {song.BgmId}: pinch song '{song.Info1}' was not found in this series.");
+                    song.Info1 = infoId;
                 }
 
                 // ── Resolve info1 references ─────────────────────────────

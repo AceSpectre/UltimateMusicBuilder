@@ -38,6 +38,7 @@ namespace Sma5h.Mods.Music.Interfaces
         bool AddGameTitleEntry(GameTitleEntry gameTitleEntry);
         bool AddPlaylistEntry(PlaylistEntry playlistEntry);
 
+        bool ApplyVanillaSongOverride(VanillaSongOverride song);
         void InitBgmEntriesFromStateManager();
         bool SaveBgmEntriesToStateManager();
         void RegisterSeriesSongOrdering(string uiSeriesId, IReadOnlyList<string> orderedUiBgmIds);

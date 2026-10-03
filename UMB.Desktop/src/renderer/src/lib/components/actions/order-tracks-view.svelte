@@ -43,7 +43,7 @@
     new Set(
       dndItems
         .map((item) => item.fields?.info1?.trim())
-        .filter((info1): info1 is string => Boolean(info1) && !info1.startsWith('info_'))
+        .filter((info1): info1 is string => Boolean(info1))
     )
   )
 
@@ -64,7 +64,7 @@
   )
 
   function isPinchTarget(item: TrackOrderItem): boolean {
-    return Boolean(item.filename) && pinchTargets.has(item.filename)
+    return pinchTargets.has(item.filename || item.infoId)
   }
 
   function hasForeignCategory(item: TrackOrderItem): boolean {
@@ -93,20 +93,15 @@
     item.fields.info1 = value
     item.fields.special_category = PINCH_CATEGORY
 
-    // A chosen mod track cannot itself point at a pinch song (vanilla targets have no row).
-    if (!value.startsWith('info_')) {
-      const target = dndItems.find((other) => other.filename === value && other.fields)
-      if (target?.fields?.info1) {
-        target.fields.info1 = ''
-        if (target.fields.special_category === PINCH_CATEGORY) {
-          target.fields.special_category = ''
-        }
-      }
+    const target = dndItems.find((other) => (other.filename || other.infoId) === value && other.fields)
+    if (target?.fields?.info1) {
+      target.fields.info1 = ''
+      if (target.fields.special_category === PINCH_CATEGORY) target.fields.special_category = ''
     }
   }
 
   const selectedItem = $derived(dndItems.find((item) => item.id === selectedItemId) ?? null)
-  const canUseDefaults = $derived(Boolean(orderData?.defaultTrackData) && selectedItem?.fields != null)
+  const canUseDefaults = $derived(Boolean(orderData?.defaultTrackData) && selectedItem?.originalIndex != null && selectedItem?.fields != null)
 
   function applyDefaults() {
     const defaults = orderData?.defaultTrackData
@@ -350,7 +345,7 @@
           <div class="min-w-[1000px]">
             <div
               class="sticky z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-              style="grid-template-columns: 24px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px 60px minmax(160px,1fr) 84px; top: -5px"
+              style="grid-template-columns: 24px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px 76px 60px minmax(160px,1fr) 84px; top: -5px"
             >
               <span></span>
               <span>{$_('orderTracks.colTitle')}</span>
@@ -358,6 +353,7 @@
               <span>{$_('orderTracks.colAuthor')}</span>
               <span>{$_('orderTracks.colCopyright')}</span>
               <span>{$_('orderTracks.colRecord')}</span>
+              <span>{$_('orderTracks.colVolume')}</span>
               <span class="text-center">{$_('orderTracks.colIsPinch')}</span>
               <span>{$_('orderTracks.colPinchSong')}</span>
               <span class="text-center">{$_('orderTracks.colInSoundtest')}</span>
@@ -374,7 +370,7 @@
                 <div
                   animate:flip={{ duration: FLIP_MS }}
                   class="grid items-center gap-1 rounded border px-1 py-0.5 {item.isLocked ? 'border-border bg-background/75 opacity-80' : isSelected ? 'border-transparent bg-background ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border bg-background/75'}"
-                  style="grid-template-columns: 24px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px 60px minmax(160px,1fr) 84px;"
+                  style="grid-template-columns: 24px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px 76px 60px minmax(160px,1fr) 84px;"
                   role="listitem"
                   onfocusincapture={() => { if (!item.isLocked) selectedItemId = item.id }}
                   onpointerdown={() => { if (!item.isLocked) selectedItemId = item.id }}
@@ -403,7 +399,7 @@
                     />
 
                     {#if orderData.games.length > 0}
-                      <select class={inputClass} bind:value={f.game} aria-label={$_('orderTracks.colGame')}>
+                      <select class={inputClass} disabled={item.originalIndex === null} bind:value={f.game} aria-label={$_('orderTracks.colGame')}>
                         {#each orderData.games as game}
                           <option value={game.id}>{game.name}</option>
                         {/each}
@@ -412,17 +408,25 @@
                         {/if}
                       </select>
                     {:else}
-                      <input type="text" class={inputClass} bind:value={f.game} aria-label={$_('orderTracks.colGame')} />
+                      <input type="text" class={inputClass} disabled={item.originalIndex === null} bind:value={f.game} aria-label={$_('orderTracks.colGame')} />
                     {/if}
 
                     <input type="text" class={inputClass} bind:value={f.author} aria-label={$_('orderTracks.colAuthor')} />
                     <input type="text" class={inputClass} bind:value={f.copyright} aria-label={$_('orderTracks.colCopyright')} />
 
-                    <select class={inputClass} bind:value={f.record_type} aria-label={$_('orderTracks.colRecord')}>
+                    <select class={inputClass} disabled={item.originalIndex === null} bind:value={f.record_type} aria-label={$_('orderTracks.colRecord')}>
                       {#each RECORD_OPTIONS as option}
                         <option value={option}>{recordLabel(option)}</option>
                       {/each}
                     </select>
+
+                    <input type="number" min="0" step="0.05" class={inputClass}
+                      value={f.volume ?? 1} aria-label={$_('orderTracks.colVolume')}
+                      onchange={(event) => {
+                        const volume = event.currentTarget.valueAsNumber
+                        if (Number.isFinite(volume) && volume >= 0) f.volume = volume
+                        else event.currentTarget.value = String(f.volume ?? 1)
+                      }} />
 
                     <div class="flex items-center justify-center">
                       <input
@@ -449,7 +453,7 @@
                       value={pinchOptions.find((o) => o.value === f.info1)?.title ?? f.info1}
                       onchange={(event) => {
                         const text = event.currentTarget.value.trim()
-                        const match = pinchOptions.find((o) => o.title === text && o.value !== item.filename)
+                        const match = pinchOptions.find((o) => o.title === text && o.value !== (item.filename || item.infoId))
                         setPinchSong(item, text === '' ? '' : match?.value ?? '')
                         // Reset display so an unmatched free-text entry doesn't linger.
                         event.currentTarget.value = pinchOptions.find((o) => o.value === f.info1)?.title ?? f.info1
@@ -460,6 +464,7 @@
                       <input
                         type="checkbox"
                         class="h-4 w-4 accent-[hsl(var(--gradient-from))]"
+                        disabled={item.originalIndex === null}
                         checked={f.in_soundtest.toLowerCase() === 'true'}
                         aria-label={$_('orderTracks.colInSoundtest')}
                         onchange={(event) => {
@@ -471,6 +476,7 @@
                     <!-- Locked vanilla row: read-only, same grid layout/height as editable rows -->
                     <div class="truncate rounded border border-transparent px-1.5 py-0.5 text-[12.5px] font-medium" title={item.title}>{item.title}</div>
                     <span class="truncate self-center px-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">{$_('orderTracks.vanillaTag')}</span>
+                    <span></span>
                     <span></span>
                     <span></span>
                     <span></span>

@@ -5,6 +5,7 @@ using UMB.CLI.Views;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
+using Sma5h.Mods.Music.Models;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -26,7 +27,7 @@ namespace UMB.CLI.Services
         {
             ("title", f => f.Title), ("game", f => f.Game), ("author", f => f.Author), ("copyright", f => f.Copyright),
             ("record_type", f => f.RecordType), ("special_category", f => f.SpecialCategory), ("info1", f => f.Info1),
-            ("in_soundtest", f => f.InSoundtest)
+            ("in_soundtest", f => f.InSoundtest), ("volume", f => f.Volume?.ToString("0.###", CultureInfo.InvariantCulture))
         };
 
         private readonly ILogger _logger;
@@ -72,7 +73,7 @@ namespace UMB.CLI.Services
                     OriginalIndex = item.OriginalIndex ?? -1,
                     Title = item.Title,
                     Subtitle = item.Subtitle,
-                    IsVanilla = item.IsLocked,
+                    IsVanilla = item.OriginalIndex == null,
                     BgmId = item.BgmId,
                 };
                 itemIdByViewModel[vm] = item.Id;
@@ -119,18 +120,22 @@ namespace UMB.CLI.Services
             var (data, rows, headers) = LoadUnchecked(resolvedSeriesPath);
             var files = SeriesFiles.Of(resolvedSeriesPath);
 
-            var orderedIds = items.Select(i => i.Id).ToList();
+            var orderedIds = items.Select(i => i.Id).Distinct().ToList();
             var itemById = data.Items.ToDictionary(i => i.Id);
             var finalItems = orderedIds.Where(itemById.ContainsKey).Select(id => itemById[id])
                 .Concat(data.Items.Where(i => !orderedIds.Contains(i.Id)))
                 .ToList();
 
             var fieldsById = items.Where(i => i.Fields != null).ToDictionary(i => i.Id, i => i.Fields);
+            foreach (var fields in fieldsById.Values)
+                if (fields.Volume is float volume && (!float.IsFinite(volume) || volume < 0))
+                    throw new DesktopApiException("Volume must be a finite non-negative multiplier.");
+            SaveVanillaFields(resolvedSeriesPath, finalItems, fieldsById);
             foreach (var item in finalItems)
             {
                 if (item.OriginalIndex is not int index || !fieldsById.TryGetValue(item.Id, out var fields)) continue;
                 foreach (var (column, value) in EditableColumns)
-                    rows[index][column] = value(fields) ?? "";
+                    if (column != "volume" || fields.Volume != null) rows[index][column] = value(fields) ?? "";
             }
 
             var nextHeaders = headers.ToList();
@@ -164,7 +169,7 @@ namespace UMB.CLI.Services
                     "# Listed in the order they will appear in the in-game Sound Test / My Music view.",
                     "song_order = ["
                 };
-                lines.AddRange(ids.Select((item, i) => $"  \"{item.BgmId}\"{(i < ids.Count - 1 ? "," : "")} # {(item.IsLocked ? "vanilla" : "mod")}"));
+                lines.AddRange(ids.Select((item, i) => $"  \"{item.BgmId}\"{(i < ids.Count - 1 ? "," : "")} # {(item.OriginalIndex == null ? "vanilla" : "mod")}"));
                 lines.Add("]");
                 File.WriteAllText(files.SongOrder, string.Join("\n", lines) + "\n");
             }
@@ -200,7 +205,12 @@ namespace UMB.CLI.Services
             var declared = series.Games.Select(g => g.Id).ToHashSet();
             var games = series.Games.Concat(vanillaGames.Where(g => !declared.Contains(g.Id))).ToList();
 
-            var items = OrderItems(BuildModItems(rows), rows, songOrder, ResolveVanillaTitle);
+            var overrides = VanillaSongOverride.Read(seriesPath).ToDictionary(o => o.BgmId);
+            var vanillaItems = series.ExistingSeries ? (catalog?.Songs ?? new()).Where(s => s.SeriesId == uiSeriesId)
+                .Select(s => BuildVanillaItem(s, overrides.GetValueOrDefault(s.BgmId))).ToList() : new();
+            var items = OrderItems(BuildModItems(rows), rows, songOrder, ResolveVanillaTitle, vanillaItems);
+            var references = items.Select(i => i.Fields?.Info1).Where(id => !string.IsNullOrEmpty(id)).ToHashSet();
+            items = items.Select(i => i with { IsPinchTarget = references.Contains(i.OriginalIndex == null ? i.InfoId : i.Filename) }).ToList();
             var data = new TrackOrderData(Path.GetFileName(seriesPath), seriesPath, series.ExistingSeries, songOrder.Count > 0,
                 games, vanillaSongs, series.DefaultTrackData, items);
             return (data, rows, headers);
@@ -255,12 +265,14 @@ namespace UMB.CLI.Services
                     ? MusicConstants.InternalIds.UI_BGM_ID_PREFIX + FolderMusicMod.DeriveToneId(filename)
                     : $"{MusicConstants.InternalIds.UI_BGM_ID_PREFIX}track_{index}";
                 return new TrackOrderItem($"mod:{index}", title, game.Length > 0 ? $"{game} - {filename}" : filename,
-                    bgmId, filename, false, index, BuildFields(row), filename.Length > 0 && referencedFilenames.Contains(filename));
+                    bgmId, filename, false, index, BuildFields(row), filename.Length > 0 && referencedFilenames.Contains(filename),
+                    MusicConstants.InternalIds.INFO_ID_PREFIX + FolderMusicMod.DeriveToneId(filename));
             }).ToList();
         }
 
         private static TrackFields BuildFields(CsvRow row) => new()
         {
+            Volume = string.IsNullOrWhiteSpace(row.Get("volume")) ? null : VolumeConfigService.ParseVolume(row.Get("volume")),
             Title = row.Get("title"),
             Game = row.Get("game"),
             Author = row.Get("author"),
@@ -272,29 +284,35 @@ namespace UMB.CLI.Services
         };
 
         /// <summary>
-        /// song_order.toml wins when present (unknown ids become locked vanilla items, unlisted
-        /// mod tracks are appended); otherwise mod tracks sorted by their `order` column.
+        /// song_order.toml wins when present. Unknown ids are preserved, and unlisted songs
+        /// are appended; otherwise mod tracks use the CSV order followed by vanilla songs.
         /// </summary>
         private static List<TrackOrderItem> OrderItems(List<TrackOrderItem> modItems, List<CsvRow> rows,
-            List<string> songOrder, Func<string, string> resolveVanillaTitle)
+            List<string> songOrder, Func<string, string> resolveVanillaTitle, List<TrackOrderItem> vanillaItems)
         {
             if (songOrder.Count == 0)
             {
                 return modItems
                     .OrderBy(item => ParseOrder(rows[item.OriginalIndex ?? 0]) ?? int.MaxValue)
-                    .ToList();
+                    .Concat(vanillaItems).ToList();
             }
 
             var modByBgmId = modItems.GroupBy(i => i.BgmId).ToDictionary(g => g.Key, g => g.Last());
             var seen = new HashSet<string>();
             var result = new List<TrackOrderItem>();
+            var vanillaByBgmId = vanillaItems.ToDictionary(i => i.BgmId);
             var vanillaIndex = 0;
-            foreach (var bgmId in songOrder)
+            foreach (var bgmId in songOrder.Distinct())
             {
                 if (modByBgmId.TryGetValue(bgmId, out var modItem))
                 {
                     seen.Add(modItem.Id);
                     result.Add(modItem);
+                }
+                else if (vanillaByBgmId.TryGetValue(bgmId, out var vanillaItem))
+                {
+                    seen.Add(vanillaItem.Id);
+                    result.Add(vanillaItem);
                 }
                 else
                 {
@@ -302,8 +320,47 @@ namespace UMB.CLI.Services
                         "[vanilla] preserved from song_order.toml", bgmId, "", true, null, null, false));
                 }
             }
-            result.AddRange(modItems.Where(i => !seen.Contains(i.Id)));
+            result.AddRange(modItems.Concat(vanillaItems).Where(i => !seen.Contains(i.Id)));
             return result;
+        }
+
+        private static TrackFields VanillaFields(VanillaCatalogService.Song song, VanillaSongOverride saved = null) => new()
+        {
+            Title = saved?.Title ?? song.Name, Author = saved?.Author ?? song.Author,
+            Copyright = saved?.Copyright ?? song.Copyright, Volume = saved?.Volume ?? 1,
+            Game = song.Game, RecordType = song.RecordType, InSoundtest = song.InSoundtest.ToString(),
+            Info1 = saved?.Info1 ?? song.Info1, SpecialCategory = saved?.SpecialCategory ?? song.SpecialCategory
+        };
+
+        private static TrackOrderItem BuildVanillaItem(VanillaCatalogService.Song song, VanillaSongOverride saved)
+        {
+            var fields = VanillaFields(song, saved);
+            return new TrackOrderItem("vanilla:" + song.BgmId, fields.Title, "[vanilla] " + song.BgmId,
+                song.BgmId, "", false, null, fields, false, song.InfoId);
+        }
+
+        private void SaveVanillaFields(string seriesPath, List<TrackOrderItem> items, Dictionary<string, TrackFields> fieldsById)
+        {
+            var overrides = VanillaSongOverride.Read(seriesPath).ToDictionary(o => o.BgmId);
+            var catalog = _catalog.Get();
+            foreach (var item in items.Where(i => i.OriginalIndex == null && i.Fields != null))
+            {
+                if (!fieldsById.TryGetValue(item.Id, out var fields)) continue;
+                var song = catalog?.Songs.SingleOrDefault(s => s.BgmId == item.BgmId);
+                if (song == null) continue;
+                overrides[item.BgmId] = new VanillaSongOverride
+                {
+                    BgmId = item.BgmId,
+                    Title = fields.Title == song.Name ? null : fields.Title,
+                    Author = fields.Author == song.Author ? null : fields.Author,
+                    Copyright = fields.Copyright == song.Copyright ? null : fields.Copyright,
+                    Volume = fields.Volume == 1 && overrides.GetValueOrDefault(item.BgmId)?.Volume == null ? null : fields.Volume,
+                    Info1 = fields.Info1 == song.Info1 ? null : fields.Info1,
+                    SpecialCategory = fields.SpecialCategory == song.SpecialCategory ? null : fields.SpecialCategory
+                };
+            }
+            if (overrides.Count > 0 || File.Exists(Path.Combine(seriesPath, VanillaSongOverride.FileName)))
+                VanillaSongOverride.Write(seriesPath, overrides.Values);
         }
 
         internal static int? ParseOrder(Dictionary<string, string> row) =>

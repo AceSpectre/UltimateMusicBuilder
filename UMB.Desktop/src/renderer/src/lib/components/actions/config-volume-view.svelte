@@ -36,7 +36,7 @@
 
   const seriesPath = $derived(selectedPath)
   const selectedSeries = $derived(series.find((e) => e.path === selectedPath) ?? null)
-  const isDirty = $derived(rows.some((r) => Math.abs((baseline.get(r.originalIndex) ?? r.userOverride) - r.userOverride) > 0.0001))
+  const isDirty = $derived(rows.some((r) => (r.bgmId && !r.hasVolumeOverride) || Math.abs((baseline.get(r.originalIndex) ?? r.userOverride) - r.userOverride) > 0.0001))
   // Highlighted when no LUFS cache exists yet.
   const canAnalyze = $derived(!!data && !!selectedPath && data.ffmpegAvailable && !analyzing && !loadingConfig)
   const needsAnalysis = $derived(!!data && !data.lufsCacheExists)
@@ -128,8 +128,9 @@
     try {
       await window.electron.umb.saveVolumeConfig(
         seriesPath,
-        rows.map((r) => ({ originalIndex: r.originalIndex, volume: r.userOverride }))
+        rows.map((r) => ({ originalIndex: r.originalIndex, bgmId: r.bgmId, volume: r.userOverride }))
       )
+      rows = rows.map((r) => ({ ...r, hasVolumeOverride: true }))
       baseline = new Map(rows.map((r) => [r.originalIndex, r.userOverride]))
       saveState = 'saved'
     } catch (err) {
@@ -347,7 +348,8 @@
         </div>
       {:else}
         <div class="min-h-0 flex-1 overflow-auto bg-background px-5 py-3">
-          <p class="mb-3 max-w-[820px] text-[12.5px] leading-relaxed text-muted-foreground">{$_('configVolume.intro')}</p>
+          <p class="mb-3 max-w-[820px] text-[12.5px] leading-relaxed text-muted-foreground">{$_('configVolume.intro')}
+          {#if rows.some((r) => r.bgmId)} {$_('configVolume.vanillaHint')} {/if}</p>
 
           {#if data && !data.ffmpegAvailable}
             <div class="mb-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px]" style="border-color: hsl(38 92% 50% / .4); background: hsl(38 92% 50% / .1); color: hsl(38 92% 35%);">
@@ -381,7 +383,7 @@
                     <td class="px-3 py-2">
                       <div class="flex min-w-0 flex-col">
                         <span class="truncate font-semibold">{row.title}</span>
-                        <span class="truncate text-[11px] text-muted-foreground">{row.filename}</span>
+                        <span class="truncate text-[11px] text-muted-foreground">{row.bgmId ? `${$_('orderTracks.vanillaTag')} · ${row.bgmId}` : row.filename}</span>
                       </div>
                     </td>
                     <td class="px-3 py-2 text-right font-mono text-[12px]">

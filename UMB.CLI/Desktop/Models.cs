@@ -46,12 +46,13 @@ namespace UMB.CLI.Desktop
         public string Copyright { get; set; } = "";
         [JsonPropertyName("record_type")] public string RecordType { get; set; } = "original";
         [JsonPropertyName("special_category")] public string SpecialCategory { get; set; } = "";
+        public float? Volume { get; set; }
         public string Info1 { get; set; } = "";
         [JsonPropertyName("in_soundtest")] public string InSoundtest { get; set; } = "True";
     }
 
     public record TrackOrderItem(string Id, string Title, string Subtitle, string BgmId, string Filename,
-        bool IsLocked, int? OriginalIndex, TrackFields Fields, bool IsPinchTarget);
+        bool IsLocked, int? OriginalIndex, TrackFields Fields, bool IsPinchTarget, string InfoId = "");
 
     public record VanillaSongOption(string InfoId, string Name);
 

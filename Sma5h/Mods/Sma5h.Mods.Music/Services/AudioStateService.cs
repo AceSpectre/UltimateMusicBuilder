@@ -147,6 +147,19 @@ namespace Sma5h.Mods.Music.Services
         }
         #endregion
 
+        private readonly HashSet<string> _editedVanillaLabels = new();
+
+        public bool ApplyVanillaSongOverride(VanillaSongOverride song)
+        {
+            if (!_bgmDbRootEntries.TryGetValue(song.BgmId, out var root) || root.Source != EntrySource.Core)
+                throw new InvalidDataException($"Vanilla song '{song.BgmId}' was not found in game resources.");
+            _bgmStreamSetEntries.TryGetValue(root.StreamSetId, out var set);
+            song.Apply(root, set);
+            if (song.Title != null || song.Author != null || song.Copyright != null)
+                _editedVanillaLabels.Add(song.BgmId);
+            return true;
+        }
+
         #region CAN ADD
         public bool CanAddBgmDbRootEntry(string uiBgmId)
         {
@@ -497,7 +510,7 @@ namespace Sma5h.Mods.Music.Services
                 var uiBgmId = bgmDbRootEntry.UiBgmId;
 
                 //Generate NameId - If needed
-                if (bgmDbRootEntry.Source != EntrySource.Core && bgmDbRootEntry.ContainsValidLabels)
+                if ((bgmDbRootEntry.Source != EntrySource.Core && bgmDbRootEntry.ContainsValidLabels) || _editedVanillaLabels.Contains(bgmDbRootEntry.UiBgmId))
                     bgmDbRootEntry.NameId = GetNewNameId();
 
                 //Save Bin & BGM PRC
@@ -518,26 +531,26 @@ namespace Sma5h.Mods.Music.Services
                         var entries = msbtDb.Value.Entries;
 
                         //Title
-                        if (titleDict != null && titleDict.ContainsKey(msbtDb.Key) && !string.IsNullOrEmpty(titleDict[msbtDb.Key]))
+                        if (titleDict != null && titleDict.ContainsKey(msbtDb.Key))
                             entries[titleLabel] = ConvertToGameTextTag(titleDict[msbtDb.Key]);
-                        else if (titleDict != null && titleDict.ContainsKey(defaultLocale) && !string.IsNullOrEmpty(titleDict[defaultLocale]))
+                        else if (titleDict != null && titleDict.ContainsKey(defaultLocale))
                             entries[titleLabel] = ConvertToGameTextTag(titleDict[defaultLocale]);
 
                         //Author
                         if (authorDict != null)
                         {
-                            if (authorDict.ContainsKey(msbtDb.Key) && !string.IsNullOrEmpty(authorDict[msbtDb.Key]))
+                            if (authorDict.ContainsKey(msbtDb.Key))
                                 entries[authorLabel] = authorDict[msbtDb.Key];
-                            else if (authorDict.ContainsKey(defaultLocale) && !string.IsNullOrEmpty(authorDict[defaultLocale]))
+                            else if (authorDict.ContainsKey(defaultLocale))
                                 entries[authorLabel] = authorDict[defaultLocale];
                         }
 
                         //Copyright
                         if (copyrightDict != null)
                         {
-                            if (copyrightDict.ContainsKey(msbtDb.Key) && !string.IsNullOrEmpty(copyrightDict[msbtDb.Key]))
+                            if (copyrightDict.ContainsKey(msbtDb.Key))
                                 entries[copyrightLabel] = copyrightDict[msbtDb.Key];
-                            else if (copyrightDict.ContainsKey(defaultLocale) && !string.IsNullOrEmpty(copyrightDict[defaultLocale]))
+                            else if (copyrightDict.ContainsKey(defaultLocale))
                                 entries[copyrightLabel] = copyrightDict[defaultLocale];
                         }
                     }
@@ -610,6 +623,7 @@ namespace Sma5h.Mods.Music.Services
             _state.UnloadResources();
             _bgmDbRootEntries.Clear();
             _bgmStreamSetEntries.Clear();
+            _editedVanillaLabels.Clear();
             _bgmAssignedInfoEntries.Clear();
             _bgmStreamPropertyEntries.Clear();
             _bgmPropertyEntries.Clear();

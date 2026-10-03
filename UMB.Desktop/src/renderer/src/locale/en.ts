@@ -254,6 +254,7 @@ export default {
     empty: 'This series has no tracks in tracks.csv.',
     intro:
       'Per-track loudness preview. Auto-gain shows the multiplier LUFS normalization will apply to hit the target loudness. Override nudges individual tracks on top of that — the final bank volume is global × auto × override. Press play to hear the track at the exact volume the built mod will produce; adjusting the override while playing updates loudness in real time.',
+    vanillaHint: 'Save Overrides to include vanilla songs in the build’s configured volume and loudness normalization. Their extracted game audio is used for measurement and preview when available.',
     ffmpegWarning: 'FFmpeg is not available — auto-gain values cannot be measured. You can still set per-track overrides, but they will not be informed by loudness measurement.',
     globalLabel: 'Global ×{value}',
     targetLabel: 'Target {value} LUFS',
@@ -374,7 +375,7 @@ export default {
     collapseSeries: 'Collapse series list',
     expandSeries: 'Expand series list',
     dragHintLocked:
-      'Edit song details below, or drag the handle to reorder. Locked vanilla entries are preserved from song_order.toml.',
+      'Edit song details and volume below, or drag the handle to reorder. Vanilla songs are included for existing game series.',
     dragHint: 'Edit each song’s details, or drag the handle to reorder the tracks.csv entries for this series.',
     pickSeriesHint: 'Pick a series from the left to start managing songs.',
     save: 'Save Changes',
@@ -401,6 +402,7 @@ export default {
     colGame: 'Game',
     colAuthor: 'Author',
     colCopyright: 'Copyright',
+    colVolume: 'Volume',
     colRecord: 'Record',
     colIsPinch: 'Is Pinch?',
     colPinchSong: 'Pinch Song',

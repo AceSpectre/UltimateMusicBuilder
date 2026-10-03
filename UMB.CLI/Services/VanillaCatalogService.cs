@@ -25,7 +25,9 @@ namespace UMB.CLI.Services
     public class VanillaCatalogService
     {
         public record GameTitle(string Id, string Name, string SeriesId);
-        public record Song(string BgmId, string InfoId, string Name, string SeriesId);
+        public record Song(string BgmId, string InfoId, string Name, string SeriesId, string Author = "",
+            string Copyright = "", string Game = "", string RecordType = "original", string Info1 = "",
+            string SpecialCategory = "", string AudioPath = "", float BaseVolume = 1, bool InSoundtest = true);
 
         private const string Locale = "us_en";
 
@@ -44,7 +46,7 @@ namespace UMB.CLI.Services
         }
 
         /// <summary>The vanilla catalog, or null when the game files are missing.</summary>
-        public Catalog Get()
+        public virtual Catalog Get()
         {
             var gamePath = Path.GetFullPath(_config.CurrentValue.GameResourcesPath);
             return Cache.GetOrAdd(gamePath, path => new Lazy<Catalog>(() => Load(path))).Value;
@@ -106,14 +108,26 @@ namespace UMB.CLI.Services
             var seriesByGameTitle = gameTitleDb.DbRootEntries.Values
                 .Where(g => !string.IsNullOrEmpty(g.UiGameTitleId))
                 .ToDictionary(g => g.UiGameTitleId, g => g.UiSeriesId ?? "");
+            var volumes = TracksCsv.ReadLenient(Path.Combine(_config.CurrentValue.ResourcesPath, MusicConstants.Resources.NUS3BANK_IDS_FILE))
+                .ToDictionary(r => r.Get("NUS3Bank Name"), r => VolumeConfigService.ParseVolume(r.Get("Volume")));
             var songs = new List<Song>();
-            foreach (var entry in bgmDb.DbRootEntries.Values)
+            foreach (var entry in bgmDb.DbRootEntries.Values.OrderBy(e => e.TestDispOrder))
             {
                 if (string.IsNullOrEmpty(entry.UiBgmId)) continue;
                 var infoId = entry.StreamSetId != null && bgmDb.StreamSetEntries.TryGetValue(entry.StreamSetId, out var set) ? set.Info0 : null;
                 if (infoId == null || !infoId.StartsWith("info_")) continue;
+                var streamSet = bgmDb.StreamSetEntries[entry.StreamSetId];
+                var streamId = bgmDb.AssignedInfoEntries.TryGetValue(infoId, out var info) ? info.StreamId : null;
+                var toneId = streamId != null && bgmDb.StreamPropertyEntries.TryGetValue(streamId, out var stream) ? stream.DataName0 : null;
+                var audioPath = toneId == null ? "" : Game(Path.Combine("stream;", "sound", "bgm", $"bgm_{toneId}.nus3audio"));
+                var baseVolume = volumes.GetValueOrDefault("bgm_" + toneId, 1);
                 songs.Add(new Song(entry.UiBgmId, infoId, bgmTitles[entry.UiBgmId],
-                    seriesByGameTitle.GetValueOrDefault(entry.UiGameTitleId ?? "", "")));
+                    seriesByGameTitle.GetValueOrDefault(entry.UiGameTitleId ?? "", ""),
+                    bgmMsbt.GetValueOrDefault("bgm_author_" + entry.NameId, ""),
+                    bgmMsbt.GetValueOrDefault("bgm_copyright_" + entry.NameId, ""),
+                    (entry.UiGameTitleId ?? "").Replace(MusicConstants.InternalIds.GAME_TITLE_ID_PREFIX, ""),
+                    (entry.RecordType ?? "original").Replace("record_", ""), streamSet.Info1 ?? "",
+                    streamSet.SpecialCategory ?? "", audioPath, baseVolume, entry.TestDispOrder >= 0));
             }
 
             return new Catalog

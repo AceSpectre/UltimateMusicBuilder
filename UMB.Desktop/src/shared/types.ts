@@ -29,6 +29,7 @@ export interface TrackFields {
   copyright: string
   record_type: string
   special_category: string
+  volume: number | null
   info1: string
   in_soundtest: string
 }
@@ -43,6 +44,7 @@ export interface TrackOrderItem {
   originalIndex: number | null
   fields: TrackFields | null
   isPinchTarget: boolean
+  infoId: string
 }
 
 export interface SeriesGame {
@@ -184,6 +186,8 @@ export interface LoopAnalysisOptions {
 
 /** One track row mirroring the Avalonia VolumeRowViewModel. */
 export interface VolumeRowItem {
+  hasVolumeOverride?: boolean
+  bgmId?: string
   originalIndex: number
   title: string
   filename: string
@@ -206,6 +210,7 @@ export interface VolumeConfigData {
 }
 
 export interface VolumeOverride {
+  bgmId?: string
   originalIndex: number
   volume: number
 }

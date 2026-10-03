@@ -160,6 +160,9 @@ When `existing-series = true`:
 * Game-title entries are still emitted. Vanilla duplicates are deduped; custom sub-games get registered.
 * `series-playlist` points at the vanilla stage playlist, so your songs join the random rotation on every stage using it.
 * Optional `song_order.toml` (written by `Order Tracks`) interleaves your songs with vanilla in Sound Test / My Music.
+* `Order Tracks` includes all vanilla songs from this series when the extracted game databases and messages are available. Drag their handles to reorder them, or edit title, author, copyright, volume multiplier and pinch song. Vanilla game, record type and Sound Test visibility are shown as read-only values.
+* Vanilla edits are saved in `vanilla_tracks.json` beside `series.toml`. Only changed fields are stored; an empty author or copyright clears that text, while an omitted field preserves it. Pinch songs can reference a mod filename in this series or a vanilla `info_*` ID.
+* `Config Volume` includes the same vanilla songs. Extracted audio under `Resources/Game/stream;/sound/bgm` enables loudness analysis and playback; missing audio still permits manual overrides. Save Overrides to apply the configured global volume and enabled LUFS normalization to vanilla songs during builds, including songs whose override stays at `1`. Builds generate volume banks while retaining native bank IDs and use the game's existing audio.
 
 ---
 
