@@ -76,6 +76,12 @@ Adding songs to existing series (Final Fantasy, Persona, etc.) required two fixe
    that loads it from `Tools/VGAudioCli.exe`, plus a post-publish MSBuild target that copies the
    exe into `publish/Tools/`. Dev is unaffected (it's copied next to the binary there).
 
+## MSBT Locale Output (2026-10-03)
+`StateManager.WriteChanges()` writes `msg_bgm` / `msg_title` MSBTs locale-less (`msg_bgm.msbt`)
+when only one locale is in `Resources/Game` (the normal setup). When several locales are present
+(e.g. `+eu_fr` and `+us_en`), each keeps its `+locale` suffix — previously they all collapsed onto
+one path, so only one locale survived.
+
 ## Testing
 Test on Nintendo Switch by copying ArcOutput to the SD card mod folder.
 
