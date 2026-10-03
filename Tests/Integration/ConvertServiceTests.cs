@@ -25,7 +25,6 @@ namespace Tests.Integration
     public class ConvertServiceTests : IDisposable
     {
         private const string LegacyAudioFileName = "flowerhead__somewhat_good_karts__01_karts.nus3audio";
-        // Import copies the payload verbatim; codec validation is covered by audio tests.
         private static readonly byte[] LegacyAudioFixture = { 0x4E, 0x55, 0x53, 0x33, 0x01, 0x02, 0x03, 0x04 };
         private readonly TestEnvironment _env;
         private readonly IAnsiConsole _originalConsole;
@@ -62,7 +61,6 @@ namespace Tests.Integration
             foreach (var file in Directory.GetFiles(sourceDir))
                 File.Copy(file, Path.Combine(oldModDir, Path.GetFileName(file)), overwrite: true);
 
-            // Audio assets are gitignored, so construct the copy-test fixture locally.
             File.WriteAllBytes(Path.Combine(oldModDir, LegacyAudioFileName), LegacyAudioFixture);
 
             return oldModDir;

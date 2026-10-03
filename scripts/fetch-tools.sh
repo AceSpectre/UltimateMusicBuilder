@@ -89,13 +89,6 @@ extract_zip() {
     fi
 }
 
-extract_tar_xz() {
-    local tar=$1
-    local dest=$2
-    tar -xf "$tar" -C "$dest"
-}
-
-# Skip if the final target file already exists (idempotent), unless --force.
 needs_install() {
     local target=$1
     if [[ -f "$target" && "$FORCE" -eq 0 ]]; then
@@ -219,7 +212,6 @@ install_vgmstream_cli() {
     local dir="$TOOLS_DIR/vgmstream-cli"
     local target="$dir/vgmstream-cli"
     mkdir -p "$dir"
-    # A working Mac binary must also be independent of Homebrew's codec ABI.
     if [[ "$OS" == mac && -f "$target" ]] && otool -L "$target" | grep -q '/\(opt/homebrew\|usr/local\)/'; then
         echo "   Rebuilding binary with nonportable Homebrew dependencies."
     else
@@ -232,15 +224,9 @@ install_vgmstream_cli() {
         return
     fi
 
-    local asset
-    case "$OS" in
-        linux) asset="vgmstream-linux-cli.zip" ;;
-        mac)   asset="vgmstream-mac-cli.zip" ;;
-    esac
-
     local tmpzip
     tmpzip="$(mktemp -t umb_vgm.XXXXXX.zip)"
-    download "https://github.com/vgmstream/vgmstream/releases/download/$VGMSTREAM_TAG/$asset" "$tmpzip"
+    download "https://github.com/vgmstream/vgmstream/releases/download/$VGMSTREAM_TAG/vgmstream-linux-cli.zip" "$tmpzip"
     extract_zip "$tmpzip" "$dir"
     rm -f "$tmpzip"
 

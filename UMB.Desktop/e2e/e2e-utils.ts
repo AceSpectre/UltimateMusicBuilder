@@ -52,9 +52,7 @@ export async function launchApp(workspace: E2EWorkspace): Promise<ElectronApplic
   })
 
   try {
-    const page = await app.firstWindow({ timeout: FIRST_WINDOW_TIMEOUT })
-    await page.waitForLoadState('domcontentloaded')
-    initialPages.set(app, page)
+    await firstWindow(app)
     return app
   } catch (error) {
     await closeApp(app)
@@ -76,7 +74,7 @@ export async function closeApp(app: ElectronApplication | undefined): Promise<vo
   if (!app) return
 
   const process = app.process()
-  const exited = process.exitCode !== null
+  const exited = process.exitCode !== null || process.signalCode !== null
     ? Promise.resolve()
     : new Promise<void>((resolveExit) => { process.once('exit', () => resolveExit()) })
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -90,6 +88,10 @@ export async function closeApp(app: ElectronApplication | undefined): Promise<vo
     process.kill('SIGKILL')
     await exited
   }
+  initialPages.delete(app)
+  rmSync(join(tmpdir(), `umb-electron-test-${process.pid}`), {
+    recursive: true, force: true, maxRetries: 3, retryDelay: 100
+  })
 }
 
 /** Walks up from this file to the UltimateMusicBuilder working tree (contains Sma5h.sln). */

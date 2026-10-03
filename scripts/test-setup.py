@@ -80,7 +80,6 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_package_managers_and_repeat_setup(self):
-        # A successful first run installs commands; a second must not reinstall them.
         for manager, system, ffmpeg_package, pipx_package in (
             ('brew', 'Darwin', 'ffmpeg', 'pipx'),
             ('apt-get', 'Linux', 'ffmpeg', 'pipx'),
@@ -144,7 +143,6 @@ class SetupTests(unittest.TestCase):
 
     def test_dev_requires_sdk_before_installing_dependencies(self):
         self.add('dotnet')
-        # Deliberately omit Node and npm.
         result = self.run_setup('--dev')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Node.js', result.stderr)

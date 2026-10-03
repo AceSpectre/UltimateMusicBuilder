@@ -4,8 +4,6 @@ import { createWorkspace, seedTestDataMod, launchApp, firstWindow, closeApp, typ
 let ws: E2EWorkspace
 let app: ElectronApplication
 
-// The window is frameless, so these IPC handlers are the title bar.
-
 test.beforeAll(async () => {
   ws = createWorkspace()
   seedTestDataMod(ws, 'test-mod')

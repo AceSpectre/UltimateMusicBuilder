@@ -35,8 +35,6 @@ namespace Tests.Unit
         [InlineData("ZZZ", 46655)]
         [InlineData("R614P0", 1642717188)]
         [InlineData("R614P1", 1642717189)]
-        // The allocator also parses filename-derived tone IDs before assigning
-        // NameIds. Preserve the Windows x64 result on every architecture.
         [InlineData("flowerhead___somewhat_good__karts___06_retro_ro", 1642717188)]
         [InlineData("flowerhead___somewhat_good__lofi___01_summer", 1587214227)]
         public void ToInt_ParsesBase36(string text, int expected)

@@ -17,7 +17,6 @@ class FetchToolsTests(unittest.TestCase):
         shutil.copyfile(Path(__file__).with_name('fetch-tools.sh'), self.script)
         self.fake_bin = self.root / 'bin'
         self.fake_bin.mkdir()
-        # Architecture queries need x86_64, while OS queries need Linux.
         self.executable(self.fake_bin / 'uname', '[ "$1" = -m ] && echo x86_64 || echo Linux')
         self.executable(self.fake_bin / 'curl', 'echo unexpected-download >&2; exit 47')
         for command in ['ffmpeg', 'ffprobe', 'ffplay', 'pymusiclooper']:

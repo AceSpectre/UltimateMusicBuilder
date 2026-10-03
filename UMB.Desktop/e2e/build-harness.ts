@@ -17,8 +17,7 @@ export interface IsolatedBuild {
  */
 export function prepareIsolatedBuild(): IsolatedBuild {
   const repo = repoRoot()
-  // NuGet makes transitive project paths relative to this directory. On macOS,
-  // /var is a symlink to /private/var; resolve it before computing those paths.
+  // Canonical paths keep NuGet's relative project references consistent.
   const wsRoot = mkdtempSync(join(realpathSync(tmpdir()), 'umb-e2e-build-'))
   const cliProjectDir = join(wsRoot, 'UMB.CLI')
 

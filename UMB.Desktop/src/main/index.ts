@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'path'
-import { tmpdir } from 'os'
+import { homedir, tmpdir } from 'os'
+import { macToolPath, packagedWorkspacePath } from './runtime-paths'
 import { listModSeries, listMods, getModStats } from './mods'
 import { loadTrackOrderData, saveTrackOrderData, type SaveTrackItem } from './order-tracks'
 import { createSeries, loadSeriesOrderData, saveSeriesOrderData, setSeriesIcon, type CreateSeriesInput, type SaveSeriesItem } from './order-series'
@@ -20,6 +21,10 @@ import { IPC } from '../shared/ipc-channels'
 
 let mainWindow: BrowserWindow | null = null
 
+if (process.platform === 'darwin') {
+  process.env.PATH = macToolPath(process.env.PATH ?? '', homedir(), process.env.PIPX_BIN_DIR)
+}
+
 if (process.env['NODE_ENV'] === 'test') {
   app.setPath('userData', join(tmpdir(), `umb-electron-test-${process.pid}`))
 }
@@ -29,11 +34,7 @@ function getWorkspacePath(): string {
     return resolve(process.env['UMB_WORKSPACE'])
   }
   if (app.isPackaged) {
-    // Layout: <root>/desktop/resources/cli/UMB.CLI.exe and <root>/UMB.CLI.exe (standalone).
-    // Workspace is <root> — the folder holding both the desktop/ subfolder and the CLI —
-    // so the GUI and the standalone CLI share the same Resources/, Mods/, ArcOutput/.
-    // process.resourcesPath = <root>/desktop/resources → up two = <root>.
-    return resolve(process.resourcesPath, '..', '..')
+    return packagedWorkspacePath(process.resourcesPath)
   }
   return resolve(__dirname, '..', '..', '..')
 }

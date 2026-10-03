@@ -33,9 +33,7 @@ namespace Sma5h.Helpers
             {
                 int chr = chars[i];
 
-                // NameId allocation also passes long filename-derived tone IDs.
-                // Preserve the legacy Windows x64 overflow result explicitly:
-                // an out-of-range double-to-int cast saturates differently on ARM.
+                // Keep legacy x64 overflow behavior for filename-derived tone IDs.
                 double power = Math.Pow(Base, j);
                 int multiplier = power > int.MaxValue ? int.MinValue : (int)power;
                 int value = unchecked((chr - (chr > 57 ? 55 : 48)) * multiplier);

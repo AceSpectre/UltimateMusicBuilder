@@ -26,7 +26,6 @@ function parseLogLine(raw: string): LogLine {
   return { timestamp, level: 'info', message: raw.trim() }
 }
 
-/** Resolves the CLI command + arg list for the current package mode. */
 export function packagedCliPath(
   resourcesPath: string,
   platform: NodeJS.Platform = process.platform

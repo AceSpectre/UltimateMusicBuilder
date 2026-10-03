@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Build the pinned CLI with static codecs. Upstream's Mac zip links against
-# absolute Homebrew paths and a particular FFmpeg ABI, so it isn't portable.
+# Build pinned vgmstream with static codec libraries.
 set -euo pipefail
 
 [[ "$(uname -s)" == Darwin ]] || { echo 'This builder requires macOS.' >&2; exit 1; }
@@ -25,9 +24,7 @@ tar -xf "$work/vgmstream.tar.gz" -C "$work"
 tar -xf "$work/ffmpeg.tar.xz" -C "$work"
 source_dir="$work/vgmstream-$tag"
 
-# Upstream's static recipe assumes GNU linker flags and detects external Opus.
-# Apple links its system runtime dynamically; FFmpeg supplies its own Opus decoder.
-# Patch only the temporary, pinned source, never the repository or Homebrew files.
+# Adapt the pinned recipe for Apple's linker and static codec libraries.
 python3 - "$source_dir" <<'PY'
 from pathlib import Path
 import sys
@@ -72,15 +69,14 @@ cmake -S "$source_dir" -B "$work/build" \
 cmake --build "$work/build" --target vgmstream_cli --parallel "$(sysctl -n hw.ncpu)"
 binary="$work/build/cli/vgmstream-cli"
 
-# Fail before replacing a working installation if any non-system dylib leaked in.
+# Reject non-system dylib dependencies.
 otool -L "$binary" | tail -n +2 | while read -r library rest; do
     case "$library" in
         /usr/lib/*|/System/Library/*) ;;
         *) echo "Nonportable dependency: $library" >&2; exit 1 ;;
     esac
 done
-# Upstream returns 1 even for valid help/version output. Check both the status
-# and the JSON, so a loader crash cannot be mistaken for a successful probe.
+# A valid version probe returns 1; also validate its JSON.
 "$binary" -V > "$work/version.json" || [[ $? == 1 ]]
 python3 - "$work/version.json" "$tag" <<'PY'
 import json, sys
