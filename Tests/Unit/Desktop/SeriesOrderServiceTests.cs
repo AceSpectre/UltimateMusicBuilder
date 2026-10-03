@@ -39,7 +39,7 @@ namespace Tests.Unit.Desktop
         /// <summary>Saves every loaded item with its fields changed by <paramref name="edit"/>.</summary>
         private void SaveEdited(Action<SeriesFields> edit)
         {
-            var items = _service.Load(_modPath).Items.Select(i =>
+            var items = _service.Load(_modPath).Items.Where(i => !i.IsExistingSeries).Select(i =>
             {
                 edit(i.Fields);
                 return new SaveSeriesItem(i.Id, i.Fields);
@@ -72,14 +72,14 @@ namespace Tests.Unit.Desktop
 
             Assert.Equal("mymod", data.ModName);
             Assert.False(data.HasSeriesOrder);
-            Assert.Equal(2, data.Items.Count);
+            Assert.Equal(2, data.Items.Count(i => !i.IsExistingSeries));
             Assert.Equal(("series:0", "Alpha", "alpha", (string)null, 0),
                 (data.Items[0].Id, data.Items[0].Name, data.Items[0].SeriesId, data.Items[0].IconDataUrl, data.Items[0].OriginalIndex));
             Assert.Equal("bravo", data.Items[1].SeriesId);
         }
 
         [Fact]
-        public void Load_ExcludesExistingSeriesEtcDotfilesAndFoldersWithoutToml()
+        public void Load_ExcludesEtcDotfilesAndFoldersWithoutToml()
         {
             WriteCustomSeries("good", "id = \"good\"\nname = \"Good\"\n");
             WriteCustomSeries("existing", "id = \"ff\"\nname = \"FF\"\nexisting-series = true\n");
@@ -87,7 +87,7 @@ namespace Tests.Unit.Desktop
             WriteCustomSeries(".hidden", "id = \"h\"\nname = \"H\"\n");
             _ws.ModDir("mymod", "notoml");
 
-            Assert.Equal(new[] { "good" }, _service.Load(_modPath).Items.Select(i => i.SeriesId));
+            Assert.Equal(new[] { "good" }, _service.Load(_modPath).Items.Where(i => !i.IsExistingSeries).Select(i => i.SeriesId));
         }
 
         [Fact]
@@ -101,7 +101,7 @@ namespace Tests.Unit.Desktop
             var data = _service.Load(_modPath);
 
             Assert.True(data.HasSeriesOrder);
-            Assert.Equal(new[] { "c", "a", "b" }, data.Items.Select(i => i.SeriesId));
+            Assert.Equal(new[] { "c", "a", "b" }, data.Items.Where(i => !i.IsExistingSeries).Select(i => i.SeriesId));
         }
 
         [Fact]
@@ -125,6 +125,105 @@ namespace Tests.Unit.Desktop
             Assert.Equal("Invalid mod path.", Assert.Throws<DesktopApiException>(() => _service.SetIcon(outside, "a", PngDataUrl)).Message);
         }
 
+
+        [Fact]
+        public void Load_IncludesVanillaSeriesWithoutCreatingFolders()
+        {
+            var splatoon = _service.Load(_modPath).Items.Single(i => i.SeriesId == "splatoon");
+            Assert.True(splatoon.IsExistingSeries);
+            Assert.Equal("Splatoon", splatoon.Fields.Name);
+            Assert.Empty(Directory.GetDirectories(_modPath));
+        }
+
+        [Fact]
+        public void Save_UnchangedVanillaSeriesDoesNotCreateOverrides()
+        {
+            var loaded = _service.Load(_modPath);
+            _service.Save(_modPath, loaded.Items.Select(i => new SaveSeriesItem(i.Id, i.Fields)).ToList());
+            Assert.Empty(Directory.GetDirectories(_modPath));
+            Assert.Empty(UMB.CLI.Services.SeriesToml.ReadIdList(Path.Combine(_modPath, "series-order.toml")));
+        }
+
+        [Fact]
+        public void Save_CreatesVanillaGameAndDefaultsAndPreservesExistingFiles()
+        {
+            var dir = WriteCustomSeries("splatoon_override", "[series]\nid = \"splatoon\"\nexisting-series = true\nname = \"Splatoon\"\n# retained\ncustom-key = 7\n");
+            var originalCsv = File.ReadAllText(Path.Combine(dir, "tracks.csv"));
+            var item = _service.Load(_modPath).Items.Single(i => i.SeriesId == "splatoon");
+            item.Fields.Games.Add(new("splatoon_3", "Splatoon 3"));
+            item.Fields.DefaultGame = "splatoon_3";
+            item.Fields.DefaultAuthor = "Composer";
+            item.Fields.DefaultVolume = 0.8;
+            _service.Save(_modPath, new() { new(item.Id, item.Fields) });
+
+            var reloaded = _service.Load(_modPath).Items.Single(i => i.SeriesId == "splatoon");
+            Assert.Contains(new SeriesGame("splatoon_3", "Splatoon 3"), reloaded.Fields.Games);
+            Assert.Equal(("splatoon_3", "Composer", 0.8), (reloaded.Fields.DefaultGame, reloaded.Fields.DefaultAuthor, reloaded.Fields.DefaultVolume));
+            Assert.Contains("existing-series = true", SeriesToml("splatoon_override"));
+            Assert.Contains("# retained\ncustom-key = 7", SeriesToml("splatoon_override"));
+            Assert.Equal(originalCsv, File.ReadAllText(Path.Combine(dir, "tracks.csv")));
+            Assert.DoesNotContain("splatoon", File.ReadAllText(Path.Combine(_modPath, "series-order.toml")));
+        }
+
+        [Fact]
+        public void Save_MaterializesOnlyTheEditedVanillaSeries()
+        {
+            var item = _service.Load(_modPath).Items.Single(i => i.SeriesId == "splatoon");
+            item.Fields.Games.Add(new("splatoon_3", "Splatoon 3"));
+            item.Fields.DefaultCopyright = "Copyright";
+            _service.Save(_modPath, new() { new(item.Id, item.Fields) });
+            Assert.Equal(new[] { "splatoon" }, Directory.GetDirectories(_modPath).Select(Path.GetFileName));
+            Assert.Contains("existing-series = true", SeriesToml("splatoon"));
+            Assert.Equal("Copyright", _service.Load(_modPath).Items.Single(i => i.SeriesId == "splatoon").Fields.DefaultCopyright);
+        }
+
+        [Fact]
+        public void SetIcon_MaterializesVanillaSeriesAndRetainsItsName()
+        {
+            Assert.Equal(PngDataUrl, _service.SetIcon(_modPath, "splatoon", PngDataUrl));
+            var item = _service.Load(_modPath).Items.Single(i => i.SeriesId == "splatoon");
+            Assert.True(item.IsExistingSeries);
+            Assert.Equal("Splatoon", item.Name);
+            Assert.Equal(PngDataUrl, item.IconDataUrl);
+            Assert.Contains("existing-series = true", SeriesToml("splatoon"));
+        }
+
+        [Fact]
+        public void SetIcon_InvalidVanillaIconDoesNotCreateFiles()
+        {
+            Assert.Throws<DesktopApiException>(() => _service.SetIcon(_modPath, "splatoon", "data:image/png;base64,a"));
+            Assert.Empty(Directory.GetDirectories(_modPath));
+        }
+
+        [Fact]
+        public void Save_VanillaFolderWithoutSettingsPreservesExistingData()
+        {
+            var dir = _ws.ModDir("mymod", "splatoon");
+            File.WriteAllText(Path.Combine(dir, "tracks.csv"), DummyCsv);
+            File.WriteAllText(Path.Combine(dir, "notes.txt"), "keep");
+            var item = _service.Load(_modPath).Items.Single(i => i.SeriesId == "splatoon");
+            item.Fields.DefaultAuthor = "Composer";
+            _service.Save(_modPath, new() { new(item.Id, item.Fields) });
+            Assert.Equal(DummyCsv, File.ReadAllText(Path.Combine(dir, "tracks.csv")));
+            Assert.Equal("keep", File.ReadAllText(Path.Combine(dir, "notes.txt")));
+        }
+
+        [Fact]
+        public void SetIcon_RejectsVanillaFolderUsedByAnotherSeries()
+        {
+            WriteCustomSeries("splatoon", "[series]\nid = \"another_series\"\nname = \"Another Series\"\n");
+            Assert.Throws<DesktopApiException>(() => _service.SetIcon(_modPath, "splatoon", PngDataUrl));
+            Assert.Contains("another_series", SeriesToml("splatoon"));
+            Assert.False(File.Exists(Path.Combine(_modPath, "splatoon", "icon.png")));
+        }
+
+        [Fact]
+        public void Create_RejectsVanillaSeriesId()
+        {
+            Assert.Throws<DesktopApiException>(() => _service.Create(_modPath, OneGame(i => i.SeriesId = "splatoon")));
+            Assert.Empty(Directory.GetDirectories(_modPath));
+        }
+
         // ── Create ───────────────────────────────────────────────────────────
 
         [Fact]
@@ -132,7 +231,7 @@ namespace Tests.Unit.Desktop
         {
             var result = _service.Create(_modPath, OneGame());
 
-            Assert.Contains("my_series", result.Items.Select(i => i.SeriesId));
+            Assert.Contains("my_series", result.Items.Where(i => !i.IsExistingSeries).Select(i => i.SeriesId));
             var toml = SeriesToml("my_series");
             Assert.Contains("id = \"my_series\"", toml);
             Assert.Contains("name = \"My Series\"", toml);
@@ -247,7 +346,7 @@ namespace Tests.Unit.Desktop
             var result = _service.Save(_modPath, Order("series:2", "series:0"));
 
             Assert.True(result.HasSeriesOrder);
-            Assert.Equal(new[] { "c", "a", "b" }, result.Items.Select(i => i.SeriesId));
+            Assert.Equal(new[] { "c", "a", "b" }, result.Items.Where(i => !i.IsExistingSeries).Select(i => i.SeriesId));
             var written = File.ReadAllText(Path.Combine(_modPath, "series-order.toml"));
             Assert.Contains("# Custom series display order", written);
             Assert.Contains("order = [", written);

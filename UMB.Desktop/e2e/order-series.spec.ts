@@ -21,10 +21,10 @@ test.afterAll(async () => { await closeApp(app); ws?.cleanup() })
 test('loadSeriesOrder lists custom series; dev pre-ordered by series-order.toml', async () => {
   const page = await firstWindow(app)
   const data = await page.evaluate((mp) => window.electron.umb.loadSeriesOrder(mp), modDir)
-  const ids = data.items.map((i) => i.seriesId).sort()
+  const ids = data.items.filter((i) => !i.isExistingSeries).map((i) => i.seriesId).sort()
   expect(ids).toEqual(['dev', 'gamma'])
   expect(data.hasSeriesOrder).toBe(true)
-  expect(data.items.map((i) => i.seriesId)).toEqual(['dev', 'gamma'])
+  expect(data.items.filter((i) => !i.isExistingSeries).map((i) => i.seriesId)).toEqual(['dev', 'gamma'])
 })
 
 test('saveSeriesOrder writes gamma before dev', async () => {
@@ -40,7 +40,7 @@ test('saveSeriesOrder writes gamma before dev', async () => {
     ([mp, payload]) => window.electron.umb.saveSeriesOrder(mp as string, payload as never),
     [modDir, items] as const
   )
-  expect(result.items.map((i) => i.seriesId)).toEqual(['gamma', 'dev'])
+  expect(result.items.filter((i) => !i.isExistingSeries).map((i) => i.seriesId)).toEqual(['gamma', 'dev'])
 
   const toml = readFileSync(join(modDir, 'series-order.toml'), 'utf8')
   const order = [...toml.matchAll(/^\s+"([^"]+)",/gm)].map((m) => m[1])
@@ -197,4 +197,35 @@ test('UI: Change icon in the settings panel writes the chosen PNG', async () => 
 
   const iconPath = join(modDir, 'dev', 'icon.png')
   await expect.poll(() => (existsSync(iconPath) ? readFileSync(iconPath).toString('base64') : null)).toBe(PNG_B64)
+})
+
+
+test('UI: vanilla series supports new games, defaults, and an icon override', async () => {
+  const page = await firstWindow(app)
+  await page.getByText('Manage Series').first().click()
+  await page.getByRole('button', { name: 'Reload series' }).click()
+  await page.getByRole('button', { name: 'Splatoon', exact: true }).click()
+  await page.getByRole('button', { name: 'Games', exact: true }).click()
+  await page.getByRole('button', { name: 'Add game', exact: true }).click()
+  await page.getByPlaceholder('mario_kart_8').fill('splatoon_3')
+  await page.getByPlaceholder('Mario Kart 8').fill('Splatoon 3')
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+  await page.locator('aside').getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByLabel('Default game').selectOption('splatoon_3')
+  await page.getByLabel('Default author', { exact: true }).fill('New Composer')
+  await page.getByLabel('Default volume', { exact: true }).fill('0.8')
+  await page.getByRole('button', { name: 'Save Changes' }).click()
+  await expect(page.getByRole('button', { name: 'Saved' })).toBeVisible()
+  await page.locator('label:has-text("Change icon") input[type="file"]').setInputFiles(pngFile())
+  const iconPath = join(modDir, 'splatoon', 'icon.png')
+  await expect.poll(() => existsSync(iconPath) ? readFileSync(iconPath).toString('base64') : null).toBe(PNG_B64)
+  await page.getByRole('button', { name: 'Reload series' }).click()
+  await page.getByRole('button', { name: 'Splatoon', exact: true }).click()
+  await expect(page.getByLabel('Default game')).toHaveValue('splatoon_3')
+  await expect(page.getByLabel('Default author', { exact: true })).toHaveValue('New Composer')
+  await expect(page.getByLabel('Default volume', { exact: true })).toHaveValue('0.8')
+  const toml = readFileSync(join(modDir, 'splatoon', 'series.toml'), 'utf8')
+  expect(toml).toContain('existing-series = true')
+  expect(toml).toContain('id = "splatoon_3"')
+  expect(readFileSync(join(modDir, 'series-order.toml'), 'utf8')).not.toContain('"splatoon"')
 })

@@ -304,9 +304,10 @@ namespace Sma5h.Mods.Music.Services
             }
 
             //Save Series
-            if (!_seriesEntries.ContainsKey(seriesEntry.UiSeriesId))
+            if (!_seriesEntries.TryGetValue(seriesEntry.UiSeriesId, out var existing))
                 _seriesEntries.Add(seriesEntry.UiSeriesId, seriesEntry);
-            //It is very well possible that the series already exists.
+            else if (!string.IsNullOrEmpty(seriesEntry.IconPath))
+                existing.IconPath = seriesEntry.IconPath;
 
             return true;
         }

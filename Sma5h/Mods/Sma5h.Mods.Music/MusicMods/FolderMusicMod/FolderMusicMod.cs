@@ -100,7 +100,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     _logger.LogError("series.toml in {Subfolder}: [series] id is required.", subfolder);
                     continue;
                 }
-                if (seriesFile.Games == null || seriesFile.Games.Count == 0)
+                if (!seriesFile.Series.ExistingSeries && (seriesFile.Games == null || seriesFile.Games.Count == 0))
                 {
                     _logger.LogError("series.toml in {Subfolder} has no [[games]] entries.", subfolder);
                     continue;
@@ -129,7 +129,9 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 }
                 else
                 {
-                    _logger.LogInformation("Series {SeriesId} is flagged as existing — skipping SeriesEntry creation.", uiSeriesId);
+                    var iconPath = Path.Combine(subfolder, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
+                    if (File.Exists(iconPath))
+                        output.SeriesEntries.Add(new SeriesEntry(uiSeriesId, EntrySource.Mod) { IconPath = iconPath });
 
                     // Optional song_order.toml: lets the user interleave modded songs with vanilla
                     // ones in the Sound Test / My Music ordering. Only meaningful for existing series.
@@ -154,7 +156,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
 
                 // ── GameTitleEntries (always created — duplicates handled by AudioStateService) ───
                 var gameIdLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var game in seriesFile.Games)
+                foreach (var game in seriesFile.Games ?? new())
                 {
                     if (string.IsNullOrWhiteSpace(game.Id))
                     {

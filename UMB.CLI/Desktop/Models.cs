@@ -24,7 +24,7 @@ namespace UMB.CLI.Desktop
         public double DefaultVolume { get; set; } = 1;
     }
 
-    public record SeriesOrderItem(string Id, string Name, string SeriesId, string IconDataUrl, int OriginalIndex, SeriesFields Fields);
+    public record SeriesOrderItem(string Id, string Name, string SeriesId, string IconDataUrl, int OriginalIndex, SeriesFields Fields, bool IsExistingSeries = false);
     public record SeriesOrderData(string ModName, string ModPath, bool HasSeriesOrder, List<SeriesOrderItem> Items);
     public record SaveSeriesItem(string Id, SeriesFields Fields);
 

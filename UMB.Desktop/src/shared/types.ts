@@ -98,6 +98,7 @@ export interface SeriesOrderItem {
   seriesId: string
   iconDataUrl: string | null
   originalIndex: number
+  isExistingSeries: boolean
   fields: SeriesFields
 }
 

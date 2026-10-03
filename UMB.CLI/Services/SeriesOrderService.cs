@@ -11,6 +11,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Text.Json;
 
 namespace UMB.CLI.Services
 {
@@ -22,7 +23,7 @@ namespace UMB.CLI.Services
     {
         private const string SeriesOrderHeader =
             "# Custom series display order\n" +
-            "# Listed series appear after official series, before \"Other\"\n" +
+            "# Listed series appear after official series, before Other\n" +
             "# Unlisted custom series will be placed after these\n";
 
         // Header-only tracks.csv: the series exists but has no songs yet.
@@ -34,12 +35,14 @@ namespace UMB.CLI.Services
 
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
+        private readonly VanillaCatalogService _catalog;
 
         public SeriesOrderService(IOptionsMonitor<Sma5hMusicOptions> musicConfig,
-            ILogger<SeriesOrderService> logger)
+            ILogger<SeriesOrderService> logger, VanillaCatalogService catalog = null)
         {
             _musicConfig = musicConfig;
             _logger = logger;
+            _catalog = catalog;
         }
 
         public void Run()
@@ -119,9 +122,9 @@ namespace UMB.CLI.Services
         /// <param name="series">The scanned series, indexed like the returned items.</param>
         private SeriesOrderData Load(string resolvedModPath, out List<CustomSeries> series)
         {
-            series = SortedCustomSeries(resolvedModPath);
+            series = ManagedSeries(resolvedModPath);
             var items = series
-                .Select((s, index) => new SeriesOrderItem($"series:{index}", s.Name, s.Id, s.IconDataUrl, index, s.Fields))
+                .Select((s, index) => new SeriesOrderItem(s.ExistingSeries ? $"vanilla:{s.Id}" : $"series:{index}", s.Name, s.Id, s.IconDataUrl, index, s.Fields, s.ExistingSeries))
                 .ToList();
             var hasSeriesOrder = SeriesToml.ReadIdList(SeriesOrderPath(resolvedModPath)).Count > 0;
             return new SeriesOrderData(Path.GetFileName(resolvedModPath), resolvedModPath, hasSeriesOrder, items);
@@ -144,11 +147,14 @@ namespace UMB.CLI.Services
             var fieldsById = items.Where(i => i.Fields != null).ToDictionary(i => i.Id, i => i.Fields);
             foreach (var item in finalItems)
             {
-                if (fieldsById.TryGetValue(item.Id, out var fields))
-                    WriteSeriesTomlFields(Path.Combine(series[item.OriginalIndex].Dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
+                if (!fieldsById.TryGetValue(item.Id, out var fields)) continue;
+                var entry = series[item.OriginalIndex];
+                if (entry.ExistingSeries && JsonSerializer.Serialize(fields) == JsonSerializer.Serialize(item.Fields)) continue;
+                EnsureSeriesFiles(entry);
+                WriteSeriesTomlFields(Path.Combine(entry.Dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
             }
 
-            WriteSeriesOrder(resolvedModPath, finalItems.Select(i => i.SeriesId));
+            WriteSeriesOrder(resolvedModPath, finalItems.Where(i => !i.IsExistingSeries).Select(i => i.SeriesId));
             return Load(resolvedModPath);
         }
 
@@ -163,8 +169,8 @@ namespace UMB.CLI.Services
             var seriesId = (input.SeriesId ?? "").Trim();
             if (!SeriesIdPattern.IsMatch(seriesId))
                 throw new DesktopApiException("Series ID must contain only lowercase letters, numbers, and underscores.");
-            if (seriesId == "etc")
-                throw new DesktopApiException("\"etc\" is a reserved series ID.");
+            if (seriesId == "etc" || IsVanillaId(seriesId))
+                throw new DesktopApiException("That is a reserved vanilla series ID.");
 
             var name = (input.Name ?? "").Trim();
             if (name.Length == 0)
@@ -204,13 +210,15 @@ namespace UMB.CLI.Services
         public string SetIcon(string modPath, string seriesId, string iconDataUrl)
         {
             var resolvedModPath = ModPaths.ResolveUnderMods(_musicConfig, modPath);
-            var series = ScanCustomSeries(resolvedModPath).FirstOrDefault(s => s.Id == seriesId)
+            var series = ManagedSeries(resolvedModPath).FirstOrDefault(s => s.Id == seriesId)
                 ?? throw new DesktopApiException("Series not found.");
+            ValidateIcon(iconDataUrl);
+            EnsureSeriesFiles(series);
             WriteSeriesIcon(series.Dir, iconDataUrl);
             return PngDataUrlOf(Path.Combine(series.Dir, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE));
         }
 
-        private record CustomSeries(string Dir, string Id, string Name, string IconPath, SeriesFields Fields)
+        private record CustomSeries(string Dir, string Id, string Name, string IconPath, SeriesFields Fields, bool ExistingSeries = false)
         {
             public string IconDataUrl => IconPath == null ? null : PngDataUrlOf(IconPath);
         }
@@ -226,7 +234,7 @@ namespace UMB.CLI.Services
                 .ToList();
         }
 
-        private static List<CustomSeries> ScanCustomSeries(string modPath)
+        private static List<CustomSeries> ScanCustomSeries(string modPath, bool includeExisting = false)
         {
             var results = new List<CustomSeries>();
             if (!Directory.Exists(modPath)) return results;
@@ -239,14 +247,57 @@ namespace UMB.CLI.Services
 
                 var text = File.ReadAllText(tomlPath);
                 var header = SeriesToml.ReadHeader(text);
-                if (header.Id == null || header.ExistingSeries) continue;
-                if (string.Equals(header.Id, "etc", StringComparison.OrdinalIgnoreCase)) continue;
+                if (header.Id == null || ((header.ExistingSeries || IsVanillaId(header.Id)) && !includeExisting)) continue;
+                if (!includeExisting && string.Equals(header.Id, "etc", StringComparison.OrdinalIgnoreCase)) continue;
 
                 var iconPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
                 results.Add(new CustomSeries(seriesDir, header.Id, header.Name ?? header.Id,
-                    File.Exists(iconPath) ? iconPath : null, ReadFields(text, header)));
+                    File.Exists(iconPath) ? iconPath : null, ReadFields(text, header), header.ExistingSeries || IsVanillaId(header.Id)));
             }
             return results;
+        }
+
+        private static bool IsVanillaId(string id) =>
+            DisplayNames.Series.ContainsKey(MusicConstants.InternalIds.SERIES_ID_PREFIX + id);
+
+        private List<CustomSeries> ManagedSeries(string modPath)
+        {
+            var stored = ScanCustomSeries(modPath, includeExisting: true);
+            var catalog = _catalog?.Get();
+            var vanilla = DisplayNames.Series
+                .Where(s => s.Key != "ui_series_none")
+                .Select(s =>
+                {
+                    var id = s.Key[MusicConstants.InternalIds.SERIES_ID_PREFIX.Length..];
+                    return stored.FirstOrDefault(e => e.Id == id) is { } existing ? existing with { ExistingSeries = true } : new CustomSeries(
+                        Path.Combine(modPath, id), id, s.Value, null, new SeriesFields { Name = s.Value }, true);
+                })
+                .Concat(stored.Where(s => s.ExistingSeries && !IsVanillaId(s.Id)))
+                .ToList();
+            foreach (var entry in vanilla)
+            {
+                var declared = entry.Fields.Games.Select(g => g.Id).ToHashSet();
+                entry.Fields.Games.AddRange(catalog?.GameTitles
+                    .Where(g => g.SeriesId == MusicConstants.InternalIds.SERIES_ID_PREFIX + entry.Id && !declared.Contains(g.Id))
+                    .Select(g => new SeriesGame(g.Id, g.Name)) ?? Enumerable.Empty<SeriesGame>());
+            }
+            return SortedCustomSeries(modPath).Where(s => !IsVanillaId(s.Id))
+                .Concat(vanilla.OrderBy(s => s.Name, StringComparer.InvariantCulture)).ToList();
+        }
+
+        private static void EnsureSeriesFiles(CustomSeries series)
+        {
+            var tomlPath = Path.Combine(series.Dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
+            if (File.Exists(tomlPath) && SeriesToml.ReadHeader(File.ReadAllText(tomlPath)).Id != series.Id)
+                throw new DesktopApiException("The series folder contains settings for another series.");
+            Directory.CreateDirectory(series.Dir);
+            if (!File.Exists(tomlPath))
+                File.WriteAllText(tomlPath, $"[series]\nid = \"{SeriesToml.Escape(series.Id)}\"\nexisting-series = true\nname = \"{SeriesToml.Escape(series.Name)}\"\n");
+            else if (series.ExistingSeries)
+                SeriesToml.WriteLines(tomlPath, SeriesToml.UpsertTable(SeriesToml.ReadLines(tomlPath), "series",
+                    new[] { new SeriesToml.Entry("existing-series", "existing-series = true") }, createIfMissing: false));
+            var csvPath = Path.Combine(series.Dir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
+            if (!File.Exists(csvPath)) File.WriteAllText(csvPath, TracksCsvHeader);
         }
 
         private static SeriesFields ReadFields(string text, SeriesToml.SeriesHeader header)
@@ -321,11 +372,17 @@ namespace UMB.CLI.Services
         // Series icons are stored verbatim as icon.png; there is no transcoder, so only PNG is accepted.
         private static void WriteSeriesIcon(string seriesDir, string dataUrl)
         {
-            var match = PngDataUrl.Match((dataUrl ?? "").Trim());
-            if (!match.Success)
-                throw new DesktopApiException("Icon must be a PNG image.");
+            var bytes = ValidateIcon(dataUrl);
             File.WriteAllBytes(Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE),
-                Convert.FromBase64String(match.Groups[1].Value));
+                bytes);
+        }
+
+        private static byte[] ValidateIcon(string dataUrl)
+        {
+            var match = PngDataUrl.Match((dataUrl ?? "").Trim());
+            if (!match.Success) throw new DesktopApiException("Icon must be a PNG image.");
+            try { return Convert.FromBase64String(match.Groups[1].Value); }
+            catch (FormatException) { throw new DesktopApiException("Icon must be a PNG image."); }
         }
 
         private static string PngDataUrlOf(string path) =>

@@ -39,6 +39,8 @@
   }
 
   const isDirty = $derived(Boolean(orderData) && snapshot(dndItems) !== baselineSnapshot)
+  const customItems = $derived(dndItems.filter((item) => !item.isExistingSeries))
+  const vanillaItems = $derived(dndItems.filter((item) => item.isExistingSeries))
   const selectedItem = $derived(dndItems.find((item) => item.id === selectedItemId) ?? null)
 
   const trimmedNewGameId = $derived(newGameId.trim())
@@ -205,12 +207,12 @@
   })
 
   function handleConsider(event: CustomEvent<DndEvent<SeriesOrderItem>>) {
-    dndItems = event.detail.items
+    dndItems = [...event.detail.items, ...vanillaItems]
   }
 
   function handleFinalize(event: CustomEvent<DndEvent<SeriesOrderItem>>) {
-    dndItems = event.detail.items
-    if (orderData) orderData = { ...orderData, items: event.detail.items }
+    dndItems = [...event.detail.items, ...vanillaItems]
+    if (orderData) orderData = { ...orderData, items: dndItems }
   }
 
   async function loadOrder(modPath: string | null) {
@@ -316,14 +318,16 @@
             {$_('orderSeries.loading')}
           </div>
         {:else if orderData && orderData.items.length > 0}
+          {#if customItems.length > 0}
+          <h3 class="mb-3 text-[12.5px] font-semibold">{$_('orderSeries.customSeries')}</h3>
           <div
             class="grid gap-3"
             style="grid-template-columns: repeat(auto-fill, 128px);"
-            use:dragHandleZone={{ items: dndItems, flipDurationMs: FLIP_MS, dropTargetStyle: {} }}
+            use:dragHandleZone={{ items: customItems, flipDurationMs: FLIP_MS, dropTargetStyle: {} }}
             onconsider={handleConsider}
             onfinalize={handleFinalize}
           >
-            {#each dndItems as item (item.id)}
+            {#each customItems as item (item.id)}
               {@const isSelected = item.id === selectedItemId}
               <div
                 animate:flip={{ duration: FLIP_MS }}
@@ -356,6 +360,26 @@
                   <span class="block truncate text-[12px] font-medium" title={item.fields.name}>{item.fields.name}</span>
                 </div>
               </div>
+            {/each}
+          </div>
+          {/if}
+          <h3 class="mb-3 mt-4 text-[12.5px] font-semibold">{$_('orderSeries.vanillaSeries')}</h3>
+          <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, 128px);">
+            {#each vanillaItems as item (item.id)}
+              <button
+                aria-label={item.fields.name}
+                onclick={() => (selectedItemId = item.id)}
+                class="w-[128px] h-[132px] flex flex-col items-center rounded-xl border bg-background/75 p-2 transition-shadow hover:shadow-md {item.id === selectedItemId ? 'border-transparent ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border'}"
+              >
+                <div class="w-[80px] h-[80px] rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+                  {#if item.iconDataUrl}
+                    <img src={item.iconDataUrl} alt={item.fields.name} class="w-full h-full object-contain invert dark:invert-0" draggable="false" />
+                  {:else}
+                    <Image size={28} class="text-muted-foreground/40" />
+                  {/if}
+                </div>
+                <span class="mt-1.5 block w-full truncate text-center text-[12px] font-medium" title={item.fields.name}>{item.fields.name}</span>
+              </button>
             {/each}
           </div>
         {:else if orderData && orderData.items.length === 0}
@@ -444,7 +468,7 @@
 
             <label class="flex flex-col gap-1">
               <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldName')}</span>
-              <input type="text" class={inputClass} bind:value={f.name} />
+              <input type="text" class={inputClass} bind:value={f.name} readonly={selectedItem.isExistingSeries} />
             </label>
 
             <label class="flex flex-col gap-1">
