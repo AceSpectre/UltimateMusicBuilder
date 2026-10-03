@@ -132,7 +132,10 @@ Fields:
   * `id` - playlist identifier (existing stage playlist, or a new one UMB will create).
   * `incidence` - random-roll weight for this block's songs.
   * `songs` - `"*"` for all, or a TOML array of filenames. Stem-tolerant: `"Destroyer"` matches `Destroyer.nus3audio`. Pre-build validation warns on no-match entries; `Cleanup` prunes them.
-* `[default-track-data]` - defaults applied to rows `Scaffold` adds to `tracks.csv`.
+* `[default-track-data]` - series defaults applied to rows `Scaffold` adds to `tracks.csv`.
+* `[[song-presets]]` - optional game-specific defaults. Each game can have one preset with `game`, `author`, `copyright`, `record-type`, and `volume`, using the same fields as `[default-track-data]`. Scaffold uses the preset matching the series default game. Games without a preset use series defaults while retaining their game ID.
+
+In the desktop **Manage Songs** view, **Song Presets** lets you edit series defaults and presets for multiple games. Select a game and clear **Use series defaults for this game** to create its preset; check it again to remove the preset. Choose the selected song's game defaults, series defaults, or a specific game preset before clicking **Use Default Values**. Save song changes to write the applied values to `tracks.csv`. Saving presets affects new scaffolded songs; existing songs retain their metadata until you apply defaults.
 
 ## series.toml - existing in-game series
 

@@ -4,6 +4,8 @@ export const IPC = {
   GET_MOD_STATS: 'umb:get-mod-stats',
   LOAD_TRACK_ORDER: 'umb:load-track-order',
   SAVE_TRACK_ORDER: 'umb:save-track-order',
+  SAVE_SONG_PRESETS: 'umb:save-song-presets',
+  APPLY_SONG_PRESET: 'umb:apply-song-preset',
   LOAD_SERIES_ORDER: 'umb:load-series-order',
   SAVE_SERIES_ORDER: 'umb:save-series-order',
   CREATE_SERIES: 'umb:create-series',

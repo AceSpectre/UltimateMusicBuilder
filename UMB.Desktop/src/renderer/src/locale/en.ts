@@ -363,6 +363,20 @@ export default {
     add: 'Add',
     cancel: 'Cancel'
   },
+  songPresets: {
+    title: 'Song Presets',
+    hint: 'Set series defaults and optional game presets. New songs use the preset for the default game when scaffolded. Existing songs change when you apply defaults and save.',
+    editScope: 'Edit defaults for',
+    seriesDefaults: 'Series defaults',
+    gameDefaults: 'Selected song’s game defaults',
+    useSeriesDefaults: 'Use series defaults for this game',
+    fallbackHint: 'Games without a preset use the series author, copyright, record type and volume.',
+    volume: 'Volume multiplier',
+    save: 'Save Presets',
+    saving: 'Saving…',
+    cancel: 'Cancel',
+    apply: 'Preset to apply'
+  },
   orderTracks: {
     title: 'Manage Songs',
     seriesHeading: 'Series',
@@ -381,7 +395,7 @@ export default {
     saving: 'Saving...',
     saved: 'Saved',
     useDefaults: 'Use Default Values',
-    useDefaultsHint: 'Fill the selected song with the series default game, author, copyright and record type.',
+    useDefaultsHint: 'Fill the selected song with the chosen default game, author, copyright, record type and volume.',
     volConfig: 'Vol. Config',
     volConfigHint: 'Open Config Volume for this series.',
     loadingOrder: 'Loading songs...',

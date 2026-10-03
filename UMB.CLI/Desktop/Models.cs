@@ -40,6 +40,7 @@ namespace UMB.CLI.Desktop
     // ── Track order ────────────────────────────────────────────────────────
     public class TrackFields
     {
+        public float? Volume { get; set; }
         public string Title { get; set; } = "";
         public string Game { get; set; } = "";
         public string Author { get; set; } = "";
@@ -57,6 +58,7 @@ namespace UMB.CLI.Desktop
 
     public class DefaultTrackData
     {
+        public float Volume { get; set; } = 1;
         public string Game { get; set; } = "";
         public string Author { get; set; } = "";
         public string Copyright { get; set; } = "";
@@ -64,7 +66,7 @@ namespace UMB.CLI.Desktop
     }
 
     public record TrackOrderData(string SeriesName, string SeriesPath, bool IsExistingSeries, bool HasSongOrder,
-        List<SeriesGame> Games, List<VanillaSongOption> VanillaSongs, DefaultTrackData DefaultTrackData, List<TrackOrderItem> Items);
+        List<SeriesGame> Games, List<VanillaSongOption> VanillaSongs, DefaultTrackData DefaultTrackData, List<TrackOrderItem> Items, List<DefaultTrackData> SongPresets = null);
 
     public record SaveTrackItem(string Id, TrackFields Fields);
 

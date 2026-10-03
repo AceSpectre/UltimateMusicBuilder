@@ -2,6 +2,7 @@ using CsvHelper.Configuration;
 using CsvHelper.Configuration.Attributes;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
 {
@@ -51,6 +52,22 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public List<FolderGameConfig> Games { get; set; } = new();
         public List<FolderPlaylistOverrideConfig> Playlists { get; set; } = new();
         public FolderDefaultTrackDataConfig DefaultTrackData { get; set; }
+        public List<FolderDefaultTrackDataConfig> SongPresets { get; set; } = new();
+
+        public FolderDefaultTrackDataConfig ResolveTrackDefaults(string game = null, bool useSeriesDefaults = false)
+        {
+            var gameId = game ?? DefaultTrackData?.Game ?? "";
+            var defaults = (!useSeriesDefaults && gameId.Length > 0
+                ? SongPresets.FirstOrDefault(p => p.Game == gameId) : null) ?? DefaultTrackData;
+            return new FolderDefaultTrackDataConfig
+            {
+                Game = gameId,
+                Author = defaults?.Author ?? "",
+                Copyright = defaults?.Copyright ?? "",
+                RecordType = defaults?.RecordType ?? "original",
+                Volume = defaults?.Volume ?? 1
+            };
+        }
     }
 
     // ── CSV models (CsvHelper mapping) ───────────────────────────────────────

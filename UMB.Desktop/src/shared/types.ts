@@ -23,6 +23,7 @@ export interface ModStats {
 }
 
 export interface TrackFields {
+  volume?: number | null
   title: string
   game: string
   author: string
@@ -61,6 +62,7 @@ export interface VanillaSongOption {
 }
 
 export interface DefaultTrackData {
+  volume: number
   game: string
   author: string
   copyright: string
@@ -76,6 +78,7 @@ export interface TrackOrderData {
   vanillaSongs: VanillaSongOption[]
   defaultTrackData: DefaultTrackData | null
   items: TrackOrderItem[]
+  songPresets: DefaultTrackData[]
 }
 
 // Editable series.toml fields (series id stays read-only — it is the identity). Covers the

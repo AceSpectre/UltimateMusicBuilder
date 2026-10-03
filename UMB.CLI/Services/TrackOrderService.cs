@@ -11,6 +11,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Tomlyn;
 
 namespace UMB.CLI.Services
 {
@@ -131,6 +132,11 @@ namespace UMB.CLI.Services
                 if (item.OriginalIndex is not int index || !fieldsById.TryGetValue(item.Id, out var fields)) continue;
                 foreach (var (column, value) in EditableColumns)
                     rows[index][column] = value(fields) ?? "";
+                if (fields.Volume is float volume)
+                {
+                    if (!float.IsFinite(volume) || volume < 0) throw new DesktopApiException("Volume must be a finite, non-negative number.");
+                    rows[index]["volume"] = volume.ToString(CultureInfo.InvariantCulture);
+                }
             }
 
             var nextHeaders = headers.ToList();
@@ -138,6 +144,8 @@ namespace UMB.CLI.Services
             {
                 if (!nextHeaders.Contains(column)) nextHeaders.Add(column);
             }
+
+            if (items.Any(i => i.Fields?.Volume != null) && !nextHeaders.Contains("volume")) nextHeaders.Add("volume");
 
             foreach (var row in rows)
                 row["order"] = "";
@@ -172,6 +180,74 @@ namespace UMB.CLI.Services
             return Load(resolvedSeriesPath);
         }
 
+        public TrackOrderData SavePresets(string seriesPath, DefaultTrackData seriesDefaults, List<DefaultTrackData> presets)
+        {
+            var resolved = ModPaths.ResolveUnderMods(_musicConfig, seriesPath, "Invalid series path.");
+            var data = Load(resolved);
+            if (seriesDefaults == null || presets == null) throw new DesktopApiException("Song defaults are required.");
+            foreach (var defaults in presets.Append(seriesDefaults))
+            {
+                if (!float.IsFinite(defaults.Volume) || defaults.Volume < 0)
+                    throw new DesktopApiException("Volume must be a finite, non-negative number.");
+                if (defaults.RecordType is not ("original" or "arrange" or "new_arrange"))
+                    throw new DesktopApiException("Unknown record type.");
+                if (!string.IsNullOrEmpty(defaults.Game) && !data.Games.Any(g => g.Id == defaults.Game))
+                    throw new DesktopApiException("Select a game from this series.");
+            }
+            if (presets.Any(p => string.IsNullOrEmpty(p.Game)) || presets.Select(p => p.Game).Distinct().Count() != presets.Count)
+                throw new DesktopApiException("Each game can have one song preset.");
+
+            var path = SeriesFiles.Of(resolved).SeriesToml;
+            if (!File.Exists(path)) throw new DesktopApiException("Scaffold this series before editing song presets.");
+            var lines = SeriesToml.UpsertTable(SeriesToml.ReadLines(path), "default-track-data",
+                DefaultEntries(seriesDefaults), createIfMissing: true);
+            var (kept, insertIndex) = SeriesToml.StripArrayTables(lines, "song-presets");
+            var blocks = presets.SelectMany(p => new[] { "", "[[song-presets]]" }
+                .Concat(DefaultEntries(p).Select(e => e.Line))).ToList();
+            if (insertIndex < 0) insertIndex = kept.Count;
+            lines = kept.Take(insertIndex).Concat(blocks).Concat(kept.Skip(insertIndex)).ToList();
+            SeriesToml.WriteLines(path, lines);
+            return Load(resolved);
+        }
+
+        public TrackFields ApplyPreset(string seriesPath, TrackFields fields, string game, bool useSeriesDefaults)
+        {
+            var resolved = ModPaths.ResolveUnderMods(_musicConfig, seriesPath, "Invalid series path.");
+            if (fields == null) throw new DesktopApiException("Select an editable song.");
+            var path = SeriesFiles.Of(resolved).SeriesToml;
+            if (!File.Exists(path)) throw new DesktopApiException("Scaffold this series before applying song presets.");
+            var config = ReadPresetConfig(File.ReadAllText(path));
+            var defaults = config.ResolveTrackDefaults(useSeriesDefaults || string.IsNullOrEmpty(game) ? null : game, useSeriesDefaults);
+            fields.Game = defaults.Game;
+            fields.Author = defaults.Author;
+            fields.Copyright = defaults.Copyright;
+            fields.RecordType = defaults.RecordType;
+            fields.Volume = defaults.Volume;
+            return fields;
+        }
+
+        private static FolderSeriesFileConfig ReadPresetConfig(string text)
+        {
+            var options = CliUtil.KebabTomlOptions();
+            options.IgnoreMissingProperties = true;
+            return Toml.ToModel<FolderSeriesFileConfig>(text, options: options);
+        }
+
+        private static DefaultTrackData ToDefaults(FolderDefaultTrackDataConfig d) => new()
+        {
+            Game = d.Game ?? "", Author = d.Author ?? "", Copyright = d.Copyright ?? "",
+            RecordType = d.RecordType, Volume = d.Volume
+        };
+
+        private static SeriesToml.Entry[] DefaultEntries(DefaultTrackData d) => new[]
+        {
+            new SeriesToml.Entry("game", $"game = \"{SeriesToml.Escape(d.Game)}\""),
+            new SeriesToml.Entry("author", $"author = \"{SeriesToml.Escape(d.Author)}\""),
+            new SeriesToml.Entry("copyright", $"copyright = \"{SeriesToml.Escape(d.Copyright)}\""),
+            new SeriesToml.Entry("record-type", $"record-type = \"{SeriesToml.Escape(d.RecordType)}\""),
+            new SeriesToml.Entry("volume", $"volume = {d.Volume.ToString(CultureInfo.InvariantCulture)}")
+        };
+
         private record SeriesFiles(string Csv, string SeriesToml, string SongOrder)
         {
             public static SeriesFiles Of(string seriesPath) => new(
@@ -202,23 +278,23 @@ namespace UMB.CLI.Services
 
             var items = OrderItems(BuildModItems(rows), rows, songOrder, ResolveVanillaTitle);
             var data = new TrackOrderData(Path.GetFileName(seriesPath), seriesPath, series.ExistingSeries, songOrder.Count > 0,
-                games, vanillaSongs, series.DefaultTrackData, items);
+                games, vanillaSongs, series.DefaultTrackData, items, series.SongPresets);
             return (data, rows, headers);
         }
 
-        private record SeriesInfo(string Id, bool ExistingSeries, List<SeriesGame> Games, DefaultTrackData DefaultTrackData);
+        private record SeriesInfo(string Id, bool ExistingSeries, List<SeriesGame> Games, DefaultTrackData DefaultTrackData, List<DefaultTrackData> SongPresets);
 
         private static SeriesInfo ReadSeriesToml(string path)
         {
             if (!File.Exists(path))
-                return new SeriesInfo(null, false, new List<SeriesGame>(), null);
+                return new SeriesInfo(null, false, new List<SeriesGame>(), null, new());
 
             var text = File.ReadAllText(path);
             var header = SeriesToml.ReadHeader(text);
-            var defaults = SeriesToml.ReadDefaults(text) is { } d
-                ? new DefaultTrackData { Game = d.Game, Author = d.Author, Copyright = d.Copyright, RecordType = d.RecordType }
-                : null;
-            return new SeriesInfo(header.Id, header.ExistingSeries, SeriesToml.Games(text), defaults);
+            var config = ReadPresetConfig(text);
+            return new SeriesInfo(header.Id, header.ExistingSeries, SeriesToml.Games(text),
+                config.DefaultTrackData == null ? null : ToDefaults(config.DefaultTrackData),
+                config.SongPresets.Select(ToDefaults).ToList());
         }
 
         /// <summary>Appends [[games]] blocks for known game ids used by rows but not yet declared.</summary>
@@ -261,6 +337,7 @@ namespace UMB.CLI.Services
 
         private static TrackFields BuildFields(CsvRow row) => new()
         {
+            Volume = float.TryParse(row.Get("volume"), NumberStyles.Float, CultureInfo.InvariantCulture, out var volume) ? volume : null,
             Title = row.Get("title"),
             Game = row.Get("game"),
             Author = row.Get("author"),

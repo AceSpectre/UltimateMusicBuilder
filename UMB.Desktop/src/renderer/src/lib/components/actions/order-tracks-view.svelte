@@ -10,7 +10,8 @@
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import Modal from '$lib/components/ui/modal.svelte'
-  import type { ModInfo, ModSeriesInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
+  import SongPresetsModal from './song-presets-modal.svelte'
+  import type { DefaultTrackData, ModInfo, ModSeriesInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
   const PINCH_CATEGORY = 'sf_situationlink'
@@ -30,6 +31,10 @@
   let pendingSeriesPath = $state<string | null>(null)
   let baselineSnapshot = $state('')
   let selectedItemId = $state<string | null>(null)
+  let showPresets = $state(false)
+  let presetChoice = $state('game')
+  let applyingPreset = $state(false)
+  let presetError = $state('')
   const seriesLoader = createSeriesLoader((v) => (loading = v))
 
   function snapshot(items: TrackOrderItem[]): string {
@@ -106,17 +111,35 @@
   }
 
   const selectedItem = $derived(dndItems.find((item) => item.id === selectedItemId) ?? null)
-  const canUseDefaults = $derived(Boolean(orderData?.defaultTrackData) && selectedItem?.fields != null)
+  const canUseDefaults = $derived(Boolean(orderData?.defaultTrackData || orderData?.songPresets.length) && selectedItem?.fields != null)
 
-  function applyDefaults() {
-    const defaults = orderData?.defaultTrackData
-    if (!defaults || !selectedItem?.fields) {
-      return
+  async function applyDefaults() {
+    const item = selectedItem
+    const seriesPath = orderData?.seriesPath
+    if (!item?.fields || !seriesPath) return
+    applyingPreset = true
+    presetError = ''
+    try {
+      const fields = await window.electron.umb.applySongPreset(
+        seriesPath, { ...item.fields }, presetChoice === 'game' ? item.fields.game : presetChoice.slice(7), presetChoice === 'series'
+      )
+      if (orderData?.seriesPath === seriesPath && dndItems.includes(item)) item.fields = fields
+    } catch (error) {
+      presetError = error instanceof Error ? error.message : String(error)
+    } finally {
+      applyingPreset = false
     }
-    selectedItem.fields.game = defaults.game
-    selectedItem.fields.author = defaults.author
-    selectedItem.fields.copyright = defaults.copyright
-    selectedItem.fields.record_type = defaults.record_type
+  }
+
+  async function savePresets(defaults: DefaultTrackData, presets: DefaultTrackData[]) {
+    if (!orderData) return
+    const seriesPath = orderData.seriesPath
+    const data = await window.electron.umb.saveSongPresets(seriesPath, defaults, presets)
+    if (orderData?.seriesPath === seriesPath) {
+      orderData.defaultTrackData = data.defaultTrackData
+      orderData.songPresets = data.songPresets
+      presetChoice = 'game'
+    }
   }
 
   function openVolConfig() {
@@ -177,6 +200,9 @@
     orderLoading = true
     saveState = 'idle'
     selectedItemId = null
+    showPresets = false
+    presetError = ''
+    presetChoice = 'game'
     try {
       orderData = await window.electron.umb.loadTrackOrder(seriesPath)
       baselineSnapshot = snapshot(orderData.items)
@@ -286,7 +312,7 @@
 
     <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
-      <div class="shrink-0 border-b border-border px-4 py-3 flex items-center justify-between gap-4">
+      <div class="shrink-0 border-b border-border px-4 py-3 flex flex-wrap items-center justify-between gap-4">
         <div class="flex min-w-0 items-center gap-3">
           <GradientIcon>
             <ArrowUpDown size={18} />
@@ -303,7 +329,7 @@
           </div>
         </div>
 
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <button
             onclick={openVolConfig}
             class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
@@ -314,10 +340,23 @@
             {$_('orderTracks.volConfig')}
           </button>
 
+          <button onclick={() => (showPresets = true)} disabled={!orderData}
+            class="rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium disabled:opacity-60">
+            {$_('songPresets.title')}
+          </button>
+          <select class="max-w-[180px] rounded border border-input bg-background px-2 py-2 text-[12px]"
+            bind:value={presetChoice} aria-label={$_('songPresets.apply')} disabled={!orderData || applyingPreset}>
+            <option value="game">{$_('songPresets.gameDefaults')}</option>
+            <option value="series">{$_('songPresets.seriesDefaults')}</option>
+            {#each orderData?.songPresets ?? [] as preset}
+              <option value={`preset:${preset.game}`}>{orderData?.games.find((g) => g.id === preset.game)?.name ?? preset.game}</option>
+            {/each}
+          </select>
+
           <button
             onclick={applyDefaults}
             class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={!canUseDefaults}
+            disabled={!canUseDefaults || applyingPreset}
             title={$_('orderTracks.useDefaultsHint')}
           >
             <Wand2 size={14} />
@@ -327,7 +366,7 @@
           <SaveButton
             {saveState}
             onclick={handleSave}
-            disabled={!orderData || !isDirty || saveState === 'saving'}
+            disabled={!orderData || !isDirty || saveState === 'saving' || applyingPreset}
             save={$_('orderTracks.save')}
             saving={$_('orderTracks.saving')}
             saved={$_('orderTracks.saved')}
@@ -335,6 +374,7 @@
         </div>
       </div>
 
+      {#if presetError}<p class="px-4 py-2 text-[13px] text-destructive" role="alert">{presetError}</p>{/if}
       <div class="min-h-0 flex-1 overflow-auto p-1">
         {#if orderLoading}
           <div class="grid h-full min-h-[320px] place-items-center rounded-2xl border border-dashed border-border bg-background/60 text-[13px] text-muted-foreground">
@@ -522,4 +562,9 @@
         </button>
       </div>
   </Modal>
+{/if}
+
+{#if showPresets && orderData}
+  <SongPresetsModal games={orderData.games} defaults={orderData.defaultTrackData}
+    presets={orderData.songPresets} onSave={savePresets} onClose={() => (showPresets = false)} />
 {/if}

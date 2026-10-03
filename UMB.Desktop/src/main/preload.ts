@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 import type {
   CreateSeriesInput,
+  DefaultTrackData,
+  TrackFields,
   DebugPingResult,
   ExtractIconsAnalysis,
   ExtractIconsResult,
@@ -44,6 +46,8 @@ const api = {
   listMods: (): Promise<ModInfo[]> => ipcRenderer.invoke(IPC.LIST_MODS),
   listModSeries: (modPath: string): Promise<ModSeriesInfo[]> => ipcRenderer.invoke(IPC.LIST_MOD_SERIES, modPath),
   getModStats: (modPath: string): Promise<ModStats> => ipcRenderer.invoke(IPC.GET_MOD_STATS, modPath),
+  saveSongPresets: (seriesPath: string, seriesDefaults: DefaultTrackData, presets: DefaultTrackData[]): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.SAVE_SONG_PRESETS, seriesPath, seriesDefaults, presets),
+  applySongPreset: (seriesPath: string, fields: TrackFields, game: string | null, useSeriesDefaults: boolean): Promise<TrackFields> => ipcRenderer.invoke(IPC.APPLY_SONG_PRESET, seriesPath, fields, game, useSeriesDefaults),
   loadTrackOrder: (seriesPath: string): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.LOAD_TRACK_ORDER, seriesPath),
   saveTrackOrder: (seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.SAVE_TRACK_ORDER, seriesPath, items),
   loadSeriesOrder: (modPath: string): Promise<SeriesOrderData> => ipcRenderer.invoke(IPC.LOAD_SERIES_ORDER, modPath),

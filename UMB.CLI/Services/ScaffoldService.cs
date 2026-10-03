@@ -122,7 +122,7 @@ namespace UMB.CLI.Services
                         continue;
                     }
 
-                    var defaults = seriesFile.DefaultTrackData;
+                    var defaults = seriesFile.ResolveTrackDefaults();
 
                     // dynamic columns: preserves "order" and any extras
                     var (existingRows, existingHeaders) = ReadCsvRows(csvPath);
@@ -153,7 +153,7 @@ namespace UMB.CLI.Services
                         foreach (var h in existingHeaders)
                             row[h] = "";
                         row["filename"] = filename;
-                        row["game"] = defaults?.Game ?? folderName;
+                        row["game"] = CliUtil.FirstNonEmpty(defaults.Game, folderName);
                         row["title"] = Path.GetFileNameWithoutExtension(filename);
                         row["author"] = defaults?.Author ?? "";
                         row["copyright"] = defaults?.Copyright ?? "";

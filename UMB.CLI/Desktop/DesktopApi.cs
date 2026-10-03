@@ -42,6 +42,8 @@ namespace UMB.CLI.Desktop
                 ["series-set-icon"] = In<SetSeriesIconInput>(i => Get<SeriesOrderService>().SetIcon(i.ModPath, i.SeriesId, i.IconDataUrl)),
 
                 ["track-order-load"] = In<SeriesPathInput>(i => Get<TrackOrderService>().Load(i.SeriesPath)),
+                ["song-presets-save"] = In<SaveSongPresetsInput>(i => Get<TrackOrderService>().SavePresets(i.SeriesPath, i.SeriesDefaults, i.Presets)),
+                ["song-preset-apply"] = In<ApplySongPresetInput>(i => Get<TrackOrderService>().ApplyPreset(i.SeriesPath, i.Fields, i.Game, i.UseSeriesDefaults)),
                 ["track-order-save"] = In<SaveTrackOrderInput>(i => Get<TrackOrderService>().Save(i.SeriesPath, i.Items)),
 
                 ["merge-analyze"] = In<MergeInput>(i => Get<MergeService>().Analyze(i.ModPaths)),
@@ -106,6 +108,8 @@ namespace UMB.CLI.Desktop
         private record SaveSeriesOrderInput(string ModPath, List<SaveSeriesItem> Items);
         private record CreateSeriesRequest(string ModPath, CreateSeriesInput Input);
         private record SetSeriesIconInput(string ModPath, string SeriesId, string IconDataUrl);
+        private record SaveSongPresetsInput(string SeriesPath, DefaultTrackData SeriesDefaults, List<DefaultTrackData> Presets);
+        private record ApplySongPresetInput(string SeriesPath, TrackFields Fields, string Game, bool UseSeriesDefaults);
         private record SaveTrackOrderInput(string SeriesPath, List<SaveTrackItem> Items);
         private record MergeInput(List<string> ModPaths, string OutputName, string PriorityModPath);
         private record ExtractIconsInput(string CompiledModPath, string ModPath, string Mode);

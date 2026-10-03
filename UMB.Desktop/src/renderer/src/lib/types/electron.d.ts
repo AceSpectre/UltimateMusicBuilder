@@ -6,6 +6,8 @@ export * from '$shared/types'
 import type {
   AppSettings,
   CreateSeriesInput,
+  DefaultTrackData,
+  TrackFields,
   DebugPingResult,
   ExtractIconsAnalysis,
   ExtractIconsResult,
@@ -40,6 +42,8 @@ export interface UmbApi {
   listMods(): Promise<ModInfo[]>
   listModSeries(modPath: string): Promise<ModSeriesInfo[]>
   getModStats(modPath: string): Promise<ModStats>
+  saveSongPresets(seriesPath: string, seriesDefaults: DefaultTrackData, presets: DefaultTrackData[]): Promise<TrackOrderData>
+  applySongPreset(seriesPath: string, fields: TrackFields, game: string | null, useSeriesDefaults: boolean): Promise<TrackFields>
   loadTrackOrder(seriesPath: string): Promise<TrackOrderData>
   saveTrackOrder(seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData>
   loadSeriesOrder(modPath: string): Promise<SeriesOrderData>
