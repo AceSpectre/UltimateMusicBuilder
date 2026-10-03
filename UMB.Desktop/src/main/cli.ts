@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from 'child_process'
-import { join } from 'path'
+import { existsSync, unlinkSync, writeFileSync } from 'fs'
+import { join, resolve } from 'path'
 import { app } from 'electron'
-import { lineSplitter, nowTs } from './utils'
+import { lineSplitter, nowTs, readJson, tempPath } from './utils'
 import type { LogLine } from '../shared/types'
 
 export type { LogLine } from '../shared/types'
@@ -26,26 +27,47 @@ function parseLogLine(raw: string): LogLine {
   return { timestamp, level: 'info', message: raw.trim() }
 }
 
-/** Resolves the CLI command + arg list for the current package mode. */
+/**
+ * Resolves the CLI command + arg list for the current package mode. In dev it runs the CLI
+ * built by `npm run build:cli`: the workspace's own UMB.CLI when it has one (as the repo
+ * does), otherwise the app's repo (dist/main → repo root), so any folder can be the workspace.
+ */
 function cliInvocation(workspace: string, trailing: string[]): { command: string; args: string[] } {
   if (app.isPackaged) {
     return { command: join(process.resourcesPath, 'cli', 'UMB.CLI.exe'), args: trailing }
   }
-  return {
-    command: 'dotnet',
-    args: ['run', '--project', join(workspace, 'UMB.CLI'), '--no-launch-profile', '--', ...trailing]
-  }
+  const workspaceCli = join(workspace, 'UMB.CLI')
+  const project = existsSync(workspaceCli) ? workspaceCli : resolve(__dirname, '..', '..', '..', 'UMB.CLI')
+  return { command: 'dotnet', args: [join(project, 'bin', 'Debug', 'net8.0', 'UMB.CLI.dll'), ...trailing] }
 }
 
-// Headless, stateless batch actions are routed through the persistent daemon so
-// they don't pay process-spawn + .NET/DI bootstrap on every call. Window-opening
-// (config-volume, nus3-convert) and heavy actions (build, …) stay one-shot.
-const DAEMON_ACTIONS = new Set([
+function spawnCli(workspace: string, trailing: string[]): ChildProcess {
+  const { command, args } = cliInvocation(workspace, trailing)
+  return spawn(command, args, {
+    cwd: workspace,
+    // UMB_WORKSPACE anchors the CLI's relative paths (Mods/, Resources/, ArcOutput/) to the shared workspace root.
+    env: { ...process.env, UMB_WORKSPACE: workspace },
+    stdio: ['pipe', 'pipe', 'pipe']
+  })
+}
+
+// Long-running actions get their own daemon so they don't hold up quick, interactive ones
+// (a loop analysis can take a minute; a loop preview should not wait for it).
+const BACKGROUND_ACTIONS = new Set([
   'config-volume-analyze',
+  'nus3-analyze-loop',
+  'nus3-convert-track',
+  'nus3-accept',
+  'merge-execute',
+  'extract-icons-run'
+])
+
+// Headless batch actions go through a persistent daemon so they don't pay process-spawn +
+// .NET/DI bootstrap on every call. Window-opening and heavy actions (build, …) stay one-shot.
+const DAEMON_ACTIONS = new Set([
+  ...BACKGROUND_ACTIONS,
   'config-volume-save',
-  'config-volume-preview',
-  'nus3-convert-batch',
-  'accept-nus3-batch'
+  'config-volume-preview'
 ])
 
 export function spawnCliAction(
@@ -54,8 +76,34 @@ export function spawnCliAction(
   args: string[],
   onLine: (line: LogLine) => void
 ): Promise<number> {
-  if (DAEMON_ACTIONS.has(action)) return daemonRequest(workspace, action, args, onLine)
+  if (DAEMON_ACTIONS.has(action)) return daemonFor(action).request(workspace, action, args, onLine)
   return spawnOneShot(workspace, action, args, onLine)
+}
+
+/**
+ * Calls a JSON action on the CLI (UMB.CLI/Desktop/DesktopApi.cs): writes the input, runs the
+ * action through the daemon and returns its result, throwing its error message on failure.
+ */
+export async function callCli<T>(
+  workspace: string,
+  action: string,
+  input: unknown,
+  onLine: (line: LogLine) => void = () => {}
+): Promise<T> {
+  const inputPath = tempPath('umb-in', 'json')
+  const outputPath = tempPath('umb-out', 'json')
+  writeFileSync(inputPath, JSON.stringify(input ?? {}), 'utf-8')
+  try {
+    const code = await daemonFor(action).request(workspace, action, [inputPath, outputPath], onLine)
+    const response = readJson<{ result?: T; error?: string }>(outputPath)
+    if (!response) throw new Error(`CLI action '${action}' produced no result (exit code ${code}).`)
+    if (response.error !== undefined) throw new Error(response.error)
+    return response.result as T
+  } finally {
+    for (const path of [inputPath, outputPath]) {
+      try { if (existsSync(path)) unlinkSync(path) } catch { /* ignore */ }
+    }
+  }
 }
 
 function spawnOneShot(
@@ -74,15 +122,7 @@ function spawnOneShot(
   }
 
   return new Promise<number>((resolveExit) => {
-    const { command, args: spawnArgs } = cliInvocation(workspace, [action, ...args])
-
-    const proc = spawn(command, spawnArgs, {
-      cwd: workspace,
-      // UMB_WORKSPACE anchors the CLI's relative paths (Mods/, Resources/, ArcOutput/) to the shared workspace root.
-      env: { ...process.env, UMB_WORKSPACE: workspace },
-      stdio: ['pipe', 'pipe', 'pipe']
-    })
-
+    const proc = spawnCli(workspace, [action, ...args])
     currentProcess = proc
 
     const stdout = lineSplitter((line) => {
@@ -118,121 +158,113 @@ export function cancelCurrentAction(): void {
   }
 }
 
-let daemonProcess: ChildProcess | null = null
-let nextReqId = 1
-
-// The single in-flight request. Requests are serialized through `daemonQueue`,
-// so there is at most one active at any time and stdout lines map unambiguously.
-let activeReq: { id: number; onLine: (line: LogLine) => void; resolve: (code: number) => void } | null = null
-
-// Serial queue: one stdin pipe means one request at a time.
-let daemonQueue: Promise<unknown> = Promise.resolve()
-
 const DONE_RE = /^__DONE__\t(\d+)\t(-?\d+)$/
 
-function daemonRequest(
-  workspace: string,
-  action: string,
-  args: string[],
-  onLine: (line: LogLine) => void
-): Promise<number> {
-  const start = (): Promise<number> => sendDaemonRequest(workspace, action, args, onLine)
-  const result = daemonQueue.then(start, start)
-  daemonQueue = result.catch(() => {}) // a failed request must not break the chain
-  return result
-}
+// Request ids are unique across daemons and restarts.
+let nextReqId = 1
 
-function ensureDaemon(workspace: string): ChildProcess | null {
-  if (daemonProcess) return daemonProcess
+/** One persistent `UMB.CLI serve` process; requests are sent one at a time over stdin. */
+class Daemon {
+  private process: ChildProcess | null = null
+  // The single in-flight request; serialised through `queue`, so stdout lines map unambiguously.
+  private active: { onLine: (line: LogLine) => void; resolve: (code: number) => void } | null = null
+  private queue: Promise<unknown> = Promise.resolve()
 
-  const { command, args } = cliInvocation(workspace, ['serve'])
-  const proc = spawn(command, args, {
-    cwd: workspace,
-    // See spawnOneShot: anchor the CLI's relative paths to the shared workspace root.
-    env: { ...process.env, UMB_WORKSPACE: workspace },
-    stdio: ['pipe', 'pipe', 'pipe']
-  })
-  daemonProcess = proc
-
-  const stdout = lineSplitter(handleDaemonLine)
-  const stderr = lineSplitter((line) => {
-    if (line.trim() && activeReq) activeReq.onLine({ ...parseLogLine(line), level: 'error' })
-  })
-  proc.stdout?.on('data', stdout.push)
-  proc.stderr?.on('data', stderr.push)
-
-  const onExit = (code: number | null): void => {
-    daemonProcess = null
-    if (activeReq) {
-      activeReq.onLine({
-        timestamp: nowTs(),
-        level: 'warn',
-        message: `CLI daemon exited (${code ?? 'terminated'}); it will restart on the next request.`
-      })
-      const req = activeReq
-      activeReq = null
-      req.resolve(code ?? -1)
-    }
+  request(workspace: string, action: string, args: string[], onLine: (line: LogLine) => void): Promise<number> {
+    const start = (): Promise<number> => this.send(workspace, action, args, onLine)
+    const result = this.queue.then(start, start)
+    this.queue = result.catch(() => {}) // a failed request must not break the chain
+    return result
   }
 
-  proc.on('close', onExit)
-  proc.on('error', (err) => {
-    if (activeReq) {
-      activeReq.onLine({ timestamp: nowTs(), level: 'error', message: `CLI daemon error: ${err.message}` })
+  shutdown(): void {
+    if (!this.process) return
+    try {
+      this.process.stdin?.write(`${JSON.stringify({ id: 0, action: '__shutdown__', args: [] })}\n`)
+    } catch {
+      /* ignore */
     }
-    onExit(-1)
-  })
-
-  return daemonProcess
-}
-
-function handleDaemonLine(rawLine: string): void {
-  // .NET emits CRLF; strip the trailing '\r' so the sentinel matches.
-  const line = rawLine.replace(/\r$/, '')
-  const done = line.match(DONE_RE)
-  if (done) {
-    const code = parseInt(done[2], 10)
-    if (activeReq) {
-      const req = activeReq
-      activeReq = null
-      req.resolve(code)
+    try {
+      this.process.kill()
+    } catch {
+      /* ignore */
     }
-    return
+    this.process = null
   }
-  if (line.trim() && activeReq) activeReq.onLine(parseLogLine(line))
-}
 
-function sendDaemonRequest(
-  workspace: string,
-  action: string,
-  args: string[],
-  onLine: (line: LogLine) => void
-): Promise<number> {
-  return new Promise<number>((resolve) => {
-    const proc = ensureDaemon(workspace)
-    if (!proc || !proc.stdin) {
-      onLine({ timestamp: nowTs(), level: 'error', message: 'CLI daemon unavailable.' })
-      resolve(-1)
+  private send(workspace: string, action: string, args: string[], onLine: (line: LogLine) => void): Promise<number> {
+    return new Promise<number>((resolve) => {
+      const proc = this.ensureStarted(workspace)
+      if (!proc.stdin) {
+        onLine({ timestamp: nowTs(), level: 'error', message: 'CLI daemon unavailable.' })
+        resolve(-1)
+        return
+      }
+      this.active = { onLine, resolve }
+      proc.stdin.write(`${JSON.stringify({ id: nextReqId++, action, args })}\n`)
+    })
+  }
+
+  private ensureStarted(workspace: string): ChildProcess {
+    if (this.process) return this.process
+
+    const proc = spawnCli(workspace, ['serve'])
+    this.process = proc
+
+    const stdout = lineSplitter((line) => this.handleLine(line))
+    const stderr = lineSplitter((line) => {
+      if (line.trim() && this.active) this.active.onLine({ ...parseLogLine(line), level: 'error' })
+    })
+    proc.stdout?.on('data', stdout.push)
+    proc.stderr?.on('data', stderr.push)
+
+    const onExit = (code: number | null): void => {
+      if (this.process === proc) this.process = null
+      if (this.active) {
+        this.active.onLine({
+          timestamp: nowTs(),
+          level: 'warn',
+          message: `CLI daemon exited (${code ?? 'terminated'}); it will restart on the next request.`
+        })
+        this.finish(code ?? -1)
+      }
+    }
+    proc.on('close', onExit)
+    proc.on('error', (err) => {
+      this.active?.onLine({ timestamp: nowTs(), level: 'error', message: `CLI daemon error: ${err.message}` })
+      onExit(-1)
+    })
+
+    return proc
+  }
+
+  private handleLine(rawLine: string): void {
+    // .NET emits CRLF; strip the trailing '\r' so the sentinel matches.
+    const line = rawLine.replace(/\r$/, '')
+    const done = line.match(DONE_RE)
+    if (done) {
+      this.finish(parseInt(done[2], 10))
       return
     }
-    const id = nextReqId++
-    activeReq = { id, onLine, resolve }
-    proc.stdin.write(`${JSON.stringify({ id, action, args })}\n`)
-  })
+    if (line.trim()) this.active?.onLine(parseLogLine(line))
+  }
+
+  private finish(code: number): void {
+    const req = this.active
+    this.active = null
+    req?.resolve(code)
+  }
 }
 
-/** Stops the persistent daemon (call on app quit). */
+const interactiveDaemon = new Daemon()
+const backgroundDaemon = new Daemon()
+
+function daemonFor(action: string): Daemon {
+  return BACKGROUND_ACTIONS.has(action) ? backgroundDaemon : interactiveDaemon
+}
+
+/** Stops the persistent daemons (call on app quit). */
 export function shutdownDaemon(): void {
-  if (!daemonProcess) return
-  try {
-    daemonProcess.stdin?.write(`${JSON.stringify({ id: 0, action: '__shutdown__', args: [] })}\n`)
-  } catch {
-    /* ignore */
-  }
-  try {
-    daemonProcess.kill()
-  } catch {
-    /* ignore */
-  }
-  daemonProcess = null
+  interactiveDaemon.shutdown()
+  backgroundDaemon.shutdown()
 }

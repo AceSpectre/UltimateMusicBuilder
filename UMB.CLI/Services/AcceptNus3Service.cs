@@ -1,4 +1,4 @@
-﻿using CsvHelper;
+using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -79,11 +79,14 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            var seriesDir = input.SeriesPath;
-            if (!HasValidatedFiles(seriesDir))
-                return;
+            Accept(input.SeriesPath, input.DeleteSources);
+        }
 
-            AcceptCore(seriesDir, input.DeleteSources);
+        /// <summary>Moves the validated .nus3audio files into the series, optionally deleting their sources.</summary>
+        public void Accept(string seriesDir, bool deleteSources)
+        {
+            if (HasValidatedFiles(seriesDir))
+                AcceptCore(seriesDir, deleteSources);
         }
 
         /// <summary>True when the series has a songs-to-validate folder with .nus3audio files.</summary>

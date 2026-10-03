@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { LogLine } from './cli'
 
@@ -182,17 +183,14 @@ describe('output buffering', () => {
 })
 
 describe('CLI invocation', () => {
-  it('runs the dev project through dotnet with the action appended after --', async () => {
+  it('runs the built dev CLI through dotnet with the action as arguments', async () => {
     const done = cli.spawnCliAction(WS, 'build', ['my-mod'], onLine)
     lastProc().close(0)
     await done
 
     const { command, args } = spawnCall()
     expect(command).toBe('dotnet')
-    expect(args).toEqual([
-      'run', '--project', expect.stringContaining('UMB.CLI'),
-      '--no-launch-profile', '--', 'build', 'my-mod'
-    ])
+    expect(args).toEqual([expect.stringMatching(/UMB\.CLI[\\/]bin[\\/]Debug[\\/]net8\.0[\\/]UMB\.CLI\.dll$/), 'build', 'my-mod'])
   })
 
   it('runs the bundled exe with bare args when packaged', async () => {
@@ -305,13 +303,7 @@ describe('one-shot concurrency', () => {
 })
 
 describe('daemon routing', () => {
-  const DAEMON_ACTIONS = [
-    'config-volume-analyze',
-    'config-volume-save',
-    'config-volume-preview',
-    'nus3-convert-batch',
-    'accept-nus3-batch'
-  ]
+  const DAEMON_ACTIONS = ['config-volume-analyze', 'config-volume-save', 'config-volume-preview']
 
   it.each(DAEMON_ACTIONS)('routes %s through the persistent daemon', async (action) => {
     const done = cli.spawnCliAction(WS, action, ['in.json'], onLine)
@@ -353,6 +345,91 @@ describe('daemon routing', () => {
     expect(mocks.spawn).toHaveBeenCalledTimes(1)
     const ids = daemon.stdin.write.mock.calls.map((c) => JSON.parse(c[0]).id)
     expect(ids).toEqual([1, 2])
+  })
+
+  it('runs background and interactive actions on separate daemons', async () => {
+    const slow = cli.spawnCliAction(WS, 'config-volume-analyze', ['a'], onLine)
+    const quick = cli.spawnCliAction(WS, 'config-volume-save', ['b'], onLine)
+    await flush()
+
+    expect(mocks.spawn).toHaveBeenCalledTimes(2)
+    const [background, interactive] = procs
+    expect(background.stdin.write).toHaveBeenCalledTimes(1)
+    expect(interactive.stdin.write).toHaveBeenCalledTimes(1)
+
+    interactive.out('__DONE__\t2\t0\n')
+    expect(await quick).toBe(0)
+    background.out('__DONE__\t1\t0\n')
+    expect(await slow).toBe(0)
+  })
+})
+
+describe('callCli', () => {
+  /** Answers each daemon request by writing `response` to the request's output file. */
+  function answerWith(response: unknown, code = 0): void {
+    mocks.spawn.mockImplementation(() => {
+      const proc = new FakeProc()
+      proc.stdin.write.mockImplementation((line: string) => {
+        const { id, args } = JSON.parse(line)
+        if (response !== undefined) writeFileSync(args[1], JSON.stringify(response), 'utf-8')
+        setImmediate(() => proc.out(`__DONE__\t${id}\t${code}\n`))
+      })
+      procs.push(proc)
+      return proc
+    })
+  }
+
+  it('sends the input as a JSON file and returns the result', async () => {
+    let input: unknown
+    mocks.spawn.mockImplementation(() => {
+      const proc = new FakeProc()
+      proc.stdin.write.mockImplementation((line: string) => {
+        const { id, action, args } = JSON.parse(line)
+        expect(action).toBe('mods-list')
+        input = JSON.parse(readFileSync(args[0], 'utf-8'))
+        writeFileSync(args[1], JSON.stringify({ result: [{ name: 'a' }] }), 'utf-8')
+        setImmediate(() => proc.out(`__DONE__\t${id}\t0\n`))
+      })
+      procs.push(proc)
+      return proc
+    })
+
+    expect(await cli.callCli(WS, 'mods-list', { modPath: 'x' })).toEqual([{ name: 'a' }])
+    expect(input).toEqual({ modPath: 'x' })
+  })
+
+  it('throws the error reported by the CLI', async () => {
+    answerWith({ error: 'Series not found.' }, 1)
+    await expect(cli.callCli(WS, 'series-set-icon', {})).rejects.toThrow('Series not found.')
+  })
+
+  it('throws when the CLI wrote no result', async () => {
+    answerWith(undefined, 1)
+    await expect(cli.callCli(WS, 'mods-list', {})).rejects.toThrow("CLI action 'mods-list' produced no result (exit code 1).")
+  })
+
+  it('returns a null result as null', async () => {
+    answerWith({ result: null })
+    expect(await cli.callCli(WS, 'merge-validate-name', { outputName: 'ok' })).toBeNull()
+  })
+
+  it('removes its temp files', async () => {
+    let paths: string[] = []
+    mocks.spawn.mockImplementation(() => {
+      const proc = new FakeProc()
+      proc.stdin.write.mockImplementation((line: string) => {
+        const { id, args } = JSON.parse(line)
+        paths = args
+        writeFileSync(args[1], JSON.stringify({ result: true }), 'utf-8')
+        setImmediate(() => proc.out(`__DONE__\t${id}\t0\n`))
+      })
+      procs.push(proc)
+      return proc
+    })
+
+    await cli.callCli(WS, 'nus3-reject', {})
+    expect(paths).toHaveLength(2)
+    expect(paths.some((p) => existsSync(p))).toBe(false)
   })
 })
 

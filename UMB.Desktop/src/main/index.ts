@@ -1,21 +1,13 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'path'
-import { listModSeries, listMods, getModStats } from './mods'
-import { loadTrackOrderData, saveTrackOrderData, type SaveTrackItem } from './order-tracks'
-import { createSeries, loadSeriesOrderData, saveSeriesOrderData, setSeriesIcon, type CreateSeriesInput, type SaveSeriesItem } from './order-series'
-import { spawnCliAction, cancelCurrentAction, shutdownDaemon } from './cli'
-import {
-  listNus3Sources, analyzeLoopPoints, extractWaveformPeaks, getTrackDuration, generateLoopPreview,
-  loadConversions, convertNus3Track, rejectNus3Track, acceptNus3Files
-} from './nus3-convert'
-import type { Nus3TrackDecision, LoopAnalysisOptions } from './nus3-convert'
-import { loadVolumeConfig, saveVolumeConfig, decodeTrackPreview, type VolumeOverride } from './config-volume'
-import { getAppSettings, saveAppSettings, checkArcOutput, type AppSettings } from './app-settings'
-import { analyzeExtractIcons, extractIcons } from './extract-icons'
-import { analyzeMerge, validateOutputName, executeMerge } from './merge'
-import { getPlaylistInfo } from './playlist-info'
-import { loadManagePlaylists, saveManagePlaylists, type PlaylistAssignmentInput } from './manage-playlists'
+import { callCli, spawnCliAction, cancelCurrentAction, shutdownDaemon } from './cli'
+import { loadVolumeConfig, saveVolumeConfig, decodeTrackPreview } from './config-volume'
+import { getAppSettings, saveAppSettings, checkArcOutput } from './app-settings'
 import { IPC } from '../shared/ipc-channels'
+import type {
+  AppSettings, CreateSeriesInput, LoopAnalysisOptions, Nus3TrackDecision, PlaylistAssignmentInput,
+  SaveSeriesItem, SaveTrackItem, VolumeOverride
+} from '../shared/types'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -69,70 +61,74 @@ function createWindow(): void {
 
 function registerIpcHandlers(): void {
   const workspace = getWorkspacePath()
-  const sendLog = (line: unknown): void => {
-    mainWindow?.webContents.send(IPC.LOG_STREAM, line)
+  // CLI output can still arrive while the app quits, after the window is gone.
+  const send = (channel: string, payload: unknown): void => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload)
   }
+  const sendLog = (line: unknown): void => send(IPC.LOG_STREAM, line)
+  // Mod data logic lives in the CLI (UMB.CLI/Desktop/DesktopApi.cs); these handlers just forward.
+  const api = <T>(action: string, input: unknown = {}): Promise<T> => callCli<T>(workspace, action, input, sendLog)
 
   ipcMain.handle(IPC.GET_WORKSPACE, () => workspace)
   ipcMain.handle(IPC.DEBUG_PING, () => ({ ok: true, workspace }))
   // Packaged builds carry the real version (set by the release action); in dev show "dev".
   ipcMain.handle(IPC.GET_APP_VERSION, () => (app.isPackaged ? app.getVersion() : 'dev'))
 
-  ipcMain.handle(IPC.LIST_MODS, () => listMods(workspace))
+  ipcMain.handle(IPC.LIST_MODS, () => api('mods-list'))
 
-  ipcMain.handle(IPC.LIST_MOD_SERIES, (_event, modPath: string) => listModSeries(workspace, modPath))
+  ipcMain.handle(IPC.LIST_MOD_SERIES, (_event, modPath: string) => api('mod-series-list', { modPath }))
 
-  ipcMain.handle(IPC.GET_MOD_STATS, (_event, modPath: string) => getModStats(workspace, modPath))
+  ipcMain.handle(IPC.GET_MOD_STATS, (_event, modPath: string) => api('mod-stats', { modPath }))
 
-  ipcMain.handle(IPC.LOAD_TRACK_ORDER, (_event, seriesPath: string) => loadTrackOrderData(workspace, seriesPath))
+  ipcMain.handle(IPC.LOAD_TRACK_ORDER, (_event, seriesPath: string) => api('track-order-load', { seriesPath }))
 
-  ipcMain.handle(IPC.SAVE_TRACK_ORDER, (_event, seriesPath: string, items: SaveTrackItem[]) => saveTrackOrderData(workspace, seriesPath, items))
+  ipcMain.handle(IPC.SAVE_TRACK_ORDER, (_event, seriesPath: string, items: SaveTrackItem[]) =>
+    api('track-order-save', { seriesPath, items }))
 
-  ipcMain.handle(IPC.LOAD_SERIES_ORDER, (_event, modPath: string) => loadSeriesOrderData(workspace, modPath))
+  ipcMain.handle(IPC.LOAD_SERIES_ORDER, (_event, modPath: string) => api('series-order-load', { modPath }))
 
-  ipcMain.handle(IPC.SAVE_SERIES_ORDER, (_event, modPath: string, items: SaveSeriesItem[]) => saveSeriesOrderData(workspace, modPath, items))
+  ipcMain.handle(IPC.SAVE_SERIES_ORDER, (_event, modPath: string, items: SaveSeriesItem[]) =>
+    api('series-order-save', { modPath, items }))
 
-  ipcMain.handle(IPC.CREATE_SERIES, (_event, modPath: string, input: CreateSeriesInput) => createSeries(workspace, modPath, input))
+  ipcMain.handle(IPC.CREATE_SERIES, (_event, modPath: string, input: CreateSeriesInput) =>
+    api('series-create', { modPath, input }))
 
-  ipcMain.handle(IPC.SET_SERIES_ICON, (_event, modPath: string, seriesId: string, iconDataUrl: string) => setSeriesIcon(workspace, modPath, seriesId, iconDataUrl))
+  ipcMain.handle(IPC.SET_SERIES_ICON, (_event, modPath: string, seriesId: string, iconDataUrl: string) =>
+    api('series-set-icon', { modPath, seriesId, iconDataUrl }))
 
-  ipcMain.handle(IPC.LIST_NUS3_SOURCES, (_event, seriesPath: string) => listNus3Sources(seriesPath))
+  ipcMain.handle(IPC.LIST_NUS3_SOURCES, (_event, seriesPath: string) => api('nus3-list-sources', { seriesPath }))
 
   ipcMain.handle(IPC.ANALYZE_LOOP_POINTS, (_event, seriesPath: string, filename: string, options?: LoopAnalysisOptions) =>
-    analyzeLoopPoints(join(seriesPath, filename), options)
-  )
+    api('nus3-analyze-loop', { filePath: join(seriesPath, filename), options }))
 
   ipcMain.handle(IPC.EXTRACT_WAVEFORM, (_event, seriesPath: string, filename: string, bars?: number) =>
-    extractWaveformPeaks(join(seriesPath, filename), bars)
-  )
+    api('nus3-waveform', { filePath: join(seriesPath, filename), bars }))
 
   ipcMain.handle(IPC.GET_TRACK_DURATION, (_event, seriesPath: string, filename: string) =>
-    getTrackDuration(join(seriesPath, filename))
-  )
+    api('nus3-duration', { filePath: join(seriesPath, filename) }))
 
-  ipcMain.handle(IPC.GENERATE_LOOP_PREVIEW, (_event, seriesPath: string, filename: string, loopStartSec: number, loopEndSec: number, previewLength: number) =>
-    generateLoopPreview(join(seriesPath, filename), loopStartSec, loopEndSec, previewLength)
-  )
+  ipcMain.handle(IPC.GENERATE_LOOP_PREVIEW, (_event, seriesPath: string, filename: string, loopStart: number, loopEnd: number, previewLength: number) =>
+    api('nus3-loop-preview', { filePath: join(seriesPath, filename), loopStart, loopEnd, previewLength }))
 
-  ipcMain.handle(IPC.LOAD_NUS3_CONVERSIONS, (_event, seriesPath: string) => loadConversions(seriesPath))
+  ipcMain.handle(IPC.LOAD_NUS3_CONVERSIONS, (_event, seriesPath: string) => api('nus3-load-conversions', { seriesPath }))
 
   ipcMain.handle(IPC.CONVERT_NUS3_TRACK, (_event, seriesPath: string, decision: Nus3TrackDecision) =>
-    convertNus3Track(workspace, seriesPath, decision, sendLog)
-  )
+    api('nus3-convert-track', { seriesPath, trackId: decision.trackId, mode: decision.mode, candidate: decision.candidate ?? null }))
 
   ipcMain.handle(IPC.REJECT_NUS3_TRACK, (_event, seriesPath: string, trackId: string) =>
-    rejectNus3Track(seriesPath, trackId)
-  )
+    api('nus3-reject', { seriesPath, trackId }))
 
-  ipcMain.handle(IPC.ACCEPT_NUS3_FILES, (_event, seriesPath: string, deleteSources: boolean) =>
-    acceptNus3Files(workspace, seriesPath, deleteSources, sendLog)
-  )
+  // Resolves an exit code (0) like the other CLI actions the renderer runs.
+  ipcMain.handle(IPC.ACCEPT_NUS3_FILES, async (_event, seriesPath: string, deleteSources: boolean) => {
+    await api('nus3-accept', { seriesPath, deleteSources })
+    return 0
+  })
 
   ipcMain.handle(IPC.LOAD_VOLUME_CONFIG, (_event, seriesPath: string, analyze: boolean) =>
     loadVolumeConfig(workspace, seriesPath, analyze, (line) => {
       const match = line.message.match(/^__LUFS_PROGRESS__\t(\d+)\t(\d+)\t(.+)$/)
       if (match) {
-        mainWindow?.webContents.send(IPC.VOLUME_PROGRESS, {
+        send(IPC.VOLUME_PROGRESS, {
           completed: parseInt(match[1]),
           total: parseInt(match[2]),
           currentFile: match[3]
@@ -152,31 +148,24 @@ function registerIpcHandlers(): void {
   )
 
   ipcMain.handle(IPC.ANALYZE_EXTRACT_ICONS, (_event, compiledModPath: string, modPath: string) =>
-    analyzeExtractIcons(workspace, compiledModPath, modPath)
-  )
+    api('extract-icons-analyze', { compiledModPath, modPath }))
 
   ipcMain.handle(IPC.EXTRACT_ICONS, (_event, compiledModPath: string, modPath: string, mode: 'all' | 'missing-only') =>
-    extractIcons(workspace, compiledModPath, modPath, mode, sendLog)
-  )
+    api('extract-icons-run', { compiledModPath, modPath, mode }))
 
-  ipcMain.handle(IPC.ANALYZE_MERGE, (_event, modPaths: string[]) =>
-    analyzeMerge(workspace, modPaths)
-  )
+  ipcMain.handle(IPC.ANALYZE_MERGE, (_event, modPaths: string[]) => api('merge-analyze', { modPaths }))
 
-  ipcMain.handle(IPC.VALIDATE_MERGE_NAME, (_event, name: string) =>
-    validateOutputName(workspace, name)
-  )
+  ipcMain.handle(IPC.VALIDATE_MERGE_NAME, (_event, outputName: string) => api('merge-validate-name', { outputName }))
 
   ipcMain.handle(IPC.EXECUTE_MERGE, (_event, modPaths: string[], outputName: string, priorityModPath: string | null) =>
-    executeMerge(workspace, modPaths, outputName, priorityModPath, sendLog)
-  )
+    api('merge-execute', { modPaths, outputName, priorityModPath }))
 
-  ipcMain.handle(IPC.GET_PLAYLIST_INFO, () => getPlaylistInfo(workspace))
+  ipcMain.handle(IPC.GET_PLAYLIST_INFO, () => api('playlist-info'))
 
-  ipcMain.handle(IPC.LOAD_MANAGE_PLAYLISTS, (_event, modPath: string) => loadManagePlaylists(workspace, modPath))
+  ipcMain.handle(IPC.LOAD_MANAGE_PLAYLISTS, (_event, modPath: string) => api('playlists-load', { modPath }))
 
   ipcMain.handle(IPC.SAVE_MANAGE_PLAYLISTS, (_event, modPath: string, assignments: PlaylistAssignmentInput[]) =>
-    saveManagePlaylists(workspace, modPath, assignments))
+    api('playlists-save', { modPath, assignments }))
 
   ipcMain.handle(IPC.CHECK_ARC_OUTPUT, () => checkArcOutput(workspace))
 

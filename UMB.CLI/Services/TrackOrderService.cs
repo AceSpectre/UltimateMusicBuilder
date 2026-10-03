@@ -1,39 +1,40 @@
-using CsvHelper;
-using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using UMB.CLI.Desktop;
 using UMB.CLI.Views;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
-using Sma5h.Mods.Music.Interfaces;
-using Sma5h.Mods.Music.Models;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text;
-using Tomlyn;
-using Tomlyn.Model;
+using System.Text.RegularExpressions;
 
 namespace UMB.CLI.Services
 {
+    /// <summary>
+    /// Track order and per-track fields for a series (tracks.csv `order` column, and
+    /// song_order.toml for existing-series mods). Shared by the desktop app and the CLI's
+    /// track order window.
+    /// </summary>
     public class TrackOrderService
     {
-        private const string DefaultLocale = "en_us";
+        private static readonly string[] EditableColumns =
+            { "title", "game", "author", "copyright", "record_type", "special_category", "info1", "in_soundtest" };
 
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
-        private readonly IAudioStateService _audioStateService;
+        private readonly VanillaCatalogService _catalog;
 
         public TrackOrderService(
             IOptionsMonitor<Sma5hMusicOptions> musicConfig,
-            IAudioStateService audioStateService,
+            VanillaCatalogService catalog,
             ILogger<TrackOrderService> logger)
         {
             _musicConfig = musicConfig;
-            _audioStateService = audioStateService;
+            _catalog = catalog;
             _logger = logger;
         }
 
@@ -45,75 +46,35 @@ namespace UMB.CLI.Services
             if (modDir == null || seriesDir == null)
                 return;
 
-            var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
-            var seriesTomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
-            var songOrderPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SONG_ORDER_TOML_FILE);
-
-            if (!File.Exists(csvPath))
+            if (!File.Exists(Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE)))
             {
                 _logger.LogWarning("No tracks.csv found in {SeriesDir}.", seriesDir);
                 return;
             }
 
-            // dynamic columns: every value preserved
-            List<Dictionary<string, string>> rows;
-            string[] headers;
-            try
+            var data = Load(seriesDir);
+            if (data.Items.Count == 0)
             {
-                (rows, headers) = ReadCsvRows(csvPath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to parse {Path}.", csvPath);
+                _logger.LogWarning("No tracks found in {SeriesDir}.", seriesDir);
                 return;
             }
 
-            if (rows.Count == 0)
+            var itemIdByViewModel = new Dictionary<TrackViewModel, string>();
+            var viewModels = data.Items.Select(item =>
             {
-                _logger.LogWarning("No tracks found in {Path}.", csvPath);
-                return;
-            }
-
-            // Determine if this is an existing-series mod and resolve its ui_series_id.
-            string uiSeriesId = null;
-            bool isExistingSeries = false;
-            if (File.Exists(seriesTomlPath))
-            {
-                try
+                var vm = new TrackViewModel
                 {
-                    var (idValue, existingValue) = ReadSeriesToml(seriesTomlPath);
-                    if (!string.IsNullOrWhiteSpace(idValue))
-                    {
-                        uiSeriesId = MusicConstants.InternalIds.SERIES_ID_PREFIX + idValue;
-                        isExistingSeries = existingValue;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to parse series.toml in {SeriesDir}; falling back to mod-only ordering.", seriesDir);
-                }
-            }
+                    OriginalIndex = item.OriginalIndex ?? -1,
+                    Title = item.Title,
+                    Subtitle = item.Subtitle,
+                    IsVanilla = item.IsLocked,
+                    BgmId = item.BgmId,
+                };
+                itemIdByViewModel[vm] = item.Id;
+                return vm;
+            }).ToList();
 
-            List<TrackViewModel> vanillaRows = new();
-            if (isExistingSeries && uiSeriesId != null)
-            {
-                try
-                {
-                    _audioStateService.InitBgmEntriesFromStateManager();
-                    vanillaRows = BuildVanillaRows(uiSeriesId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to load vanilla song data for {SeriesId}; falling back to mod-only ordering.", uiSeriesId);
-                    vanillaRows = new();
-                }
-            }
-
-            var modRows = BuildModRows(rows);
-
-            var viewModels = ComposeMergedList(vanillaRows, modRows, rows, headers, songOrderPath);
-
-            List<TrackViewModel> result = null;
+            List<TrackViewModel> result;
             try
             {
                 result = AvaloniaHost.ShowWindow(
@@ -135,270 +96,242 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            // Persist: tracks.csv `order` column reflects each modded song's merged-list position
-            if (!headers.Contains("order"))
-                headers = headers.Append("order").ToArray();
+            Save(seriesDir, result.Select(vm => new SaveTrackItem(itemIdByViewModel[vm], null)).ToList());
+            _logger.LogInformation("Track order saved for {SeriesDir}.", seriesDir);
+        }
 
-            // Clear stale order values for rows that are no longer present (shouldn't happen
-            // unless rows were modified outside the GUI, but be defensive).
+        public TrackOrderData Load(string seriesPath) =>
+            LoadUnchecked(ModPaths.ResolveUnderMods(_musicConfig, seriesPath, "Invalid series path.")).data;
+
+        /// <summary>
+        /// Saves the order (listed items first, then any left out) and edited fields to
+        /// tracks.csv, declares newly used vanilla games in series.toml, and rewrites
+        /// song_order.toml for existing-series mods.
+        /// </summary>
+        public TrackOrderData Save(string seriesPath, List<SaveTrackItem> items)
+        {
+            var resolvedSeriesPath = ModPaths.ResolveUnderMods(_musicConfig, seriesPath, "Invalid series path.");
+            var (data, rows, headers) = LoadUnchecked(resolvedSeriesPath);
+            var files = SeriesFiles.Of(resolvedSeriesPath);
+
+            var orderedIds = items.Select(i => i.Id).ToList();
+            var itemById = data.Items.ToDictionary(i => i.Id);
+            var finalItems = orderedIds.Where(itemById.ContainsKey).Select(id => itemById[id])
+                .Concat(data.Items.Where(i => !orderedIds.Contains(i.Id)))
+                .ToList();
+
+            var fieldsById = items.Where(i => i.Fields != null).ToDictionary(i => i.Id, i => i.Fields);
+            foreach (var item in finalItems)
+            {
+                if (item.OriginalIndex is not int index || !fieldsById.TryGetValue(item.Id, out var fields)) continue;
+                var row = rows[index];
+                row["title"] = fields.Title ?? "";
+                row["game"] = fields.Game ?? "";
+                row["author"] = fields.Author ?? "";
+                row["copyright"] = fields.Copyright ?? "";
+                row["record_type"] = fields.RecordType ?? "";
+                row["special_category"] = fields.SpecialCategory ?? "";
+                row["info1"] = fields.Info1 ?? "";
+                row["in_soundtest"] = fields.InSoundtest ?? "";
+            }
+
+            var nextHeaders = headers.ToList();
+            foreach (var column in EditableColumns.Append("order"))
+            {
+                if (!nextHeaders.Contains(column)) nextHeaders.Add(column);
+            }
+
             foreach (var row in rows)
                 row["order"] = "";
-
-            var reorderedRows = new List<Dictionary<string, string>>();
-            for (int i = 0; i < result.Count; i++)
+            var reorderedRows = new List<CsvRow>();
+            for (var position = 0; position < finalItems.Count; position++)
             {
-                var vm = result[i];
-                if (vm.IsVanilla) continue;
-                if (vm.OriginalIndex < 0 || vm.OriginalIndex >= rows.Count) continue;
-                var row = rows[vm.OriginalIndex];
-                row["order"] = i.ToString(CultureInfo.InvariantCulture);
-                reorderedRows.Add(row);
+                if (finalItems[position].OriginalIndex is not int index) continue;
+                rows[index]["order"] = position.ToString(CultureInfo.InvariantCulture);
+                reorderedRows.Add(rows[index]);
+            }
+            reorderedRows.AddRange(rows.Where(r => !reorderedRows.Contains(r)));
+
+            TracksCsv.Write(files.Csv, reorderedRows, nextHeaders);
+
+            // The build only accepts games declared under [[games]]; declare any newly used vanilla ones.
+            EnsureSeriesGames(files.SeriesToml, rows, data.Games);
+
+            if (data.IsExistingSeries)
+            {
+                var ids = finalItems.Where(i => !string.IsNullOrEmpty(i.BgmId)).ToList();
+                var lines = new List<string>
+                {
+                    "# Generated by UltimateMusicBuilder — ordering for an existing-series mod.",
+                    "# Listed in the order they will appear in the in-game Sound Test / My Music view.",
+                    "song_order = ["
+                };
+                lines.AddRange(ids.Select((item, i) => $"  \"{item.BgmId}\"{(i < ids.Count - 1 ? "," : "")} # {(item.IsLocked ? "vanilla" : "mod")}"));
+                lines.Add("]");
+                File.WriteAllText(files.SongOrder, string.Join("\n", lines) + "\n");
             }
 
-            // Append any modded rows that somehow weren't present in the GUI result
-            foreach (var row in rows)
-            {
-                if (!reorderedRows.Contains(row))
-                    reorderedRows.Add(row);
-            }
-
-            WriteCsvRows(csvPath, reorderedRows, headers);
-            _logger.LogInformation("Track order saved to {Path}.", csvPath);
-
-            if (isExistingSeries && uiSeriesId != null)
-            {
-                WriteSongOrderToml(songOrderPath, result);
-                _logger.LogInformation("Full series ordering saved to {Path}.", songOrderPath);
-            }
+            return Load(resolvedSeriesPath);
         }
 
-        private List<TrackViewModel> BuildVanillaRows(string uiSeriesId)
+        private record SeriesFiles(string Csv, string SeriesToml, string SongOrder)
         {
-            var gameTitlesInSeries = _audioStateService.GetGameTitleEntries()
-                .Where(g => g.UiSeriesId == uiSeriesId)
-                .ToDictionary(g => g.UiGameTitleId, g => g);
-            if (gameTitlesInSeries.Count == 0)
-                return new List<TrackViewModel>();
+            public static SeriesFiles Of(string seriesPath) => new(
+                Path.Combine(seriesPath, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE),
+                Path.Combine(seriesPath, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE),
+                Path.Combine(seriesPath, MusicConstants.MusicModFiles.FOLDER_MOD_SONG_ORDER_TOML_FILE));
+        }
 
-            return _audioStateService.GetBgmDbRootEntries()
-                .Where(b => b.Source == EntrySource.Core
-                            && b.TestDispOrder >= 0
-                            && !string.IsNullOrEmpty(b.UiGameTitleId)
-                            && gameTitlesInSeries.ContainsKey(b.UiGameTitleId))
-                .OrderBy(b => b.TestDispOrder)
-                .Select(b =>
+        private (TrackOrderData data, List<CsvRow> rows, string[] headers) LoadUnchecked(string seriesPath)
+        {
+            var files = SeriesFiles.Of(seriesPath);
+            var (rows, headers) = TracksCsv.Read(files.Csv);
+            var series = ReadSeriesToml(files.SeriesToml);
+            var songOrder = SeriesToml.ReadIdList(files.SongOrder);
+            var uiSeriesId = series.Id != null ? MusicConstants.InternalIds.SERIES_ID_PREFIX + series.Id : null;
+
+            var catalog = _catalog.Get();
+            var vanillaGames = catalog?.GameTitles.Where(g => g.SeriesId == uiSeriesId).Select(g => new SeriesGame(g.Id, g.Name)).ToList()
+                ?? new List<SeriesGame>();
+            var vanillaSongs = catalog?.Songs.Where(s => s.SeriesId == uiSeriesId).Select(s => new VanillaSongOption(s.InfoId, s.Name)).ToList()
+                ?? new List<VanillaSongOption>();
+            string ResolveVanillaTitle(string bgmId) =>
+                catalog != null && catalog.BgmTitles.TryGetValue(bgmId, out var title) ? title : FormatVanillaTitle(bgmId);
+
+            // Custom (series.toml) games first, then vanilla series games not already declared.
+            var declared = series.Games.Select(g => g.Id).ToHashSet();
+            var games = series.Games.Concat(vanillaGames.Where(g => !declared.Contains(g.Id))).ToList();
+
+            var items = OrderItems(BuildModItems(rows), rows, songOrder, ResolveVanillaTitle);
+            var data = new TrackOrderData(Path.GetFileName(seriesPath), seriesPath, series.ExistingSeries, songOrder.Count > 0,
+                games, vanillaSongs, series.DefaultTrackData, items);
+            return (data, rows, headers);
+        }
+
+        private record SeriesInfo(string Id, bool ExistingSeries, List<SeriesGame> Games, DefaultTrackData DefaultTrackData);
+
+        private static SeriesInfo ReadSeriesToml(string path)
+        {
+            if (!File.Exists(path))
+                return new SeriesInfo(null, false, new List<SeriesGame>(), null);
+
+            var text = File.ReadAllText(path);
+            var id = Regex.Match(text, @"^id\s*=\s*""([^""]+)""", RegexOptions.Multiline);
+            var existing = Regex.Match(text, @"^existing-series\s*=\s*(true|false)", RegexOptions.Multiline);
+
+            DefaultTrackData defaults = null;
+            var section = SeriesToml.TableSection(text, "default-track-data");
+            if (section != null)
+            {
+                var recordType = SeriesToml.String(section, "record-type");
+                defaults = new DefaultTrackData
                 {
-                    var title = b.Title.TryGetValue(DefaultLocale, out var t) && !string.IsNullOrEmpty(t)
-                        ? t : b.UiBgmId;
-                    var gameTitle = gameTitlesInSeries[b.UiGameTitleId];
-                    var gameName = gameTitle.MSBTTitle.TryGetValue(DefaultLocale, out var g) && !string.IsNullOrEmpty(g)
-                        ? g : gameTitle.UiGameTitleId;
-                    return new TrackViewModel
-                    {
-                        OriginalIndex = -1,
-                        Title = title,
-                        Subtitle = $"[vanilla] {gameName}",
-                        IsVanilla = true,
-                        BgmId = b.UiBgmId,
-                    };
-                })
+                    Game = SeriesToml.String(section, "game"),
+                    Author = SeriesToml.String(section, "author"),
+                    Copyright = SeriesToml.String(section, "copyright"),
+                    RecordType = recordType.Length > 0 ? recordType : "original"
+                };
+            }
+
+            return new SeriesInfo(id.Success ? id.Groups[1].Value : null,
+                existing.Success && existing.Groups[1].Value == "true", SeriesToml.Games(text), defaults);
+        }
+
+        /// <summary>Appends [[games]] blocks for known game ids used by rows but not yet declared.</summary>
+        private static void EnsureSeriesGames(string seriesTomlPath, List<CsvRow> rows, List<SeriesGame> knownGames)
+        {
+            if (!File.Exists(seriesTomlPath)) return;
+
+            var text = File.ReadAllText(seriesTomlPath);
+            var declared = SeriesToml.Games(text).Select(g => g.Id).ToHashSet();
+            var nameById = knownGames.GroupBy(g => g.Id).ToDictionary(g => g.Key, g => g.First().Name);
+            var toAdd = rows.Select(r => r.Get("game").Trim()).Where(id => id.Length > 0).Distinct()
+                .Where(id => !declared.Contains(id) && nameById.ContainsKey(id))
                 .ToList();
+            if (toAdd.Count == 0) return;
+
+            var blocks = string.Concat(toAdd.Select(id =>
+                $"\n[[games]]\nid = \"{SeriesToml.Escape(id)}\"\nname = \"{SeriesToml.Escape(nameById[id])}\"\n"));
+            File.WriteAllText(seriesTomlPath, $"{text.TrimEnd()}\n{blocks}");
         }
 
-        private List<TrackViewModel> BuildModRows(List<Dictionary<string, string>> rows)
+        private static List<TrackOrderItem> BuildModItems(List<CsvRow> rows)
         {
-            var result = new List<TrackViewModel>(rows.Count);
-            for (int i = 0; i < rows.Count; i++)
+            // A track is a "pinch target" when another row's info1 references its filename.
+            var referencedFilenames = rows.Select(r => r.Get("info1").Trim())
+                .Where(info1 => info1.Length > 0 && !info1.StartsWith("info_"))
+                .ToHashSet();
+
+            return rows.Select((row, index) =>
             {
-                var row = rows[i];
-                var title = row.GetValueOrDefault("title", row.GetValueOrDefault("filename", $"Track {i}"));
-                var game = row.GetValueOrDefault("game", "");
-                var filename = row.GetValueOrDefault("filename", "");
-                var subtitle = string.IsNullOrEmpty(game) ? filename : $"{game} — {filename}";
-                var toneId = string.IsNullOrEmpty(filename) ? "" : FolderMusicMod.DeriveToneId(filename);
-                var bgmId = string.IsNullOrEmpty(toneId) ? "" : MusicConstants.InternalIds.UI_BGM_ID_PREFIX + toneId;
-                result.Add(new TrackViewModel
-                {
-                    OriginalIndex = i,
-                    Title = title,
-                    Subtitle = subtitle,
-                    IsVanilla = false,
-                    BgmId = bgmId,
-                });
+                var filename = row.Get("filename");
+                var title = FirstNonEmpty(row.Get("title"), filename, $"Track {index + 1}");
+                var game = row.Get("game");
+                var bgmId = filename.Length > 0
+                    ? MusicConstants.InternalIds.UI_BGM_ID_PREFIX + FolderMusicMod.DeriveToneId(filename)
+                    : $"{MusicConstants.InternalIds.UI_BGM_ID_PREFIX}track_{index}";
+                return new TrackOrderItem($"mod:{index}", title, game.Length > 0 ? $"{game} - {filename}" : filename,
+                    bgmId, filename, false, index, BuildFields(row), filename.Length > 0 && referencedFilenames.Contains(filename));
+            }).ToList();
+        }
+
+        private static TrackFields BuildFields(CsvRow row) => new()
+        {
+            Title = row.Get("title"),
+            Game = row.Get("game"),
+            Author = row.Get("author"),
+            Copyright = row.Get("copyright"),
+            RecordType = FirstNonEmpty(row.Get("record_type"), "original"),
+            SpecialCategory = row.Get("special_category"),
+            Info1 = row.Get("info1"),
+            InSoundtest = FirstNonEmpty(row.Get("in_soundtest"), "True")
+        };
+
+        /// <summary>
+        /// song_order.toml wins when present (unknown ids become locked vanilla items, unlisted
+        /// mod tracks are appended); otherwise mod tracks sorted by their `order` column.
+        /// </summary>
+        private static List<TrackOrderItem> OrderItems(List<TrackOrderItem> modItems, List<CsvRow> rows,
+            List<string> songOrder, Func<string, string> resolveVanillaTitle)
+        {
+            if (songOrder.Count == 0)
+            {
+                return modItems
+                    .OrderBy(item => ParseOrder(rows[item.OriginalIndex ?? 0]) ?? int.MaxValue)
+                    .ToList();
             }
+
+            var modByBgmId = modItems.GroupBy(i => i.BgmId).ToDictionary(g => g.Key, g => g.Last());
+            var seen = new HashSet<string>();
+            var result = new List<TrackOrderItem>();
+            var vanillaIndex = 0;
+            foreach (var bgmId in songOrder)
+            {
+                if (modByBgmId.TryGetValue(bgmId, out var modItem))
+                {
+                    seen.Add(modItem.Id);
+                    result.Add(modItem);
+                }
+                else
+                {
+                    result.Add(new TrackOrderItem($"vanilla:{vanillaIndex++}:{bgmId}", resolveVanillaTitle(bgmId),
+                        "[vanilla] preserved from song_order.toml", bgmId, "", true, null, null, false));
+                }
+            }
+            result.AddRange(modItems.Where(i => !seen.Contains(i.Id)));
             return result;
         }
 
-        internal List<TrackViewModel> ComposeMergedList(
-            List<TrackViewModel> vanillaRows,
-            List<TrackViewModel> modRows,
-            List<Dictionary<string, string>> rawRows,
-            string[] headers,
-            string songOrderPath)
-        {
-            // Priority 1: existing song_order.toml — use it verbatim, append anything missing.
-            if (vanillaRows.Count > 0 && File.Exists(songOrderPath))
-            {
-                try
-                {
-                    var savedOrder = ReadSongOrderToml(songOrderPath);
-                    if (savedOrder.Count > 0)
-                    {
-                        var byBgmId = vanillaRows.Concat(modRows).ToDictionary(v => v.BgmId, v => v);
-                        var seen = new HashSet<TrackViewModel>();
-                        var result = new List<TrackViewModel>();
-                        foreach (var id in savedOrder)
-                        {
-                            if (byBgmId.TryGetValue(id, out var vm) && seen.Add(vm))
-                                result.Add(vm);
-                        }
-                        // Append anything that wasn't listed
-                        foreach (var vm in vanillaRows.Concat(modRows))
-                            if (seen.Add(vm))
-                                result.Add(vm);
-                        return result;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to parse {Path}; falling back to default ordering.", songOrderPath);
-                }
-            }
+        internal static int? ParseOrder(Dictionary<string, string> row) =>
+            row.TryGetValue("order", out var value)
+            && int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var order)
+                ? order : null;
 
-            // Priority 2: existing-series with tracks.csv `order` column — sequential insertion.
-            if (vanillaRows.Count > 0 && headers.Contains("order"))
-            {
-                var modsByOrder = modRows
-                    .Select((vm, idx) => new { vm, order = ParseOrder(rawRows[idx]) })
-                    .Where(x => x.order.HasValue)
-                    .OrderBy(x => x.order.Value)
-                    .Select(x => (x.vm, x.order.Value))
-                    .ToList();
-                var modsWithoutOrder = modRows
-                    .Where((vm, idx) => !ParseOrder(rawRows[idx]).HasValue)
-                    .ToList();
+        private static string FormatVanillaTitle(string bgmId) =>
+            string.Join(" ", Regex.Replace(bgmId, "^ui_bgm_", "")
+                .Split('_', StringSplitOptions.RemoveEmptyEntries)
+                .Select(part => char.ToUpperInvariant(part[0]) + part[1..]));
 
-                var merged = new List<TrackViewModel>(vanillaRows);
-                foreach (var (vm, order) in modsByOrder)
-                {
-                    var idx = Math.Clamp(order, 0, merged.Count);
-                    merged.Insert(idx, vm);
-                }
-                merged.AddRange(modsWithoutOrder);
-                return merged;
-            }
-
-            // Priority 3: existing-series with no prior ordering — vanilla first, then mods.
-            if (vanillaRows.Count > 0)
-            {
-                var merged = new List<TrackViewModel>(vanillaRows);
-                merged.AddRange(modRows);
-                return merged;
-            }
-
-            // Fallback: mod-only mode (non-existing-series or vanilla data unavailable).
-            if (headers.Contains("order"))
-            {
-                return modRows
-                    .Select((vm, idx) => new { vm, order = ParseOrder(rawRows[idx]) ?? int.MaxValue })
-                    .OrderBy(x => x.order)
-                    .Select(x => x.vm)
-                    .ToList();
-            }
-            return modRows;
-        }
-
-        internal static int? ParseOrder(Dictionary<string, string> row)
-        {
-            return row.TryGetValue("order", out var val)
-                   && int.TryParse(val, NumberStyles.Integer, CultureInfo.InvariantCulture, out var o)
-                ? o : (int?)null;
-        }
-
-        private static (string id, bool existingSeries) ReadSeriesToml(string tomlPath)
-        {
-            var text = File.ReadAllText(tomlPath);
-            var table = Toml.ToModel(text);
-            if (!table.TryGetValue("series", out var raw) || raw is not TomlTable series)
-                return (null, false);
-            string id = series.TryGetValue("id", out var idVal) ? idVal as string : null;
-            bool existing = series.TryGetValue("existing-series", out var existingVal) && existingVal is bool b && b;
-            return (id, existing);
-        }
-
-        private static List<string> ReadSongOrderToml(string tomlPath)
-        {
-            var text = File.ReadAllText(tomlPath);
-            var table = Toml.ToModel(text);
-            var result = new List<string>();
-            if (table.TryGetValue("song_order", out var raw) && raw is TomlArray array)
-            {
-                foreach (var item in array)
-                {
-                    if (item is string s && !string.IsNullOrWhiteSpace(s))
-                        result.Add(s.Trim());
-                }
-            }
-            return result;
-        }
-
-        private static void WriteSongOrderToml(string tomlPath, List<TrackViewModel> ordered)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine("# Generated by UltimateMusicBuilder — full ordering for an existing-series mod.");
-            sb.AppendLine("# Listed in the order they will appear in the in-game Sound Test / My Music view.");
-            sb.AppendLine("song_order = [");
-            for (int i = 0; i < ordered.Count; i++)
-            {
-                var vm = ordered[i];
-                if (string.IsNullOrEmpty(vm.BgmId)) continue;
-                var tag = vm.IsVanilla ? "vanilla" : "mod";
-                var comma = i < ordered.Count - 1 ? "," : "";
-                sb.AppendLine($"  \"{vm.BgmId}\"{comma} # {tag}");
-            }
-            sb.AppendLine("]");
-            File.WriteAllText(tomlPath, sb.ToString());
-        }
-
-        private (List<Dictionary<string, string>> rows, string[] headers) ReadCsvRows(string csvPath)
-        {
-            var config = CliUtil.CsvReadLenient();
-
-            using var reader = new StreamReader(csvPath);
-            using var csv = new CsvReader(reader, config);
-            csv.Read();
-            csv.ReadHeader();
-            var headers = csv.HeaderRecord;
-
-            var rows = new List<Dictionary<string, string>>();
-            while (csv.Read())
-            {
-                var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var h in headers)
-                    dict[h] = csv.GetField(h) ?? "";
-                rows.Add(dict);
-            }
-
-            return (rows, headers);
-        }
-
-        private void WriteCsvRows(string csvPath, List<Dictionary<string, string>> rows, string[] headers)
-        {
-            var config = CliUtil.CsvWrite();
-
-            using var writer = new StreamWriter(csvPath);
-            using var csv = new CsvWriter(writer, config);
-
-            foreach (var h in headers)
-                csv.WriteField(h);
-            csv.NextRecord();
-
-            foreach (var row in rows)
-            {
-                foreach (var h in headers)
-                    csv.WriteField(row.GetValueOrDefault(h, ""));
-                csv.NextRecord();
-            }
-        }
+        private static string FirstNonEmpty(params string[] values) => values.First(v => !string.IsNullOrEmpty(v));
     }
 }

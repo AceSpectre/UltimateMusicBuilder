@@ -28,9 +28,6 @@ namespace UMB.CLI
         private readonly DumpStagesService _dumpStages;
         private readonly ILogger<Script> _logger;
 
-        // Used by Program.RunAction for top-level exception logging.
-        public ILogger Logger => _logger;
-
         public Script(BuildService build, ScaffoldService scaffold, ConvertService convert,
             MergeService merge, ExtractIconsService extractIcons, Nus3ConvertService nus3Convert,
             AcceptNus3Service acceptNus3, CleanupService cleanup, SeriesOrderService orderSeries,

@@ -25,6 +25,19 @@ jobs:
       - run: npm ci
       - run: npm run test
 
+  dotnet:
+    name: .NET unit tests
+    # Tests.Unit needs no game resources; the integration tests (which do) run locally.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - run: dotnet test Tests --filter "FullyQualifiedName~Tests.Unit"
+
   e2e:
     name: Playwright E2E
     # Heavy specs (build-differential, playlist-info, config-volume LUFS, nus3-convert)
@@ -39,6 +52,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The app's data actions run on the C# CLI, which the pretest hook builds.
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -46,6 +64,6 @@ jobs:
           cache-dependency-path: UMB.Desktop/package-lock.json
 
       - run: npm ci
-      # test:e2e builds first via the pretest hook, so the suite can never run
-      # against a stale dist/. A globalSetup staleness check backs this up.
+      # test:e2e builds the CLI and the app first via the pretest hook, so the suite can never
+      # run against a stale dist/. A globalSetup staleness check backs this up.
       - run: npm run test:e2e
