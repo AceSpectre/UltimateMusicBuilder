@@ -141,11 +141,6 @@ namespace Sma5h.Mods.Music.Services
             return _stageEntries.Values;
         }
 
-        public IEnumerable<string> GetLocales()
-        {
-            return _localesEntries;
-        }
-
         public IEnumerable<PlaylistEntry> GetPlaylists()
         {
             return _playlistsEntries.Values;
@@ -364,102 +359,6 @@ namespace Sma5h.Mods.Music.Services
                 }
                 _logger.LogInformation("Merged {AddedCount} new track(s) into existing playlist {PlaylistId} ({SkippedCount} duplicate(s) skipped).",
                     added, playlistEntry.Id, playlistEntry.Tracks.Count - added);
-            }
-
-            return true;
-        }
-        #endregion
-
-        #region DELETE
-        public bool RemoveBgmDbRootEntry(string uiBgmId)
-        {
-            if (_bgmDbRootEntries.ContainsKey(uiBgmId))
-            {
-                //if (!_deletedBgmEntries.ContainsKey(toneId))
-                //    _deletedBgmEntries.Add(toneId, _bgmEntries[toneId]);
-                _bgmDbRootEntries.Remove(uiBgmId);
-            }
-            else
-            {
-                _logger.LogWarning("UiBgmId {UiBgmId} was not found. Cannot remove from list...", uiBgmId);
-            }
-            return true;
-        }
-
-        public bool RemoveBgmStreamSetEntry(string streamSetId)
-        {
-            if (_bgmStreamSetEntries.ContainsKey(streamSetId))
-            {
-                _bgmStreamSetEntries.Remove(streamSetId);
-            }
-            else
-            {
-                _logger.LogWarning("StreamSetId {StreamSetId} was not found. Cannot remove from list...", streamSetId);
-            }
-            return true;
-        }
-
-        public bool RemoveBgmAssignedInfoEntry(string infoId)
-        {
-            if (_bgmAssignedInfoEntries.ContainsKey(infoId))
-            {
-                _bgmAssignedInfoEntries.Remove(infoId);
-            }
-            else
-            {
-                _logger.LogWarning("InfoId {InfoId} was not found. Cannot remove from list...", infoId);
-            }
-            return true;
-        }
-
-        public bool RemoveBgmStreamPropertyEntry(string streamId)
-        {
-            if (_bgmStreamPropertyEntries.ContainsKey(streamId))
-            {
-                _bgmStreamPropertyEntries.Remove(streamId);
-            }
-            else
-            {
-                _logger.LogWarning("StreamId {StreamId} was not found. Cannot remove from list...", streamId);
-            }
-            return true;
-        }
-
-        public bool RemoveBgmPropertyEntry(string nameId)
-        {
-            if (_bgmPropertyEntries.ContainsKey(nameId))
-            {
-                _bgmPropertyEntries.Remove(nameId);
-            }
-            else
-            {
-                _logger.LogWarning("NameId {NameId} was not found. Cannot remove from list...", nameId);
-            }
-            return true;
-        }
-
-        public bool RemoveGameTitleEntry(string uiGameTitleId)
-        {
-            if (_gameTitleEntries.ContainsKey(uiGameTitleId))
-            {
-                _gameTitleEntries.Remove(uiGameTitleId);
-            }
-            else
-            {
-                _logger.LogWarning("UiGameTitleId {UiGameTitleId} was not found. Cannot remove from list...", uiGameTitleId);
-            }
-            return true;
-        }
-
-        public bool RemovePlaylistEntry(string playlistId)
-        {
-            if (_playlistsEntries.ContainsKey(playlistId))
-            {
-                _playlistsEntries.Remove(playlistId);
-            }
-            else
-            {
-                _logger.LogWarning("PlaylistId {PlaylistId} was not found. Cannot remove from list...", playlistId);
             }
 
             return true;

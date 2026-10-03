@@ -14,7 +14,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Core\Helpers\VGMMusic\VGMMusic.csproj" />
     <ProjectReference Include="..\..\ResourceProviders\Sma5h.ResourceProviders.BgmPropertyFile\Sma5h.ResourceProviders.BgmPropertyFile.csproj" />
     <ProjectReference Include="..\..\ResourceProviders\Sma5h.ResourceProviders.MsbtExt\Sma5h.ResourceProviders.MsbtExt.csproj" />
     <ProjectReference Include="..\..\ResourceProviders\Sma5h.ResourceProviders.PrcExt\Sma5h.ResourceProviders.PrcExt.csproj" />
