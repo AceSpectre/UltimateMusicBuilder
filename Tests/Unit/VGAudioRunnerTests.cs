@@ -15,7 +15,6 @@ namespace Tests.Unit
         {
             var original = Console.Out;
 
-            // A missing input makes VGAudio print an error instead of converting.
             var output = VGAudioRunner.Run("-i", Path.Combine(Path.GetTempPath(), "umb-missing.wav"), "-o", "unused.lopus");
 
             Assert.Same(original, Console.Out);

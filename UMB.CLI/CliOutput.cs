@@ -7,11 +7,8 @@ using System.Threading;
 namespace UMB.CLI
 {
     /// <summary>
-    /// The CLI's real stdout when it is driven by another process (the desktop app). Log lines and
-    /// protocol lines (__DONE__, __LUFS_PROGRESS__) all go through this one writer, in order:
-    /// the stock console logger writes from a background queue, so its lines could otherwise
-    /// arrive after the __DONE__ that ends a request. The writer is captured once at startup, so
-    /// tools that temporarily swap Console.Out (VGAudio) can't swallow these lines.
+    /// Single ordered stdout channel for log and protocol lines when the CLI is driven by another
+    /// process.
     /// </summary>
     internal static class CliOutput
     {
@@ -19,9 +16,8 @@ namespace UMB.CLI
         private static TextWriter _stdout;
 
         /// <summary>
-        /// Switches redirected stdin/stdout to UTF-8 (Windows defaults to the OEM code page, which
-        /// mangles non-ASCII paths in daemon requests and song titles in logs) and captures stdout.
-        /// Must run before anything else touches Console.
+        /// Switches redirected stdin/stdout to UTF-8 and captures stdout. Call before anything
+        /// else uses Console.
         /// </summary>
         public static void Init()
         {
@@ -63,7 +59,7 @@ namespace UMB.CLI
 
             public IDisposable BeginScope<TState>(TState state) => null;
 
-            public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information && logLevel != LogLevel.None;
+            public bool IsEnabled(LogLevel logLevel) => logLevel is >= LogLevel.Information and < LogLevel.None;
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
             {
@@ -110,7 +106,7 @@ namespace UMB.CLI
         {
             public IDisposable BeginScope<TState>(TState state) => null;
 
-            public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error && logLevel != LogLevel.None;
+            public bool IsEnabled(LogLevel logLevel) => logLevel is >= LogLevel.Error and < LogLevel.None;
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
             {

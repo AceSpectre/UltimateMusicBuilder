@@ -42,11 +42,15 @@ namespace Tests.Integration
                 args = arg == null ? null : new[] { arg }
             });
 
-        /// <summary>
-        /// Starts the daemon with the given workspace, sends every request line,
-        /// then shuts it down and returns the combined stdout.
-        /// </summary>
-        private string RunDaemonSession(string workspace, IEnumerable<string> requestLines)
+        private string CreateWorkspace()
+        {
+            var workspace = Path.Combine(_env.TempDir, "ws");
+            Directory.CreateDirectory(Path.Combine(workspace, "Resources"));
+            return workspace;
+        }
+
+        /// <summary>Starts the built CLI with stdio redirected (UTF-8) and the given workspace.</summary>
+        private static Process StartCli(string workspace, string arguments)
         {
             var exe = CliExePath();
             Assert.True(File.Exists(exe), $"Built CLI not found at {exe}");
@@ -54,7 +58,7 @@ namespace Tests.Integration
             var psi = new ProcessStartInfo
             {
                 FileName = exe,
-                Arguments = "serve",
+                Arguments = arguments,
                 UseShellExecute = false,
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
@@ -65,8 +69,16 @@ namespace Tests.Integration
                 StandardOutputEncoding = Encoding.UTF8,
             };
             psi.Environment["UMB_WORKSPACE"] = workspace;
+            return Process.Start(psi);
+        }
 
-            using var proc = Process.Start(psi);
+        /// <summary>
+        /// Starts the daemon with the given workspace, sends every request line,
+        /// then shuts it down and returns the combined stdout.
+        /// </summary>
+        private string RunDaemonSession(string workspace, IEnumerable<string> requestLines)
+        {
+            using var proc = StartCli(workspace, "serve");
 
             var stdout = new StringBuilder();
             var outTask = Task.Run(() =>
@@ -106,8 +118,7 @@ namespace Tests.Integration
         [Fact]
         public void Daemon_ProcessesBatchRequest_AndReportsDone()
         {
-            var workspace = Path.Combine(_env.TempDir, "ws");
-            Directory.CreateDirectory(Path.Combine(workspace, "Resources"));
+            var workspace = CreateWorkspace();
 
             var seriesDir = Path.Combine(workspace, "series");
             Directory.CreateDirectory(seriesDir);
@@ -141,10 +152,7 @@ namespace Tests.Integration
         [Fact]
         public void Daemon_HandlesNonAsciiPaths_InRequestsAndLogs()
         {
-            // Windows defaults redirected stdio to the OEM code page; a request path with a
-            // non-ASCII character used to arrive corrupted, so the action silently failed.
-            var workspace = Path.Combine(_env.TempDir, "ws");
-            Directory.CreateDirectory(Path.Combine(workspace, "Resources"));
+            var workspace = CreateWorkspace();
 
             var seriesDir = Path.Combine(_env.TempDir, "José", "Pokémon→série");
             Directory.CreateDirectory(seriesDir);
@@ -168,14 +176,12 @@ namespace Tests.Integration
         [Fact]
         public void Daemon_ReportsFailedAction_WithCode1_AfterItsLogLines()
         {
-            var workspace = Path.Combine(_env.TempDir, "ws");
-            Directory.CreateDirectory(Path.Combine(workspace, "Resources"));
+            var workspace = CreateWorkspace();
             var missingInput = Path.Combine(_env.TempDir, "missing.json");
 
             var stdout = RunDaemonSession(workspace, new[] { Request(1, "config-volume-analyze", missingInput) });
 
             Assert.Contains("__DONE__\t1\t1", stdout);
-            // The error is written synchronously, so it precedes the request's __DONE__.
             var errorAt = stdout.IndexOf("fail:", StringComparison.Ordinal);
             Assert.InRange(errorAt, 0, stdout.IndexOf("__DONE__\t1\t1", StringComparison.Ordinal));
         }
@@ -183,8 +189,7 @@ namespace Tests.Integration
         [Fact]
         public void Daemon_AnswersMalformedRequest_AndKeepsServing()
         {
-            var workspace = Path.Combine(_env.TempDir, "ws");
-            Directory.CreateDirectory(Path.Combine(workspace, "Resources"));
+            var workspace = CreateWorkspace();
 
             var stdout = RunDaemonSession(workspace, new[]
             {
@@ -201,23 +206,7 @@ namespace Tests.Integration
         [InlineData("config-volume-analyze", 1)] // no input file → logged error
         public void OneShot_ExitCodeReflectsOutcome(string action, int expectedCode)
         {
-            var workspace = Path.Combine(_env.TempDir, "ws");
-            Directory.CreateDirectory(Path.Combine(workspace, "Resources"));
-
-            var psi = new ProcessStartInfo
-            {
-                FileName = CliExePath(),
-                Arguments = action,
-                UseShellExecute = false,
-                RedirectStandardInput = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                WorkingDirectory = workspace,
-            };
-            psi.Environment["UMB_WORKSPACE"] = workspace;
-
-            using var proc = Process.Start(psi);
+            using var proc = StartCli(CreateWorkspace(), action);
             proc.StandardInput.Close();
             var outTask = proc.StandardOutput.ReadToEndAsync();
             var errTask = proc.StandardError.ReadToEndAsync();
@@ -230,8 +219,7 @@ namespace Tests.Integration
         [Fact]
         public void Daemon_ShutdownWithNoRequests_ExitsCleanly()
         {
-            var workspace = Path.Combine(_env.TempDir, "ws-empty");
-            Directory.CreateDirectory(Path.Combine(workspace, "Resources"));
+            var workspace = CreateWorkspace();
 
             var ex = Record.Exception(() =>
                 RunDaemonSession(workspace, Array.Empty<string>()));

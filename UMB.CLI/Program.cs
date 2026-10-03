@@ -15,9 +15,9 @@ namespace UMB.CLI
     class Program
     {
         // Process exit codes, also reported in the daemon's __DONE__ line.
-        internal const int ExitOk = 0;
-        internal const int ExitFailed = 1;
-        internal const int ExitUsage = 2;
+        private const int ExitOk = 0;
+        private const int ExitFailed = 1;
+        private const int ExitUsage = 2;
 
         async static Task<int> Main(string[] args)
         {

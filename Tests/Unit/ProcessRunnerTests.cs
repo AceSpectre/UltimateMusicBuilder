@@ -15,8 +15,6 @@ namespace Tests.Unit
         {
             if (!OperatingSystem.IsWindows()) return;
 
-            // ~40 KB to each stream: well past the pipe buffer, which used to stall a
-            // caller that read one stream to the end before touching the other.
             var result = ProcessRunner.Run("cmd.exe",
                 "/c for /L %i in (1,1,3000) do @(echo out %i & echo err %i 1>&2)",
                 TimeSpan.FromSeconds(60));

@@ -38,9 +38,5 @@ namespace Sma5h
 
             ProcessRunner.Run(executablePath, arguments, onStdout: onInfo, onStderr: onError);
         }
-
-        private void ReadOnErrorReceived(object sender, DataReceivedEventArgs args)
-        {
-        }
     }
 }

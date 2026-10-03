@@ -8,13 +8,12 @@ namespace Sma5h.Helpers
     public sealed record ProcessResult(int ExitCode, string StandardOutput, string StandardError);
 
     /// <summary>
-    /// Runs an external tool to completion. Both output streams are drained asynchronously so a
-    /// chatty tool can't fill an unread pipe and stall, and a hung tool is killed after a timeout
-    /// instead of blocking the CLI (and the desktop's daemon queue) forever.
+    /// Runs an external tool to completion, draining both output streams, and kills it if it
+    /// exceeds the timeout.
     /// </summary>
     public static class ProcessRunner
     {
-        public static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(15);
+        private static readonly TimeSpan DefaultTimeout = TimeSpan.FromMinutes(15);
 
         public static ProcessResult Run(string fileName, string arguments, TimeSpan? timeout = null,
             DataReceivedEventHandler onStdout = null, DataReceivedEventHandler onStderr = null)
@@ -34,18 +33,8 @@ namespace Sma5h.Helpers
 
             var stdout = new StringBuilder();
             var stderr = new StringBuilder();
-            process.OutputDataReceived += (sender, e) =>
-            {
-                if (e.Data == null) return;
-                lock (stdout) stdout.AppendLine(e.Data);
-                onStdout?.Invoke(sender, e);
-            };
-            process.ErrorDataReceived += (sender, e) =>
-            {
-                if (e.Data == null) return;
-                lock (stderr) stderr.AppendLine(e.Data);
-                onStderr?.Invoke(sender, e);
-            };
+            process.OutputDataReceived += Collect(stdout, onStdout);
+            process.ErrorDataReceived += Collect(stderr, onStderr);
 
             process.Start();
             process.BeginOutputReadLine();
@@ -58,11 +47,18 @@ namespace Sma5h.Helpers
                 catch (InvalidOperationException) { /* exited between the timeout and the kill */ }
                 throw new TimeoutException($"{Path.GetFileName(fileName)} did not finish within {limit.TotalMinutes:0} minutes and was stopped.");
             }
-            // The timed wait can return before the async readers have flushed; this one waits for them.
+            // Let the async output readers finish.
             process.WaitForExit();
 
-            lock (stdout) lock (stderr)
-                return new ProcessResult(process.ExitCode, stdout.ToString(), stderr.ToString());
+            return new ProcessResult(process.ExitCode, stdout.ToString(), stderr.ToString());
         }
+
+        private static DataReceivedEventHandler Collect(StringBuilder buffer, DataReceivedEventHandler forward) =>
+            (sender, e) =>
+            {
+                if (e.Data == null) return;
+                buffer.AppendLine(e.Data);
+                forward?.Invoke(sender, e);
+            };
     }
 }

@@ -251,7 +251,7 @@ namespace UMB.CLI.Services
                 }
 
                 if (succeeded)
-                    _logger.LogInformation("COMPLETE - Please check the logs for any error.");
+                    _logger.LogInformation("COMPLETE");
                 else
                     _logger.LogError("BUILD FAILED - see the errors above.");
                 _logger.LogInformation("--------------------");
