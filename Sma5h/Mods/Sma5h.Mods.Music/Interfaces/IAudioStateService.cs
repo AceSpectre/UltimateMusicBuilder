@@ -20,6 +20,8 @@ namespace Sma5h.Mods.Music.Interfaces
         IEnumerable<StageEntry> GetStagesEntries();
         IEnumerable<PlaylistEntry> GetPlaylists();
 
+        double GameVersion { get; }
+
         bool CanAddBgmDbRootEntry(string uiBgmId);
         bool CanAddBgmStreamSetEntry(string streamSetId);
         bool CanAddBgmAssignedInfoEntry(string infoId);

@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using CsvHelper;
 using CsvHelper.Configuration;
+using Force.Crc32;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sma5h.Data;
@@ -44,6 +45,8 @@ namespace Sma5h.Mods.Music.Services
         private readonly Dictionary<string, StageEntry> _stageEntries;
         private readonly Dictionary<string, float> _coreVolumes;
         private readonly Dictionary<string, List<string>> _seriesSongOrderings;
+
+        public double GameVersion { get; private set; }
 
         public AudioStateService(IOptionsMonitor<Sma5hMusicOptions> config, IMapper mapper, IStateManager state, ILogger<IAudioStateService> logger)
         {
@@ -601,6 +604,7 @@ namespace Sma5h.Mods.Music.Services
         #region Private
         public void InitBgmEntriesFromStateManager()
         {
+            GuessGameVersion();
 
             //Make sure resources are unloaded
             _state.UnloadResources();
@@ -740,6 +744,40 @@ namespace Sma5h.Mods.Music.Services
             foreach (var stage in paramStageDbRoot)
             {
                 _stageEntries.Add(stage.Key, _mapper.Map<StageEntry>(stage.Value));
+            }
+        }
+
+        public void GuessGameVersion()
+        {
+            var gameResourcePath = _config.CurrentValue.GameResourcesPath;
+            var gameCrcSets = GameResourcesCrcHelper.VersionCrcSets;
+            GameVersion = 0.0;
+            foreach (var versionCrcSet in gameCrcSets)
+            {
+                bool allMatch = true;
+                foreach (var resource in versionCrcSet.CrcResources)
+                {
+                    var file = Path.Combine(gameResourcePath, resource.Key);
+                    if (File.Exists(file))
+                    {
+                        var hash = Crc32Algorithm.Compute(File.ReadAllBytes(file));
+                        if (hash != resource.Value)
+                        {
+                            _logger.LogDebug("CRC Check: File {File} did not match expected CRC32 hash for Version {Version}. Expected: 0x{ExpectedHash:x}, Was: 0x{ActualHash:x}", file, versionCrcSet.Version, resource.Value, hash);
+                            allMatch = false;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogDebug("CRC Check: File {File} could not be found", file);
+                    }
+                }
+                if (allMatch)
+                {
+                    GameVersion = versionCrcSet.Version;
+                    break;
+                }
             }
         }
 

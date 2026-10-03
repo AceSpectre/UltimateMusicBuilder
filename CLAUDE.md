@@ -42,6 +42,10 @@ the user's mods. `appsettings.json` is always loaded from the exe's own director
     assignment, playlist and Sound Test order). Not registered by the CLI yet
     (`AddSma5hMusicOverride`), but kept on purpose for future features — don't delete it as dead
     code. (The original Sma5hMusic GUI that used it was removed on 2026-10-03.)
+  - Also kept for v1.0 but not wired into the CLI yet: `ISma5hMod.BuildPreCheck()` (Sma5hMusic's
+    `CheckBuildSpecialCategory` fails a build whose `info1` special-category link points at a missing
+    song) and `IAudioStateService.GameVersion` (CRC match of `Resources/Game` against known Smash
+    versions, `GameResourcesCrcHelper`).
   - `Services/` — AudioStateService, Nus3AudioService, metadata services
   - `Helpers/MusicConstants.cs` — All ID prefixes, file constants, valid extensions
 - `UMB.CLI/` — Console entry point
