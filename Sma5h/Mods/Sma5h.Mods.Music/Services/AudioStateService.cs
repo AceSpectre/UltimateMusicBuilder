@@ -1,7 +1,6 @@
 ﻿using AutoMapper;
 using CsvHelper;
 using CsvHelper.Configuration;
-using Force.Crc32;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Sma5h.Data;
@@ -45,8 +44,6 @@ namespace Sma5h.Mods.Music.Services
         private readonly Dictionary<string, StageEntry> _stageEntries;
         private readonly Dictionary<string, float> _coreVolumes;
         private readonly Dictionary<string, List<string>> _seriesSongOrderings;
-
-        public double GameVersion { get; private set; }
 
         public AudioStateService(IOptionsMonitor<Sma5hMusicOptions> config, IMapper mapper, IStateManager state, ILogger<IAudioStateService> logger)
         {
@@ -139,11 +136,6 @@ namespace Sma5h.Mods.Music.Services
         public IEnumerable<StageEntry> GetStagesEntries()
         {
             return _stageEntries.Values;
-        }
-
-        public IEnumerable<string> GetLocales()
-        {
-            return _localesEntries;
         }
 
         public IEnumerable<PlaylistEntry> GetPlaylists()
@@ -364,102 +356,6 @@ namespace Sma5h.Mods.Music.Services
                 }
                 _logger.LogInformation("Merged {AddedCount} new track(s) into existing playlist {PlaylistId} ({SkippedCount} duplicate(s) skipped).",
                     added, playlistEntry.Id, playlistEntry.Tracks.Count - added);
-            }
-
-            return true;
-        }
-        #endregion
-
-        #region DELETE
-        public bool RemoveBgmDbRootEntry(string uiBgmId)
-        {
-            if (_bgmDbRootEntries.ContainsKey(uiBgmId))
-            {
-                //if (!_deletedBgmEntries.ContainsKey(toneId))
-                //    _deletedBgmEntries.Add(toneId, _bgmEntries[toneId]);
-                _bgmDbRootEntries.Remove(uiBgmId);
-            }
-            else
-            {
-                _logger.LogWarning("UiBgmId {UiBgmId} was not found. Cannot remove from list...", uiBgmId);
-            }
-            return true;
-        }
-
-        public bool RemoveBgmStreamSetEntry(string streamSetId)
-        {
-            if (_bgmStreamSetEntries.ContainsKey(streamSetId))
-            {
-                _bgmStreamSetEntries.Remove(streamSetId);
-            }
-            else
-            {
-                _logger.LogWarning("StreamSetId {StreamSetId} was not found. Cannot remove from list...", streamSetId);
-            }
-            return true;
-        }
-
-        public bool RemoveBgmAssignedInfoEntry(string infoId)
-        {
-            if (_bgmAssignedInfoEntries.ContainsKey(infoId))
-            {
-                _bgmAssignedInfoEntries.Remove(infoId);
-            }
-            else
-            {
-                _logger.LogWarning("InfoId {InfoId} was not found. Cannot remove from list...", infoId);
-            }
-            return true;
-        }
-
-        public bool RemoveBgmStreamPropertyEntry(string streamId)
-        {
-            if (_bgmStreamPropertyEntries.ContainsKey(streamId))
-            {
-                _bgmStreamPropertyEntries.Remove(streamId);
-            }
-            else
-            {
-                _logger.LogWarning("StreamId {StreamId} was not found. Cannot remove from list...", streamId);
-            }
-            return true;
-        }
-
-        public bool RemoveBgmPropertyEntry(string nameId)
-        {
-            if (_bgmPropertyEntries.ContainsKey(nameId))
-            {
-                _bgmPropertyEntries.Remove(nameId);
-            }
-            else
-            {
-                _logger.LogWarning("NameId {NameId} was not found. Cannot remove from list...", nameId);
-            }
-            return true;
-        }
-
-        public bool RemoveGameTitleEntry(string uiGameTitleId)
-        {
-            if (_gameTitleEntries.ContainsKey(uiGameTitleId))
-            {
-                _gameTitleEntries.Remove(uiGameTitleId);
-            }
-            else
-            {
-                _logger.LogWarning("UiGameTitleId {UiGameTitleId} was not found. Cannot remove from list...", uiGameTitleId);
-            }
-            return true;
-        }
-
-        public bool RemovePlaylistEntry(string playlistId)
-        {
-            if (_playlistsEntries.ContainsKey(playlistId))
-            {
-                _playlistsEntries.Remove(playlistId);
-            }
-            else
-            {
-                _logger.LogWarning("PlaylistId {PlaylistId} was not found. Cannot remove from list...", playlistId);
             }
 
             return true;
@@ -705,7 +601,6 @@ namespace Sma5h.Mods.Music.Services
         #region Private
         public void InitBgmEntriesFromStateManager()
         {
-            GuessGameVersion();
 
             //Make sure resources are unloaded
             _state.UnloadResources();
@@ -845,40 +740,6 @@ namespace Sma5h.Mods.Music.Services
             foreach (var stage in paramStageDbRoot)
             {
                 _stageEntries.Add(stage.Key, _mapper.Map<StageEntry>(stage.Value));
-            }
-        }
-
-        public void GuessGameVersion()
-        {
-            var gameResourcePath = _config.CurrentValue.GameResourcesPath;
-            var gameCrcSets = GameResourcesCrcHelper.VersionCrcSets;
-            GameVersion = 0.0;
-            foreach (var versionCrcSet in gameCrcSets)
-            {
-                bool allMatch = true;
-                foreach (var resource in versionCrcSet.CrcResources)
-                {
-                    var file = Path.Combine(gameResourcePath, resource.Key);
-                    if (File.Exists(file))
-                    {
-                        var hash = Crc32Algorithm.Compute(File.ReadAllBytes(file));
-                        if (hash != resource.Value)
-                        {
-                            _logger.LogDebug("CRC Check: File {File} did not match expected CRC32 hash for Version {Version}. Expected: 0x{ExpectedHash:x}, Was: 0x{ActualHash:x}", file, versionCrcSet.Version, resource.Value, hash);
-                            allMatch = false;
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogDebug("CRC Check: File {File} could not be found", file);
-                    }
-                }
-                if (allMatch)
-                {
-                    GameVersion = versionCrcSet.Version;
-                    break;
-                }
             }
         }
 

@@ -18,8 +18,6 @@ namespace Sma5h
 
         public virtual bool Run() { return true; }
 
-        public virtual string BuildPreCheck() { return string.Empty; }
-
         public virtual bool Build(bool useCache) { return true; }
     }
 }

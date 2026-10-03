@@ -38,6 +38,10 @@ the user's mods. `appsettings.json` is always loaded from the exe's own director
 - `Sma5h/Mods/Sma5h.Mods.Music/` — Music mod logic (audio state, services, mod formats)
   - `MusicMods/FolderMusicMod/` — Folder-based mod format (series.toml + tracks.csv)
   - `MusicMods/MusicModConfig/` — Original JSON-based mod format
+  - `Sma5hMusicOverride.cs` + `MusicOverride/` — overrides for vanilla data (stage playlist
+    assignment, playlist and Sound Test order). Not registered by the CLI yet
+    (`AddSma5hMusicOverride`), but kept on purpose for future features — don't delete it as dead
+    code. (The original Sma5hMusic GUI that used it was removed on 2026-10-03.)
   - `Services/` — AudioStateService, Nus3AudioService, metadata services
   - `Helpers/MusicConstants.cs` — All ID prefixes, file constants, valid extensions
 - `UMB.CLI/` — Console entry point

@@ -33,15 +33,6 @@ namespace Sma5h.Mods.Music.MusicMods
             _musicModConfig = LoadMusicModConfig();
         }
 
-        public MusicMod(IMapper mapper, ILogger<IMusicMod> logger, string newModPath, MusicModInformation newMod)
-        {
-            ModPath = newModPath;
-            _logger = logger;
-            _mapper = mapper;
-            _musicModConfig = InitializeNewMod(newModPath, newMod);
-            SaveMusicModConfig();
-        }
-
         public MusicModEntries GetMusicModEntries()
         {
             var output = new MusicModEntries();
@@ -280,95 +271,6 @@ namespace Sma5h.Mods.Music.MusicMods
             return true;
         }
 
-        public bool ReorderSongs(List<string> orderedList)
-        {
-            //Sanity check
-            var allModSongsDict = _musicModConfig.Series.SelectMany(s => s.Games.SelectMany(p => p.Bgms)).OrderBy(p => p.DbRoot.UiBgmId);
-            var dictAllModSongsDict = allModSongsDict.ToDictionary(p => p.DbRoot.UiBgmId, p => p);
-            if (!orderedList.OrderBy(p => p).SequenceEqual(allModSongsDict.Select(p => p.DbRoot.UiBgmId)))
-            {
-                _logger.LogError("The provider list of songs to reorder did not match the list of songs found in the mod. Aborting reorder...");
-                return false;
-            }
-
-            //Wipe all games & series
-            var seriesCache = _musicModConfig.Series.ToList();
-            var gamesCache = _musicModConfig.Series.SelectMany(s => s.Games).ToList();
-            gamesCache.ForEach(p => p.Bgms.Clear());
-            seriesCache.ForEach(p => p.Games.Clear());
-            _musicModConfig.Series.Clear();
-
-            //Reorder
-            foreach (var orderedSongId in orderedList)
-            {
-                var orderedSong = dictAllModSongsDict[orderedSongId];
-                var game = gamesCache.FirstOrDefault(p => p.UiGameTitleId == orderedSong.DbRoot.UiGameTitleId);
-                if (game == null)
-                {
-                    _logger.LogError("A game wasn't found during reordering. Aborting reorder...");
-                    return false;
-                }
-                var series = seriesCache.FirstOrDefault(p => p.UiSeriesId == game.UiSeriesId);
-                if (series == null)
-                {
-                    _logger.LogError("A series wasn't found during reordering. Aborting reorder...");
-                    return false;
-                }
-
-                game.Bgms.Add(orderedSong);
-                if (!series.Games.Contains(game))
-                    series.Games.Add(game);
-                if (!_musicModConfig.Series.Contains(series))
-                    _musicModConfig.Series.Add(series);
-            }
-
-            //Save
-            SaveMusicModConfig();
-
-            return true;
-        }
-
-        public bool RemoveMusicModEntries(MusicModDeleteEntries musicModDeleteEntries)
-        {
-            if (musicModDeleteEntries == null)
-            {
-                return false;
-            }
-
-            //For this specific mod, we want 1 entry of everything
-            if (musicModDeleteEntries.BgmDbRootEntries.Count != 1 ||
-               musicModDeleteEntries.BgmAssignedInfoEntries.Count != 1 ||
-               musicModDeleteEntries.BgmStreamSetEntries.Count != 1 ||
-               musicModDeleteEntries.BgmStreamPropertyEntries.Count != 1 ||
-               musicModDeleteEntries.BgmPropertyEntries.Count != 1)
-            {
-                _logger.LogError("This update is not compatible with {MusicMod}", nameof(MusicMod));
-                return false;
-            }
-
-            var toneId = musicModDeleteEntries.BgmPropertyEntries.FirstOrDefault();
-
-            _logger.LogInformation("Remove ToneId {ToneId} from Mod {ModName}", toneId, Mod.Name);
-            var bgms = _musicModConfig.Series.SelectMany(s => s.Games.SelectMany(g => g.Bgms.Where(s => s.ToneId == toneId))).ToList();
-            _musicModConfig.Series.ForEach(s =>
-            {
-                s.Games.ForEach(g => g.Bgms.RemoveAll(p => p.ToneId == toneId));
-                s.Games.RemoveAll(p => p.Bgms.Count == 0);
-            });
-            _musicModConfig.Series.RemoveAll(p => p.Games.Count == 0);
-            SaveMusicModConfig();
-            foreach (var bgm in bgms)
-            {
-                var file = Path.Combine(ModPath, bgm.Filename);
-                if (File.Exists(file))
-                {
-                    _logger.LogInformation("Remove File {File} from Mod {ModName}", file, Mod.Name);
-                    File.Delete(file);
-                }
-            }
-            return true;
-        }
-
         public bool UpdateSeriesEntry(SeriesEntry seriesEntry)
         {
             if (_musicModConfig?.Series != null)
@@ -416,31 +318,6 @@ namespace Sma5h.Mods.Music.MusicMods
                 }
             }
             return true;
-        }
-
-        public bool UpdateModInformation(MusicModInformation configBase)
-        {
-            _musicModConfig.Author = configBase.Author;
-            _musicModConfig.Name = configBase.Name;
-            _musicModConfig.Website = configBase.Website;
-            _musicModConfig.Description = configBase.Description;
-            return SaveMusicModConfig();
-        }
-
-        protected virtual MusicModConfig InitializeNewMod(string newModPath, MusicModInformation newMod)
-        {
-            var musicModConfig = new MusicModConfig(Guid.NewGuid().ToString())
-            {
-                Name = newMod.Name,
-                Author = newMod.Author,
-                Description = newMod.Description,
-                Series = new List<SeriesConfig>(),
-                Website = newMod.Website
-            };
-
-            Directory.CreateDirectory(newModPath);
-
-            return musicModConfig;
         }
 
         private string GetMusicModAudioFile(string bgmFilename)

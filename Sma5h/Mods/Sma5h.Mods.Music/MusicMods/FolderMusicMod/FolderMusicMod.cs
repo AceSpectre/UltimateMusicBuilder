@@ -400,24 +400,6 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             return Task.FromResult(false);
         }
 
-        public bool ReorderSongs(List<string> list)
-        {
-            _logger.LogWarning("FolderMusicMod '{ModId}' is read-only. Edit series.toml and tracks.csv directly.", Id);
-            return false;
-        }
-
-        public bool RemoveMusicModEntries(MusicModDeleteEntries entries)
-        {
-            _logger.LogWarning("FolderMusicMod '{ModId}' is read-only. Edit series.toml and tracks.csv directly.", Id);
-            return false;
-        }
-
-        public bool UpdateModInformation(MusicModInformation info)
-        {
-            _logger.LogWarning("FolderMusicMod '{ModId}' is read-only. Edit series.toml and tracks.csv directly.", Id);
-            return false;
-        }
-
         // ── Private helpers ───────────────────────────────────────────────────
 
         private FolderSeriesFileConfig ParseSeriesFile(string tomlPath)

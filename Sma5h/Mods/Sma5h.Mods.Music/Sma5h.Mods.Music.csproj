@@ -8,13 +8,11 @@
     <PackageReference Include="AutoMapper" Version="14.0.0" />
     <PackageReference Include="CsvHelper" Version="27.1.1" />
     <PackageReference Include="Tomlyn" Version="0.17.0" />
-    <PackageReference Include="Crc32.NET" Version="1.2.0" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Core\Helpers\VGMMusic\VGMMusic.csproj" />
     <ProjectReference Include="..\..\ResourceProviders\Sma5h.ResourceProviders.BgmPropertyFile\Sma5h.ResourceProviders.BgmPropertyFile.csproj" />
     <ProjectReference Include="..\..\ResourceProviders\Sma5h.ResourceProviders.MsbtExt\Sma5h.ResourceProviders.MsbtExt.csproj" />
     <ProjectReference Include="..\..\ResourceProviders\Sma5h.ResourceProviders.PrcExt\Sma5h.ResourceProviders.PrcExt.csproj" />

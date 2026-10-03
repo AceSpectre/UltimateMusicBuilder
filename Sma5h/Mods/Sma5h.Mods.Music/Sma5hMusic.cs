@@ -92,20 +92,6 @@ namespace Sma5h.Mods.Music
             return true;
         }
 
-        public override string BuildPreCheck()
-        {
-            try
-            {
-                //Checks
-                CheckBuildSpecialCategory();
-                return string.Empty;
-            }
-            catch (Exception e)
-            {
-                return e.Message;
-            }
-        }
-
         public override bool Build(bool useCache)
         {
             _logger.LogInformation("Starting Build...");
