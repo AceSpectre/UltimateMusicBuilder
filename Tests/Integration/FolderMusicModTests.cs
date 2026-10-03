@@ -31,6 +31,25 @@ namespace Tests.Integration
         // ── New series (dev/) ──────────────────────────────────────────────
 
         [Fact]
+        public void SeriesLoading_IsStableAcrossDirectoryCreationOrder()
+        {
+            var modDir = Path.Combine(_env.ModPath, "ordering-mod");
+            foreach (var id in new[] { "gamma", "dev" })
+            {
+                var dir = Path.Combine(modDir, id);
+                Directory.CreateDirectory(dir);
+                File.WriteAllText(Path.Combine(dir, "series.toml"),
+                    $"[series]\nid = \"{id}\"\nname = \"{id}\"\n\n[[games]]\nid = \"{id}\"\nname = \"{id}\"\n");
+                File.WriteAllText(Path.Combine(dir, "tracks.csv"),
+                    "filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\n");
+            }
+
+            var entries = CreateMod(modDir).GetMusicModEntries();
+            Assert.Equal(new[] { "ui_series_dev", "ui_series_gamma" },
+                entries.SeriesEntries.Select(series => series.UiSeriesId));
+        }
+
+        [Fact]
         public void NewSeries_CreatesSeriesEntry()
         {
             var modDir = _env.CreateConfiguredMod();

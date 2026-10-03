@@ -1,7 +1,7 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { createWorkspace, seedTestDataMod, launchApp, firstWindow, type E2EWorkspace } from './e2e-utils'
+import { createWorkspace, seedTestDataMod, launchApp, firstWindow, closeApp, type E2EWorkspace } from './e2e-utils'
 
 let ws: E2EWorkspace
 let app: ElectronApplication
@@ -13,7 +13,7 @@ test.beforeAll(async () => {
   app = await launchApp(ws)
 })
 test.afterAll(async () => {
-  await app?.close()
+  await closeApp(app)
   ws?.cleanup()
 })
 

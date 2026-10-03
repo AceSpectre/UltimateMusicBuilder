@@ -10,13 +10,63 @@ UMB is a fork of [Sma5hMusic](https://github.com/Deinonychus71/Sma5hMusic) for a
 
 ## Dependencies
 
-1. **FFmpeg** - For LUFS volume normalisation, use `appsettings.json → Sma5hMusic.LufsNormalization.FfmpegPath` to point to local install
-   - Just install via commandline `winget/choco/apt-install/pacman/brew` for easiest setup
+1. **FFmpeg** - For LUFS volume normalisation, decoding, waveforms, and playback previews. `ffmpeg`, `ffprobe`, and `ffplay` must be on PATH.
 2. **pymusiclooper** - For detecting loop points during standard audio -> `nus3audio` conversion
-   - Global install via `pip`
+   - Installed in an isolated environment using pipx, rather than into system Python.
 3. A partial dump of Smash Ultimate assets from `data.arc` (identical to Sma5h) in `Resources/Game`
    - [Video guide to dump](https://youtu.be/CXe_Su-Yo2c?si=8iFYrD_xxfrzwhog)
    - [Guide to setup resources](https://github.com/Deinonychus71/Sma5hMusic/wiki/Setup) 
+
+### One-time setup
+
+Run from the extracted release folder or a source checkout:
+
+```bash
+# macOS / Linux
+bash setup.sh
+bash setup.sh --dry-run   # inspect commands without installing anything
+```
+
+```powershell
+# Windows
+powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
+# Add -DryRun to inspect commands without installing anything.
+```
+
+Setup checks for existing commands and installs only missing dependencies.
+macOS requires Homebrew; Linux supports Debian/Ubuntu (`apt`), Fedora (`dnf`),
+and Arch (`pacman`); Windows requires App Installer (`winget`). System package
+installs may ask for administrator access. Fedora uses its `ffmpeg-free` package;
+codec availability depends on the distribution's build. Setup uses pipx for
+pymusiclooper and adds its application directory to PATH. Open a new terminal
+after setup, and restart UMB if it was already running.
+
+Game data and `Resources/template.nus3bank` must be supplied separately; setup
+does not download these files.
+
+### Developer setup
+
+Install the .NET 8 SDK, Node.js 20+ and npm first. Unix developers also need
+Rust/cargo to build `bgm-property` if it isn't already present. Then run:
+
+```bash
+bash setup.sh --dev
+```
+
+On Windows, add `-Dev` to the PowerShell command above. Developer setup also
+runs the existing `scripts/fetch-tools.sh` / `scripts/fetch-tools.ps1` scripts
+and `npm ci` for the desktop app. It checks the toolchain before installing
+runtime dependencies, and works from any current directory.
+
+Release archives bundle tools for their target OS. A Git checkout currently
+contains Windows tool binaries; the fetch scripts supply pinned versions for
+the developer's OS. On Apple Silicon, the currently pinned `nus3audio` binary
+requires Rosetta. On macOS, setup builds pinned `vgmstream-cli` sources with
+static codec libraries; Homebrew installs CMake and the codec build dependencies
+once. This requires Xcode Command Line Tools (`xcode-select --install`). The
+resulting executable does not depend on Homebrew codec versions at runtime.
+Released apps are self-contained and don't need Node.js,
+the .NET SDK, or Rust installed.
 
 
 ## Usage 

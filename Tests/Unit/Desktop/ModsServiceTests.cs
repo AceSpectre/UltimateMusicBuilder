@@ -58,6 +58,27 @@ namespace Tests.Unit.Desktop
             Assert.Empty(_service.ListModSeries(Path.Combine(_ws.Root, "elsewhere")));
         }
 
+        [UnixFact]
+        public void ListModSeries_AcceptsASymlinkToTheModsFolder()
+        {
+            _ws.WriteSeries("persona", "persona", Csv);
+            var alias = Path.Combine(_ws.Root, "mods-alias");
+            Directory.CreateSymbolicLink(alias, _ws.ModsRoot);
+
+            Assert.Equal(new[] { "persona" }, _service.ListModSeries(Path.Combine(alias, "persona")).Select(s => s.Name));
+        }
+
+        [UnixFact]
+        public void ListModSeries_RejectsASymlinkOutsideTheModsFolder()
+        {
+            var outside = Path.Combine(_ws.Root, "elsewhere");
+            DesktopWorkspace.WriteFile(Path.Combine(outside, "persona"), "tracks.csv", Csv);
+            var alias = Path.Combine(_ws.ModsRoot, "escaped");
+            Directory.CreateSymbolicLink(alias, outside);
+
+            Assert.Empty(_service.ListModSeries(alias));
+        }
+
         [Fact]
         public void GetModStats_CountsSeriesAndTracks()
         {

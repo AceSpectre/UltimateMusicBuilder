@@ -1,11 +1,8 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { _electron as electron } from '@playwright/test'
 import { readFileSync } from 'fs'
-import { resolve, join, dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { firstWindow, repoRoot, copyConfiguredSeries, hasGameResources, hasTool } from './e2e-utils'
+import { join } from 'path'
+import { launchApp, firstWindow, closeApp, repoRoot, copyConfiguredSeries, hasGameResources, hasTool } from './e2e-utils'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
 let app: ElectronApplication
 let series: { dir: string; cleanup(): void }
 
@@ -13,13 +10,9 @@ test.describe.configure({ timeout: 240_000 }) // real LUFS + daemon bootstrap
 
 test.beforeAll(async () => {
   series = copyConfiguredSeries('dev')
-  const mainPath = resolve(__dirname, '..', 'dist', 'main', 'index.js')
-  app = await electron.launch({
-    args: [mainPath],
-    env: { ...process.env, UMB_WORKSPACE: repoRoot(), NODE_ENV: 'test' }
-  })
+  app = await launchApp(repoRoot())
 })
-test.afterAll(async () => { await app?.close(); series?.cleanup() })
+test.afterAll(async () => { await closeApp(app); series?.cleanup() })
 
 test('analyze returns per-track LUFS + auto-gain matching the CLI gain formula', async () => {
   test.skip(

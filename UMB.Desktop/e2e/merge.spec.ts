@@ -1,7 +1,7 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'fs'
 import { join } from 'path'
-import { createWorkspace, seedTestDataMod, launchApp, firstWindow, type E2EWorkspace } from './e2e-utils'
+import { createWorkspace, seedTestDataMod, launchApp, firstWindow, closeApp, type E2EWorkspace } from './e2e-utils'
 
 let ws: E2EWorkspace
 let app: ElectronApplication
@@ -28,7 +28,7 @@ test.beforeAll(async () => {
   writeFileSync(join(modB, 'series-order.toml'), 'order = [\n    "custom",\n    "dev",\n]\n', 'utf8')
   app = await launchApp(ws)
 })
-test.afterAll(async () => { await app?.close(); ws?.cleanup() })
+test.afterAll(async () => { await closeApp(app); ws?.cleanup() })
 
 test('analyzeMerge flags the dev conflict and lists all series', async () => {
   const page = await firstWindow(app)

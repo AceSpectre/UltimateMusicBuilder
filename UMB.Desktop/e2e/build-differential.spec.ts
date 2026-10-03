@@ -1,13 +1,10 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { _electron as electron } from '@playwright/test'
 import { rmSync, existsSync } from 'fs'
-import { resolve, join, dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { firstWindow, hasGameResources, hasTool } from './e2e-utils'
+import { join } from 'path'
+import { launchApp, firstWindow, closeApp, hasGameResources, hasTool } from './e2e-utils'
 import { prepareIsolatedBuild, runCliBuild, snapshot, type IsolatedBuild } from './build-harness'
 import { compareDirs, formatReport } from './baseline-compare'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
 let app: ElectronApplication
 let build: IsolatedBuild
 let refDir: string
@@ -24,15 +21,11 @@ test.beforeAll(async () => {
   snapshot(build.arcOutput, refDir)
   rmSync(build.arcOutput, { recursive: true, force: true })
 
-  const mainPath = resolve(__dirname, '..', 'dist', 'main', 'index.js')
-  app = await electron.launch({
-    args: [mainPath],
-    env: { ...process.env, UMB_WORKSPACE: build.wsRoot, NODE_ENV: 'test' }
-  })
+  app = await launchApp(build.wsRoot)
 })
 
 test.afterAll(async () => {
-  await app?.close()
+  await closeApp(app)
   // retry once: dotnet may still lock the temp dir
   try {
     build?.cleanup()

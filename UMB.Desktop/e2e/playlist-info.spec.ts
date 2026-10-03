@@ -1,21 +1,13 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { _electron as electron } from '@playwright/test'
-import { firstWindow, repoRoot, hasGameResources } from './e2e-utils'
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
+import { launchApp, firstWindow, closeApp, repoRoot, hasGameResources } from './e2e-utils'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
 let app: ElectronApplication
 
 test.beforeAll(async () => {
   test.skip(!hasGameResources(), 'requires local game resources (vanilla PRC/MSBT)')
-  const mainPath = resolve(__dirname, '..', 'dist', 'main', 'index.js')
-  app = await electron.launch({
-    args: [mainPath],
-    env: { ...process.env, UMB_WORKSPACE: repoRoot(), NODE_ENV: 'test' }
-  })
+  app = await launchApp(repoRoot())
 })
-test.afterAll(async () => { await app?.close() })
+test.afterAll(async () => { await closeApp(app) })
 
 test('getPlaylistInfo parses vanilla playlists and stages', async () => {
   const page = await firstWindow(app)

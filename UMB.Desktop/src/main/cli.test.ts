@@ -183,6 +183,12 @@ describe('output buffering', () => {
 })
 
 describe('CLI invocation', () => {
+  it('selects the packaged CLI name for each platform', () => {
+    expect(cli.packagedCliPath('/app/resources', 'win32')).toContain('UMB.CLI.exe')
+    expect(cli.packagedCliPath('/app/resources', 'darwin')).toMatch(/UMB\.CLI$/)
+    expect(cli.packagedCliPath('/app/resources', 'linux')).toMatch(/UMB\.CLI$/)
+  })
+
   it('runs the built dev CLI through dotnet with the action as arguments', async () => {
     const done = cli.spawnCliAction(WS, 'build', ['my-mod'], onLine)
     lastProc().close(0)
@@ -193,7 +199,7 @@ describe('CLI invocation', () => {
     expect(args).toEqual([expect.stringMatching(/UMB\.CLI[\\/]bin[\\/]Debug[\\/]net8\.0[\\/]UMB\.CLI\.dll$/), 'build', 'my-mod'])
   })
 
-  it('runs the bundled exe with bare args when packaged', async () => {
+  it('runs the bundled CLI with bare args when packaged', async () => {
     mocks.app.isPackaged = true
     ;(process as any).resourcesPath = '/app/resources'
 
@@ -202,7 +208,7 @@ describe('CLI invocation', () => {
     await done
 
     const { command, args } = spawnCall()
-    expect(command).toContain('UMB.CLI.exe')
+    expect(command).toBe(cli.packagedCliPath('/app/resources'))
     expect(args).toEqual(['build', 'my-mod'])
   })
 

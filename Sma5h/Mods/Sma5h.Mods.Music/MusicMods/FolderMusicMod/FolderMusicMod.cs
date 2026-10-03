@@ -54,7 +54,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             var output = new MusicModEntries();
             var seenToneIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var subfolder in Directory.GetDirectories(_modPath))
+            foreach (var subfolder in Directory.GetDirectories(_modPath).OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
             {
                 // Apply series filter if set for this mod
                 if (SeriesFilterByMod != null

@@ -33,9 +33,12 @@ namespace Sma5h.Helpers
             {
                 int chr = chars[i];
 
-                int value = (chr - (chr > 57 ? 55 : 48)) * (int)Math.Pow(Base, j);
+                // Keep legacy x64 overflow behavior for filename-derived tone IDs.
+                double power = Math.Pow(Base, j);
+                int multiplier = power > int.MaxValue ? int.MinValue : (int)power;
+                int value = unchecked((chr - (chr > 57 ? 55 : 48)) * multiplier);
 
-                counter += value;
+                counter = unchecked(counter + value);
             }
 
             return counter;

@@ -8,11 +8,11 @@ namespace UMB.CLI.Services
     public static class ModPaths
     {
         public static string Root(IOptionsMonitor<Sma5hMusicOptions> config) =>
-            Path.GetFullPath(config.CurrentValue.Sma5hMusic.ModPath);
+            CanonicalDirectoryPath(config.CurrentValue.Sma5hMusic.ModPath);
 
         public static bool IsUnderMods(IOptionsMonitor<Sma5hMusicOptions> config, string path)
         {
-            var relative = Path.GetRelativePath(Root(config), Path.GetFullPath(path));
+            var relative = Path.GetRelativePath(Root(config), CanonicalDirectoryPath(path));
             return relative != "." && !relative.StartsWith("..") && !Path.IsPathRooted(relative);
         }
 
@@ -21,7 +21,19 @@ namespace UMB.CLI.Services
         {
             if (string.IsNullOrWhiteSpace(path) || !IsUnderMods(config, path))
                 throw new DesktopApiException(message);
-            return Path.GetFullPath(path);
+            return CanonicalDirectoryPath(path);
+        }
+
+        private static string CanonicalDirectoryPath(string path)
+        {
+            var fullPath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+            var parent = Path.GetDirectoryName(fullPath);
+            if (parent == null) return fullPath;
+
+            var directory = new DirectoryInfo(Path.Combine(CanonicalDirectoryPath(parent), Path.GetFileName(fullPath)));
+            return directory.LinkTarget == null
+                ? directory.FullName
+                : CanonicalDirectoryPath(directory.ResolveLinkTarget(returnFinalTarget: true).FullName);
         }
     }
 }

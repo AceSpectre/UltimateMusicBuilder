@@ -83,6 +83,10 @@ jobs:
         shell: bash
         run: rm -f publish/*.pdb
 
+      - name: Include runtime setup scripts
+        shell: bash
+        run: cp setup.sh setup.ps1 publish/
+
       - name: Write RELEASE_README.md
         shell: bash
         run: |
@@ -105,7 +109,16 @@ jobs:
             Resources/Game/<extracted data>  vanilla game data (see Resources/Game/README.txt)
           Build output is written here to ArcOutput/.
 
-          System prerequisites (not bundled — install once):
+          Install missing system prerequisites (not bundled — install once):
+
+            macOS / Linux:  bash setup.sh
+            Windows:        powershell -NoProfile -ExecutionPolicy Bypass -File .\setup.ps1
+
+          Setup skips existing dependencies. Reopen your terminal and restart the
+          app afterwards. To preview changes, add --dry-run (shell) or -DryRun
+          (PowerShell). Developer toolchains are only needed for source builds.
+
+          Manual installation:
 
             ffmpeg (required for LUFS normalization and loop-preview playback):
               Windows:  choco install ffmpeg

@@ -43,7 +43,8 @@ namespace Sma5h.Mods.Music.Services
             _musicMods.Clear();
 
             Directory.CreateDirectory(_config.CurrentValue.Sma5hMusic.ModPath);
-            foreach (var musicModPath in Directory.GetDirectories(_config.CurrentValue.Sma5hMusic.ModPath, "*", SearchOption.TopDirectoryOnly))
+            foreach (var musicModPath in Directory.GetDirectories(_config.CurrentValue.Sma5hMusic.ModPath, "*", SearchOption.TopDirectoryOnly)
+                .OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
             {
                 //Check if disabled
                 if (Path.GetFileName(musicModPath).StartsWith("."))

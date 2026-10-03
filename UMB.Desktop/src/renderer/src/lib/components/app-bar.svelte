@@ -7,12 +7,14 @@
   import type { ModInfo } from '$lib/types/electron'
 
   let {
+    platform,
     mods,
     activeMod,
     loading,
     onSelectMod,
     onWindowControlAttempt
   }: {
+    platform: NodeJS.Platform
     mods: ModInfo[]
     activeMod: ModInfo | null
     loading: boolean
@@ -83,7 +85,7 @@
 <div class="drag-region flex flex-col shrink-0">
   <div class="h-[2px] gradient-strip"></div>
 
-  <div class="h-14 flex items-center gap-3 px-4 bg-card border-b border-border">
+  <div class="h-14 flex items-center gap-3 px-4 bg-card border-b border-border {platform === 'darwin' ? 'pl-[84px]' : ''}">
     <div class="flex items-center gap-2.5 no-drag">
       <div
         class="w-[30px] h-[30px] rounded-lg gradient-bg flex items-center justify-center text-white font-bold text-sm tracking-wider"
@@ -179,29 +181,31 @@
       <Settings size={15} class="text-muted-foreground" />
     </button>
 
-    <div class="no-drag flex items-center ml-2">
-      <button
-        onclick={() => onWindowControlAttempt('minimize')}
-        class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
-        aria-label={$_('appBar.minimize')}
-      >
-        <Minus size={14} class="text-muted-foreground" />
-      </button>
-      <button
-        onclick={() => onWindowControlAttempt('fullscreen')}
-        class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
-        aria-label={$_('appBar.fullscreen')}
-      >
-        <Square size={12} class="text-muted-foreground" />
-      </button>
-      <button
-        onclick={() => onWindowControlAttempt('close')}
-        class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
-        aria-label={$_('appBar.close')}
-      >
-        <X size={14} class="text-muted-foreground" />
-      </button>
-    </div>
+    {#if platform !== 'darwin'}
+      <div class="no-drag flex items-center ml-2">
+        <button
+          onclick={() => onWindowControlAttempt('minimize')}
+          class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
+          aria-label={$_('appBar.minimize')}
+        >
+          <Minus size={14} class="text-muted-foreground" />
+        </button>
+        <button
+          onclick={() => onWindowControlAttempt('fullscreen')}
+          class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
+          aria-label={$_('appBar.fullscreen')}
+        >
+          <Square size={12} class="text-muted-foreground" />
+        </button>
+        <button
+          onclick={() => onWindowControlAttempt('close')}
+          class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
+          aria-label={$_('appBar.close')}
+        >
+          <X size={14} class="text-muted-foreground" />
+        </button>
+      </div>
+    {/if}
   </div>
 </div>
 

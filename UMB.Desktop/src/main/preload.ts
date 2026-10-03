@@ -37,6 +37,7 @@ const subscribe = <T>(channel: string) => (cb: (value: T) => void): (() => void)
 }
 
 const api = {
+  platform: process.platform,
   getWorkspace: (): Promise<string> => ipcRenderer.invoke(IPC.GET_WORKSPACE),
   getAppVersion: (): Promise<string> => ipcRenderer.invoke(IPC.GET_APP_VERSION),
   debugPing: (): Promise<DebugPingResult> => ipcRenderer.invoke(IPC.DEBUG_PING),

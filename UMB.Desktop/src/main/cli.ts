@@ -27,6 +27,13 @@ function parseLogLine(raw: string): LogLine {
   return { timestamp, level: 'info', message: raw.trim() }
 }
 
+export function packagedCliPath(
+  resourcesPath: string,
+  platform: NodeJS.Platform = process.platform
+): string {
+  return join(resourcesPath, 'cli', platform === 'win32' ? 'UMB.CLI.exe' : 'UMB.CLI')
+}
+
 /**
  * Resolves the CLI command + arg list for the current package mode. In dev it runs the CLI
  * built by `npm run build:cli`: the workspace's own UMB.CLI when it has one (as the repo
@@ -34,7 +41,7 @@ function parseLogLine(raw: string): LogLine {
  */
 function cliInvocation(workspace: string, trailing: string[]): { command: string; args: string[] } {
   if (app.isPackaged) {
-    return { command: join(process.resourcesPath, 'cli', 'UMB.CLI.exe'), args: trailing }
+    return { command: packagedCliPath(process.resourcesPath), args: trailing }
   }
   const workspaceCli = join(workspace, 'UMB.CLI')
   const project = existsSync(workspaceCli) ? workspaceCli : resolve(__dirname, '..', '..', '..', 'UMB.CLI')

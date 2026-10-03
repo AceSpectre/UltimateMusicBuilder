@@ -34,6 +34,7 @@ import type {
 } from '$shared/types'
 
 export interface UmbApi {
+  readonly platform: NodeJS.Platform
   getAppVersion(): Promise<string>
   debugPing(): Promise<DebugPingResult>
   listMods(): Promise<ModInfo[]>

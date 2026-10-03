@@ -1,5 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { join, resolve } from 'path'
+import { homedir, tmpdir } from 'os'
+import { macToolPath, packagedWorkspacePath } from './runtime-paths'
 import { callCli, spawnCliAction, cancelCurrentAction, shutdownDaemon } from './cli'
 import { loadVolumeConfig, saveVolumeConfig, decodeTrackPreview } from './config-volume'
 import { getAppSettings, saveAppSettings, checkArcOutput } from './app-settings'
@@ -11,28 +13,41 @@ import type {
 
 let mainWindow: BrowserWindow | null = null
 
+if (process.platform === 'darwin') {
+  process.env.PATH = macToolPath(process.env.PATH ?? '', homedir(), process.env.PIPX_BIN_DIR)
+}
+
+if (process.env['NODE_ENV'] === 'test') {
+  app.setPath('userData', join(tmpdir(), `umb-electron-test-${process.pid}`))
+}
+
 function getWorkspacePath(): string {
   if (process.env['UMB_WORKSPACE']) {
     return resolve(process.env['UMB_WORKSPACE'])
   }
   if (app.isPackaged) {
-    // Layout: <root>/desktop/resources/cli/UMB.CLI.exe and <root>/UMB.CLI.exe (standalone).
-    // Workspace is <root> — the folder holding both the desktop/ subfolder and the CLI —
-    // so the GUI and the standalone CLI share the same Resources/, Mods/, ArcOutput/.
-    // process.resourcesPath = <root>/desktop/resources → up two = <root>.
-    return resolve(process.resourcesPath, '..', '..')
+    // Workspace is the release root holding both the desktop/ subfolder and the standalone
+    // CLI, so the GUI and the CLI share the same Resources/, Mods/, ArcOutput/.
+    return packagedWorkspacePath(process.resourcesPath)
   }
   return resolve(__dirname, '..', '..', '..')
 }
 
 function createWindow(): void {
+  const isMac = process.platform === 'darwin'
+
   mainWindow = new BrowserWindow({
     width: 1320,
     height: 820,
     minWidth: 900,
     minHeight: 600,
-    frame: false,
-    titleBarStyle: 'hidden',
+    ...(isMac
+      ? {
+          frame: true,
+          titleBarStyle: 'hiddenInset' as const,
+          trafficLightPosition: { x: 14, y: 20 }
+        }
+      : { frame: false }),
     backgroundColor: '#09090b',
     show: false,
     webPreferences: {
@@ -56,6 +71,29 @@ function createWindow(): void {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '..', 'renderer', 'index.html'))
+  }
+}
+
+async function applyWindowState(
+  window: NodeJS.EventEmitter,
+  event: 'minimize' | 'enter-full-screen' | 'leave-full-screen',
+  apply: () => void,
+  isApplied: () => boolean
+): Promise<boolean> {
+  if (isApplied()) return true
+
+  // Windows applies the change synchronously; macOS animates it, so wait for the event there.
+  let changed!: () => void
+  const settled = new Promise<void>((resolveChange) => { changed = resolveChange })
+  const timeout = setTimeout(changed, 5_000)
+  window.on(event, changed)
+  try {
+    apply()
+    if (!isApplied()) await settled
+    return isApplied()
+  } finally {
+    clearTimeout(timeout)
+    window.removeListener(event, changed)
   }
 }
 
@@ -193,18 +231,31 @@ function registerIpcHandlers(): void {
     cancelCurrentAction()
   })
 
-  ipcMain.handle(IPC.WINDOW_MINIMIZE, () => {
-    mainWindow?.minimize()
-    return { ok: true, action: 'minimize' }
+  ipcMain.handle(IPC.WINDOW_MINIMIZE, async () => {
+    if (!mainWindow) return { ok: false, action: 'minimize' }
+
+    const minimized = await applyWindowState(
+      mainWindow,
+      'minimize',
+      () => mainWindow?.minimize(),
+      () => mainWindow?.isMinimized() ?? false
+    )
+    return { ok: minimized, action: 'minimize' }
   })
 
-  ipcMain.handle(IPC.WINDOW_FULLSCREEN, () => {
+  ipcMain.handle(IPC.WINDOW_FULLSCREEN, async () => {
     if (!mainWindow) {
       return { ok: false, action: 'fullscreen' }
     }
 
-    mainWindow.setFullScreen(!mainWindow.isFullScreen())
-    return { ok: true, action: 'fullscreen', fullScreen: mainWindow.isFullScreen() }
+    const fullScreen = !mainWindow.isFullScreen()
+    const applied = await applyWindowState(
+      mainWindow,
+      fullScreen ? 'enter-full-screen' : 'leave-full-screen',
+      () => mainWindow?.setFullScreen(fullScreen),
+      () => mainWindow?.isFullScreen() === fullScreen
+    )
+    return { ok: applied, action: 'fullscreen', fullScreen: mainWindow.isFullScreen() }
   })
 
   ipcMain.handle(IPC.WINDOW_CLOSE, () => {
