@@ -82,6 +82,7 @@ namespace Sma5h.ResourceProviders
             catch (Exception e)
             {
                 _logger.LogError(e, "MSBT Generation error");
+                return false;
             }
 
             return true;

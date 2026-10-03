@@ -82,6 +82,19 @@ when only one locale is in `Resources/Game` (the normal setup). When several loc
 (e.g. `+eu_fr` and `+us_en`), each keeps its `+locale` suffix — previously they all collapsed onto
 one path, so only one locale survived.
 
+## CLI ↔ Desktop Bridge (2026-10-03)
+The desktop spawns `UMB.CLI` one-shot or talks to `UMB.CLI serve` (daemon: one JSON request per
+stdin line, `__DONE__\t<id>\t<code>` reply). Rules the CLI side now guarantees:
+- **Exit / `__DONE__` codes**: 0 ok, 1 failed, 2 unknown action or malformed request. An action
+  "failed" if it threw or logged any error (`ErrorCountingLoggerProvider`), so services keep
+  reporting failure by `LogError` + return.
+- **UTF-8 stdio** when redirected (`CliOutput.Init`); Windows otherwise uses the OEM code page.
+- **Ordered stdout**: when redirected, logs are written synchronously through `CliOutput`, as are
+  `__DONE__`/`__LUFS_PROGRESS__`, so a request's logs always precede its `__DONE__`.
+- **External tools** go through `ProcessRunner` (drains both pipes, 15 min timeout, kills the tree).
+- **VGAudio** goes through `VGAudioRunner` (it writes to the global `Console.Out`, including from a
+  timer after returning — never dispose or race the capture writer).
+
 ## Testing
 Test on Nintendo Switch by copying ArcOutput to the SD card mod folder.
 

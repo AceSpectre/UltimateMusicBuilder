@@ -3,13 +3,13 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using Sma5h.Helpers;
 using Sma5h.Interfaces;
+using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
 using Sma5h.Mods.Music.Models;
 using System;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
-using VGAudio.Cli;
 
 namespace Sma5h.Mods.Music.Services
 {
@@ -146,25 +146,10 @@ namespace Sma5h.Mods.Music.Services
                 return true;
             }
 
-            var builder = new StringBuilder();
-
-            var oldValue = Console.Out;
-            using (var writer = new StringWriter(builder))
-            {
-                Console.SetOut(writer);
-                if (outputMediaFile.EndsWith("lopus"))
-                {
-                    //Special tags for opus
-                    Converter.RunConverterCli(new string[] { "-i", inputMediaFile, "-o", outputMediaFile, "--opusheader", "Namco", "--cbr" });
-                }
-                else
-                {
-                    Converter.RunConverterCli(new string[] { "-i", inputMediaFile, "-o", outputMediaFile });
-                }
-            }
-            Console.SetOut(oldValue);
-
-            var output = builder.ToString();
+            var output = outputMediaFile.EndsWith("lopus")
+                //Special tags for opus
+                ? VGAudioRunner.Run("-i", inputMediaFile, "-o", outputMediaFile, "--opusheader", "Namco", "--cbr")
+                : VGAudioRunner.Run("-i", inputMediaFile, "-o", outputMediaFile);
 
             _logger.LogDebug("VGAudio Convert for {OutputMediaFile}: {Data}", outputMediaFile, output.Trim('\r', '\n'));
 

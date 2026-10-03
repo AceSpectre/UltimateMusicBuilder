@@ -218,24 +218,42 @@ namespace UMB.CLI.Services
 
                 _logger.LogInformation("--------------------");
                 var initMods = new List<ISma5hMod>();
+                var succeeded = true;
                 foreach (var mod in mods)
                 {
                     _logger.LogInformation("{ModeName}: Initialize mod", mod.ModName);
                     if (mod.Init())
                         initMods.Add(mod);
+                    else
+                    {
+                        _logger.LogError("{ModeName}: initialization failed, so it was not built.", mod.ModName);
+                        succeeded = false;
+                    }
                 }
 
                 _logger.LogInformation("--------------------");
                 foreach (var mod in initMods)
                 {
                     _logger.LogInformation("{ModeName}; Build mod changes", mod.ModName);
-                    mod.Build();
+                    if (!mod.Build())
+                    {
+                        _logger.LogError("{ModeName}: build failed.", mod.ModName);
+                        succeeded = false;
+                    }
                 }
 
                 _logger.LogInformation("--------------------");
                 _logger.LogInformation("Starting State Manager Mod Generation");
-                _state.WriteChanges();
-                _logger.LogInformation("COMPLETE - Please check the logs for any error.");
+                if (!_state.WriteChanges())
+                {
+                    _logger.LogError("Writing the build output failed.");
+                    succeeded = false;
+                }
+
+                if (succeeded)
+                    _logger.LogInformation("COMPLETE");
+                else
+                    _logger.LogError("BUILD FAILED - see the errors above.");
                 _logger.LogInformation("--------------------");
             }
             finally

@@ -14,8 +14,15 @@ namespace UMB.CLI
 {
     class Program
     {
-        async static Task Main(string[] args)
+        // Process exit codes, also reported in the daemon's __DONE__ line.
+        private const int ExitOk = 0;
+        private const int ExitFailed = 1;
+        private const int ExitUsage = 2;
+
+        async static Task<int> Main(string[] args)
         {
+            CliOutput.Init();
+
             // VGAudioCli is a loose managed .exe in Tools/, not a NuGet package; a single-file publish neither bundles it nor lists it in .deps.json, so resolve it by hand.
             AssemblyLoadContext.Default.Resolving += (ctx, name) =>
             {
@@ -61,22 +68,21 @@ namespace UMB.CLI
             if (args.Length > 0 && args[0].Equals("serve", StringComparison.OrdinalIgnoreCase))
             {
                 await RunDaemon(serviceProvider);
-                return;
+                return ExitOk;
             }
 
             if (args.Length > 0)
             {
                 using var scope = serviceProvider.CreateScope();
                 var entry = scope.ServiceProvider.GetService<Script>();
-                await RunAction(args[0].ToLowerInvariant(), entry, args.Length > 1 ? args[1..] : null);
-                return;
+                return await RunAction(args[0].ToLowerInvariant(), entry, args.Length > 1 ? args[1..] : null);
             }
 
             while (true)
             {
                 var action = ShowMenu(AnsiConsole.Console);
                 if (action == "quit")
-                    return;
+                    return ExitOk;
 
                 using (var scope = serviceProvider.CreateScope())
                 {
@@ -101,11 +107,13 @@ namespace UMB.CLI
         /// Reads newline-delimited JSON requests from stdin, runs each action against
         /// a fresh DI scope (reusing the already-built service provider — and the
         /// singleton LUFS cache stays warm across requests), then prints a sentinel
-        /// "__DONE__\t&lt;id&gt;\t&lt;code&gt;" line so the caller knows the result
-        /// artifacts (output files) are fully written. Requests are processed serially.
+        /// "__DONE__\t&lt;id&gt;\t&lt;code&gt;" line (code: 0 ok, 1 failed, 2 bad request)
+        /// so the caller knows the result artifacts are fully written. Requests are
+        /// processed serially.
         /// </summary>
         private static async Task RunDaemon(IServiceProvider serviceProvider)
         {
+            var logger = serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(Program));
             string line;
             while ((line = Console.ReadLine()) != null)
             {
@@ -113,27 +121,36 @@ namespace UMB.CLI
 
                 DaemonRequest req;
                 try { req = JsonSerializer.Deserialize<DaemonRequest>(line, _daemonJsonOpts); }
-                catch { continue; }
-                if (req == null) continue;
+                catch (JsonException) { req = null; }
+                if (req == null)
+                {
+                    // Still answer, or the caller waits forever for this request's __DONE__.
+                    logger.LogError("Ignoring malformed daemon request: {Request}", line);
+                    CliOutput.WriteLine($"__DONE__\t0\t{ExitUsage}");
+                    continue;
+                }
 
                 if (string.Equals(req.Action, "__shutdown__", StringComparison.OrdinalIgnoreCase))
                     return;
 
-                // RunAction catches and logs handler exceptions (same as one-shot mode,
-                // which also exits 0 on a caught failure), so we always report code 0.
+                int code;
                 using (var scope = serviceProvider.CreateScope())
                 {
                     var entry = scope.ServiceProvider.GetService<Script>();
-                    await RunAction(req.Action?.ToLowerInvariant() ?? "", entry, req.Args);
+                    code = await RunAction(req.Action?.ToLowerInvariant() ?? "", entry, req.Args);
                 }
 
-                Console.Out.WriteLine($"__DONE__\t{req.Id}\t0");
-                Console.Out.Flush();
+                CliOutput.WriteLine($"__DONE__\t{req.Id}\t{code}");
             }
         }
 
-        private static async Task RunAction(string action, Script entry, string[] extraArgs = null)
+        /// <summary>
+        /// Runs one action. Services report failure by logging an error, so the result is
+        /// <see cref="ExitFailed"/> if the action threw or logged any error.
+        /// </summary>
+        private static async Task<int> RunAction(string action, Script entry, string[] extraArgs = null)
         {
+            ErrorCountingLoggerProvider.Reset();
             try
             {
                 switch (action)
@@ -194,7 +211,7 @@ namespace UMB.CLI
                     default:
                         Console.WriteLine($"Unknown command: {action}");
                         Console.WriteLine("Usage: dotnet run [build|scaffold|convert|merge|extract-icons|nus3-convert|nus3-convert-batch|accept-nus3|accept-nus3-batch|cleanup|order-series|order-tracks|config-volume|config-volume-analyze|config-volume-save|config-volume-preview|dump-stages]");
-                        break;
+                        return ExitUsage;
                 }
             }
             catch (Exception ex)
@@ -204,7 +221,10 @@ namespace UMB.CLI
                 AnsiConsole.MarkupLine($"[red]✗ '{action}' failed:[/] {ex.Message.EscapeMarkup()}");
                 AnsiConsole.MarkupLine("[dim]Full stack trace written to Log/log_*.txt[/]");
                 AnsiConsole.WriteLine();
+                return ExitFailed;
             }
+
+            return ErrorCountingLoggerProvider.ErrorCount > 0 ? ExitFailed : ExitOk;
         }
 
         internal static readonly Dictionary<string, string> MenuOptions = new()
@@ -247,13 +267,21 @@ namespace UMB.CLI
                .AddCommandLine(args)
                .Build();
 
-            var loggerFactory = LoggerFactory.Create(builder => builder
-                .AddFilter<ConsoleLoggerProvider>((ll) => ll >= LogLevel.Information)
-                .AddFile(Path.Combine(configuration.GetValue<string>("LogPath"), "log_{Date}.txt"), LogLevel.Debug, retainedFileCountLimit: 7)
-                .AddSimpleConsole((c) =>
-                {
-                    c.SingleLine = true;
-                }));
+            var loggerFactory = LoggerFactory.Create(builder =>
+            {
+                builder
+                    .AddFilter<ConsoleLoggerProvider>((ll) => ll >= LogLevel.Information)
+                    .AddFile(Path.Combine(configuration.GetValue<string>("LogPath"), "log_{Date}.txt"), LogLevel.Debug, retainedFileCountLimit: 7)
+                    .AddProvider(new ErrorCountingLoggerProvider());
+
+                if (Console.IsOutputRedirected)
+                    builder.AddProvider(new RedirectedConsoleLoggerProvider());
+                else
+                    builder.AddSimpleConsole((c) =>
+                    {
+                        c.SingleLine = true;
+                    });
+            });
 
             services.AddLogging();
             services.AddOptions();
