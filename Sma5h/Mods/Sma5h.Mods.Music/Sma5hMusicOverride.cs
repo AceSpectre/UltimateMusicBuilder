@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Sma5h.Interfaces;
@@ -18,7 +17,6 @@ namespace Sma5h.Mods.Music
     public class Sma5hMusicOverride : BaseSma5hMod, ISma5hMusicOverride
     {
         private readonly ILogger _logger;
-        private readonly IMapper _mapper;
         private readonly IOptionsMonitor<Sma5hMusicOverrideOptions> _config;
         private readonly IAudioStateService _audioStateService;
         private const Formatting _defaultFormatting = Formatting.Indented;
@@ -26,12 +24,11 @@ namespace Sma5h.Mods.Music
 
         public override string ModName => "Sma5hMusicOverride";
 
-        public Sma5hMusicOverride(IOptionsMonitor<Sma5hMusicOverrideOptions> config, IStateManager state, IMapper mapper, IAudioStateService audioStateService, ILogger<Sma5hMusicOverride> logger)
+        public Sma5hMusicOverride(IOptionsMonitor<Sma5hMusicOverrideOptions> config, IStateManager state, IAudioStateService audioStateService, ILogger<Sma5hMusicOverride> logger)
             : base(state)
         {
             _logger = logger;
             _state = state;
-            _mapper = mapper;
             _config = config;
             _audioStateService = audioStateService;
         }
@@ -58,11 +55,13 @@ namespace Sma5h.Mods.Music
                     if (seriesEntries.ContainsKey(coreSeries.UiSeriesId))
                     {
                         _logger.LogInformation("Overriding Core Series {SeriesId}...", coreSeries.UiSeriesId);
-                        _mapper.Map(coreSeries, seriesEntries[coreSeries.UiSeriesId]);
+                        MusicMapper.Map(coreSeries, seriesEntries[coreSeries.UiSeriesId]);
                     }
                     else
                     {
-                        _audioStateService.AddSeriesEntry(_mapper.Map(coreSeries, new SeriesEntry(coreSeries.UiSeriesId, EntrySource.Mod)));
+                        var seriesEntry = new SeriesEntry(coreSeries.UiSeriesId, EntrySource.Mod);
+                        MusicMapper.Map(coreSeries, seriesEntry);
+                        _audioStateService.AddSeriesEntry(seriesEntry);
                     }
                 }
             }
@@ -75,11 +74,13 @@ namespace Sma5h.Mods.Music
                     if (gameTitleEntries.ContainsKey(coreGameTitle.UiGameTitleId))
                     {
                         _logger.LogInformation("Overriding Core Game {GameId}...", coreGameTitle.UiGameTitleId);
-                        _mapper.Map(coreGameTitle, gameTitleEntries[coreGameTitle.UiGameTitleId]);
+                        MusicMapper.Map(coreGameTitle, gameTitleEntries[coreGameTitle.UiGameTitleId]);
                     }
                     else
                     {
-                        _audioStateService.AddGameTitleEntry(_mapper.Map(coreGameTitle, new GameTitleEntry(coreGameTitle.UiGameTitleId, EntrySource.Mod)));
+                        var gameTitleEntry = new GameTitleEntry(coreGameTitle.UiGameTitleId, EntrySource.Mod);
+                        MusicMapper.Map(coreGameTitle, gameTitleEntry);
+                        _audioStateService.AddGameTitleEntry(gameTitleEntry);
                     }
                 }
             }
@@ -95,7 +96,7 @@ namespace Sma5h.Mods.Music
                     {
                         if (bgmDbRootEntry.Source == EntrySource.Core && coreDbRootOverrides.ContainsKey(bgmDbRootEntry.UiBgmId))
                         {
-                            _mapper.Map(coreDbRootOverrides[bgmDbRootEntry.UiBgmId], bgmDbRootEntry);
+                            MusicMapper.Map(coreDbRootOverrides[bgmDbRootEntry.UiBgmId], bgmDbRootEntry);
                         }
                     }
                 }
@@ -108,7 +109,7 @@ namespace Sma5h.Mods.Music
                         if (bgmStreamSetEntry.Source == EntrySource.Core && coreStreamSetOverrides.ContainsKey(bgmStreamSetEntry.StreamSetId))
                         {
                             var streamSetObj = GetUpdatedStreamSetConfig(coreStreamSetOverrides[bgmStreamSetEntry.StreamSetId]);
-                            _mapper.Map(streamSetObj, bgmStreamSetEntry);
+                            MusicMapper.Map(streamSetObj, bgmStreamSetEntry);
                         }
                     }
                 }
@@ -121,7 +122,7 @@ namespace Sma5h.Mods.Music
                         if (bgmAssignedInfoEntry.Source == EntrySource.Core && coreAssignedInfoOverrides.ContainsKey(bgmAssignedInfoEntry.InfoId))
                         {
                             var assignedInfoObj = GetUpdatedBgmAssignedInfoConfig(coreAssignedInfoOverrides[bgmAssignedInfoEntry.InfoId]);
-                            _mapper.Map(assignedInfoObj, bgmAssignedInfoEntry);
+                            MusicMapper.Map(assignedInfoObj, bgmAssignedInfoEntry);
                         }
                     }
                 }
@@ -133,7 +134,7 @@ namespace Sma5h.Mods.Music
                     {
                         if (bgmStreamPropertyEntry.Source == EntrySource.Core && coreStreamPropertyOverrides.ContainsKey(bgmStreamPropertyEntry.StreamId))
                         {
-                            _mapper.Map(coreStreamPropertyOverrides[bgmStreamPropertyEntry.StreamId], bgmStreamPropertyEntry);
+                            MusicMapper.Map(coreStreamPropertyOverrides[bgmStreamPropertyEntry.StreamId], bgmStreamPropertyEntry);
                         }
                     }
                 }
@@ -145,7 +146,7 @@ namespace Sma5h.Mods.Music
                     {
                         if (bgmPropertyEntry.Source == EntrySource.Core && coreBgmPropertyOverrides.ContainsKey(bgmPropertyEntry.NameId))
                         {
-                            _mapper.Map(coreBgmPropertyOverrides[bgmPropertyEntry.NameId], bgmPropertyEntry);
+                            MusicMapper.Map(coreBgmPropertyOverrides[bgmPropertyEntry.NameId], bgmPropertyEntry);
                         }
                     }
                 }
@@ -180,7 +181,7 @@ namespace Sma5h.Mods.Music
                     foreach (var overrideTrack in playlistConfig.Value.Tracks)
                     {
                         if (dbRootEntries.Contains(overrideTrack.UiBgmId))
-                            playlist.Tracks.Add(_mapper.Map<Models.PlaylistEntryModels.PlaylistValueEntry>(overrideTrack));
+                            playlist.Tracks.Add(MusicMapper.ToEntry(overrideTrack));
                         else
                             _logger.LogWarning("Track with BGM ID {BgmId} from Playlist {Playlist} was not found. This song was removed.", overrideTrack.UiBgmId, playlistConfig.Key);
                     }
@@ -195,7 +196,7 @@ namespace Sma5h.Mods.Music
                 foreach (var stageEntry in _audioStateService.GetStagesEntries())
                 {
                     if (_musicOverrideConfig.StageOverrides.ContainsKey(stageEntry.UiStageId))
-                        _mapper.Map(_musicOverrideConfig.StageOverrides[stageEntry.UiStageId], stageEntry);
+                        MusicMapper.Map(_musicOverrideConfig.StageOverrides[stageEntry.UiStageId], stageEntry);
                 }
             }
 
@@ -312,19 +313,19 @@ namespace Sma5h.Mods.Music
 
             if (musicModEntries.BgmDbRootEntries != null)
                 foreach (var bgmDbRootEntry in musicModEntries.BgmDbRootEntries)
-                    _musicOverrideConfig.CoreBgmOverrides.CoreBgmDbRootOverrides[bgmDbRootEntry.UiBgmId] = _mapper.Map<BgmDbRootConfig>(bgmDbRootEntry);
+                    _musicOverrideConfig.CoreBgmOverrides.CoreBgmDbRootOverrides[bgmDbRootEntry.UiBgmId] = MusicMapper.ToConfig(bgmDbRootEntry);
             if (musicModEntries.BgmStreamSetEntries != null)
                 foreach (var bgmStreamSetEntry in musicModEntries.BgmStreamSetEntries)
-                    _musicOverrideConfig.CoreBgmOverrides.CoreBgmStreamSetOverrides[bgmStreamSetEntry.StreamSetId] = _mapper.Map<BgmStreamSetConfig>(bgmStreamSetEntry);
+                    _musicOverrideConfig.CoreBgmOverrides.CoreBgmStreamSetOverrides[bgmStreamSetEntry.StreamSetId] = MusicMapper.ToConfig(bgmStreamSetEntry);
             if (musicModEntries.BgmAssignedInfoEntries != null)
                 foreach (var bgmAssignedInfoEntry in musicModEntries.BgmAssignedInfoEntries)
-                    _musicOverrideConfig.CoreBgmOverrides.CoreBgmAssignedInfoOverrides[bgmAssignedInfoEntry.InfoId] = _mapper.Map<BgmAssignedInfoConfig>(bgmAssignedInfoEntry);
+                    _musicOverrideConfig.CoreBgmOverrides.CoreBgmAssignedInfoOverrides[bgmAssignedInfoEntry.InfoId] = MusicMapper.ToConfig(bgmAssignedInfoEntry);
             if (musicModEntries.BgmStreamPropertyEntries != null)
                 foreach (var bgmStreamPropertyEntry in musicModEntries.BgmStreamPropertyEntries)
-                    _musicOverrideConfig.CoreBgmOverrides.CoreBgmStreamPropertyOverrides[bgmStreamPropertyEntry.StreamId] = _mapper.Map<BgmStreamPropertyConfig>(bgmStreamPropertyEntry);
+                    _musicOverrideConfig.CoreBgmOverrides.CoreBgmStreamPropertyOverrides[bgmStreamPropertyEntry.StreamId] = MusicMapper.ToConfig(bgmStreamPropertyEntry);
             if (musicModEntries.BgmPropertyEntries != null)
                 foreach (var bgmPropertyEntry in musicModEntries.BgmPropertyEntries)
-                    _musicOverrideConfig.CoreBgmOverrides.CoreBgmPropertyOverrides[bgmPropertyEntry.NameId] = _mapper.Map<BgmPropertyEntryConfig>(bgmPropertyEntry);
+                    _musicOverrideConfig.CoreBgmOverrides.CoreBgmPropertyOverrides[bgmPropertyEntry.NameId] = MusicMapper.ToConfig(bgmPropertyEntry);
 
             var overrideJsonFile = Path.Combine(_config.CurrentValue.Sma5hMusicOverride.ModPath, MusicConstants.MusicModFiles.MUSIC_OVERRIDE_CORE_BGM_JSON_FILE);
             File.WriteAllText(overrideJsonFile, JsonConvert.SerializeObject(_musicOverrideConfig.CoreBgmOverrides, _defaultFormatting));
@@ -333,7 +334,7 @@ namespace Sma5h.Mods.Music
 
         public bool UpdateGameTitleEntry(Models.GameTitleEntry gameTitleEntry)
         {
-            _musicOverrideConfig.CoreGameOverrides[gameTitleEntry.UiGameTitleId] = _mapper.Map<GameConfig>(gameTitleEntry);
+            _musicOverrideConfig.CoreGameOverrides[gameTitleEntry.UiGameTitleId] = MusicMapper.ToConfig(gameTitleEntry);
             var overrideJsonFile = Path.Combine(_config.CurrentValue.Sma5hMusicOverride.ModPath, MusicConstants.MusicModFiles.MUSIC_OVERRIDE_CORE_GAME_JSON_FILE);
             File.WriteAllText(overrideJsonFile, JsonConvert.SerializeObject(_musicOverrideConfig.CoreGameOverrides, _defaultFormatting));
             return true;
@@ -341,7 +342,7 @@ namespace Sma5h.Mods.Music
 
         public bool UpdateSeriesEntry(Models.SeriesEntry seriesEntry)
         {
-            _musicOverrideConfig.CoreSeriesOverrides[seriesEntry.UiSeriesId] = _mapper.Map<SeriesConfig>(seriesEntry);
+            _musicOverrideConfig.CoreSeriesOverrides[seriesEntry.UiSeriesId] = MusicMapper.ToConfig(seriesEntry);
             var overrideJsonFile = Path.Combine(_config.CurrentValue.Sma5hMusicOverride.ModPath, MusicConstants.MusicModFiles.MUSIC_OVERRIDE_CORE_SERIES_JSON_FILE);
             File.WriteAllText(overrideJsonFile, JsonConvert.SerializeObject(_musicOverrideConfig.CoreSeriesOverrides, _defaultFormatting));
             return true;
@@ -367,7 +368,7 @@ namespace Sma5h.Mods.Music
 
         public bool UpdatePlaylistConfig(Dictionary<string, PlaylistEntry> playlistEntries)
         {
-            _musicOverrideConfig.PlaylistsOverrides = _mapper.Map<Dictionary<string, PlaylistConfig>>(playlistEntries);
+            _musicOverrideConfig.PlaylistsOverrides = playlistEntries.ToDictionary(p => p.Key, p => MusicMapper.ToConfig(p.Value));
             var overrideJsonFile = Path.Combine(_config.CurrentValue.Sma5hMusicOverride.ModPath, MusicConstants.MusicModFiles.MUSIC_OVERRIDE_PLAYLIST_JSON_FILE);
             File.WriteAllText(overrideJsonFile, JsonConvert.SerializeObject(_musicOverrideConfig.PlaylistsOverrides, _defaultFormatting));
             return true;
@@ -375,7 +376,7 @@ namespace Sma5h.Mods.Music
 
         public bool UpdateMusicStageOverride(List<StageEntry> stageEntries)
         {
-            _musicOverrideConfig.StageOverrides = _mapper.Map<Dictionary<string, StageConfig>>(stageEntries.ToDictionary(p => p.UiStageId, p => p));
+            _musicOverrideConfig.StageOverrides = stageEntries.ToDictionary(p => p.UiStageId, MusicMapper.ToConfig);
             var overrideJsonFile = Path.Combine(_config.CurrentValue.Sma5hMusicOverride.ModPath, MusicConstants.MusicModFiles.MUSIC_OVERRIDE_STAGE_JSON_FILE);
             File.WriteAllText(overrideJsonFile, JsonConvert.SerializeObject(_musicOverrideConfig.StageOverrides, _defaultFormatting));
             return true;

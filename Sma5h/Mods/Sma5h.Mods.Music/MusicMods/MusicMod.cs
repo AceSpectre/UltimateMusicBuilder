@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
@@ -15,7 +14,6 @@ namespace Sma5h.Mods.Music.MusicMods
 {
     public class MusicMod : IMusicMod
     {
-        protected readonly IMapper _mapper;
         protected readonly ILogger _logger;
 
         protected readonly MusicModConfig _musicModConfig;
@@ -25,11 +23,10 @@ namespace Sma5h.Mods.Music.MusicMods
         public string ModPath { get; }
         public MusicModInformation Mod => _musicModConfig;
 
-        public MusicMod(IMapper mapper, ILogger<IMusicMod> logger, string musicModPath)
+        public MusicMod(ILogger<IMusicMod> logger, string musicModPath)
         {
             ModPath = musicModPath;
             _logger = logger;
-            _mapper = mapper;
             _musicModConfig = LoadMusicModConfig();
         }
 
@@ -45,11 +42,15 @@ namespace Sma5h.Mods.Music.MusicMods
 
             foreach (var series in _musicModConfig.Series)
             {
-                output.SeriesEntries.Add(_mapper.Map(series, new SeriesEntry(series.UiSeriesId, EntrySource.Mod)));
+                var seriesEntry = new SeriesEntry(series.UiSeriesId, EntrySource.Mod);
+                MusicMapper.Map(series, seriesEntry);
+                output.SeriesEntries.Add(seriesEntry);
 
                 foreach (var game in series.Games)
                 {
-                    output.GameTitleEntries.Add(_mapper.Map(game, new GameTitleEntry(game.UiGameTitleId, EntrySource.Mod)));
+                    var gameTitleEntry = new GameTitleEntry(game.UiGameTitleId, EntrySource.Mod);
+                    MusicMapper.Map(game, gameTitleEntry);
+                    output.GameTitleEntries.Add(gameTitleEntry);
 
                     foreach (var bgm in game.Bgms)
                     {
@@ -64,13 +65,22 @@ namespace Sma5h.Mods.Music.MusicMods
                         GetUpdatedStreamSetConfig(bgm.StreamSet);
 
                         _logger.LogInformation("Mod {MusicMod}: Adding song {Song} ({ToneId})", _musicModConfig.Name, filename, bgm.ToneId);
-                        var bgmDbRootEntry = _mapper.Map(bgm.DbRoot, new BgmDbRootEntry(bgm.DbRoot.UiBgmId, this));
+                        var bgmDbRootEntry = new BgmDbRootEntry(bgm.DbRoot.UiBgmId, this);
+                        var streamSetEntry = new BgmStreamSetEntry(bgm.StreamSet.StreamSetId, this);
+                        var assignedInfoEntry = new BgmAssignedInfoEntry(bgm.AssignedInfo.InfoId, this);
+                        var streamPropertyEntry = new BgmStreamPropertyEntry(bgm.StreamProperty.StreamId, this);
+                        var bgmPropertyEntry = new BgmPropertyEntry(bgm.BgmProperties.NameId, filename, this) { AudioVolume = bgm.NUS3BankConfig.AudioVolume };
+                        MusicMapper.Map(bgm.DbRoot, bgmDbRootEntry);
+                        MusicMapper.Map(bgm.StreamSet, streamSetEntry);
+                        MusicMapper.Map(bgm.AssignedInfo, assignedInfoEntry);
+                        MusicMapper.Map(bgm.StreamProperty, streamPropertyEntry);
+                        MusicMapper.Map(bgm.BgmProperties, bgmPropertyEntry);
                         bgmDbRootEntry.UiGameTitleId = game.UiGameTitleId; //Enforce
                         output.BgmDbRootEntries.Add(bgmDbRootEntry);
-                        output.BgmStreamSetEntries.Add(_mapper.Map(bgm.StreamSet, new BgmStreamSetEntry(bgm.StreamSet.StreamSetId, this)));
-                        output.BgmAssignedInfoEntries.Add(_mapper.Map(bgm.AssignedInfo, new BgmAssignedInfoEntry(bgm.AssignedInfo.InfoId, this)));
-                        output.BgmStreamPropertyEntries.Add(_mapper.Map(bgm.StreamProperty, new BgmStreamPropertyEntry(bgm.StreamProperty.StreamId, this)));
-                        output.BgmPropertyEntries.Add(_mapper.Map(bgm.BgmProperties, new BgmPropertyEntry(bgm.BgmProperties.NameId, filename, this) { AudioVolume = bgm.NUS3BankConfig.AudioVolume }));
+                        output.BgmStreamSetEntries.Add(streamSetEntry);
+                        output.BgmAssignedInfoEntries.Add(assignedInfoEntry);
+                        output.BgmStreamPropertyEntries.Add(streamPropertyEntry);
+                        output.BgmPropertyEntries.Add(bgmPropertyEntry);
                     }
                 }
             }
@@ -192,7 +202,7 @@ namespace Sma5h.Mods.Music.MusicMods
                 if (game == null)
                 {
                     if (gameTitle != null)
-                        game = _mapper.Map<GameConfig>(gameTitle);
+                        game = MusicMapper.ToConfig(gameTitle);
                     if (game == null)
                     {
                         game = new GameConfig()
@@ -207,7 +217,7 @@ namespace Sma5h.Mods.Music.MusicMods
                         game.Bgms = new List<BgmConfig>();
                 }
                 else if(gameTitle != null)
-                    game = _mapper.Map(gameTitle, game);
+                    MusicMapper.Map(gameTitle, game);
 
                 //Remove game from previous series location
                 _musicModConfig.Series.ForEach(g => g.Games.RemoveAll(p => p.UiGameTitleId == game.UiGameTitleId));
@@ -216,7 +226,7 @@ namespace Sma5h.Mods.Music.MusicMods
                 if (series == null)
                 {
                     if (seriesEntry != null)
-                        series = _mapper.Map<SeriesConfig>(seriesEntry);
+                        series = MusicMapper.ToConfig(seriesEntry);
                     if (series == null)
                     {
                         series = new SeriesConfig()
@@ -233,16 +243,16 @@ namespace Sma5h.Mods.Music.MusicMods
                     _musicModConfig.Series.Add(series);
                 }
                 else if(seriesEntry != null)
-                    series = _mapper.Map(seriesEntry, series);
+                    MusicMapper.Map(seriesEntry, series);
                 series.Games.Add(game);
 
                 var bgmConfig = new BgmConfig()
                 {
-                    DbRoot = _mapper.Map<BgmDbRootConfig>(dbRoot),
-                    StreamSet = _mapper.Map<BgmStreamSetConfig>(streamSet),
-                    StreamProperty = _mapper.Map<BgmStreamPropertyConfig>(streamProperty),
-                    AssignedInfo = _mapper.Map<BgmAssignedInfoConfig>(assignedInfo),
-                    BgmProperties = _mapper.Map<BgmPropertyEntryConfig>(bgmProperty),
+                    DbRoot = MusicMapper.ToConfig(dbRoot),
+                    StreamSet = MusicMapper.ToConfig(streamSet),
+                    StreamProperty = MusicMapper.ToConfig(streamProperty),
+                    AssignedInfo = MusicMapper.ToConfig(assignedInfo),
+                    BgmProperties = MusicMapper.ToConfig(bgmProperty),
                     Filename = filenameWithoutPath,
                     ToneId = bgmProperty.NameId,
                     NUS3BankConfig = new NUS3BankConfig()
@@ -278,7 +288,7 @@ namespace Sma5h.Mods.Music.MusicMods
                 var series = _musicModConfig.Series.FirstOrDefault(p => p.UiSeriesId == seriesEntry.UiSeriesId);
                 if(series != null)
                 {
-                    _mapper.Map(seriesEntry, series);
+                    MusicMapper.Map(seriesEntry, series);
                     return SaveMusicModConfig();
                 }
             }
@@ -293,18 +303,18 @@ namespace Sma5h.Mods.Music.MusicMods
                 if (game != null)
                 {
                     var oldSeries = game.UiSeriesId;
-                    _mapper.Map(gameTitleEntry, game);
+                    MusicMapper.Map(gameTitleEntry, game);
 
                     if(oldSeries != game.UiSeriesId)
                     {
                         var series = _musicModConfig.Series.FirstOrDefault(p => p.UiSeriesId == seriesEntry.UiSeriesId);
                         if (series != null)
                         {
-                            _mapper.Map(seriesEntry, series);
+                            MusicMapper.Map(seriesEntry, series);
                         }
                         else
                         {
-                            series = _mapper.Map<SeriesConfig>(seriesEntry);
+                            series = MusicMapper.ToConfig(seriesEntry);
                             series.Games = new List<GameConfig>();
                             _musicModConfig.Series.Add(series);
                         }

@@ -207,12 +207,6 @@ dotnet publish UMB.CLI -c Release -r win-x64 --self-contained -p:PublishSingleFi
 
 ---
 
-## Vulnerabilities
-
-Uses AutoMapper 14.0.0 which has a [known high-severity DoS vulnerability](https://github.com/advisories/GHSA-rvv3-g6hj-g44x). AutoMapper 14 is the latest MIT-licensed version. UMB runs locally so the risk is not practical - but **do not deploy as a service or expose to a network.**
-
----
-
 ## Thanks & repositories
 
 UMB is a fork of [Sma5hMusic](https://github.com/Deinonychus71/Sma5hMusic) by Deinonychus71. Most of the heavy lifting was done there.

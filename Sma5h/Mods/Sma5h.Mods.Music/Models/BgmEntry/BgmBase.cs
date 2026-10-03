@@ -1,10 +1,12 @@
-﻿using Sma5h.Mods.Music.Interfaces;
+﻿using Riok.Mapperly.Abstractions;
+using Sma5h.Mods.Music.Interfaces;
 
 namespace Sma5h.Mods.Music.Models
 {
     public abstract class BgmBase
     {
         public EntrySource Source { get; }
+        [MapperIgnore]
         public IMusicMod MusicMod { get; set; }
         public string ModId { get { return MusicMod?.Mod.Id; } }
 
