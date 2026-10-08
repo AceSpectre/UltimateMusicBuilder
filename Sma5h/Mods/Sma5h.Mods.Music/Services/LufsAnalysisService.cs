@@ -108,7 +108,7 @@ namespace Sma5h.Mods.Music.Services
             dirCache.EnsureLoaded(_logger);
 
             var lufsOpts = _config.CurrentValue.Sma5hMusic?.LufsNormalization;
-            var currentTarget = lufsOpts?.TargetLufs ?? -14f;
+            var currentTarget = lufsOpts?.TargetLufs ?? -11f;
             var maxMult = lufsOpts?.MaxGainMultiplier ?? 4f;
 
             // Cache hit: size + mtime match.

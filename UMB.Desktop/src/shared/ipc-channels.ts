@@ -2,6 +2,7 @@ export const IPC = {
   LIST_MODS: 'umb:list-mods',
   LIST_MOD_SERIES: 'umb:list-mod-series',
   GET_MOD_STATS: 'umb:get-mod-stats',
+  CHECK_BUILD_VOLUMES: 'umb:check-build-volumes',
   LOAD_TRACK_ORDER: 'umb:load-track-order',
   SAVE_TRACK_ORDER: 'umb:save-track-order',
   LOAD_SERIES_ORDER: 'umb:load-series-order',

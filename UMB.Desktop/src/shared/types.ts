@@ -336,6 +336,15 @@ export interface PlaylistAssignmentInput {
   incidence: number
 }
 
+// A tracks.csv row whose volume looks like a legacy nus3bank dB value (checked before Build).
+export interface SuspiciousVolumeTrack {
+  modName: string
+  seriesName: string
+  filename: string
+  title: string
+  volume: number
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string

@@ -27,10 +27,12 @@ namespace UMB.CLI.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly IWorkspaceManager _workspace;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
+        private readonly VolumeCheckService _volumeCheck;
 
         public BuildService(IServiceProvider serviceProvider, IWorkspaceManager workspace, IStateManager state,
-            IOptionsMonitor<Sma5hMusicOptions> musicConfig, ILogger<BuildService> logger)
+            IOptionsMonitor<Sma5hMusicOptions> musicConfig, VolumeCheckService volumeCheck, ILogger<BuildService> logger)
         {
+            _volumeCheck = volumeCheck;
             _serviceProvider = serviceProvider;
             _workspace = workspace;
             _state = state;
@@ -205,6 +207,12 @@ namespace UMB.CLI.Services
                 }
             }
 
+            if (!ConfirmVolumes(activeMods, seriesFilters, interactive))
+            {
+                _logger.LogInformation("Build cancelled.");
+                return;
+            }
+
             try
             {
                 await Task.Delay(1000);
@@ -263,6 +271,35 @@ namespace UMB.CLI.Services
                 Sma5hMusic.ExplicitSeriesOrder = null;
             }
         }
+        /// <summary>
+        /// Warns about tracks.csv volumes that look like legacy nus3bank dB values (older imports
+        /// copied e.g. 2.7 straight into the multiplier column). The desktop app asks before
+        /// starting the build, so non-interactive runs only log.
+        /// </summary>
+        private bool ConfirmVolumes(List<string> activeMods, Dictionary<string, HashSet<string>> seriesFilters, bool interactive)
+        {
+            var suspicious = _volumeCheck.Check(activeMods, seriesFilters);
+            if (suspicious.Count == 0)
+                return true;
+
+            _logger.LogWarning("{Count} track(s) have a volume of {Threshold} or higher. Volume in tracks.csv is a multiplier (1 = normal, 2 = about +6 dB); "
+                + "mods imported with older versions of Convert copied legacy dB values (usually 2.7) into it. Set these to 1 unless the boost is intentional:",
+                suspicious.Count, VolumeCheckService.SuspiciousVolume);
+            foreach (var t in suspicious)
+                _logger.LogWarning("  {Mod}/{Series}: \"{Title}\" ({Filename}) volume = {Volume}", t.ModName, t.SeriesName, t.Title, t.Filename, t.Volume);
+
+            if (!interactive)
+                return true;
+
+            var proceed = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .WrapAround()
+                    .Title("[yellow]Some track volumes look too high. Proceed with build?[/]")
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices("Yes - build anyway", "No - cancel build"));
+            return proceed.StartsWith("Yes");
+        }
+
         private List<string> ValidateSeries(List<string> activeMods, Dictionary<string, HashSet<string>> seriesFilters)
         {
             var warnings = new List<string>();

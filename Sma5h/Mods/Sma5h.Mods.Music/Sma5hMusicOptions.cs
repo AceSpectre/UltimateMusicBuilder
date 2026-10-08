@@ -17,7 +17,7 @@ namespace Sma5h.Mods.Music
             public string DefaultLocale { get; set; }
             public string ModPath { get; set; }
             public string CachePath { get; set; }
-            public float GlobalVolumeMultiplier { get; set; } = 1.5f;
+            public float GlobalVolumeMultiplier { get; set; } = 1.0f;
             public LufsNormalizationOptions LufsNormalization { get; set; } = new();
         }
 
@@ -32,7 +32,7 @@ namespace Sma5h.Mods.Music
         public class LufsNormalizationOptions
         {
             public bool Enabled { get; set; } = true;
-            public float TargetLufs { get; set; } = -14.0f;
+            public float TargetLufs { get; set; } = -11.0f;
             public float MaxGainMultiplier { get; set; } = 4.0f;
             // ffmpeg is resolved from the system PATH only (install via choco/brew/apt).
             // Filename for the per-series cache file. Location is always derived from the

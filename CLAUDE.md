@@ -82,6 +82,18 @@ when only one locale is in `Resources/Game` (the normal setup). When several loc
 (e.g. `+eu_fr` and `+us_en`), each keeps its `+locale` suffix — previously they all collapsed onto
 one path, so only one locale survived.
 
+## Volume / LUFS normalisation (2026-10-08)
+The nus3bank volume the game reads is **dB** (vanilla `nusbank_ids.csv`: −12..12, median 2.9, −90 = muted;
+`template.nus3bank` = 2.7). Previously the build wrote `global × lufsGain × volume` (linear) into it, so
+normalisation and the global override barely did anything and mods played ~4–12 dB under vanilla.
+Now `BgmPropertyEntry.AudioVolume` is dB everywhere (its original meaning): `FolderMusicMod` loads it as
+`2.7 + 20·log10(tracks.csv volume)`, and the build writes `AudioVolume + 20·log10(global) + 20·log10(lufsGain)`.
+User-facing values (`tracks.csv` volume, `GlobalVolumeMultiplier`, LUFS gain) stay linear multipliers
+(`VolumeHelper.MultiplierToDb`). Defaults: global 1.0, `TargetLufs` −11 (vanilla audio is mastered at
+~−11 LUFS ±1), so a normalised track plays at `TargetLufs + 2.7` ≈ the vanilla median.
+Audio samples are never changed — normalisation is playback gain only. Older Convert runs copied legacy dB
+values (2.7) into `tracks.csv`; Build warns on volumes ≥ 2 (`VolumeCheckService`, desktop modal / CLI y/n).
+
 ## CLI ↔ Desktop Bridge (2026-10-03)
 The desktop spawns `UMB.CLI` one-shot or talks to `UMB.CLI serve` (daemon: one JSON request per
 stdin line, `__DONE__\t<id>\t<code>` reply). Rules the CLI side now guarantees:

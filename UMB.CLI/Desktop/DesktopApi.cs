@@ -35,6 +35,7 @@ namespace UMB.CLI.Desktop
                 ["mods-list"] = _ => Get<ModsService>().ListMods(),
                 ["mod-series-list"] = In<ModPathInput>(i => Get<ModsService>().ListModSeries(i.ModPath)),
                 ["mod-stats"] = In<ModPathInput>(i => Get<ModsService>().GetModStats(i.ModPath)),
+                ["build-volume-check"] = In<ModNameInput>(i => Get<VolumeCheckService>().Check(i.ModName)),
 
                 ["series-order-load"] = In<ModPathInput>(i => Get<SeriesOrderService>().Load(i.ModPath)),
                 ["series-order-save"] = In<SaveSeriesOrderInput>(i => Get<SeriesOrderService>().Save(i.ModPath, i.Items)),
@@ -102,6 +103,7 @@ namespace UMB.CLI.Desktop
             json => handler(json.Deserialize<T>(Json) ?? throw new DesktopApiException("Missing request input."));
 
         private record ModPathInput(string ModPath);
+        private record ModNameInput(string ModName);
         private record SeriesPathInput(string SeriesPath);
         private record SaveSeriesOrderInput(string ModPath, List<SaveSeriesItem> Items);
         private record CreateSeriesRequest(string ModPath, CreateSeriesInput Input);

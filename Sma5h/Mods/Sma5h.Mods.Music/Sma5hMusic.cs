@@ -129,8 +129,10 @@ namespace Sma5h.Mods.Music
                 Directory.CreateDirectory(_config.CurrentValue.Sma5hMusic.CachePath);
 
             //Save NUS3Audio/Nus3Bank
+            // Bank volumes are dB, so the multipliers are converted and added.
             var globalMult = _config.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
-            _logger.LogInformation("Global volume multiplier: {Mult}x", globalMult);
+            var globalDb = VolumeHelper.MultiplierToDb(globalMult);
+            _logger.LogInformation("Global volume multiplier: {Mult}x ({Db:+0.0;-0.0} dB)", globalMult, globalDb);
 
             var lufsOpts = _config.CurrentValue.Sma5hMusic.LufsNormalization;
             var lufsEnabled = lufsOpts != null && lufsOpts.Enabled && _lufsService.IsAvailable;
@@ -186,20 +188,21 @@ namespace Sma5h.Mods.Music
                 var nusBankOutputFile = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3BANK_FILE, bgmPropertyEntry.NameId));
                 var nusAudioOutputFile = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3AUDIO_FILE, bgmPropertyEntry.NameId));
 
-                var finalVolume = globalMult * bgmPropertyEntry.AudioVolume;
+                var finalVolume = bgmPropertyEntry.AudioVolume + globalDb;
                 if (lufsEnabled && !string.IsNullOrEmpty(bgmPropertyEntry.Filename) && File.Exists(bgmPropertyEntry.Filename))
                 {
                     var measurement = _lufsService.Measure(bgmPropertyEntry.Filename);
                     if (measurement.IsValid)
                     {
                         var gain = _lufsService.CalculateGain(measurement, lufsOpts.TargetLufs, lufsOpts.MaxGainMultiplier);
-                        finalVolume = globalMult * gain.Multiplier * bgmPropertyEntry.AudioVolume;
+                        var gainDb = VolumeHelper.MultiplierToDb(gain.Multiplier);
+                        finalVolume = bgmPropertyEntry.AudioVolume + globalDb + gainDb;
                         if (gain.WasClamped)
                             _logger.LogWarning("Song {NameId}: LUFS gain clamped to {Max}x (source measured {Measured:F1} LUFS). Source is too quiet to reach target loudness — consider replacing with a louder master.",
                                 bgmPropertyEntry.NameId, lufsOpts.MaxGainMultiplier, measurement.IntegratedLufs);
                         else
-                            _logger.LogDebug("Song {NameId}: measured {Measured:F1} LUFS, applying {Gain:F2}x gain (final bank volume {Final:F2}).",
-                                bgmPropertyEntry.NameId, measurement.IntegratedLufs, gain.Multiplier, finalVolume);
+                            _logger.LogDebug("Song {NameId}: measured {Measured:F1} LUFS, applying {Gain:+0.0;-0.0} dB gain (final bank volume {Final:F2} dB).",
+                                bgmPropertyEntry.NameId, measurement.IntegratedLufs, gainDb, finalVolume);
                     }
                 }
 

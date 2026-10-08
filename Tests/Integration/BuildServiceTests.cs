@@ -62,6 +62,7 @@ namespace Tests.Integration
                 workspace,
                 sp.GetRequiredService<IStateManager>(),
                 sp.GetRequiredService<IOptionsMonitor<Sma5hMusicOptions>>(),
+                new VolumeCheckService(sp.GetRequiredService<IOptionsMonitor<Sma5hMusicOptions>>()),
                 TestEnvironment.CreateLogger<BuildService>());
             return (build, sp);
         }

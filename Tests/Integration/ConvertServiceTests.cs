@@ -173,8 +173,9 @@ namespace Tests.Integration
             Assert.Contains("flowerhead", row); // game name_id
             // record_type "record_original" has its "record_" prefix stripped
             Assert.Contains("original", row);
-            // nus3bank_config.volume = 2.7
-            Assert.Contains("2.7", row);
+            // nus3bank_config.volume = 2.7 dB (the default) becomes a 1x multiplier
+            Assert.DoesNotContain("2.7", row);
+            Assert.Contains(",1,", row);
         }
 
         [Fact]

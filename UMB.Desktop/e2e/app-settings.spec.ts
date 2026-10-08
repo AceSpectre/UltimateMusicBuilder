@@ -52,18 +52,18 @@ test('getAppSettings reads GlobalVolumeMultiplier out of appsettings.json', asyn
   expect(settings.globalVolumeMultiplier).toBe(2.25)
 })
 
-test('getAppSettings falls back to the 1.5 default when appsettings.json is absent', async () => {
+test('getAppSettings falls back to the 1 default when appsettings.json is absent', async () => {
   rmSync(settingsPath(), { force: true })
   const page = await firstWindow(app)
   const settings = await page.evaluate(() => window.electron.umb.getAppSettings())
-  expect(settings.globalVolumeMultiplier).toBe(1.5)
+  expect(settings.globalVolumeMultiplier).toBe(1)
 })
 
 test('getAppSettings falls back to the default when GlobalVolumeMultiplier is missing', async () => {
   writeSettings({ OutputPath: 'ArcOutput', Sma5hMusic: { CachePath: 'Cache' } })
   const page = await firstWindow(app)
   const settings = await page.evaluate(() => window.electron.umb.getAppSettings())
-  expect(settings.globalVolumeMultiplier).toBe(1.5)
+  expect(settings.globalVolumeMultiplier).toBe(1)
 })
 
 test('saveAppSettings rewrites the multiplier and preserves every other key', async () => {

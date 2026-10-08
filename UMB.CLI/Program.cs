@@ -302,6 +302,7 @@ namespace UMB.CLI
             services.AddScoped<Services.SeriesOrderService>();
             services.AddScoped<Services.TrackOrderService>();
             services.AddScoped<Services.VolumeConfigService>();
+            services.AddScoped<Services.VolumeCheckService>();
             services.AddScoped<Services.DumpStagesService>();
             services.AddScoped<Services.ModsService>();
             services.AddScoped<Services.VanillaCatalogService>();

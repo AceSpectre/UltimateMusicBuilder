@@ -29,6 +29,14 @@ export default {
       description: 'Building will overwrite the existing output. Are you sure you want to continue?',
       cancel: 'Cancel',
       overwrite: 'Overwrite & Build'
+    },
+    volumeModal: {
+      title: 'Check Track Volumes',
+      subtitle: '{count, plural, one {# track has} other {# tracks have}} a volume of 2 or higher.',
+      description:
+        'Volume in tracks.csv is a multiplier (1 = normal, 2 ≈ +6 dB). Mods imported with older versions of Import copied legacy values (usually 2.7) into this column, which now play much louder than intended. Set these to 1 unless the boost is intentional.',
+      cancel: 'Cancel',
+      build: 'Build Anyway'
     }
   },
   appBar: {
@@ -50,7 +58,7 @@ export default {
     title: 'Settings',
     subtitle: 'Configure build defaults',
     globalVolume: 'Global Volume Multiplier',
-    globalVolumeHint: 'Applied to every track during build. Default is 1.5×.',
+    globalVolumeHint: 'Applied to every track during build. Default is 1× (2× ≈ +6 dB).',
     save: 'Save',
     saving: 'Saving...',
     saved: 'Saved',

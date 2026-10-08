@@ -4,7 +4,7 @@
 
   let { open, onClose }: { open: boolean; onClose: () => void } = $props()
 
-  let globalVolumeMultiplier = $state(1.5)
+  let globalVolumeMultiplier = $state(1.0)
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let loaded = $state(false)
 

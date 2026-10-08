@@ -274,9 +274,10 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     output.BgmStreamPropertyEntries.Add(streamProp);
 
                     // BgmPropertyEntry
+                    // tracks.csv volume is a multiplier on the default bank volume (dB).
                     var bgmProp = new BgmPropertyEntry(toneId, audioFile, this)
                     {
-                        AudioVolume = row.Volume
+                        AudioVolume = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB + VolumeHelper.MultiplierToDb(row.Volume)
                     };
                     try
                     {

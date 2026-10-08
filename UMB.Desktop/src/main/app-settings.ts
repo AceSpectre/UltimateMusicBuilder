@@ -6,7 +6,7 @@ import type { AppSettings } from '../shared/types'
 export type { AppSettings } from '../shared/types'
 
 const DEFAULTS: AppSettings = {
-  globalVolumeMultiplier: 1.5
+  globalVolumeMultiplier: 1.0
 }
 
 // The CLI loads appsettings.json from its own directory (AppContext.BaseDirectory):

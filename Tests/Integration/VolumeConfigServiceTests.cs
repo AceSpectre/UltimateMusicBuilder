@@ -160,12 +160,12 @@ namespace Tests.Integration
         // ── Options plumbing ───────────────────────────────────────────────
 
         [Fact]
-        public void Sma5hMusicOptions_DefaultGlobalVolumeMultiplierIsOnePointFive()
+        public void Sma5hMusicOptions_DefaultGlobalVolumeMultiplierIsOne()
         {
             // Compile-time guard: bug surface if the option default ever changes
             // without updating callers / tests / appsettings.json simultaneously.
             var options = new Sma5hMusicOptions.Sma5hMusicOptionsSection();
-            Assert.Equal(1.5f, options.GlobalVolumeMultiplier);
+            Assert.Equal(1.0f, options.GlobalVolumeMultiplier);
         }
     }
 }
