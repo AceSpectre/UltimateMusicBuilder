@@ -336,13 +336,14 @@ export interface PlaylistAssignmentInput {
   incidence: number
 }
 
-// A tracks.csv row whose volume looks like a legacy nus3bank dB value (checked before Build).
+// A track whose global x track volume multiplier is 2 or more (checked before Build).
 export interface SuspiciousVolumeTrack {
   modName: string
   seriesName: string
   filename: string
   title: string
   volume: number
+  effectiveVolume: number
 }
 
 export interface DebugPingResult {

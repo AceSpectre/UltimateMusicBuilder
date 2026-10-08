@@ -36,6 +36,7 @@ namespace UMB.CLI.Desktop
                 ["mod-series-list"] = In<ModPathInput>(i => Get<ModsService>().ListModSeries(i.ModPath)),
                 ["mod-stats"] = In<ModPathInput>(i => Get<ModsService>().GetModStats(i.ModPath)),
                 ["build-volume-check"] = In<ModNameInput>(i => Get<BuildValidationService>().Validate(i.ModName).SuspiciousVolumes),
+                ["volume-reset-all"] = _ => Get<VolumeConfigService>().ResetAllVolumes(),
 
                 ["series-order-load"] = In<ModPathInput>(i => Get<SeriesOrderService>().Load(i.ModPath)),
                 ["series-order-save"] = In<SaveSeriesOrderInput>(i => Get<SeriesOrderService>().Save(i.ModPath, i.Items)),

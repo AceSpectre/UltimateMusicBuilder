@@ -1,12 +1,15 @@
 <script lang="ts">
-  import { Settings, Volume2 } from '@lucide/svelte'
+  import { AlertTriangle, RotateCcw, Settings, Volume2 } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
+  import Modal from '$lib/components/ui/modal.svelte'
 
   let { open, onClose }: { open: boolean; onClose: () => void } = $props()
 
   let globalVolumeMultiplier = $state(1.5)
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let loaded = $state(false)
+  let resetConfirmOpen = $state(false)
+  let resetting = $state(false)
 
   $effect(() => {
     if (open && !loaded) {
@@ -36,6 +39,18 @@
       setTimeout(() => onClose(), 600)
     } catch {
       saveState = 'idle'
+    }
+  }
+
+  async function handleReset() {
+    resetting = true
+    try {
+      await window.electron.umb.resetAllVolumes()
+      await window.electron.umb.saveAppSettings({ globalVolumeMultiplier: 1 })
+      globalVolumeMultiplier = 1
+      resetConfirmOpen = false
+    } finally {
+      resetting = false
     }
   }
 
@@ -89,6 +104,17 @@
           />
           <p class="text-[11.5px] text-muted-foreground">{$_('settings.globalVolumeHint')}</p>
         </div>
+        <div class="flex flex-col gap-1.5">
+          <button
+            onclick={() => { resetConfirmOpen = true }}
+            disabled={saveState === 'saving'}
+            class="inline-flex items-center gap-2 self-start rounded-lg border-0 px-4 py-2 text-[12.5px] font-medium text-white transition-colors bg-destructive hover:bg-destructive/90 disabled:opacity-60"
+          >
+            <RotateCcw size={14} />
+            {$_('settings.resetVolumes')}
+          </button>
+          <p class="text-[11.5px] text-muted-foreground">{$_('settings.resetVolumesHint')}</p>
+        </div>
       </div>
 
       <div class="border-t border-border px-5 py-4 flex items-center justify-end gap-2">
@@ -110,4 +136,33 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if resetConfirmOpen}
+  <Modal>
+    <div class="flex flex-col gap-3 px-5 py-4">
+      <h3 class="flex items-center gap-2 text-sm font-semibold">
+        <AlertTriangle size={16} class="text-destructive" />
+        {$_('settings.resetModal.title')}
+      </h3>
+      <p class="text-[12.5px] text-muted-foreground">{$_('settings.resetModal.description')}</p>
+    </div>
+    <div class="flex justify-end gap-2 border-t border-border px-5 py-4">
+      <button
+        onclick={() => { resetConfirmOpen = false }}
+        disabled={resetting}
+        class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:opacity-60"
+      >
+        {$_('settings.resetModal.cancel')}
+      </button>
+      <button
+        onclick={handleReset}
+        disabled={resetting}
+        class="inline-flex items-center gap-2 rounded-lg border-0 px-4 py-2 text-[12.5px] font-medium text-white transition-colors bg-destructive hover:bg-destructive/90 disabled:opacity-60"
+      >
+        <RotateCcw size={14} />
+        {resetting ? $_('settings.resetModal.resetting') : $_('settings.resetModal.confirm')}
+      </button>
+    </div>
+  </Modal>
 {/if}

@@ -36,6 +36,17 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
+        public void Validate_FlagsTracksTheGlobalMultiplierPushesOverTheThreshold()
+        {
+            _ws.Options.Sma5hMusic.GlobalVolumeMultiplier = 2f;
+            _ws.WriteSeries("persona", "persona", Csv);
+
+            var flagged = _service.Validate("persona").SuspiciousVolumes;
+            Assert.Equal(new[] { "normal.nus3audio", "boosted.nus3audio", "legacy.nus3audio", "blank.nus3audio" }, flagged.Select(t => t.Filename));
+            Assert.Equal(5.4f, flagged.Single(t => t.Filename == "legacy.nus3audio").EffectiveVolume, precision: 3);
+        }
+
+        [Fact]
         public void Validate_WithoutAModNameChecksEveryMod()
         {
             _ws.WriteSeries("persona", "persona", Csv);

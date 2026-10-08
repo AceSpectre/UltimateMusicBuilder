@@ -19,7 +19,7 @@ namespace UMB.CLI.Services
     /// <summary>Pre-build checks of the mods' series.toml / tracks.csv files.</summary>
     public class BuildValidationService
     {
-        /// <summary>Volume multipliers at or above this are rarely intentional (2x is about +6 dB).</summary>
+        /// <summary>Global x track volume at or above this is rarely intentional (2x is about +6 dB).</summary>
         public const float SuspiciousVolume = 2.0f;
 
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
@@ -41,6 +41,7 @@ namespace UMB.CLI.Services
         {
             var warnings = new List<string>();
             var volumes = new List<SuspiciousVolumeTrack>();
+            var globalVolume = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
 
             foreach (var modDir in activeMods)
             {
@@ -148,10 +149,10 @@ namespace UMB.CLI.Services
                             csvFilenames.Add(filename);
 
                             var volume = hasVolumeColumn ? VolumeConfigService.ParseVolume(csv.GetField("volume")) : 1f;
-                            if (volume >= SuspiciousVolume)
+                            if (globalVolume * volume >= SuspiciousVolume)
                             {
-                                volumes.Add(new SuspiciousVolumeTrack(modName, seriesName, filename, title, volume));
-                                warnings.Add($"  {prefix}: \"{title}\" ({filename}) has volume {volume}, likely a legacy dB value from an older Convert. Set it to 1 unless the boost is intended");
+                                volumes.Add(new SuspiciousVolumeTrack(modName, seriesName, filename, title, volume, globalVolume * volume));
+                                warnings.Add($"  {prefix}: \"{title}\" ({filename}) plays at {globalVolume * volume}x (global {globalVolume}x, track {volume}x). Track volumes above 1 may be legacy dB values from an older Convert");
                             }
 
                             if (validGameIds.Count > 0 && !string.IsNullOrWhiteSpace(game)

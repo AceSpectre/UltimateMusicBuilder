@@ -377,7 +377,7 @@
             <span class="min-w-0 flex-1 truncate" title={track.filename}>
               <span class="text-muted-foreground">{track.seriesName} /</span> {track.title || track.filename}
             </span>
-            <span class="shrink-0 font-mono">{track.volume}</span>
+            <span class="shrink-0 font-mono">{track.effectiveVolume}×</span>
           </li>
         {/each}
       </ul>

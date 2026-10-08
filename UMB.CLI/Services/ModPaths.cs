@@ -13,8 +13,8 @@ namespace UMB.CLI.Services
             CanonicalDirectoryPath(config.CurrentValue.Sma5hMusic.ModPath);
 
         /// <summary>The mod folders in <paramref name="modPath"/>, skipping dot folders.</summary>
-        public static List<string> ModDirs(string modPath) =>
-            Directory.GetDirectories(modPath).Where(d => !Path.GetFileName(d).StartsWith(".")).ToList();
+        public static List<string> ModDirs(string modPath) => !Directory.Exists(modPath) ? new()
+            : Directory.GetDirectories(modPath).Where(d => !Path.GetFileName(d).StartsWith(".")).ToList();
 
         public static bool IsUnderMods(IOptionsMonitor<Sma5hMusicOptions> config, string path)
         {
