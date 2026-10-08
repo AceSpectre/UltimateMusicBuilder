@@ -129,7 +129,6 @@ namespace Sma5h.Mods.Music
                 Directory.CreateDirectory(_config.CurrentValue.Sma5hMusic.CachePath);
 
             //Save NUS3Audio/Nus3Bank
-            // Bank volumes are dB, so the multipliers are converted and added.
             var globalMult = _config.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
             var globalDb = VolumeHelper.MultiplierToDb(globalMult);
             _logger.LogInformation("Global volume multiplier: {Mult}x ({Db:+0.0;-0.0} dB)", globalMult, globalDb);
@@ -195,14 +194,13 @@ namespace Sma5h.Mods.Music
                     if (measurement.IsValid)
                     {
                         var gain = _lufsService.CalculateGain(measurement, lufsOpts.TargetLufs, lufsOpts.MaxGainMultiplier);
-                        var gainDb = VolumeHelper.MultiplierToDb(gain.Multiplier);
-                        finalVolume = bgmPropertyEntry.AudioVolume + globalDb + gainDb;
+                        finalVolume = bgmPropertyEntry.AudioVolume + globalDb + gain.Db;
                         if (gain.WasClamped)
                             _logger.LogWarning("Song {NameId}: LUFS gain clamped to {Max}x (source measured {Measured:F1} LUFS). Source is too quiet to reach target loudness — consider replacing with a louder master.",
                                 bgmPropertyEntry.NameId, lufsOpts.MaxGainMultiplier, measurement.IntegratedLufs);
                         else
                             _logger.LogDebug("Song {NameId}: measured {Measured:F1} LUFS, applying {Gain:+0.0;-0.0} dB gain (final bank volume {Final:F2} dB).",
-                                bgmPropertyEntry.NameId, measurement.IntegratedLufs, gainDb, finalVolume);
+                                bgmPropertyEntry.NameId, measurement.IntegratedLufs, gain.Db, finalVolume);
                     }
                 }
 

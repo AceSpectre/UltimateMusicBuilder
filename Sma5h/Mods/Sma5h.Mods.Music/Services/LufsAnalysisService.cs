@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using Sma5h.Helpers;
 using Sma5h.Interfaces;
+using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
 using System;
 using System.Collections.Concurrent;
@@ -107,9 +108,9 @@ namespace Sma5h.Mods.Music.Services
             var dirCache = _dirCaches.GetOrAdd(dir, d => new DirectoryCache(d, GetCsvFileName()));
             dirCache.EnsureLoaded(_logger);
 
-            var lufsOpts = _config.CurrentValue.Sma5hMusic?.LufsNormalization;
-            var currentTarget = lufsOpts?.TargetLufs ?? -11f;
-            var maxMult = lufsOpts?.MaxGainMultiplier ?? 4f;
+            var lufsOpts = _config.CurrentValue.Sma5hMusic?.LufsNormalization ?? new();
+            var currentTarget = lufsOpts.TargetLufs;
+            var maxMult = lufsOpts.MaxGainMultiplier;
 
             // Cache hit: size + mtime match.
             if (dirCache.TryGet(filename, out var entry)
@@ -120,7 +121,7 @@ namespace Sma5h.Mods.Music.Services
                 // No ffmpeg needed.
                 if (Math.Abs(entry.TargetLufs - currentTarget) > 0.001f)
                 {
-                    var (newMult, _) = ComputeMultiplier(entry.MeasuredLufs, currentTarget, maxMult);
+                    var newMult = VolumeHelper.DbToMultiplier(ComputeGainDb(entry.MeasuredLufs, currentTarget, maxMult).db);
                     dirCache.UpdateDerived(filename, newMult, currentTarget, _logger);
                 }
                 return new LufsMeasurement
@@ -139,7 +140,7 @@ namespace Sma5h.Mods.Music.Services
             var measurement = RunFfmpegLoudnorm(audioFilePath);
             if (measurement.IsValid)
             {
-                var (mult, _) = ComputeMultiplier(measurement.IntegratedLufs, currentTarget, maxMult);
+                var mult = VolumeHelper.DbToMultiplier(ComputeGainDb(measurement.IntegratedLufs, currentTarget, maxMult).db);
                 dirCache.Upsert(new LufsCacheEntry
                 {
                     Filename = filename,
@@ -156,21 +157,17 @@ namespace Sma5h.Mods.Music.Services
         public GainResult CalculateGain(LufsMeasurement measurement, float targetLufs, float maxMultiplier)
         {
             if (measurement == null || !measurement.IsValid)
-                return new GainResult(1.0f, false);
-            var (mult, clamped) = ComputeMultiplier(measurement.IntegratedLufs, targetLufs, maxMultiplier);
-            return new GainResult(mult, clamped);
+                return new GainResult(0, false);
+            var (db, clamped) = ComputeGainDb(measurement.IntegratedLufs, targetLufs, maxMultiplier);
+            return new GainResult(db, clamped);
         }
 
-        // linear_gain = 10^((target - measured) / 20), clamped to [0, max].
-        private static (float multiplier, bool wasClamped) ComputeMultiplier(float measuredLufs, float targetLufs, float maxMultiplier)
+        // gain_db = target - measured, with the boost capped at maxMultiplier.
+        private static (float db, bool wasClamped) ComputeGainDb(float measuredLufs, float targetLufs, float maxMultiplier)
         {
-            var deltaDb = targetLufs - measuredLufs;
-            var raw = (float)Math.Pow(10.0, deltaDb / 20.0);
-            if (raw <= 0 || float.IsNaN(raw) || float.IsInfinity(raw))
-                return (1.0f, false);
-            if (maxMultiplier > 0 && raw > maxMultiplier)
-                return (maxMultiplier, true);
-            return (raw, false);
+            var db = targetLufs - measuredLufs;
+            var maxDb = VolumeHelper.MultiplierToDb(maxMultiplier);
+            return maxMultiplier > 0 && db > maxDb ? (maxDb, true) : (db, false);
         }
 
         public void SaveCache()

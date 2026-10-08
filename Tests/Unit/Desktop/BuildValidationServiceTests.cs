@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Tests.Unit.Desktop
 {
-    public class VolumeCheckServiceTests : IDisposable
+    public class BuildValidationServiceTests : IDisposable
     {
         private const string Csv =
             "filename,title,game,volume\n" +
@@ -14,39 +14,41 @@ namespace Tests.Unit.Desktop
             "blank.nus3audio,Blank,game,\n";
 
         private readonly DesktopWorkspace _ws = new();
-        private readonly VolumeCheckService _service;
+        private readonly BuildValidationService _service;
 
-        public VolumeCheckServiceTests()
+        public BuildValidationServiceTests()
         {
-            _service = new VolumeCheckService(_ws.MusicOptions());
+            _service = new BuildValidationService(_ws.MusicOptions(), TestEnvironment.CreateLogger<BuildValidationService>());
         }
 
         public void Dispose() => _ws.Dispose();
 
         [Fact]
-        public void Check_FlagsVolumesAtOrAboveTheThreshold()
+        public void Validate_FlagsVolumesAtOrAboveTheThreshold()
         {
             _ws.WriteSeries("persona", "persona", Csv);
 
-            var track = Assert.Single(_service.Check("persona"));
+            var result = _service.Validate("persona");
+            var track = Assert.Single(result.SuspiciousVolumes);
             Assert.Equal(("persona", "persona", "legacy.nus3audio", "Legacy", 2.7f),
                 (track.ModName, track.SeriesName, track.Filename, track.Title, track.Volume));
+            Assert.Contains(result.Warnings, w => w.Contains("legacy.nus3audio"));
         }
 
         [Fact]
-        public void Check_WithoutAModNameChecksEveryMod()
+        public void Validate_WithoutAModNameChecksEveryMod()
         {
             _ws.WriteSeries("persona", "persona", Csv);
             _ws.WriteSeries("mario", "mario", Csv);
 
-            Assert.Equal(new[] { "mario", "persona" }, _service.Check(null).Select(t => t.ModName).OrderBy(n => n));
+            Assert.Equal(new[] { "mario", "persona" }, _service.Validate(null).SuspiciousVolumes.Select(t => t.ModName).OrderBy(n => n));
         }
 
         [Fact]
-        public void Check_IgnoresCsvWithoutAVolumeColumn()
+        public void Validate_IgnoresCsvWithoutAVolumeColumn()
         {
             _ws.WriteSeries("persona", "persona", "filename,title,game\nsong.flac,Song,Game\n");
-            Assert.Empty(_service.Check("persona"));
+            Assert.Empty(_service.Validate("persona").SuspiciousVolumes);
         }
     }
 }

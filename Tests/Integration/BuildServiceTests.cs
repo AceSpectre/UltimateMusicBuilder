@@ -62,7 +62,7 @@ namespace Tests.Integration
                 workspace,
                 sp.GetRequiredService<IStateManager>(),
                 sp.GetRequiredService<IOptionsMonitor<Sma5hMusicOptions>>(),
-                new VolumeCheckService(sp.GetRequiredService<IOptionsMonitor<Sma5hMusicOptions>>()),
+                new BuildValidationService(sp.GetRequiredService<IOptionsMonitor<Sma5hMusicOptions>>(), TestEnvironment.CreateLogger<BuildValidationService>()),
                 TestEnvironment.CreateLogger<BuildService>());
             return (build, sp);
         }
@@ -76,34 +76,34 @@ namespace Tests.Integration
         }
 
         [Fact]
-        public async Task Run_NoMods_WarnsAndProducesNoOutput()
+        public void Run_NoMods_WarnsAndProducesNoOutput()
         {
             // ModPath exists (created by TestEnvironment) but holds no mod folders.
             var (build, sp) = CreateBuildService();
             using (sp)
-                await build.Run();
+                build.Run();
 
             Assert.Empty(ArcOutputFiles());
         }
 
         [Fact]
-        public async Task Run_RequestedModNotFound_ProducesNoOutput()
+        public void Run_RequestedModNotFound_ProducesNoOutput()
         {
             _env.CreateConfiguredMod("test-mod");
             var (build, sp) = CreateBuildService();
             using (sp)
-                await build.Run("does-not-exist");
+                build.Run("does-not-exist");
 
             Assert.Empty(ArcOutputFiles());
         }
 
         [Fact]
-        public async Task Run_RequestedModByName_ProducesArcOutput()
+        public void Run_RequestedModByName_ProducesArcOutput()
         {
             _env.CreateConfiguredMod("test-mod");
             var (build, sp) = CreateBuildService();
             using (sp)
-                await build.Run("test-mod");
+                build.Run("test-mod");
 
             var files = ArcOutputFiles();
             Assert.True(files.Length > 0, "Building the named mod should produce ArcOutput files");
@@ -111,13 +111,13 @@ namespace Tests.Integration
         }
 
         [Fact]
-        public async Task Run_SingleModNonInteractive_ProducesArcOutput()
+        public void Run_SingleModNonInteractive_ProducesArcOutput()
         {
             // No requestedMod + exactly one mod → auto-selected without a prompt.
             _env.CreateConfiguredMod("test-mod");
             var (build, sp) = CreateBuildService();
             using (sp)
-                await build.Run();
+                build.Run();
 
             Assert.True(ArcOutputFiles().Length > 0,
                 "Single-mod non-interactive build should produce ArcOutput files");

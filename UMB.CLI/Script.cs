@@ -49,7 +49,7 @@ namespace UMB.CLI
             _logger = logger;
         }
 
-        public async Task RunBuild(string selectedMod = null) => await _build.Run(selectedMod);
+        public void RunBuild(string selectedMod = null) => _build.Run(selectedMod);
         public void RunScaffold() => _scaffold.Run();
         public void RunConvert(string sourcePath = null, string outputName = null)
         {

@@ -86,16 +86,13 @@ namespace Tests.Unit
         }
 
         [Fact]
-        public void CalculateGain_OverflowToInfinityHitsGuardNotClamp()
+        public void CalculateGain_NearSilentSourceIsClampedToMax()
         {
-            // measured -1000, target 0 → 10^50 → +Infinity. The NaN/Inf guard
-            // returns (1.0, false) BEFORE the clamp branch, so it is NOT reported
-            // as clamped.
             var gain = CreateService().CalculateGain(
                 new LufsMeasurement { IntegratedLufs = -1000f, IsValid = true }, 0.0f, 4.0f);
 
-            Assert.Equal(1.0f, gain.Multiplier);
-            Assert.False(gain.WasClamped);
+            Assert.Equal(4.0f, gain.Multiplier, precision: 3);
+            Assert.True(gain.WasClamped);
         }
 
         // ── ParseLoudnormJson / ParseFloat (private, via reflection) ────────

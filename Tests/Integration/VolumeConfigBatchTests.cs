@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Moq;
+using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
 using Tests.Helpers;
 using UMB.CLI.Services;
@@ -68,7 +69,7 @@ namespace Tests.Integration
             mock.Setup(m => m.Measure(It.IsAny<string>())).Returns(measurement);
             mock.Setup(m => m.MeasureCached(It.IsAny<string>())).Returns(measurement);
             mock.Setup(m => m.CalculateGain(It.IsAny<LufsMeasurement>(), It.IsAny<float>(), It.IsAny<float>()))
-                .Returns(new GainResult(gain, false));
+                .Returns(new GainResult(VolumeHelper.MultiplierToDb(gain), false));
             mock.Setup(m => m.IsAvailable).Returns(available);
             return mock;
         }

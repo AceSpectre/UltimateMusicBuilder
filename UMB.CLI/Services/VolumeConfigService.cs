@@ -125,9 +125,9 @@ namespace UMB.CLI.Services
             }
 
             var globalMult = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
-            var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization;
-            var target = lufsOpts?.TargetLufs ?? -11.0f;
-            var maxMult = lufsOpts?.MaxGainMultiplier ?? 4.0f;
+            var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization ?? new();
+            var target = lufsOpts.TargetLufs;
+            var maxMult = lufsOpts.MaxGainMultiplier;
 
             if (!_lufsService.IsAvailable)
             {
@@ -264,10 +264,10 @@ namespace UMB.CLI.Services
             var (rows, _) = ReadCsvRows(csvPath);
 
             var globalMult = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
-            var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization;
-            var target = lufsOpts?.TargetLufs ?? -11.0f;
-            var maxMult = lufsOpts?.MaxGainMultiplier ?? 4.0f;
-            var lufsCacheName = string.IsNullOrWhiteSpace(lufsOpts?.LufsCacheFileName) ? "LUFS.csv" : lufsOpts.LufsCacheFileName;
+            var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization ?? new();
+            var target = lufsOpts.TargetLufs;
+            var maxMult = lufsOpts.MaxGainMultiplier;
+            var lufsCacheName = string.IsNullOrWhiteSpace(lufsOpts.LufsCacheFileName) ? "LUFS.csv" : lufsOpts.LufsCacheFileName;
             var lufsCacheExists = File.Exists(Path.Combine(seriesDir, lufsCacheName));
 
             if (input.Analyze && !_lufsService.IsAvailable)

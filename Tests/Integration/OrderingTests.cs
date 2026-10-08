@@ -164,7 +164,6 @@ namespace Tests.Integration
                 modDir);
 
             var entries = mod.GetMusicModEntries();
-            // volume 1 = the default bank volume (dB)
             foreach (var prop in entries.BgmPropertyEntries)
                 Assert.Equal(2.7f, prop.AudioVolume, precision: 3);
         }
@@ -189,7 +188,6 @@ namespace Tests.Integration
 
             var entries = mod.GetMusicModEntries();
             var first = entries.BgmPropertyEntries.First();
-            // volume 0.5 = default bank volume - 6.02 dB
             Assert.Equal(2.7f - 6.0206f, first.AudioVolume, precision: 3);
         }
 

@@ -2,20 +2,14 @@ using System;
 
 namespace Sma5h.Mods.Music.Helpers
 {
-    /// <summary>
-    /// The nus3bank volume the game reads is in dB (vanilla songs range -12..12, -90 = muted),
-    /// while the user-facing settings (tracks.csv volume, GlobalVolumeMultiplier, LUFS gain) are
-    /// linear multipliers. Convert them here before adding them to a bank volume.
-    /// </summary>
+    /// <summary>nus3bank volume is dB; user-facing volumes are linear multipliers.</summary>
     public static class VolumeHelper
     {
-        public const float MUTED_NUS3BANK_VOLUME_DB = -90f;
+        private const float MUTED_NUS3BANK_VOLUME_DB = -90f;
 
-        public static float MultiplierToDb(float multiplier)
-        {
-            if (multiplier <= 0 || float.IsNaN(multiplier) || float.IsInfinity(multiplier))
-                return MUTED_NUS3BANK_VOLUME_DB;
-            return (float)(20 * Math.Log10(multiplier));
-        }
+        public static float MultiplierToDb(float multiplier) =>
+            multiplier > 0 ? (float)(20 * Math.Log10(multiplier)) : MUTED_NUS3BANK_VOLUME_DB;
+
+        public static float DbToMultiplier(float db) => (float)Math.Pow(10, db / 20);
     }
 }

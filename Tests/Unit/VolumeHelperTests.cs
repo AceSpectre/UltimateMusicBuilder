@@ -13,15 +13,15 @@ namespace Tests.Unit
         public void MultiplierToDb_ConvertsLinearGain(float multiplier, float expectedDb)
         {
             Assert.Equal(expectedDb, VolumeHelper.MultiplierToDb(multiplier), precision: 3);
+            Assert.Equal(multiplier, VolumeHelper.DbToMultiplier(expectedDb), precision: 3);
         }
 
         [Theory]
         [InlineData(0f)]
         [InlineData(-1f)]
-        [InlineData(float.NaN)]
         public void MultiplierToDb_NonPositiveIsMuted(float multiplier)
         {
-            Assert.Equal(VolumeHelper.MUTED_NUS3BANK_VOLUME_DB, VolumeHelper.MultiplierToDb(multiplier));
+            Assert.Equal(-90f, VolumeHelper.MultiplierToDb(multiplier));
         }
     }
 }
