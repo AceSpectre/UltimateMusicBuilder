@@ -18,7 +18,6 @@ namespace Sma5h.Mods.Music.Interfaces
         IEnumerable<SeriesEntry> GetSeriesEntries();
         IEnumerable<GameTitleEntry> GetGameTitleEntries();
         IEnumerable<StageEntry> GetStagesEntries();
-        IEnumerable<string> GetLocales();
         IEnumerable<PlaylistEntry> GetPlaylists();
 
         double GameVersion { get; }
@@ -38,14 +37,6 @@ namespace Sma5h.Mods.Music.Interfaces
         bool AddSeriesEntry(SeriesEntry seriesEntry);
         bool AddGameTitleEntry(GameTitleEntry gameTitleEntry);
         bool AddPlaylistEntry(PlaylistEntry playlistEntry);
-
-        bool RemoveBgmDbRootEntry(string uiBgmId);
-        bool RemoveBgmStreamSetEntry(string streamSetId);
-        bool RemoveBgmAssignedInfoEntry(string infoId);
-        bool RemoveBgmStreamPropertyEntry(string streamId);
-        bool RemoveBgmPropertyEntry(string nameId);
-        bool RemoveGameTitleEntry(string uiGameTitleId);
-        bool RemovePlaylistEntry(string playlistId);
 
         void InitBgmEntriesFromStateManager();
         bool SaveBgmEntriesToStateManager();

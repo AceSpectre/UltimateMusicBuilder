@@ -74,17 +74,6 @@ namespace Sma5h.Mods.Music.Services
             return MusicMods;
         }
 
-        public IMusicMod AddMusicMod(MusicModInformation configBase, string modPath)
-        {
-            var basePath = _config.CurrentValue.Sma5hMusic.ModPath;
-            if (!modPath.StartsWith(basePath))
-                modPath = Path.Combine(basePath, modPath);
-
-            var newManagerMod = ActivatorUtilities.CreateInstance<MusicMod>(_serviceProvider, modPath, configBase);
-            _musicMods.Add(newManagerMod);
-            return newManagerMod;
-        }
-
 
         private IMusicMod GetMusicModManager(string musicModFolder)
         {
@@ -138,20 +127,5 @@ namespace Sma5h.Mods.Music.Services
             return true;
         }
 
-        public async Task<bool> UpdateGameEntry(SeriesEntry seriesEntry, GameTitleEntry gameTitleEntry)
-        {
-            if (_musicMods != null)
-            {
-                foreach (var musicMod in _musicMods)
-                {
-                    var newMusicModEntries = new MusicModEntries();
-                    newMusicModEntries.GameTitleEntries.Add(gameTitleEntry);
-                    newMusicModEntries.SeriesEntries.Add(seriesEntry);
-                    if (!await musicMod.AddOrUpdateMusicModEntries(newMusicModEntries))
-                        return false;
-                }
-            }
-            return true;
-        }
     }
 }

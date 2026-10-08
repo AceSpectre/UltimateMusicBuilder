@@ -17,9 +17,7 @@ namespace Sma5h.Mods.Music.Services
     {
         // Cross-platform: shells out to the official `vgmstream-cli` binary
         // (https://github.com/vgmstream/vgmstream/releases) and parses its JSON
-        // metadata output (-I flag). Previously this called into libvgmstream
-        // via P/Invoke through VGMMusicPlayer, which required a chain of native
-        // Windows DLLs and had no equivalent prebuilt on Linux/macOS.
+        // metadata output (-I flag).
 
         private const string VgmStreamCliRelative = "vgmstream-cli/vgmstream-cli";
 
