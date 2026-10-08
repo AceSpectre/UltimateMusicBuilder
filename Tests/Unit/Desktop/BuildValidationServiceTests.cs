@@ -31,7 +31,7 @@ namespace Tests.Unit.Desktop
             var result = _service.Validate("persona");
             var track = Assert.Single(result.SuspiciousVolumes);
             Assert.Equal(("persona", "persona", "legacy.nus3audio", "Legacy", 2.7f),
-                (track.ModName, track.SeriesName, track.Filename, track.Title, track.Volume));
+                (track.ModName, track.SeriesName, track.Filename, track.Title, track.EffectiveVolume));
             Assert.Contains(result.Warnings, w => w.Contains("legacy.nus3audio"));
         }
 

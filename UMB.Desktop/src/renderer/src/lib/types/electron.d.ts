@@ -42,7 +42,7 @@ export interface UmbApi {
   listModSeries(modPath: string): Promise<ModSeriesInfo[]>
   getModStats(modPath: string): Promise<ModStats>
   checkBuildVolumes(modName: string | null): Promise<SuspiciousVolumeTrack[]>
-  resetAllVolumes(): Promise<number>
+  resetAllVolumes(): Promise<void>
   loadTrackOrder(seriesPath: string): Promise<TrackOrderData>
   saveTrackOrder(seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData>
   loadSeriesOrder(modPath: string): Promise<SeriesOrderData>

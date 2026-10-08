@@ -25,7 +25,7 @@ namespace Tests.Unit.Desktop
             var persona = _ws.WriteSeries("persona", "persona", "filename,title,volume\na.nus3audio,A,2.7\nb.nus3audio,B,1\n");
             var mario = _ws.WriteSeries("mario", "mario", "filename,title,volume\nc.nus3audio,C,0.5\n");
 
-            Assert.Equal(2, _service.ResetAllVolumes());
+            _service.ResetAllVolumes();
             Assert.Equal("filename,title,volume\na.nus3audio,A,1\nb.nus3audio,B,1\n", ReadCsv(persona));
             Assert.Equal("filename,title,volume\nc.nus3audio,C,1\n", ReadCsv(mario));
         }
@@ -36,15 +36,25 @@ namespace Tests.Unit.Desktop
             const string csv = "filename,title\na.nus3audio,A\n";
             var series = _ws.WriteSeries("persona", "persona", csv);
 
-            Assert.Equal(0, _service.ResetAllVolumes());
+            _service.ResetAllVolumes();
             Assert.Equal(csv, ReadCsv(series));
         }
 
         [Fact]
-        public void ResetAllVolumes_IsZeroWithoutTheModsFolder()
+        public void ResetAllVolumes_DoesNothingWithoutTheModsFolder()
         {
             Directory.Delete(_ws.ModsRoot);
-            Assert.Equal(0, _service.ResetAllVolumes());
+            _service.ResetAllVolumes();
+        }
+
+        [Fact]
+        public void ResetAllVolumes_SkipsDotSeriesFolders()
+        {
+            const string csv = "filename,title,volume\na.nus3audio,A,2.7\n";
+            var hidden = _ws.WriteSeries("persona", ".hidden", csv);
+
+            _service.ResetAllVolumes();
+            Assert.Equal(csv, ReadCsv(hidden));
         }
 
         private static string ReadCsv(string seriesDir) =>

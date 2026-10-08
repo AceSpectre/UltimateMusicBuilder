@@ -10,6 +10,7 @@
   let loaded = $state(false)
   let resetConfirmOpen = $state(false)
   let resetting = $state(false)
+  let resetFailed = $state(false)
 
   $effect(() => {
     if (open && !loaded) {
@@ -44,11 +45,14 @@
 
   async function handleReset() {
     resetting = true
+    resetFailed = false
     try {
-      await window.electron.umb.resetAllVolumes()
       await window.electron.umb.saveAppSettings({ globalVolumeMultiplier: 1 })
       globalVolumeMultiplier = 1
+      await window.electron.umb.resetAllVolumes()
       resetConfirmOpen = false
+    } catch {
+      resetFailed = true
     } finally {
       resetting = false
     }
@@ -104,17 +108,14 @@
           />
           <p class="text-[11.5px] text-muted-foreground">{$_('settings.globalVolumeHint')}</p>
         </div>
-        <div class="flex flex-col gap-1.5">
-          <button
-            onclick={() => { resetConfirmOpen = true }}
-            disabled={saveState === 'saving'}
-            class="inline-flex items-center gap-2 self-start rounded-lg border-0 px-4 py-2 text-[12.5px] font-medium text-white transition-colors bg-destructive hover:bg-destructive/90 disabled:opacity-60"
-          >
-            <RotateCcw size={14} />
-            {$_('settings.resetVolumes')}
-          </button>
-          <p class="text-[11.5px] text-muted-foreground">{$_('settings.resetVolumesHint')}</p>
-        </div>
+        <button
+          onclick={() => { resetFailed = false; resetConfirmOpen = true }}
+          disabled={saveState === 'saving'}
+          class="btn-danger self-start"
+        >
+          <RotateCcw size={14} />
+          {$_('settings.resetVolumes')}
+        </button>
       </div>
 
       <div class="border-t border-border px-5 py-4 flex items-center justify-end gap-2">
@@ -146,6 +147,9 @@
         {$_('settings.resetModal.title')}
       </h3>
       <p class="text-[12.5px] text-muted-foreground">{$_('settings.resetModal.description')}</p>
+      {#if resetFailed}
+        <p class="text-[12px] text-destructive">{$_('settings.resetModal.failed')}</p>
+      {/if}
     </div>
     <div class="flex justify-end gap-2 border-t border-border px-5 py-4">
       <button
@@ -158,7 +162,7 @@
       <button
         onclick={handleReset}
         disabled={resetting}
-        class="inline-flex items-center gap-2 rounded-lg border-0 px-4 py-2 text-[12.5px] font-medium text-white transition-colors bg-destructive hover:bg-destructive/90 disabled:opacity-60"
+        class="btn-danger"
       >
         <RotateCcw size={14} />
         {resetting ? $_('settings.resetModal.resetting') : $_('settings.resetModal.confirm')}

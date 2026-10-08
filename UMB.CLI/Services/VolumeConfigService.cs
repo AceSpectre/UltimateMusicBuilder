@@ -398,25 +398,24 @@ namespace UMB.CLI.Services
             File.WriteAllText(outputPath, json);
         }
 
-        /// <summary>Sets every tracks.csv volume in every mod to 1. Returns how many tracks changed.</summary>
-        public int ResetAllVolumes()
+        /// <summary>Sets every tracks.csv volume in every mod to 1.</summary>
+        public void ResetAllVolumes()
         {
             var changed = 0;
-            var csvPaths = ModPaths.ModDirs(_musicConfig.CurrentValue.Sma5hMusic.ModPath)
-                .SelectMany(Directory.GetDirectories)
+            var csvPaths = ModPaths.VisibleDirs(_musicConfig.CurrentValue.Sma5hMusic.ModPath)
+                .SelectMany(ModPaths.VisibleDirs)
                 .Select(d => Path.Combine(d, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE))
                 .Where(File.Exists);
             foreach (var csvPath in csvPaths)
             {
                 var (rows, headers) = ReadCsvRows(csvPath);
-                var boosted = headers.Contains("volume") ? rows.Where(r => ParseVolume(r["volume"]) != 1f).ToList() : new();
-                if (boosted.Count == 0) continue;
-                boosted.ForEach(r => r["volume"] = "1");
+                var rowsToReset = headers.Contains("volume") ? rows.Where(r => ParseVolume(r["volume"]) != 1f).ToList() : new();
+                if (rowsToReset.Count == 0) continue;
+                rowsToReset.ForEach(r => r["volume"] = "1");
                 WriteCsvRows(csvPath, rows, headers);
-                changed += boosted.Count;
+                changed += rowsToReset.Count;
             }
             _logger.LogInformation("Reset {Count} track volume(s) to 1.", changed);
-            return changed;
         }
 
         internal static float ParseVolume(string raw)

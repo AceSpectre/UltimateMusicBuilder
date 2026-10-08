@@ -134,5 +134,5 @@ namespace UMB.CLI.Desktop
     public record PlaylistAssignmentInput(string PlaylistId, string SeriesId, string Filename, double Incidence);
 
     // ── Build pre-checks ───────────────────────────────────────────────────
-    public record SuspiciousVolumeTrack(string ModName, string SeriesName, string Filename, string Title, float Volume, float EffectiveVolume);
+    public record SuspiciousVolumeTrack(string ModName, string SeriesName, string Filename, string Title, float EffectiveVolume);
 }

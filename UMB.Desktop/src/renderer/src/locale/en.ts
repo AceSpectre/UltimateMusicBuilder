@@ -34,7 +34,7 @@ export default {
       title: 'Check Track Volumes',
       subtitle: '{count, plural, one {# track plays} other {# tracks play}} at 2× or more (global × track volume).',
       description:
-        'Volumes are multipliers (1 = normal, 2 ≈ +6 dB). Mods imported with older versions of Import copied legacy values (usually 2.7) into tracks.csv, which play much louder than intended. Lower the global or track volume unless the boost is intentional.',
+        'Volumes are multipliers (1 = normal, 2 ≈ +6 dB) and track volumes above 1 may be legacy values. Lower the global or track volume unless the boost is intentional.',
       cancel: 'Cancel',
       build: 'Build Anyway'
     }
@@ -64,14 +64,14 @@ export default {
     saved: 'Saved',
     cancel: 'Cancel',
     resetVolumes: 'Reset All Volumes',
-    resetVolumesHint: 'Sets the global and every track volume in every mod to 1×.',
     resetModal: {
       title: 'Reset All Volumes?',
       description:
         'Every track volume in every mod, and the global volume multiplier, will be set to 1×. This overwrites per-track volumes in tracks.csv and cannot be undone.',
       cancel: 'Cancel',
       confirm: 'Reset Volumes',
-      resetting: 'Resetting...'
+      resetting: 'Resetting...',
+      failed: 'Reset failed. See the log for details.'
     }
   },
   nav: {

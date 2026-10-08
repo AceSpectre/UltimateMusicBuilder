@@ -336,13 +336,12 @@ export interface PlaylistAssignmentInput {
   incidence: number
 }
 
-// A track whose global x track volume multiplier is 2 or more (checked before Build).
+// Track flagged by the pre-build volume check.
 export interface SuspiciousVolumeTrack {
   modName: string
   seriesName: string
   filename: string
   title: string
-  volume: number
   effectiveVolume: number
 }
 

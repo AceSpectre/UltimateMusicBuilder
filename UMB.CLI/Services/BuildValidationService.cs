@@ -33,7 +33,7 @@ namespace UMB.CLI.Services
 
         /// <summary>Validates the named mod, or every mod when <paramref name="modName"/> is empty.</summary>
         public BuildValidation Validate(string modName) =>
-            Validate(ModPaths.ModDirs(_musicConfig.CurrentValue.Sma5hMusic.ModPath)
+            Validate(ModPaths.VisibleDirs(_musicConfig.CurrentValue.Sma5hMusic.ModPath)
                 .Where(d => string.IsNullOrWhiteSpace(modName) || Path.GetFileName(d).Equals(modName, StringComparison.OrdinalIgnoreCase))
                 .ToList());
 
@@ -45,9 +45,7 @@ namespace UMB.CLI.Services
 
             foreach (var modDir in activeMods)
             {
-                var seriesDirs = Directory.GetDirectories(modDir)
-                    .Where(d => !Path.GetFileName(d).StartsWith("."))
-                    .ToList();
+                var seriesDirs = ModPaths.VisibleDirs(modDir);
 
                 if (seriesFilters != null && seriesFilters.TryGetValue(modDir, out var filter))
                     seriesDirs = seriesDirs.Where(d => filter.Contains(Path.GetFileName(d))).ToList();
@@ -149,10 +147,11 @@ namespace UMB.CLI.Services
                             csvFilenames.Add(filename);
 
                             var volume = hasVolumeColumn ? VolumeConfigService.ParseVolume(csv.GetField("volume")) : 1f;
-                            if (globalVolume * volume >= SuspiciousVolume)
+                            var effectiveVolume = globalVolume * volume;
+                            if (effectiveVolume >= SuspiciousVolume)
                             {
-                                volumes.Add(new SuspiciousVolumeTrack(modName, seriesName, filename, title, volume, globalVolume * volume));
-                                warnings.Add($"  {prefix}: \"{title}\" ({filename}) plays at {globalVolume * volume}x (global {globalVolume}x, track {volume}x). Track volumes above 1 may be legacy dB values from an older Convert");
+                                volumes.Add(new SuspiciousVolumeTrack(modName, seriesName, filename, title, effectiveVolume));
+                                warnings.Add($"  {prefix}: \"{title}\" ({filename}) plays at {effectiveVolume}x (global {globalVolume}x, track {volume}x); track volumes above 1 may be legacy values");
                             }
 
                             if (validGameIds.Count > 0 && !string.IsNullOrWhiteSpace(game)

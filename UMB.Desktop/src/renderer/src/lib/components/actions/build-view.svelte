@@ -350,7 +350,7 @@
         </button>
         <button
           onclick={startBuild}
-          class="inline-flex items-center gap-2 rounded-lg border-0 px-4 py-2 text-[12.5px] font-medium text-white transition-colors bg-destructive hover:bg-destructive/90"
+          class="btn-danger"
         >
           <Hammer size={14} />
           {$_('build.overwriteModal.overwrite')}
@@ -391,7 +391,7 @@
       </button>
       <button
         onclick={checkOutputAndBuild}
-        class="inline-flex items-center gap-2 rounded-lg border-0 px-4 py-2 text-[12.5px] font-medium text-white transition-colors bg-destructive hover:bg-destructive/90"
+        class="btn-danger"
       >
         <Hammer size={14} />
         {$_('build.volumeModal.build')}

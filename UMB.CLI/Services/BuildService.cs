@@ -43,7 +43,7 @@ namespace UMB.CLI.Services
             var modPath = _musicConfig.CurrentValue.Sma5hMusic.ModPath;
             Directory.CreateDirectory(modPath);
 
-            var modDirs = ModPaths.ModDirs(modPath);
+            var modDirs = ModPaths.VisibleDirs(modPath);
 
             if (modDirs.Count == 0)
             {
