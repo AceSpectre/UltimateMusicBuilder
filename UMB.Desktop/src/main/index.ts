@@ -118,6 +118,10 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.GET_MOD_STATS, (_event, modPath: string) => api('mod-stats', { modPath }))
 
+  ipcMain.handle(IPC.CHECK_BUILD_VOLUMES, (_event, modName: string | null) => api('build-volume-check', { modName }))
+
+  ipcMain.handle(IPC.RESET_ALL_VOLUMES, () => api('volume-reset-all'))
+
   ipcMain.handle(IPC.LOAD_TRACK_ORDER, (_event, seriesPath: string) => api('track-order-load', { seriesPath }))
 
   ipcMain.handle(IPC.SAVE_TRACK_ORDER, (_event, seriesPath: string, items: SaveTrackItem[]) =>

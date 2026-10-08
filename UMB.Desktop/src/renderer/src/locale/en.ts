@@ -29,6 +29,14 @@ export default {
       description: 'Building will overwrite the existing output. Are you sure you want to continue?',
       cancel: 'Cancel',
       overwrite: 'Overwrite & Build'
+    },
+    volumeModal: {
+      title: 'Check Track Volumes',
+      subtitle: '{count, plural, one {# track plays} other {# tracks play}} at 2× or more (global × track volume).',
+      description:
+        'Volumes are multipliers (1 = normal, 2 ≈ +6 dB) and track volumes above 1 may be legacy values. Lower the global or track volume unless the boost is intentional.',
+      cancel: 'Cancel',
+      build: 'Build Anyway'
     }
   },
   appBar: {
@@ -50,11 +58,21 @@ export default {
     title: 'Settings',
     subtitle: 'Configure build defaults',
     globalVolume: 'Global Volume Multiplier',
-    globalVolumeHint: 'Applied to every track during build. Default is 1.5×.',
+    globalVolumeHint: 'Applied to every track during build. Default is 1× (2× ≈ +6 dB).',
     save: 'Save',
     saving: 'Saving...',
     saved: 'Saved',
-    cancel: 'Cancel'
+    cancel: 'Cancel',
+    resetVolumes: 'Reset All Volumes',
+    resetModal: {
+      title: 'Reset All Volumes?',
+      description:
+        'Every track volume in every mod, and the global volume multiplier, will be set to 1×. This overwrites per-track volumes in tracks.csv and cannot be undone.',
+      cancel: 'Cancel',
+      confirm: 'Reset Volumes',
+      resetting: 'Resetting...',
+      failed: 'Reset failed. See the log for details.'
+    }
   },
   nav: {
     groups: {

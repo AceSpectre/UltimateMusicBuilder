@@ -125,9 +125,9 @@ namespace UMB.CLI.Services
             }
 
             var globalMult = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
-            var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization;
-            var target = lufsOpts?.TargetLufs ?? -14.0f;
-            var maxMult = lufsOpts?.MaxGainMultiplier ?? 4.0f;
+            var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization ?? new();
+            var target = lufsOpts.TargetLufs;
+            var maxMult = lufsOpts.MaxGainMultiplier;
 
             if (!_lufsService.IsAvailable)
             {
@@ -264,10 +264,10 @@ namespace UMB.CLI.Services
             var (rows, _) = ReadCsvRows(csvPath);
 
             var globalMult = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
-            var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization;
-            var target = lufsOpts?.TargetLufs ?? -14.0f;
-            var maxMult = lufsOpts?.MaxGainMultiplier ?? 4.0f;
-            var lufsCacheName = string.IsNullOrWhiteSpace(lufsOpts?.LufsCacheFileName) ? "LUFS.csv" : lufsOpts.LufsCacheFileName;
+            var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization ?? new();
+            var target = lufsOpts.TargetLufs;
+            var maxMult = lufsOpts.MaxGainMultiplier;
+            var lufsCacheName = string.IsNullOrWhiteSpace(lufsOpts.LufsCacheFileName) ? "LUFS.csv" : lufsOpts.LufsCacheFileName;
             var lufsCacheExists = File.Exists(Path.Combine(seriesDir, lufsCacheName));
 
             if (input.Analyze && !_lufsService.IsAvailable)
@@ -396,6 +396,26 @@ namespace UMB.CLI.Services
             var json = JsonSerializer.Serialize(result,
                 new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
             File.WriteAllText(outputPath, json);
+        }
+
+        /// <summary>Sets every tracks.csv volume in every mod to 1.</summary>
+        public void ResetAllVolumes()
+        {
+            var changed = 0;
+            var csvPaths = ModPaths.VisibleDirs(_musicConfig.CurrentValue.Sma5hMusic.ModPath)
+                .SelectMany(ModPaths.VisibleDirs)
+                .Select(d => Path.Combine(d, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE))
+                .Where(File.Exists);
+            foreach (var csvPath in csvPaths)
+            {
+                var (rows, headers) = ReadCsvRows(csvPath);
+                var rowsToReset = headers.Contains("volume") ? rows.Where(r => ParseVolume(r["volume"]) != 1f).ToList() : new();
+                if (rowsToReset.Count == 0) continue;
+                rowsToReset.ForEach(r => r["volume"] = "1");
+                WriteCsvRows(csvPath, rows, headers);
+                changed += rowsToReset.Count;
+            }
+            _logger.LogInformation("Reset {Count} track volume(s) to 1.", changed);
         }
 
         internal static float ParseVolume(string raw)

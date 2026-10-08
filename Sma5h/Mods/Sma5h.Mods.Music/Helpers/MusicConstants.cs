@@ -7,6 +7,9 @@ namespace Sma5h.Mods.Music.Helpers
         public const double VersionSma5hMusic = 1.62;
         public const double VersionSma5hMusicOverride = 1.62;
 
+        // nus3bank volume (dB) of template.nus3bank, and the legacy JSON format's default.
+        public const float DEFAULT_NUS3BANK_VOLUME_DB = 2.7f;
+
         public class MusicModFiles
         {
             public const string MUSIC_MOD_METADATA_JSON_FILE = "metadata_mod.json";

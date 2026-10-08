@@ -1,5 +1,3 @@
-using CsvHelper;
-using CsvHelper.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,10 +9,8 @@ using Sma5h.Mods.Music.Services;
 using Spectre.Console;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using Tomlyn;
 using Tomlyn.Model;
 
@@ -27,10 +23,12 @@ namespace UMB.CLI.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly IWorkspaceManager _workspace;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
+        private readonly BuildValidationService _validation;
 
         public BuildService(IServiceProvider serviceProvider, IWorkspaceManager workspace, IStateManager state,
-            IOptionsMonitor<Sma5hMusicOptions> musicConfig, ILogger<BuildService> logger)
+            IOptionsMonitor<Sma5hMusicOptions> musicConfig, BuildValidationService validation, ILogger<BuildService> logger)
         {
+            _validation = validation;
             _serviceProvider = serviceProvider;
             _workspace = workspace;
             _state = state;
@@ -38,16 +36,14 @@ namespace UMB.CLI.Services
             _logger = logger;
         }
 
-        public async Task Run(string requestedMod = null)
+        public void Run(string requestedMod = null)
         {
             Script.PrintBanner(_logger);
 
             var modPath = _musicConfig.CurrentValue.Sma5hMusic.ModPath;
             Directory.CreateDirectory(modPath);
 
-            var modDirs = Directory.GetDirectories(modPath, "*", SearchOption.TopDirectoryOnly)
-                .Where(d => !Path.GetFileName(d).StartsWith("."))
-                .ToList();
+            var modDirs = ModPaths.VisibleDirs(modPath);
 
             if (modDirs.Count == 0)
             {
@@ -176,7 +172,7 @@ namespace UMB.CLI.Services
                 }
             }
 
-            var warnings = ValidateSeries(activeMods, seriesFilters);
+            var warnings = _validation.Validate(activeMods, seriesFilters).Warnings;
 
             if (warnings.Count > 0)
             {
@@ -207,8 +203,6 @@ namespace UMB.CLI.Services
 
             try
             {
-                await Task.Delay(1000);
-
                 _state.Init();
 
                 if (!_workspace.Init())
@@ -262,166 +256,6 @@ namespace UMB.CLI.Services
                 FolderMusicMod.SeriesFilterByMod = null;
                 Sma5hMusic.ExplicitSeriesOrder = null;
             }
-        }
-        private List<string> ValidateSeries(List<string> activeMods, Dictionary<string, HashSet<string>> seriesFilters)
-        {
-            var warnings = new List<string>();
-
-            foreach (var modDir in activeMods)
-            {
-                var seriesDirs = Directory.GetDirectories(modDir)
-                    .Where(d => !Path.GetFileName(d).StartsWith("."))
-                    .ToList();
-
-                if (seriesFilters.TryGetValue(modDir, out var filter))
-                    seriesDirs = seriesDirs.Where(d => filter.Contains(Path.GetFileName(d))).ToList();
-
-                var modName = Path.GetFileName(modDir);
-
-                // Load this mod's series-order.toml so we can warn about custom series
-                // that have no explicit position (their in-game order is otherwise unpredictable).
-                var modOrderedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var modOrderPath = Path.Combine(modDir,
-                    MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE);
-                if (File.Exists(modOrderPath))
-                {
-                    try
-                    {
-                        var orderTomlText = File.ReadAllText(modOrderPath);
-                        var orderModel = Toml.ToModel(orderTomlText);
-                        if (orderModel.TryGetValue("order", out var orderVal) && orderVal is TomlArray arr)
-                            foreach (var id in arr.OfType<string>())
-                                modOrderedIds.Add(id);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to parse {Path} for validation.", modOrderPath);
-                    }
-                }
-
-                foreach (var seriesDir in seriesDirs)
-                {
-                    var seriesName = Path.GetFileName(seriesDir);
-                    var prefix = $"{modName}/{seriesName}";
-                    var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
-                    var tomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
-
-                    if (!File.Exists(csvPath))
-                        continue;
-
-                    var validGameIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    var playlistSongRefs = new List<(string playlistId, string songRef)>();
-                    FolderSeriesFileConfig seriesConfig = null;
-                    if (File.Exists(tomlPath))
-                    {
-                        try
-                        {
-                            var tomlText = File.ReadAllText(tomlPath);
-                            seriesConfig = Toml.ToModel<FolderSeriesFileConfig>(tomlText,
-                                options: CliUtil.KebabTomlOptions());
-                            foreach (var game in seriesConfig.Games ?? new List<FolderGameConfig>())
-                            {
-                                if (!string.IsNullOrWhiteSpace(game.Id))
-                                    validGameIds.Add(game.Id);
-                            }
-                            foreach (var pl in seriesConfig.Playlists ?? new List<FolderPlaylistOverrideConfig>())
-                            {
-                                if (string.IsNullOrWhiteSpace(pl.Id)) continue;
-                                if (pl.Songs == null || FolderMusicMod.IsWildcardSongs(pl.Songs)) continue;
-                                foreach (var s in FolderMusicMod.ExplicitSongs(pl.Songs))
-                                    playlistSongRefs.Add((pl.Id, s));
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to parse {Path} for validation.", tomlPath);
-                        }
-                    }
-
-                    if (seriesConfig?.Series != null
-                        && !seriesConfig.Series.ExistingSeries
-                        && !string.IsNullOrWhiteSpace(seriesConfig.Series.Id)
-                        && !string.Equals(seriesConfig.Series.Id, "etc", StringComparison.OrdinalIgnoreCase)
-                        && !modOrderedIds.Contains(seriesConfig.Series.Id))
-                    {
-                        warnings.Add($"  {prefix}: custom series \"{seriesConfig.Series.Id}\" is not listed in series-order.toml. Its in-game position will be unpredictable. Run 'Scaffold' to append it, or use 'Order Series' to place it manually.");
-                    }
-
-                    var csvFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    try
-                    {
-                        var csvConfig = CliUtil.CsvReadLenient();
-                        using var reader = new StreamReader(csvPath);
-                        using var csv = new CsvReader(reader, csvConfig);
-                        csv.Read();
-                        csv.ReadHeader();
-                        var headers = csv.HeaderRecord;
-                        bool hasOrderColumn = headers.Contains("order");
-
-                        int rowNum = 0;
-                        while (csv.Read())
-                        {
-                            rowNum++;
-                            var filename = csv.GetField("filename")?.Trim() ?? "";
-                            var game = csv.GetField("game")?.Trim() ?? "";
-                            var title = csv.GetField("title")?.Trim() ?? "";
-
-                            if (string.IsNullOrWhiteSpace(filename))
-                                continue;
-
-                            csvFilenames.Add(filename);
-
-                            if (validGameIds.Count > 0 && !string.IsNullOrWhiteSpace(game)
-                                && !validGameIds.Contains(game))
-                            {
-                                warnings.Add($"  {prefix}: \"{title}\" ({filename}) has game \"{game}\" not found in series.toml");
-                            }
-
-                            if (!hasOrderColumn)
-                            {
-                                if (rowNum == 1) // only warn once per file
-                                    warnings.Add($"  {prefix}: tracks.csv is missing the \"order\" column");
-                            }
-                            else
-                            {
-                                var orderVal = csv.GetField("order")?.Trim() ?? "";
-                                if (string.IsNullOrWhiteSpace(orderVal) || !int.TryParse(orderVal, out _))
-                                    warnings.Add($"  {prefix}: \"{title}\" ({filename}) is missing a valid order number");
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to validate {Path}.", csvPath);
-                        continue;
-                    }
-
-                    var orphanedNus3 = Directory.GetFiles(seriesDir, "*.nus3audio")
-                        .Select(Path.GetFileName)
-                        .Where(f => !csvFilenames.Contains(f))
-                        .OrderBy(f => f)
-                        .ToList();
-
-                    foreach (var file in orphanedNus3)
-                        warnings.Add($"  {prefix}: {file} is not listed in tracks.csv");
-
-                    // Matches by stem so "Destroyer" and "Destroyer.nus3audio" are both accepted.
-                    if (playlistSongRefs.Count > 0)
-                    {
-                        var csvStems = new HashSet<string>(
-                            csvFilenames.Select(f => Path.GetFileNameWithoutExtension(f)),
-                            StringComparer.OrdinalIgnoreCase);
-                        foreach (var (playlistId, songRef) in playlistSongRefs)
-                        {
-                            var stem = Path.GetFileNameWithoutExtension(songRef);
-                            if (!csvStems.Contains(stem))
-                                warnings.Add($"  {prefix}: [[playlists]] \"{playlistId}\" lists song \"{songRef}\" which doesn't match any track in tracks.csv");
-                        }
-                    }
-                }
-            }
-
-            return warnings;
         }
     }
 }

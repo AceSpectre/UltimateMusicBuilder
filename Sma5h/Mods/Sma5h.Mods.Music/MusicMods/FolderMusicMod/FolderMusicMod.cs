@@ -276,7 +276,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     // BgmPropertyEntry
                     var bgmProp = new BgmPropertyEntry(toneId, audioFile, this)
                     {
-                        AudioVolume = row.Volume
+                        AudioVolume = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB + VolumeHelper.MultiplierToDb(row.Volume)
                     };
                     try
                     {

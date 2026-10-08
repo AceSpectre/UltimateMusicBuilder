@@ -72,6 +72,12 @@
   }
 }
 
+@layer components {
+  .btn-danger {
+    @apply inline-flex items-center gap-2 rounded-lg border-0 px-4 py-2 text-[12.5px] font-medium text-white transition-colors bg-destructive hover:bg-destructive/90 disabled:opacity-60;
+  }
+}
+
 @layer utilities {
   .gradient-strip {
     background: linear-gradient(90deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));

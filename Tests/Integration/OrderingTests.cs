@@ -165,7 +165,7 @@ namespace Tests.Integration
 
             var entries = mod.GetMusicModEntries();
             foreach (var prop in entries.BgmPropertyEntries)
-                Assert.Equal(1.0f, prop.AudioVolume);
+                Assert.Equal(2.7f, prop.AudioVolume, precision: 3);
         }
 
         [Fact]
@@ -188,7 +188,7 @@ namespace Tests.Integration
 
             var entries = mod.GetMusicModEntries();
             var first = entries.BgmPropertyEntries.First();
-            Assert.Equal(0.5f, first.AudioVolume);
+            Assert.Equal(2.7f - 6.0206f, first.AudioVolume, precision: 3);
         }
 
         // ── In-memory ordering reflected after Init/Build ──────────────────

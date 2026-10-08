@@ -161,7 +161,7 @@ namespace UMB.CLI
                 switch (action)
                 {
                     case "build":
-                        await entry.RunBuild(extraArgs?.Length > 0 ? extraArgs[0] : null);
+                        entry.RunBuild(extraArgs?.Length > 0 ? extraArgs[0] : null);
                         break;
                     case "scaffold":
                         entry.RunScaffold();
@@ -302,6 +302,7 @@ namespace UMB.CLI
             services.AddScoped<Services.SeriesOrderService>();
             services.AddScoped<Services.TrackOrderService>();
             services.AddScoped<Services.VolumeConfigService>();
+            services.AddScoped<Services.BuildValidationService>();
             services.AddScoped<Services.DumpStagesService>();
             services.AddScoped<Services.ModsService>();
             services.AddScoped<Services.VanillaCatalogService>();

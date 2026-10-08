@@ -29,13 +29,13 @@ describe('getAppSettings', () => {
     expect(getAppSettings(ws.root).globalVolumeMultiplier).toBe(2.5)
   })
 
-  it('defaults to 1.5 when the key is absent', () => {
+  it('defaults to 1 when the key is absent', () => {
     writeSettings(JSON.stringify({ Sma5hMusic: {} }))
-    expect(getAppSettings(ws.root).globalVolumeMultiplier).toBe(1.5)
+    expect(getAppSettings(ws.root).globalVolumeMultiplier).toBe(1)
   })
 
-  it('defaults to 1.5 when the settings file is missing', () => {
-    expect(getAppSettings(ws.root).globalVolumeMultiplier).toBe(1.5)
+  it('defaults to 1 when the settings file is missing', () => {
+    expect(getAppSettings(ws.root).globalVolumeMultiplier).toBe(1)
   })
 
   it('tolerates a UTF-8 BOM prefix', () => {

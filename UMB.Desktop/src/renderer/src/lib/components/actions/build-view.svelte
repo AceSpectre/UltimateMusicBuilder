@@ -3,7 +3,8 @@
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
-  import type { ModInfo } from '$lib/types/electron'
+  import Modal from '$lib/components/ui/modal.svelte'
+  import type { ModInfo, SuspiciousVolumeTrack } from '$lib/types/electron'
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
 
@@ -16,6 +17,7 @@
   let importSource = $state('')
   let importName = $state('')
   let overwriteModalOpen = $state(false)
+  let volumeWarnings = $state<SuspiciousVolumeTrack[]>([])
 
   const canImport = $derived(importSource.trim() !== '' && importName.trim() !== '' && !importRunning)
 
@@ -25,6 +27,17 @@
       return
     }
 
+    const warnings = await window.electron.umb.checkBuildVolumes(activeMod?.name ?? null).catch(() => [])
+    if (warnings.length > 0) {
+      volumeWarnings = warnings
+      return
+    }
+
+    checkOutputAndBuild()
+  }
+
+  async function checkOutputAndBuild() {
+    volumeWarnings = []
     const hasOutput = await window.electron.umb.checkArcOutput()
     if (hasOutput) {
       overwriteModalOpen = true
@@ -337,7 +350,7 @@
         </button>
         <button
           onclick={startBuild}
-          class="inline-flex items-center gap-2 rounded-lg border-0 px-4 py-2 text-[12.5px] font-medium text-white transition-colors bg-destructive hover:bg-destructive/90"
+          class="btn-danger"
         >
           <Hammer size={14} />
           {$_('build.overwriteModal.overwrite')}
@@ -345,4 +358,44 @@
       </div>
     </div>
   </div>
+{/if}
+
+{#if volumeWarnings.length > 0}
+  <Modal maxWidth="520px">
+    <div class="flex flex-col gap-3 px-5 py-4">
+      <h3 class="flex items-center gap-2 text-sm font-semibold">
+        <AlertTriangle size={16} class="text-destructive" />
+        {$_('build.volumeModal.title')}
+      </h3>
+      <p class="text-[12.5px] text-muted-foreground">
+        {$_('build.volumeModal.subtitle', { values: { count: volumeWarnings.length } })}
+        {$_('build.volumeModal.description')}
+      </p>
+      <ul class="max-h-[240px] overflow-auto rounded-lg border border-border bg-background text-[12px]">
+        {#each volumeWarnings as track (`${track.modName}/${track.seriesName}/${track.filename}`)}
+          <li class="flex items-center gap-3 border-b border-border px-3 py-1.5 last:border-b-0">
+            <span class="min-w-0 flex-1 truncate" title={track.filename}>
+              <span class="text-muted-foreground">{track.seriesName} /</span> {track.title || track.filename}
+            </span>
+            <span class="shrink-0 font-mono">{track.effectiveVolume}×</span>
+          </li>
+        {/each}
+      </ul>
+    </div>
+    <div class="flex justify-end gap-2 border-t border-border px-5 py-4">
+      <button
+        onclick={() => { volumeWarnings = [] }}
+        class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted"
+      >
+        {$_('build.volumeModal.cancel')}
+      </button>
+      <button
+        onclick={checkOutputAndBuild}
+        class="btn-danger"
+      >
+        <Hammer size={14} />
+        {$_('build.volumeModal.build')}
+      </button>
+    </div>
+  </Modal>
 {/if}

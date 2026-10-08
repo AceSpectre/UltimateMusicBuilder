@@ -186,7 +186,9 @@ namespace UMB.CLI.Services
                         var recordType = dbRoot?["record_type"]?.ToString() ?? "record_original";
                         if (recordType.StartsWith("record_"))
                             recordType = recordType.Substring(7);
-                        var volume = bgm["nus3bank_config"]?["volume"]?.Value<float>() ?? 2.7f;
+                        // Legacy volume is bank dB; tracks.csv takes a multiplier on the default.
+                        var volumeDb = bgm["nus3bank_config"]?["volume"]?.Value<float>() ?? MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB;
+                        var volume = MathF.Round(VolumeHelper.DbToMultiplier(volumeDb - MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB), 3);
                         var testDispOrder = dbRoot?["test_disp_order"]?.Value<int>() ?? 0;
                         var specialCategory = bgm["stream_set"]?["special_category"]?.ToString();
 

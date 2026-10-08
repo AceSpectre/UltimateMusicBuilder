@@ -1,3 +1,5 @@
+using Sma5h.Mods.Music.Helpers;
+
 namespace Sma5h.Mods.Music.Interfaces
 {
     public interface ILufsAnalysisService
@@ -30,12 +32,13 @@ namespace Sma5h.Mods.Music.Interfaces
 
     public readonly struct GainResult
     {
-        public float Multiplier { get; }
+        public float Db { get; }
+        public float Multiplier => VolumeHelper.DbToMultiplier(Db);
         public bool WasClamped { get; }
 
-        public GainResult(float multiplier, bool wasClamped)
+        public GainResult(float db, bool wasClamped)
         {
-            Multiplier = multiplier;
+            Db = db;
             WasClamped = wasClamped;
         }
     }

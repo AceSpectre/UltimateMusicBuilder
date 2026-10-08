@@ -176,7 +176,7 @@ namespace UMB.CLI.Views
 
         public bool HasMeasurement { get; set; }
         public float MeasuredLufs { get; set; }
-        public float GlobalVolumeMultiplier { get; set; } = 1.5f;
+        public float GlobalVolumeMultiplier { get; set; }
         public float AutoGain { get; set; } = 1.0f;
         public bool WasClamped { get; set; }
 

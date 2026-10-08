@@ -336,6 +336,15 @@ export interface PlaylistAssignmentInput {
   incidence: number
 }
 
+// Track flagged by the pre-build volume check.
+export interface SuspiciousVolumeTrack {
+  modName: string
+  seriesName: string
+  filename: string
+  title: string
+  effectiveVolume: number
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string

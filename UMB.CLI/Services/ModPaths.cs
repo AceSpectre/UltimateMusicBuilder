@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Options;
 using Sma5h.Mods.Music;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UMB.CLI.Desktop;
 
 namespace UMB.CLI.Services
@@ -9,6 +11,11 @@ namespace UMB.CLI.Services
     {
         public static string Root(IOptionsMonitor<Sma5hMusicOptions> config) =>
             CanonicalDirectoryPath(config.CurrentValue.Sma5hMusic.ModPath);
+
+        /// <summary>The subfolders of <paramref name="path"/> (mods or series), skipping dot folders.</summary>
+        public static List<string> VisibleDirs(string path) => Directory.Exists(path)
+            ? Directory.GetDirectories(path).Where(d => !Path.GetFileName(d).StartsWith(".")).ToList()
+            : new();
 
         public static bool IsUnderMods(IOptionsMonitor<Sma5hMusicOptions> config, string path)
         {

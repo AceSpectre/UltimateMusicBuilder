@@ -132,4 +132,7 @@ namespace UMB.CLI.Desktop
     public record ModSong(string SeriesId, string SeriesName, string Filename, string Title);
     public record ManagePlaylistsData(string ModName, string ModPath, List<PlaylistTarget> Playlists, List<ModSong> Songs);
     public record PlaylistAssignmentInput(string PlaylistId, string SeriesId, string Filename, double Incidence);
+
+    // ── Build pre-checks ───────────────────────────────────────────────────
+    public record SuspiciousVolumeTrack(string ModName, string SeriesName, string Filename, string Title, float EffectiveVolume);
 }
