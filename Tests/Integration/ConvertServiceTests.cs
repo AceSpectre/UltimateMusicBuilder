@@ -151,7 +151,7 @@ namespace Tests.Integration
             Assert.Equal(2, lines.Length); // header + 1 track
             var header = lines[0];
             foreach (var col in new[] { "filename", "game", "title", "author", "copyright",
-                "record_type", "special_category", "volume", "info1", "in_soundtest", "order" })
+                "record_type", "special_category", "volume_db", "info1", "in_soundtest", "order" })
             {
                 Assert.Contains(col, header);
             }
@@ -173,7 +173,7 @@ namespace Tests.Integration
             Assert.Contains("flowerhead", row); // game name_id
             // record_type "record_original" has its "record_" prefix stripped
             Assert.Contains("original", row);
-            Assert.Equal("1", row.Split(',')[Array.IndexOf(lines[0].Split(','), "volume")]);
+            Assert.Equal("0", row.Split(',')[Array.IndexOf(lines[0].Split(','), "volume_db")]);
         }
 
         [Fact]

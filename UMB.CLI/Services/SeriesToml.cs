@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Sma5h.Mods.Music.Helpers;
 using UMB.CLI.Desktop;
 
 namespace UMB.CLI.Services
@@ -53,18 +54,36 @@ namespace UMB.CLI.Services
                 existing.Success && existing.Groups[1].Value == "true");
         }
 
-        public record TrackDefaults(string Game, string Author, string Copyright, string RecordType, double Volume);
+        public record TrackDefaults(string Game, string Author, string Copyright, string RecordType, double VolumeDb);
 
         /// <summary>The [default-track-data] table, or null when absent.</summary>
         public static TrackDefaults ReadDefaults(string text)
         {
             var section = TableSection(text, "default-track-data");
             if (section == null) return null;
-            var volume = Regex.Match(section, @"^\s*volume\s*=\s*([0-9.]+)", RegexOptions.Multiline);
+            var volume = Regex.Match(section, @"^\s*volume-db\s*=\s*(-?[0-9.]+)", RegexOptions.Multiline);
             return new TrackDefaults(String(section, "game"), String(section, "author"), String(section, "copyright"),
                 CliUtil.FirstNonEmpty(String(section, "record-type"), "original"),
-                volume.Success && double.TryParse(volume.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 1);
+                volume.Success && double.TryParse(volume.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0);
         }
+
+        /// <summary>The series dB boost ([default-track-data] volume-db); 0 when unset or there is no series.toml.</summary>
+        public static double ReadVolumeDb(string seriesDir)
+        {
+            var path = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
+            return File.Exists(path) ? ReadDefaults(File.ReadAllText(path))?.VolumeDb ?? 0 : 0;
+        }
+
+        /// <summary>Upserts the series dB boost; a series without series.toml is left alone.</summary>
+        public static void WriteVolumeDb(string seriesDir, double db)
+        {
+            var path = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
+            if (!File.Exists(path)) return;
+            WriteLines(path, UpsertTable(ReadLines(path), "default-track-data",
+                new[] { new Entry("volume-db", $"volume-db = {FormatDb(db)}") }, createIfMissing: true));
+        }
+
+        public static string FormatDb(double db) => db.ToString("0.0##", CultureInfo.InvariantCulture);
 
         /// <summary>The [[games]] blocks (name defaults to id).</summary>
         public static List<SeriesGame> Games(string text)

@@ -24,23 +24,23 @@ function writeSettings(content: string): void {
 }
 
 describe('getAppSettings', () => {
-  it('reads the configured GlobalVolumeMultiplier', () => {
-    writeSettings(JSON.stringify({ Sma5hMusic: { GlobalVolumeMultiplier: 2.5 } }))
-    expect(getAppSettings(ws.root).globalVolumeMultiplier).toBe(2.5)
+  it('reads the configured GlobalVolumeDb', () => {
+    writeSettings(JSON.stringify({ Sma5hMusic: { GlobalVolumeDb: 2.5 } }))
+    expect(getAppSettings(ws.root).globalVolumeDb).toBe(2.5)
   })
 
-  it('defaults to 1 when the key is absent', () => {
+  it('defaults to 0 dB when the key is absent', () => {
     writeSettings(JSON.stringify({ Sma5hMusic: {} }))
-    expect(getAppSettings(ws.root).globalVolumeMultiplier).toBe(1)
+    expect(getAppSettings(ws.root).globalVolumeDb).toBe(0)
   })
 
-  it('defaults to 1 when the settings file is missing', () => {
-    expect(getAppSettings(ws.root).globalVolumeMultiplier).toBe(1)
+  it('defaults to 0 dB when the settings file is missing', () => {
+    expect(getAppSettings(ws.root).globalVolumeDb).toBe(0)
   })
 
   it('tolerates a UTF-8 BOM prefix', () => {
-    writeSettings('﻿' + JSON.stringify({ Sma5hMusic: { GlobalVolumeMultiplier: 3 } }))
-    expect(getAppSettings(ws.root).globalVolumeMultiplier).toBe(3)
+    writeSettings('﻿' + JSON.stringify({ Sma5hMusic: { GlobalVolumeDb: 3 } }))
+    expect(getAppSettings(ws.root).globalVolumeDb).toBe(3)
   })
 })
 
@@ -69,21 +69,21 @@ describe('checkArcOutput', () => {
 })
 
 describe('saveAppSettings', () => {
-  it('persists the multiplier while preserving other keys', () => {
+  it('persists the global dB boost while preserving other keys', () => {
     writeSettings(JSON.stringify({ OutputPath: 'ArcOutput', Sma5hMusic: { Foo: 1 } }))
 
-    saveAppSettings(ws.root, { globalVolumeMultiplier: 3 })
+    saveAppSettings(ws.root, { globalVolumeDb: 3 })
 
     const raw = JSON.parse(readFileSync(join(SETTINGS_DIR(ws.root), 'appsettings.json'), 'utf8'))
-    expect(raw.Sma5hMusic.GlobalVolumeMultiplier).toBe(3)
+    expect(raw.Sma5hMusic.GlobalVolumeDb).toBe(3)
     expect(raw.Sma5hMusic.Foo).toBe(1)
     expect(raw.OutputPath).toBe('ArcOutput')
-    expect(getAppSettings(ws.root).globalVolumeMultiplier).toBe(3)
+    expect(getAppSettings(ws.root).globalVolumeDb).toBe(3)
   })
 
   it('creates the Sma5hMusic section if absent', () => {
     writeSettings(JSON.stringify({ OutputPath: 'ArcOutput' }))
-    saveAppSettings(ws.root, { globalVolumeMultiplier: 2 })
-    expect(getAppSettings(ws.root).globalVolumeMultiplier).toBe(2)
+    saveAppSettings(ws.root, { globalVolumeDb: 2 })
+    expect(getAppSettings(ws.root).globalVolumeDb).toBe(2)
   })
 })

@@ -25,34 +25,27 @@ test('analyze returns per-track LUFS + auto-gain matching the CLI gain formula',
   expect(data.ffmpegAvailable).toBe(true)
   expect(data.items.length).toBe(13)
   expect(data.targetLufs).toBe(-14)
-  expect(data.maxMultiplier).toBe(4)
+  expect(data.maxGainDb).toBe(12)
 
-  const target = data.targetLufs
-  const max = data.maxMultiplier
   for (const item of data.items) {
     expect(item.hasMeasurement).toBe(true)
-    const raw = Math.pow(10, (target - item.measuredLufs) / 20)
-    const expected = Math.min(raw, max)
-    if (!item.wasClamped) {
-      expect(Math.abs(item.autoGain - expected)).toBeLessThan(0.02)
-    } else {
-      expect(item.autoGain).toBeCloseTo(max, 2)
-    }
+    const expected = Math.min(data.targetLufs - item.measuredLufs, data.maxGainDb)
+    expect(item.autoGainDb).toBeCloseTo(expected, 1)
   }
 })
 
-test('save writes the per-track override into tracks.csv volume column', async () => {
+test('save writes the per-track dB boost into the tracks.csv volume_db column', async () => {
   // daemon-routed: dotnet only
   test.skip(!hasTool('dotnet'), 'requires dotnet for the CLI daemon')
   const page = await firstWindow(app)
   await page.evaluate(
-    (sp) => window.electron.umb.saveVolumeConfig(sp, [{ originalIndex: 0, volume: 0.5 }]),
+    (sp) => window.electron.umb.saveVolumeConfig(sp, [{ originalIndex: 0, db: -6 }]),
     series.dir
   )
   const csv = readFileSync(join(series.dir, 'tracks.csv'), 'utf8').split(/\r?\n/).filter((l) => l.trim())
   const header = csv[0].split(',')
-  const volIdx = header.indexOf('volume')
+  const volIdx = header.indexOf('volume_db')
   expect(volIdx).toBeGreaterThanOrEqual(0)
-  expect(csv[1].split(',')[volIdx]).toBe('0.5')
-  expect(csv[2].split(',')[volIdx]).toBe('1')
+  expect(csv[1].split(',')[volIdx]).toBe('-6')
+  expect(csv[2].split(',')[volIdx]).toBe('0')
 })

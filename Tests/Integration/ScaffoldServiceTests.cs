@@ -112,7 +112,7 @@ namespace Tests.Integration
             Assert.Contains("filename", header);
             Assert.Contains("game", header);
             Assert.Contains("title", header);
-            Assert.Contains("volume", header);
+            Assert.Contains("volume_db", header);
             Assert.Contains("in_soundtest", header);
         }
 
@@ -152,7 +152,7 @@ namespace Tests.Integration
             var content = File.ReadAllText(tomlPath);
             Assert.Contains("[default-track-data]", content);
             Assert.Contains("game =", content);
-            Assert.Contains("volume =", content);
+            Assert.Contains("volume-db =", content);
         }
 
         [Fact]
@@ -319,7 +319,7 @@ namespace Tests.Integration
             var lines = File.ReadAllLines(csvPath);
             var header = lines[0];
             foreach (var col in new[] { "filename", "game", "title", "author", "copyright",
-                "record_type", "special_category", "volume", "info1", "in_soundtest" })
+                "record_type", "special_category", "volume_db", "info1", "in_soundtest" })
             {
                 Assert.Contains(col, header);
             }
@@ -341,7 +341,7 @@ namespace Tests.Integration
             var trackName = TestEnvironment.DevTrackFiles[0].Replace(".flac", ".nus3audio");
             var csvPath = Path.Combine(seriesDir, "tracks.csv");
             File.WriteAllText(csvPath,
-                "filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\n" +
+                "filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest\n" +
                 $"{trackName},dev,My Custom Title,CustomAuthor,CustomCopyright,arrangement,,0.5,,True\n");
 
             CreateService().Run();

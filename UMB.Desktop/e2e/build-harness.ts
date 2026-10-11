@@ -51,9 +51,10 @@ export function prepareIsolatedBuild(): IsolatedBuild {
       EnableAudioCaching: false,
       AudioConversionFormat: 'idsp',
       DefaultLocale: 'en_us',
-      GlobalVolumeMultiplier: 1.5,
+      // dB equivalent of the 1.5x multiplier the build baselines were generated with.
+      GlobalVolumeDb: 20 * Math.log10(1.5),
       PlaylistMapping: { GenerationMode: 'Manual', AutoMappingIncidence: 0, AutoMapping: {} },
-      LufsNormalization: { Enabled: false, TargetLufs: -14, MaxGainMultiplier: 4, LufsCacheFileName: 'LUFS.csv' }
+      LufsNormalization: { Enabled: false, TargetLufs: -14, MaxGainDb: 12, LufsCacheFileName: 'LUFS.csv' }
     },
     Sma5hStagePlaylist: { ModFile: 'Mods/StagePlaylistMod/metadata_stage_playlists.json' }
   }

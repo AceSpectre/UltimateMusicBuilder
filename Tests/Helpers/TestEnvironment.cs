@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music;
+using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
 using Sma5h.Mods.Music.Models;
 using System;
@@ -16,6 +17,9 @@ namespace Tests.Helpers
 {
     public class TestEnvironment : IDisposable
     {
+        /// <summary>The dB equivalent of the 1.5x global multiplier the build baselines were generated with.</summary>
+        public static readonly float GlobalVolumeDb = VolumeHelper.MultiplierToDb(1.5f);
+
         public string TempDir { get; }
         public string ModPath { get; }
         public string RepoRoot { get; }
@@ -164,7 +168,7 @@ namespace Tests.Helpers
                     AudioConversionFormat = "idsp",
                     EnableAudioCaching = false,
                     DefaultLocale = "en_us",
-                    GlobalVolumeMultiplier = 1.5f,
+                    GlobalVolumeDb = GlobalVolumeDb,
                     LufsNormalization = new Sma5hMusicOptions.LufsNormalizationOptions
                     {
                         Enabled = false
@@ -203,7 +207,7 @@ namespace Tests.Helpers
                 ["Sma5hMusic:AudioConversionFormat"] = "idsp",
                 ["Sma5hMusic:EnableAudioCaching"] = "false",
                 ["Sma5hMusic:DefaultLocale"] = "en_us",
-                ["Sma5hMusic:GlobalVolumeMultiplier"] = "1.5",
+                ["Sma5hMusic:GlobalVolumeDb"] = GlobalVolumeDb.ToString("R", System.Globalization.CultureInfo.InvariantCulture),
                 ["Sma5hMusic:LufsNormalization:Enabled"] = "false",
                 ["Sma5hMusic:PlaylistMapping:GenerationMode"] = "Manual"
             };

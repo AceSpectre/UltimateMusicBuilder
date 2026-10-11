@@ -2,10 +2,11 @@
   import { AlertTriangle, RotateCcw, Settings, Volume2 } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import Modal from '$lib/components/ui/modal.svelte'
+  import { DB_INPUT, parseDb } from '$lib/volume'
 
   let { open, onClose }: { open: boolean; onClose: () => void } = $props()
 
-  let globalVolumeMultiplier = $state(1.5)
+  let globalVolumeDb = $state(0)
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let loaded = $state(false)
   let resetConfirmOpen = $state(false)
@@ -15,7 +16,7 @@
   $effect(() => {
     if (open && !loaded) {
       void window.electron.umb.getAppSettings().then((s) => {
-        globalVolumeMultiplier = s.globalVolumeMultiplier
+        globalVolumeDb = s.globalVolumeDb
         loaded = true
       })
     }
@@ -25,17 +26,10 @@
     }
   })
 
-  function clamp(v: number): number {
-    if (Number.isNaN(v)) return 1
-    return Math.max(0, Math.min(10, Math.round(v * 100) / 100))
-  }
-
   async function handleSave() {
     saveState = 'saving'
     try {
-      await window.electron.umb.saveAppSettings({
-        globalVolumeMultiplier: clamp(globalVolumeMultiplier)
-      })
+      await window.electron.umb.saveAppSettings({ globalVolumeDb: parseDb(String(globalVolumeDb)) })
       saveState = 'saved'
       setTimeout(() => onClose(), 600)
     } catch {
@@ -47,8 +41,8 @@
     resetting = true
     resetFailed = false
     try {
-      await window.electron.umb.saveAppSettings({ globalVolumeMultiplier: 1 })
-      globalVolumeMultiplier = 1
+      await window.electron.umb.saveAppSettings({ globalVolumeDb: 0 })
+      globalVolumeDb = 0
       await window.electron.umb.resetAllVolumes()
       resetConfirmOpen = false
     } catch {
@@ -99,10 +93,8 @@
           <input
             id="global-volume"
             type="number"
-            min="0"
-            max="10"
-            step="0.1"
-            bind:value={globalVolumeMultiplier}
+            {...DB_INPUT}
+            bind:value={globalVolumeDb}
             oninput={() => { if (saveState === 'saved') saveState = 'idle' }}
             class="rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-mono outline-none focus:border-ring"
           />

@@ -8,7 +8,7 @@ namespace Tests.Unit
     /// <summary>
     /// Pure helpers behind the CLI services: the shared CliUtil statics plus the
     /// internal helpers exposed to this assembly via InternalsVisibleTo
-    /// (VolumeConfigService.ParseVolume, TrackOrderService.ParseOrder,
+    /// (VolumeConfigService.ParseDb, TrackOrderService.ParseOrder,
     /// MergeService.AppendSongsField).
     /// </summary>
     public class ServiceHelperTests
@@ -58,18 +58,18 @@ namespace Tests.Unit
             Assert.Equal(expected, CliUtil.ToKebabCase(input));
         }
 
-        // ── VolumeConfigService.ParseVolume ─────────────────────────────────
+        // ── VolumeConfigService.ParseDb ─────────────────────────────────────
 
         [Theory]
         [InlineData("1.5", 1.5f)]
-        [InlineData("0.75", 0.75f)]
-        [InlineData("", 1.0f)]
-        [InlineData("   ", 1.0f)]
-        [InlineData("not-a-number", 1.0f)]
-        [InlineData(null, 1.0f)]
-        public void ParseVolume_FallsBackToUnity(string input, float expected)
+        [InlineData("-6", -6f)]
+        [InlineData("", 0f)]
+        [InlineData("   ", 0f)]
+        [InlineData("not-a-number", 0f)]
+        [InlineData(null, 0f)]
+        public void ParseDb_FallsBackToZero(string input, float expected)
         {
-            Assert.Equal(expected, VolumeConfigService.ParseVolume(input));
+            Assert.Equal(expected, VolumeConfigService.ParseDb(input));
         }
 
         // ── CliUtil.MakeSafeFileName ────────────────────────────────────────

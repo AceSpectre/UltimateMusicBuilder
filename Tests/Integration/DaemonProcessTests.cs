@@ -123,13 +123,13 @@ namespace Tests.Integration
             var seriesDir = Path.Combine(workspace, "series");
             Directory.CreateDirectory(seriesDir);
             File.WriteAllText(Path.Combine(seriesDir, "tracks.csv"),
-                "filename,title,volume\na.nus3audio,a,1.0\n");
+                "filename,title,volume_db\na.nus3audio,a,0\n");
 
             var inputJson = Path.Combine(_env.TempDir, "save.json");
             File.WriteAllText(inputJson, JsonSerializer.Serialize(new
             {
                 seriesPath = seriesDir,
-                overrides = new[] { new { originalIndex = 0, volume = 1.75f } }
+                overrides = new[] { new { originalIndex = 0, db = 1.75f } }
             }));
 
             var stdout = RunDaemonSession(workspace, new[]
@@ -157,13 +157,13 @@ namespace Tests.Integration
             var seriesDir = Path.Combine(_env.TempDir, "José", "Pokémon→série");
             Directory.CreateDirectory(seriesDir);
             File.WriteAllText(Path.Combine(seriesDir, "tracks.csv"),
-                "filename,title,volume\na.nus3audio,a,1.0\n");
+                "filename,title,volume_db\na.nus3audio,a,0\n");
 
             var inputJson = Path.Combine(_env.TempDir, "José", "save.json");
             File.WriteAllText(inputJson, JsonSerializer.Serialize(new
             {
                 seriesPath = seriesDir,
-                overrides = new[] { new { originalIndex = 0, volume = 1.5f } }
+                overrides = new[] { new { originalIndex = 0, db = 1.5f } }
             }));
 
             var stdout = RunDaemonSession(workspace, new[] { Request(1, "config-volume-save", inputJson) });

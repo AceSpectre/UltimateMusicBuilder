@@ -25,7 +25,7 @@ const BASE_SETTINGS = {
   OutputPath: 'ArcOutput',
   ModPath: 'Mods/MusicMods',
   Sma5hMusic: {
-    GlobalVolumeMultiplier: 2.25,
+    GlobalVolumeDb: 2.25,
     CachePath: 'Cache'
   }
 }
@@ -46,46 +46,46 @@ test.beforeEach(() => {
   writeSettings(BASE_SETTINGS)
 })
 
-test('getAppSettings reads GlobalVolumeMultiplier out of appsettings.json', async () => {
+test('getAppSettings reads GlobalVolumeDb out of appsettings.json', async () => {
   const page = await firstWindow(app)
   const settings = await page.evaluate(() => window.electron.umb.getAppSettings())
-  expect(settings.globalVolumeMultiplier).toBe(2.25)
+  expect(settings.globalVolumeDb).toBe(2.25)
 })
 
-test('getAppSettings falls back to the 1 default when appsettings.json is absent', async () => {
+test('getAppSettings falls back to the 0 dB default when appsettings.json is absent', async () => {
   rmSync(settingsPath(), { force: true })
   const page = await firstWindow(app)
   const settings = await page.evaluate(() => window.electron.umb.getAppSettings())
-  expect(settings.globalVolumeMultiplier).toBe(1)
+  expect(settings.globalVolumeDb).toBe(0)
 })
 
-test('getAppSettings falls back to the default when GlobalVolumeMultiplier is missing', async () => {
+test('getAppSettings falls back to the default when GlobalVolumeDb is missing', async () => {
   writeSettings({ OutputPath: 'ArcOutput', Sma5hMusic: { CachePath: 'Cache' } })
   const page = await firstWindow(app)
   const settings = await page.evaluate(() => window.electron.umb.getAppSettings())
-  expect(settings.globalVolumeMultiplier).toBe(1)
+  expect(settings.globalVolumeDb).toBe(0)
 })
 
-test('saveAppSettings rewrites the multiplier and preserves every other key', async () => {
+test('saveAppSettings rewrites the global dB boost and preserves every other key', async () => {
   const page = await firstWindow(app)
-  await page.evaluate(() => window.electron.umb.saveAppSettings({ globalVolumeMultiplier: 0.8 }))
+  await page.evaluate(() => window.electron.umb.saveAppSettings({ globalVolumeDb: 0.8 }))
 
   const raw = readSettings()
-  expect(raw.Sma5hMusic.GlobalVolumeMultiplier).toBe(0.8)
+  expect(raw.Sma5hMusic.GlobalVolumeDb).toBe(0.8)
   expect(raw.OutputPath).toBe('ArcOutput')
   expect(raw.ModPath).toBe('Mods/MusicMods')
   expect(raw.Sma5hMusic.CachePath).toBe('Cache')
 
   const reread = await page.evaluate(() => window.electron.umb.getAppSettings())
-  expect(reread.globalVolumeMultiplier).toBe(0.8)
+  expect(reread.globalVolumeDb).toBe(0.8)
 })
 
 test('saveAppSettings creates the Sma5hMusic section when it does not exist', async () => {
   writeSettings({ OutputPath: 'ArcOutput' })
   const page = await firstWindow(app)
-  await page.evaluate(() => window.electron.umb.saveAppSettings({ globalVolumeMultiplier: 3 }))
+  await page.evaluate(() => window.electron.umb.saveAppSettings({ globalVolumeDb: 3 }))
 
-  expect(readSettings().Sma5hMusic.GlobalVolumeMultiplier).toBe(3)
+  expect(readSettings().Sma5hMusic.GlobalVolumeDb).toBe(3)
 })
 
 test('checkArcOutput is false when the output dir is missing, then empty, and true once populated', async () => {
@@ -124,7 +124,7 @@ test('checkArcOutput is false when appsettings.json is unreadable', async () => 
   expect(await page.evaluate(() => window.electron.umb.checkArcOutput())).toBe(false)
 })
 
-test('settings modal loads the current multiplier, saves the edit, and closes', async () => {
+test('settings modal loads the current global dB boost, saves the edit, and closes', async () => {
   const page = await firstWindow(app)
 
   await page.getByTitle('Settings').click()
@@ -138,7 +138,7 @@ test('settings modal loads the current multiplier, saves the edit, and closes', 
 
   // closes ~600ms after save
   await expect(input).toBeHidden({ timeout: 8000 })
-  expect(readSettings().Sma5hMusic.GlobalVolumeMultiplier).toBe(0.6)
+  expect(readSettings().Sma5hMusic.GlobalVolumeDb).toBe(0.6)
 })
 
 test('settings modal cancel discards the edit', async () => {
@@ -153,5 +153,5 @@ test('settings modal cancel discards the edit', async () => {
 
   await expect(input).toBeHidden()
   expect(existsSync(settingsPath())).toBe(true)
-  expect(readSettings().Sma5hMusic.GlobalVolumeMultiplier).toBe(2.25)
+  expect(readSettings().Sma5hMusic.GlobalVolumeDb).toBe(2.25)
 })

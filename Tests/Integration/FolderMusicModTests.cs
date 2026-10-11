@@ -41,7 +41,7 @@ namespace Tests.Integration
                 File.WriteAllText(Path.Combine(dir, "series.toml"),
                     $"[series]\nid = \"{id}\"\nname = \"{id}\"\n\n[[games]]\nid = \"{id}\"\nname = \"{id}\"\n");
                 File.WriteAllText(Path.Combine(dir, "tracks.csv"),
-                    "filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\n");
+                    "filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest\n");
             }
 
             var entries = CreateMod(modDir).GetMusicModEntries();
@@ -308,6 +308,20 @@ namespace Tests.Integration
                 Assert.Equal(100000u, prop.TotalTimeMs);
                 Assert.Equal(4800000u, prop.TotalSamples);
             }
+        }
+
+        [Fact]
+        public void BankVolume_AddsTheSeriesAndTrackDbBoosts()
+        {
+            var dir = Path.Combine(_env.ModPath, "volume-mod", "dev");
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, "series.toml"),
+                "[series]\nid = \"dev\"\nname = \"dev\"\n\n[[games]]\nid = \"g\"\nname = \"g\"\n\n[default-track-data]\nvolume-db = 4.5\n");
+            File.WriteAllText(Path.Combine(dir, "tracks.csv"), "filename,game,title,volume_db\nsong.flac,g,Song,-1.5\n");
+            File.WriteAllBytes(Path.Combine(dir, "song.flac"), new byte[] { 0x01 });
+
+            var prop = CreateMod(Path.GetDirectoryName(dir)).GetMusicModEntries().BgmPropertyEntries.Single();
+            Assert.Equal(MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB + 3f, prop.AudioVolume, precision: 3);
         }
 
         // ── Edge cases ─────────────────────────────────────────────────────

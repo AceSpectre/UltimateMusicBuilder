@@ -5,6 +5,7 @@
   import { logStore } from '$lib/stores/logs.svelte'
   import { modsStore } from '$lib/stores/mods.svelte'
   import { createSeriesLoader } from '$lib/series-loader'
+  import { DB_INPUT, dbToGain, formatDb, parseDb } from '$lib/volume'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
@@ -24,6 +25,8 @@
   let rows = $state<VolumeRowItem[]>([])
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let baseline = new Map<number, number>()
+  let seriesDb = $state(0)
+  let baselineSeriesDb = $state(0)
   const seriesLoader = createSeriesLoader((v) => (loading = v))
 
   // Web Audio preview
@@ -36,14 +39,15 @@
 
   const seriesPath = $derived(selectedPath)
   const selectedSeries = $derived(series.find((e) => e.path === selectedPath) ?? null)
-  const isDirty = $derived(rows.some((r) => Math.abs((baseline.get(r.originalIndex) ?? r.userOverride) - r.userOverride) > 0.0001))
+  const seriesDbDirty = $derived(Math.abs(seriesDb - baselineSeriesDb) > 0.0001)
+  const isDirty = $derived(seriesDbDirty || rows.some((r) => Math.abs((baseline.get(r.originalIndex) ?? r.trackDb) - r.trackDb) > 0.0001))
   // Highlighted when no LUFS cache exists yet.
   const canAnalyze = $derived(!!data && !!selectedPath && data.ffmpegAvailable && !analyzing && !loadingConfig)
   const needsAnalysis = $derived(!!data && !data.lufsCacheExists)
 
-  function effective(row: VolumeRowItem): number {
-    const global = data?.globalVolumeMultiplier ?? 1
-    return global * row.autoGain * row.userOverride
+  // Total boost the build applies: global + series + auto-gain + track.
+  function effectiveDb(row: VolumeRowItem): number {
+    return (data?.globalDb ?? 0) + seriesDb + row.autoGainDb + row.trackDb
   }
 
   async function loadSeries(modPath: string | null) {
@@ -80,7 +84,8 @@
       if (path !== selectedPath) return
       data = result
       rows = result.items.map((item) => ({ ...item }))
-      baseline = new Map(result.items.map((item) => [item.originalIndex, item.userOverride]))
+      baseline = new Map(result.items.map((item) => [item.originalIndex, item.trackDb]))
+      seriesDb = baselineSeriesDb = result.seriesDb
     } catch (err) {
       logStore.log('error', `Volume analysis failed: ${err instanceof Error ? err.message : String(err)}`)
       data = null
@@ -108,18 +113,22 @@
     if (seriesPath) void loadConfig(seriesPath)
   }
 
-  function clampOverride(value: number): number {
-    if (Number.isNaN(value)) return 1
-    return Math.max(0, Math.min(10, value))
+  // Keeps a playing preview at the edited loudness.
+  function refreshPreviewGain() {
+    const playing = rows.find((r) => r.originalIndex === playingIndex)
+    if (playing && gainNode) gainNode.gain.value = dbToGain(effectiveDb(playing))
+    if (saveState === 'saved') saveState = 'idle'
   }
 
-  function onOverrideInput(row: VolumeRowItem, raw: string) {
-    const next = clampOverride(parseFloat(raw))
-    rows = rows.map((r) => (r.originalIndex === row.originalIndex ? { ...r, userOverride: next } : r))
-    if (playingIndex === row.originalIndex && gainNode) {
-      gainNode.gain.value = (data?.globalVolumeMultiplier ?? 1) * row.autoGain * next
-    }
-    if (saveState === 'saved') saveState = 'idle'
+  function onTrackDbInput(row: VolumeRowItem, raw: string) {
+    const next = parseDb(raw)
+    rows = rows.map((r) => (r.originalIndex === row.originalIndex ? { ...r, trackDb: next } : r))
+    refreshPreviewGain()
+  }
+
+  function onSeriesDbInput(raw: string) {
+    seriesDb = parseDb(raw)
+    refreshPreviewGain()
   }
 
   async function handleSave() {
@@ -128,9 +137,11 @@
     try {
       await window.electron.umb.saveVolumeConfig(
         seriesPath,
-        rows.map((r) => ({ originalIndex: r.originalIndex, volume: r.userOverride }))
+        rows.map((r) => ({ originalIndex: r.originalIndex, db: r.trackDb })),
+        seriesDbDirty ? seriesDb : undefined
       )
-      baseline = new Map(rows.map((r) => [r.originalIndex, r.userOverride]))
+      baseline = new Map(rows.map((r) => [r.originalIndex, r.trackDb]))
+      baselineSeriesDb = seriesDb
       saveState = 'saved'
     } catch (err) {
       logStore.log('error', `Save failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -180,7 +191,7 @@
       if (audioCtx.state === 'suspended') await audioCtx.resume()
 
       gainNode = audioCtx.createGain()
-      gainNode.gain.value = effective(row)
+      gainNode.gain.value = dbToGain(effectiveDb(row))
       sourceNode = audioCtx.createBufferSource()
       sourceNode.buffer = buffer
       sourceNode.connect(gainNode).connect(audioCtx.destination)
@@ -272,7 +283,7 @@
         <div class="flex items-center gap-2">
           {#if data && rows.length > 0}
             <span class="shrink-0 inline-flex h-[22px] items-center rounded-full border border-border bg-muted px-2 text-[11px] font-medium text-muted-foreground">
-              {$_('configVolume.globalLabel', { values: { value: data.globalVolumeMultiplier.toFixed(2) } })}
+              {$_('configVolume.globalLabel', { values: { value: formatDb(data.globalDb) } })}
             </span>
             <span class="shrink-0 inline-flex h-[22px] items-center rounded-full border border-border bg-muted px-2 text-[11px] font-medium text-muted-foreground">
               {$_('configVolume.targetLabel', { values: { value: data.targetLufs.toFixed(1) } })}
@@ -349,6 +360,19 @@
         <div class="min-h-0 flex-1 overflow-auto bg-background px-5 py-3">
           <p class="mb-3 max-w-[820px] text-[12.5px] leading-relaxed text-muted-foreground">{$_('configVolume.intro')}</p>
 
+          <div class="mb-3 flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2">
+            <label for="series-db" class="text-[12.5px] font-semibold">{$_('configVolume.seriesDb')}</label>
+            <input
+              id="series-db"
+              type="number"
+              {...DB_INPUT}
+              value={seriesDb}
+              oninput={(e) => onSeriesDbInput(e.currentTarget.value)}
+              class="h-8 w-[88px] rounded-lg border border-input bg-background px-2 text-right font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            <span class="text-[12px] text-muted-foreground">{$_('configVolume.seriesDbHint')}</span>
+          </div>
+
           {#if data && !data.ffmpegAvailable}
             <div class="mb-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px]" style="border-color: hsl(38 92% 50% / .4); background: hsl(38 92% 50% / .1); color: hsl(38 92% 35%);">
               <AlertTriangle size={15} class="mt-0.5 shrink-0" />
@@ -368,6 +392,7 @@
                   <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colTrack')}</th>
                   <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colMeasured')}</th>
                   <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colAutoGain')}</th>
+                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" title={$_('configVolume.colNormalisedHint')}>{$_('configVolume.colNormalised')}</th>
                   <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colOverride')}</th>
                   <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colFinal')}</th>
                   <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"></th>
@@ -394,21 +419,29 @@
                             <AlertTriangle size={13} />
                           </span>
                         {/if}
-                        <span class="font-mono text-[12px]">{row.hasMeasurement ? `${row.autoGain.toFixed(2)}×` : '—'}</span>
+                        <span class="font-mono text-[12px]">{row.hasMeasurement ? formatDb(row.autoGainDb) : '—'}</span>
                       </div>
                     </td>
-                    <td class="px-3 py-2 text-right">
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.1"
-                        value={row.userOverride}
-                        oninput={(e) => onOverrideInput(row, e.currentTarget.value)}
-                        class="h-8 w-[88px] rounded-lg border border-input bg-background px-2 text-right font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-ring"
-                      />
+                    <td class="px-3 py-2 text-right font-mono text-[12px]">
+                      {row.hasMeasurement ? `${(row.measuredLufs + row.autoGainDb).toFixed(1)} LUFS` : '—'}
                     </td>
-                    <td class="px-3 py-2 text-right font-mono text-[12px] font-semibold">{effective(row).toFixed(2)}×</td>
+                    <td class="px-3 py-2 text-right">
+                      <div class="flex items-center justify-end gap-1.5 font-mono text-[12px]">
+                        <span class="text-muted-foreground" title={$_('configVolume.globalHint')}>{$_('configVolume.globalLabel', { values: { value: formatDb(data?.globalDb ?? 0) } })}</span>
+                        <span class="text-muted-foreground">·</span>
+                        <span class="text-muted-foreground" title={$_('configVolume.seriesDbHint')}>{$_('configVolume.seriesLabel', { values: { value: formatDb(seriesDb) } })}</span>
+                        <span class="text-muted-foreground">·</span>
+                        <input
+                          type="number"
+                          {...DB_INPUT}
+                          value={row.trackDb}
+                          oninput={(e) => onTrackDbInput(row, e.currentTarget.value)}
+                          title={$_('configVolume.trackHint')}
+                          class="h-8 w-[88px] rounded-lg border border-input bg-background px-2 text-right font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                      </div>
+                    </td>
+                    <td class="px-3 py-2 text-right font-mono text-[12px] font-semibold">{formatDb(effectiveDb(row))}</td>
                     <td class="px-3 py-2 text-right">
                       <button
                         onclick={() => togglePreview(row)}

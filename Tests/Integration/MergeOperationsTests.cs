@@ -28,7 +28,7 @@ namespace Tests.Integration
             File.WriteAllText(Path.Combine(mod2Dir, "custom-series", "series.toml"),
                 "[series]\nid = \"custom\"\nname = \"Custom\"\nplaylist-incidence = 100\nseries-playlist = \"bgm_custom\"\n\n[[games]]\nid = \"custom\"\nname = \"Custom\"\n\n[default-track-data]\ngame = \"custom\"\n");
             File.WriteAllText(Path.Combine(mod2Dir, "custom-series", "tracks.csv"),
-                "filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\ntest.nus3audio,custom,Test,Author,Copyright,original,,1,,True\n");
+                "filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest\ntest.nus3audio,custom,Test,Author,Copyright,original,,0,,True\n");
             File.WriteAllBytes(Path.Combine(mod2Dir, "custom-series", "test.nus3audio"),
                 Array.Empty<byte>());
 

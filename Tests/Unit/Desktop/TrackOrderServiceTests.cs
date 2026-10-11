@@ -14,10 +14,10 @@ namespace Tests.Unit.Desktop
             "reach-out.flac,Reach Out to the Truth,Persona 4\n";
 
         private const string FullCsv =
-            "filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\n" +
-            "a.nus3audio,g1,Song A,Auth,Copy,original,sf_situationlink,1,a_pinch.nus3audio,True\n" +
-            "a_pinch.nus3audio,g1,Song A Pinch,,,original,,1,,True\n" +
-            "b.nus3audio,g2,Song B,,,arrange,,1,,False\n";
+            "filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest\n" +
+            "a.nus3audio,g1,Song A,Auth,Copy,original,sf_situationlink,0,a_pinch.nus3audio,True\n" +
+            "a_pinch.nus3audio,g1,Song A Pinch,,,original,,0,,True\n" +
+            "b.nus3audio,g2,Song B,,,arrange,,0,,False\n";
 
         private const string SeriesTomlWithGames =
             "[series]\nid = \"s\"\nexisting-series = true\n\n" +
@@ -193,7 +193,7 @@ namespace Tests.Unit.Desktop
         public void Load_ReadsDefaultTrackData()
         {
             var toml = SeriesTomlWithGames +
-                "\n[default-track-data]\ngame = \"g2\"\nauthor = \"Nobuo\"\ncopyright = \"Square\"\nrecord-type = \"arrange\"\nvolume = 1.0\n";
+                "\n[default-track-data]\ngame = \"g2\"\nauthor = \"Nobuo\"\ncopyright = \"Square\"\nrecord-type = \"arrange\"\nvolume-db = 0.0\n";
 
             var defaults = _service.Load(_ws.WriteSeries("m", "s", FullCsv, toml)).DefaultTrackData;
 

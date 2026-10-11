@@ -26,7 +26,7 @@ namespace UMB.CLI.Services
         private static readonly string[] ExpectedCsvColumns =
         {
             "filename", "game", "title", "author", "copyright",
-            "record_type", "special_category", "volume", "info1", "in_soundtest"
+            "record_type", "special_category", "volume_db", "info1", "in_soundtest"
         };
 
         private readonly ILogger _logger;
@@ -89,7 +89,7 @@ namespace UMB.CLI.Services
                     }
                     if (!File.Exists(csvPath))
                     {
-                        var csvContent = "filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\n";
+                        var csvContent = "filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest\n";
                         File.WriteAllText(csvPath, csvContent);
                         _logger.LogInformation("Created {Path}", csvPath);
                         wasScaffolded = true;
@@ -158,7 +158,7 @@ namespace UMB.CLI.Services
                         row["author"] = defaults?.Author ?? "";
                         row["copyright"] = defaults?.Copyright ?? "";
                         row["record_type"] = defaults?.RecordType ?? "original";
-                        row["volume"] = (defaults?.Volume ?? 1.0f).ToString(CultureInfo.InvariantCulture);
+                        row["volume_db"] = "0";
                         existingRows.Add(row);
                     }
 
@@ -445,7 +445,7 @@ namespace UMB.CLI.Services
             sb.AppendLine("author = \"\"");
             sb.AppendLine("copyright = \"\"");
             sb.AppendLine("record-type = \"original\"");
-            sb.AppendLine("volume = 1.0");
+            sb.AppendLine("volume-db = 0.0");
         }
 
         /// <summary>

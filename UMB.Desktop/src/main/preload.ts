@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 import type {
+  AppSettings,
   CreateSeriesInput,
   DebugPingResult,
   ExtractIconsAnalysis,
@@ -61,7 +62,7 @@ const api = {
   rejectNus3Track: (seriesPath: string, trackId: string): Promise<void> => ipcRenderer.invoke(IPC.REJECT_NUS3_TRACK, seriesPath, trackId),
   acceptNus3Files: (seriesPath: string, deleteSources: boolean): Promise<number> => ipcRenderer.invoke(IPC.ACCEPT_NUS3_FILES, seriesPath, deleteSources),
   loadVolumeConfig: (seriesPath: string, analyze = false): Promise<VolumeConfigData> => ipcRenderer.invoke(IPC.LOAD_VOLUME_CONFIG, seriesPath, analyze),
-  saveVolumeConfig: (seriesPath: string, overrides: VolumeOverride[]): Promise<void> => ipcRenderer.invoke(IPC.SAVE_VOLUME_CONFIG, seriesPath, overrides),
+  saveVolumeConfig: (seriesPath: string, overrides: VolumeOverride[], seriesDb?: number): Promise<void> => ipcRenderer.invoke(IPC.SAVE_VOLUME_CONFIG, seriesPath, overrides, seriesDb),
   decodeTrackPreview: (seriesPath: string, filename: string): Promise<string | null> => ipcRenderer.invoke(IPC.DECODE_TRACK_PREVIEW, seriesPath, filename),
   extractWaveform: (seriesPath: string, filename: string, bars?: number): Promise<number[]> => ipcRenderer.invoke(IPC.EXTRACT_WAVEFORM, seriesPath, filename, bars),
   getTrackDuration: (seriesPath: string, filename: string): Promise<number> => ipcRenderer.invoke(IPC.GET_TRACK_DURATION, seriesPath, filename),
@@ -84,8 +85,8 @@ const api = {
     ipcRenderer.invoke(IPC.RUN_ACTION, action, args) as Promise<void>,
   selectFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.SELECT_FOLDER),
   checkArcOutput: (): Promise<boolean> => ipcRenderer.invoke(IPC.CHECK_ARC_OUTPUT),
-  getAppSettings: (): Promise<{ globalVolumeMultiplier: number }> => ipcRenderer.invoke(IPC.GET_APP_SETTINGS),
-  saveAppSettings: (settings: { globalVolumeMultiplier: number }): Promise<void> => ipcRenderer.invoke(IPC.SAVE_APP_SETTINGS, settings),
+  getAppSettings: (): Promise<AppSettings> => ipcRenderer.invoke(IPC.GET_APP_SETTINGS),
+  saveAppSettings: (settings: AppSettings): Promise<void> => ipcRenderer.invoke(IPC.SAVE_APP_SETTINGS, settings),
   cancelAction: () => { ipcRenderer.send(IPC.CANCEL_ACTION) },
   subscribeLogs: subscribe<LogLine>(IPC.LOG_STREAM),
   subscribeVolumeProgress: subscribe<VolumeProgress>(IPC.VOLUME_PROGRESS),

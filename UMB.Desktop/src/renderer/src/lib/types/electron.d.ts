@@ -56,7 +56,7 @@ export interface UmbApi {
   rejectNus3Track(seriesPath: string, trackId: string): Promise<void>
   acceptNus3Files(seriesPath: string, deleteSources: boolean): Promise<number>
   loadVolumeConfig(seriesPath: string, analyze?: boolean): Promise<VolumeConfigData>
-  saveVolumeConfig(seriesPath: string, overrides: VolumeOverride[]): Promise<void>
+  saveVolumeConfig(seriesPath: string, overrides: VolumeOverride[], seriesDb?: number): Promise<void>
   decodeTrackPreview(seriesPath: string, filename: string): Promise<string | null>
   extractWaveform(seriesPath: string, filename: string, bars?: number): Promise<number[]>
   getTrackDuration(seriesPath: string, filename: string): Promise<number>

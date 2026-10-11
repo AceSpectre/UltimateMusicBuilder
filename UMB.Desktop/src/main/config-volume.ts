@@ -9,9 +9,10 @@ export type { VolumeConfigData, VolumeOverride, VolumeRowItem } from '../shared/
 /** What the CLI config-volume-analyze action writes to its output file. */
 interface VolumeAnalyzeResult {
   seriesName: string
-  globalVolumeMultiplier: number
+  globalDb: number
+  seriesDb: number
   targetLufs: number
-  maxMultiplier: number
+  maxGainDb: number
   ffmpegAvailable: boolean
   lufsCacheExists: boolean
   items: VolumeRowItem[]
@@ -38,9 +39,10 @@ export async function loadVolumeConfig(
       return {
         seriesName: basename(seriesPath),
         seriesPath,
-        globalVolumeMultiplier: 1,
+        globalDb: 0,
+        seriesDb: 0,
         targetLufs: -14,
-        maxMultiplier: 4,
+        maxGainDb: 12,
         ffmpegAvailable: false,
         lufsCacheExists: false,
         items: []
@@ -51,9 +53,10 @@ export async function loadVolumeConfig(
     return {
       seriesName: result.seriesName || basename(seriesPath),
       seriesPath,
-      globalVolumeMultiplier: result.globalVolumeMultiplier,
+      globalDb: result.globalDb,
+      seriesDb: result.seriesDb ?? 0,
       targetLufs: result.targetLufs,
-      maxMultiplier: result.maxMultiplier,
+      maxGainDb: result.maxGainDb,
       ffmpegAvailable: result.ffmpegAvailable,
       lufsCacheExists: result.lufsCacheExists ?? false,
       items: result.items ?? []
@@ -64,15 +67,16 @@ export async function loadVolumeConfig(
   }
 }
 
-/** Persists per-track volume overrides back into the series' tracks.csv. */
+/** Persists per-track dB boosts into tracks.csv and, when given, the series dB boost into series.toml. */
 export async function saveVolumeConfig(
   workspace: string,
   seriesPath: string,
   overrides: VolumeOverride[],
+  seriesDb: number | undefined,
   onLine: (line: LogLine) => void
 ): Promise<void> {
   const inputPath = tempPath('umb-volume-save', 'json')
-  writeFileSync(inputPath, JSON.stringify({ seriesPath, overrides }, null, 2), 'utf-8')
+  writeFileSync(inputPath, JSON.stringify({ seriesPath, overrides, seriesDb }, null, 2), 'utf-8')
 
   try {
     await spawnCliAction(workspace, 'config-volume-save', [inputPath], onLine)

@@ -186,9 +186,9 @@ namespace UMB.CLI.Services
                         var recordType = dbRoot?["record_type"]?.ToString() ?? "record_original";
                         if (recordType.StartsWith("record_"))
                             recordType = recordType.Substring(7);
-                        // Legacy volume is bank dB; tracks.csv takes a multiplier on the default.
-                        var volumeDb = bgm["nus3bank_config"]?["volume"]?.Value<float>() ?? MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB;
-                        var volume = MathF.Round(VolumeHelper.DbToMultiplier(volumeDb - MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB), 3);
+                        // Legacy volume is bank dB; tracks.csv takes a dB boost on the default.
+                        var bankDb = bgm["nus3bank_config"]?["volume"]?.Value<float>() ?? MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB;
+                        var volumeDb = MathF.Round(bankDb - MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB, 2);
                         var testDispOrder = dbRoot?["test_disp_order"]?.Value<int>() ?? 0;
                         var specialCategory = bgm["stream_set"]?["special_category"]?.ToString();
 
@@ -210,7 +210,7 @@ namespace UMB.CLI.Services
                             Copyright = copyright,
                             RecordType = recordType,
                             SpecialCategory = specialCategory,
-                            Volume = volume,
+                            VolumeDb = volumeDb,
                             OriginalOrder = testDispOrder,
                             Info1 = info1Filename,
                             InSoundtest = testDispOrder >= 0
@@ -375,7 +375,7 @@ namespace UMB.CLI.Services
             csv.WriteField("copyright");
             csv.WriteField("record_type");
             csv.WriteField("special_category");
-            csv.WriteField("volume");
+            csv.WriteField("volume_db");
             csv.WriteField("info1");
             csv.WriteField("in_soundtest");
             csv.WriteField("order");
@@ -391,7 +391,7 @@ namespace UMB.CLI.Services
                 csv.WriteField(t.Copyright);
                 csv.WriteField(t.RecordType);
                 csv.WriteField(t.SpecialCategory ?? "");
-                csv.WriteField(t.Volume);
+                csv.WriteField(t.VolumeDb);
                 csv.WriteField(t.Info1 ?? "");
                 csv.WriteField(t.InSoundtest);
                 csv.WriteField(i);
@@ -408,7 +408,7 @@ namespace UMB.CLI.Services
             public string Copyright { get; set; }
             public string RecordType { get; set; }
             public string SpecialCategory { get; set; }
-            public float Volume { get; set; }
+            public float VolumeDb { get; set; }
             public int OriginalOrder { get; set; }
             public string Info1 { get; set; }
             public bool InSoundtest { get; set; }
