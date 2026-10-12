@@ -35,12 +35,23 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public object Songs { get; set; }
     }
 
-    public class FolderDefaultTrackDataConfig
+    /// <summary>
+    /// A song preset ([[game-defaults]], [[presets]]). Only the desktop app applies these; they are
+    /// modelled so series.toml still parses.
+    /// </summary>
+    public class FolderSongPresetConfig
     {
+        public string Name { get; set; }
         public string Game { get; set; }
         public string Author { get; set; }
         public string Copyright { get; set; }
-        public string RecordType { get; set; } = "original";
+        public string RecordType { get; set; }
+        public string InSoundtest { get; set; }
+    }
+
+    /// <summary>The series default preset plus the series dB boost.</summary>
+    public class FolderDefaultTrackDataConfig : FolderSongPresetConfig
+    {
         public float VolumeDb { get; set; }
     }
 
@@ -51,6 +62,8 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public List<FolderGameConfig> Games { get; set; } = new();
         public List<FolderPlaylistOverrideConfig> Playlists { get; set; } = new();
         public FolderDefaultTrackDataConfig DefaultTrackData { get; set; }
+        public List<FolderSongPresetConfig> GameDefaults { get; set; } = new();
+        public List<FolderSongPresetConfig> Presets { get; set; } = new();
     }
 
     // ── CSV models (CsvHelper mapping) ───────────────────────────────────────

@@ -13,7 +13,6 @@
   import type { ModInfo, SeriesOrderData, SeriesOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
-  const RECORD_OPTIONS = ['original', 'arrange', 'new_arrange'] as const
 
   let {
     activeMod,
@@ -30,13 +29,6 @@
   let showAddGame = $state(false)
   let newGameId = $state('')
   let newGameName = $state('')
-
-  // Mirrors recordLabel in order-tracks-view.
-  function recordLabel(value: string): string {
-    if (value === 'arrange') return $_('orderTracks.recordArrange')
-    if (value === 'new_arrange') return $_('orderTracks.recordNewArrange')
-    return $_('orderTracks.recordOriginal')
-  }
 
   let loading = $state(false)
   let orderData = $state<SeriesOrderData | null>(null)
@@ -479,43 +471,6 @@
                 <span class="inline-flex items-center gap-1 text-[11.5px]"><Volume2 size={12} />{$_('orderSeries.volumeEdit')}</span>
               </button>
             </div>
-
-            <div class="mt-1 border-t border-border pt-3">
-              <h3 class="text-[12.5px] font-semibold">{$_('orderSeries.defaultsHeading')}</h3>
-              <p class="pt-0.5 text-[11.5px] text-muted-foreground">{$_('orderSeries.defaultsHint')}</p>
-            </div>
-
-            <label class="flex flex-col gap-1">
-              <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldDefaultGame')}</span>
-              <select class={inputClass} bind:value={f.defaultGame}>
-                <option value="">{$_('orderSeries.defaultGameNone')}</option>
-                {#each f.games as game}
-                  <option value={game.id}>{game.name}</option>
-                {/each}
-                {#if f.defaultGame && !f.games.some((g) => g.id === f.defaultGame)}
-                  <option value={f.defaultGame}>{f.defaultGame}</option>
-                {/if}
-              </select>
-            </label>
-
-            <label class="flex flex-col gap-1">
-              <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldDefaultAuthor')}</span>
-              <input type="text" class={inputClass} bind:value={f.defaultAuthor} />
-            </label>
-
-            <label class="flex flex-col gap-1">
-              <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldDefaultCopyright')}</span>
-              <input type="text" class={inputClass} bind:value={f.defaultCopyright} />
-            </label>
-
-            <label class="flex flex-col gap-1">
-              <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldDefaultRecord')}</span>
-              <select class={inputClass} bind:value={f.defaultRecordType}>
-                {#each RECORD_OPTIONS as option}
-                  <option value={option}>{recordLabel(option)}</option>
-                {/each}
-              </select>
-            </label>
           </div>
         {:else}
           {@const f = selectedItem.fields}

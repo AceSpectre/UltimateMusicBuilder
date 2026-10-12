@@ -108,13 +108,13 @@ test('UI: editing a title in the table and clicking Save persists to tracks.csv'
   expect(csv).toContain('DOM Edited Title')
 })
 
-test('UI: Use Default Values enables only after selecting a custom song', async () => {
+test('UI: Apply Preset enables only after selecting a custom song', async () => {
   const page = await firstWindow(app)
   await page.getByText('Manage Songs').first().click()
   await page.getByRole('button', { name: 'mario' }).first().click()
-  const useDefaults = page.getByRole('button', { name: 'Use Default Values' })
-  await expect(useDefaults).toBeDisabled()
+  const applyPreset = page.getByRole('button', { name: 'Apply Preset' })
+  await expect(applyPreset).toBeDisabled()
 
   await page.getByLabel('Title').first().click()
-  await expect(useDefaults).toBeEnabled()
+  await expect(applyPreset).toBeEnabled()
 })

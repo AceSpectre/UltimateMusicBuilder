@@ -51,12 +51,12 @@ namespace UMB.CLI.Services
         {
             var path = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
             if (!File.Exists(path)) return;
-            var section = SeriesToml.TableSection(File.ReadAllText(path), "default-track-data") ?? "";
+            var section = SeriesToml.TableSection(File.ReadAllText(path), SeriesToml.DefaultTrackDataTable) ?? "";
             var legacy = Regex.Match(section, @"^\s*volume\s*=\s*([0-9.]+)", RegexOptions.Multiline);
             if (!legacy.Success) return;
 
             var db = ToDb(double.Parse(legacy.Groups[1].Value, CultureInfo.InvariantCulture));
-            SeriesToml.WriteLines(path, SeriesToml.UpsertTable(SeriesToml.ReadLines(path), "default-track-data", new[]
+            SeriesToml.WriteLines(path, SeriesToml.UpsertTable(SeriesToml.ReadLines(path), SeriesToml.DefaultTrackDataTable, new[]
             {
                 new SeriesToml.Entry("volume", null),
                 new SeriesToml.Entry(SeriesToml.VolumeDbKey, SeriesToml.VolumeDbLine(db))

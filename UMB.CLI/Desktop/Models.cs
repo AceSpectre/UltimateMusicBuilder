@@ -17,10 +17,6 @@ namespace UMB.CLI.Desktop
         public string SeriesPlaylist { get; set; } = "";
         public int PlaylistIncidence { get; set; } = 100;
         public List<SeriesGame> Games { get; set; } = new();
-        public string DefaultGame { get; set; } = "";
-        public string DefaultAuthor { get; set; } = "";
-        public string DefaultCopyright { get; set; } = "";
-        public string DefaultRecordType { get; set; } = "original";
     }
 
     /// <summary>VolumeDb is the read-only series dB boost; Config Volume edits it via SeriesPath.</summary>
@@ -55,16 +51,26 @@ namespace UMB.CLI.Desktop
 
     public record VanillaSongOption(string InfoId, string Name);
 
-    public class DefaultTrackData
+    /// <summary>Song values a preset fills in; "" means inherit (game default, then series default).</summary>
+    public class SongPreset
     {
+        public string Name { get; set; } = "";
         public string Game { get; set; } = "";
         public string Author { get; set; } = "";
         public string Copyright { get; set; } = "";
-        [JsonPropertyName("record_type")] public string RecordType { get; set; } = "original";
+        [JsonPropertyName("record_type")] public string RecordType { get; set; } = "";
+        [JsonPropertyName("in_soundtest")] public string InSoundtest { get; set; } = "";
+    }
+
+    public class SongPresets
+    {
+        public SongPreset SeriesDefault { get; set; } = new();
+        public List<SongPreset> GameDefaults { get; set; } = new();
+        public List<SongPreset> Presets { get; set; } = new();
     }
 
     public record TrackOrderData(string SeriesName, string SeriesPath, bool IsExistingSeries, bool HasSongOrder,
-        List<SeriesGame> Games, List<VanillaSongOption> VanillaSongs, DefaultTrackData DefaultTrackData, List<TrackOrderItem> Items);
+        List<SeriesGame> Games, List<VanillaSongOption> VanillaSongs, SongPresets Presets, List<TrackOrderItem> Items);
 
     public record SaveTrackItem(string Id, TrackFields Fields);
 

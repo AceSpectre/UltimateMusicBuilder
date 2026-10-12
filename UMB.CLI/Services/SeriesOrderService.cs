@@ -240,7 +240,7 @@ namespace UMB.CLI.Services
 
                 var iconPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
                 results.Add(new CustomSeries(seriesDir, header.Id, header.Name ?? header.Id,
-                    File.Exists(iconPath) ? iconPath : null, ReadFields(text, header), SeriesToml.ReadDefaults(text)?.VolumeDb ?? 0));
+                    File.Exists(iconPath) ? iconPath : null, ReadFields(text, header), SeriesToml.VolumeDb(text)));
             }
             return results;
         }
@@ -249,23 +249,17 @@ namespace UMB.CLI.Services
         {
             var series = SeriesToml.TableSection(text, "series") ?? text;
             var incidence = Regex.Match(series, @"^\s*playlist-incidence\s*=\s*(\d+)", RegexOptions.Multiline);
-            var defaults = SeriesToml.ReadDefaults(text);
             return new SeriesFields
             {
                 Name = header.Name ?? header.Id ?? "",
                 SeriesPlaylist = SeriesToml.String(series, "series-playlist"),
                 PlaylistIncidence = incidence.Success ? int.Parse(incidence.Groups[1].Value, CultureInfo.InvariantCulture) : 100,
-                Games = SeriesToml.Games(text),
-                DefaultGame = defaults?.Game ?? "",
-                DefaultAuthor = defaults?.Author ?? "",
-                DefaultCopyright = defaults?.Copyright ?? "",
-                DefaultRecordType = defaults?.RecordType ?? "original"
+                Games = SeriesToml.Games(text)
             };
         }
 
         /// <summary>
-        /// Writes the editable [series], [[games]] and [default-track-data] fields, keeping id,
-        /// existing-series, comments and anything else.
+        /// Writes the editable [series] and [[games]] fields, keeping id, existing-series, comments and anything else.
         /// </summary>
         private static void WriteSeriesTomlFields(string seriesTomlPath, SeriesFields fields)
         {
@@ -279,21 +273,6 @@ namespace UMB.CLI.Services
             }, createIfMissing: false);
 
             lines = SeriesToml.RewriteGames(lines, fields.Games ?? new List<SeriesGame>());
-
-            var recordType = string.IsNullOrEmpty(fields.DefaultRecordType) ? "original" : fields.DefaultRecordType;
-            // Only create [default-track-data] when it already exists or holds a non-default value.
-            var defaultsHaveContent = !string.IsNullOrEmpty(fields.DefaultGame) || !string.IsNullOrEmpty(fields.DefaultAuthor)
-                || !string.IsNullOrEmpty(fields.DefaultCopyright) || recordType != "original";
-            if (lines.Any(l => l.Trim() == "[default-track-data]") || defaultsHaveContent)
-            {
-                lines = SeriesToml.UpsertTable(lines, "default-track-data", new[]
-                {
-                    new SeriesToml.Entry("game", $"game = \"{SeriesToml.Escape(fields.DefaultGame)}\""),
-                    new SeriesToml.Entry("author", $"author = \"{SeriesToml.Escape(fields.DefaultAuthor)}\""),
-                    new SeriesToml.Entry("copyright", $"copyright = \"{SeriesToml.Escape(fields.DefaultCopyright)}\""),
-                    new SeriesToml.Entry("record-type", $"record-type = \"{SeriesToml.Escape(recordType)}\"")
-                }, createIfMissing: true);
-            }
 
             SeriesToml.WriteLines(seriesTomlPath, lines);
         }

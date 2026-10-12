@@ -120,6 +120,14 @@ author = "Embark Studios"
 copyright = "© 2023 Embark Studios"
 record-type = "original"
 volume-db = 0.0
+
+[[game-defaults]]
+game = "the-finals"
+author = "Embark Studios Audio"
+
+[[presets]]
+name = "Remix"
+record-type = "arrange"
 ```
 
 Fields:
@@ -133,6 +141,7 @@ Fields:
   * `incidence` - random-roll weight for this block's songs.
   * `songs` - `"*"` for all, or a TOML array of filenames. Stem-tolerant: `"Destroyer"` matches `Destroyer.nus3audio`. Pre-build validation warns on no-match entries; `Cleanup` prunes them.
 * `[default-track-data]` - defaults applied to rows `Scaffold` adds to `tracks.csv`, plus `volume-db`: the series dB boost (+ or -) added to every track in the series. Edit it in Config Volume.
+* `[[game-defaults]]` / `[[presets]]` - song presets, edited in the desktop app's Manage Presets view and applied from Manage Songs. A game default fills songs from that `game`; named presets can be picked per song. Keys left out (`author`, `copyright`, `record-type`, `in-soundtest`) fall back to the game default, then `[default-track-data]`.
 
 Volumes are dB boosts (0 = unchanged): the build adds the global boost (`GlobalVolumeDb` in settings), the series `volume-db`, LUFS auto-gain and the track's `volume_db` column in `tracks.csv`. Older mods that stored linear `volume` multipliers are converted automatically the next time the CLI starts. Vanilla songs are left alone unless the experimental `ApplyVolumeToVanilla` setting is on, in which case they get the global boost plus their series' boost (never LUFS auto-gain).
 

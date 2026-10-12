@@ -45,6 +45,7 @@ namespace UMB.CLI.Desktop
 
                 ["track-order-load"] = In<SeriesPathInput>(i => Get<TrackOrderService>().Load(i.SeriesPath)),
                 ["track-order-save"] = In<SaveTrackOrderInput>(i => Get<TrackOrderService>().Save(i.SeriesPath, i.Items)),
+                ["song-presets-save"] = In<SavePresetsInput>(i => Get<TrackOrderService>().SavePresets(i.SeriesPath, i.Presets)),
 
                 ["merge-analyze"] = In<MergeInput>(i => Get<MergeService>().Analyze(i.ModPaths)),
                 ["merge-validate-name"] = In<MergeInput>(i => Get<MergeService>().ValidateOutputName(i.OutputName)),
@@ -110,6 +111,7 @@ namespace UMB.CLI.Desktop
         private record CreateSeriesRequest(string ModPath, CreateSeriesInput Input);
         private record SetSeriesIconInput(string ModPath, string SeriesId, string IconDataUrl);
         private record SaveTrackOrderInput(string SeriesPath, List<SaveTrackItem> Items);
+        private record SavePresetsInput(string SeriesPath, SongPresets Presets);
         private record MergeInput(List<string> ModPaths, string OutputName, string PriorityModPath);
         private record ExtractIconsInput(string CompiledModPath, string ModPath, string Mode);
         private record Nus3FileInput(string FilePath, LoopAnalysisOptions Options, int? Bars);
