@@ -112,7 +112,7 @@ test('UI: Apply Preset enables only after selecting a custom song', async () => 
   const page = await firstWindow(app)
   await page.getByText('Manage Songs').first().click()
   await page.getByRole('button', { name: 'mario' }).first().click()
-  const applyPreset = page.getByLabel('Apply Preset')
+  const applyPreset = page.getByRole('button', { name: 'Apply Preset' })
   await expect(applyPreset).toBeDisabled()
 
   await page.getByLabel('Title').first().click()

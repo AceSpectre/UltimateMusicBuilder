@@ -239,9 +239,7 @@ namespace UMB.CLI.Services
                 return 0;
             }
 
-            WriteMergedSeriesToml(outputDir, priorityConfig, mergedGames, mergedPlaylists);
-            var outputToml = Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
-            SeriesToml.WriteLines(outputToml, SongPresetsToml.Write(SeriesToml.ReadLines(outputToml), SongPresetsToml.Read(priorityText)));
+            WriteMergedSeriesToml(outputDir, priorityConfig, priorityText, mergedGames, mergedPlaylists);
 
             var allTracks = new List<CsvRow>();
             var seenFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -274,7 +272,7 @@ namespace UMB.CLI.Services
             return allTracks.Count;
         }
 
-        private static void WriteMergedSeriesToml(string outputDir, FolderSeriesFileConfig priorityConfig,
+        private static void WriteMergedSeriesToml(string outputDir, FolderSeriesFileConfig priorityConfig, string priorityText,
             List<FolderGameConfig> games, List<FolderPlaylistOverrideConfig> playlists)
         {
             var sb = new StringBuilder();
@@ -296,7 +294,6 @@ namespace UMB.CLI.Services
                 sb.AppendLine();
             }
 
-            // The song values in [default-track-data] are written with the other presets.
             if (priorityConfig.DefaultTrackData is { } d)
             {
                 sb.AppendLine("[default-track-data]");
@@ -304,7 +301,8 @@ namespace UMB.CLI.Services
                 sb.AppendLine();
             }
 
-            File.WriteAllText(Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), sb.ToString());
+            SeriesToml.WriteLines(Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE),
+                SongPresetsToml.Write(SeriesToml.SplitLines(sb.ToString()), SongPresetsToml.Read(priorityText)));
         }
 
         internal static void AppendSongsField(StringBuilder sb, object songs)

@@ -147,7 +147,7 @@
       {:else if activeTab === 'config-volume'}
         <ConfigVolumeView activeMod={activeMod} />
       {:else if activeTab === 'order-tracks'}
-        <OrderTracksView activeMod={activeMod} onNavigate={selectAction} />
+        <OrderTracksView activeMod={activeMod} />
       {:else if activeTab === 'manage-presets'}
         <ManagePresetsView activeMod={activeMod} />
       {:else if activeTab === 'manage-playlists'}

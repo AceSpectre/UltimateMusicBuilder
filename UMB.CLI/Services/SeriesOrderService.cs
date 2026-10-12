@@ -259,8 +259,7 @@ namespace UMB.CLI.Services
         }
 
         /// <summary>
-        /// Writes the editable [series] and [[games]] fields, keeping id,
-        /// existing-series, comments and anything else.
+        /// Writes the editable [series] and [[games]] fields, keeping id, existing-series, comments and anything else.
         /// </summary>
         private static void WriteSeriesTomlFields(string seriesTomlPath, SeriesFields fields)
         {

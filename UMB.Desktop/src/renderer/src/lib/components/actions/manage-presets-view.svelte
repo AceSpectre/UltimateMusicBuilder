@@ -3,29 +3,26 @@
   import { _ } from 'svelte-i18n'
   import { modsStore } from '$lib/stores/mods.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
-  import { createSeriesLoader } from '$lib/series-loader'
+  import { createSeriesSelection } from '$lib/series-selection.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
+  import GameSelect from '$lib/components/ui/game-select.svelte'
   import IconButton from '$lib/components/ui/icon-button.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
-  import { RECORD_OPTIONS, emptyPreset, gameDefaultRows, pinchSongOptions, recordLabelKey, resolvePreset, type PresetValues } from '$lib/presets'
-  import type { ModInfo, ModSeriesInfo, SongPreset, TrackOrderData } from '$lib/types/electron'
+  import { RECORD_OPTIONS, emptyPreset, resolvePreset, type PresetValues } from '$lib/presets'
+  import { inputClass, textareaClass, toolbarButtonClass } from '$lib/ui-classes'
+  import type { ModInfo, SongPreset, TrackOrderData } from '$lib/types/electron'
 
   type Kind = 'series' | 'game' | 'preset'
 
   const GRID_COLUMNS =
-    'grid-template-columns: minmax(130px,1fr) minmax(120px,1fr) minmax(120px,1fr) minmax(120px,1fr) 130px 130px minmax(140px,1fr) 32px;'
-  const COLUMNS = ['colName', 'colGame', 'colAuthor', 'colCopyright', 'colRecord', 'colInSoundtest', 'colPinchSong'] as const
-  const inputClass =
-    'w-full rounded border border-input bg-background px-1.5 py-0.5 text-[12.5px] outline-none focus:border-ring focus:ring-1 focus:ring-ring'
-  // Multiline: credits support newlines in-game.
-  const textareaClass = `${inputClass} resize-none overflow-hidden whitespace-pre [field-sizing:content]`
+    'grid-template-columns: minmax(130px,1fr) minmax(120px,1fr) minmax(120px,1fr) minmax(120px,1fr) 130px 130px 32px;'
+  const COLUMNS = ['colName', 'colGame', 'colAuthor', 'colCopyright', 'colRecord', 'colInSoundtest'] as const
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
 
-  let loading = $state(false)
-  let series = $state<ModSeriesInfo[]>([])
+  const selection = createSeriesSelection(() => activeMod)
   let data = $state<TrackOrderData | null>(null)
   let seriesDefault = $state<SongPreset>(emptyPreset())
   let gameDefaults = $state<SongPreset[]>([])
@@ -33,12 +30,9 @@
   let dataLoading = $state(false)
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let baselineSnapshot = $state('')
-  const seriesLoader = createSeriesLoader((v) => (loading = v))
 
   const edited = $derived({ seriesDefault, gameDefaults, presets })
   const isDirty = $derived(Boolean(data) && JSON.stringify(edited) !== baselineSnapshot)
-  const pinchOptions = $derived(data ? pinchSongOptions(data.items, data.vanillaSongs) : [])
-  const selectedSeries = $derived(series.find((entry) => entry.path === modsStore.activeSeriesPath) ?? null)
 
   $effect(() => {
     if (isDirty && saveState === 'saved') {
@@ -50,51 +44,26 @@
     return data?.games.find((g) => g.id === id)?.name ?? id
   }
 
-  function recordLabel(value: string): string {
-    return $_(recordLabelKey(value))
-  }
-
-  function pinchLabel(value: string): string {
-    return pinchOptions.find((o) => o.value === value)?.title ?? value
-  }
-
   function soundtestLabel(value: string): string {
     return $_(value === 'False' ? 'managePresets.hidden' : 'managePresets.shown')
   }
 
-  // What an empty field falls back to: game defaults inherit from the series default, presets from their game.
-  function inherited(kind: Kind, preset: SongPreset): PresetValues | null {
-    if (kind === 'series') return null
-    if (kind === 'game') return resolvePreset({ seriesDefault, gameDefaults: [], presets: [] }, preset.game)
-    return resolvePreset({ seriesDefault, gameDefaults, presets }, preset.game)
+  // Blank values: the series default falls back to built-in values, game defaults to the series default, presets to their game.
+  function inherited(kind: Kind, preset: SongPreset): PresetValues {
+    const series = kind === 'series' ? emptyPreset() : seriesDefault
+    return resolvePreset({ seriesDefault: series, gameDefaults: kind === 'preset' ? gameDefaults : [], presets: [] }, preset.game)
+  }
+
+  function blankLabel(kind: Kind, value: string): string {
+    return $_(kind === 'series' ? 'managePresets.fallback' : 'managePresets.inherit', { values: { value } })
   }
 
   function setFrom(result: TrackOrderData) {
     data = result
     seriesDefault = result.presets.seriesDefault
-    gameDefaults = gameDefaultRows(result.games, result.presets.gameDefaults)
+    gameDefaults = result.games.map((g) => result.presets.gameDefaults.find((d) => d.game === g.id) ?? emptyPreset({ game: g.id }))
     presets = result.presets.presets
     baselineSnapshot = JSON.stringify(edited)
-  }
-
-  async function loadSeries(modPath: string | null) {
-    if (!modPath) {
-      seriesLoader.invalidate()
-      series = []
-      modsStore.activeSeriesPath = null
-      data = null
-      return
-    }
-
-    const nextSeries = await seriesLoader.load(modPath)
-    if (nextSeries === null) {
-      return
-    }
-
-    series = nextSeries
-    if (!nextSeries.some((entry) => entry.path === modsStore.activeSeriesPath)) {
-      modsStore.activeSeriesPath = nextSeries[0]?.path ?? null
-    }
   }
 
   async function loadData(seriesPath: string | null) {
@@ -113,11 +82,6 @@
     }
   }
 
-  function handleReload() {
-    void loadSeries(activeMod?.path ?? null)
-    void loadData(modsStore.activeSeriesPath)
-  }
-
   async function handleSave() {
     if (!data || !modsStore.activeSeriesPath) {
       return
@@ -125,7 +89,6 @@
 
     saveState = 'saving'
     try {
-      // Plain objects: Svelte $state proxies cannot be structured-cloned over IPC.
       setFrom(await window.electron.umb.saveSongPresets(modsStore.activeSeriesPath, $state.snapshot(edited)))
       saveState = 'saved'
     } catch (error) {
@@ -133,10 +96,6 @@
       saveState = 'idle'
     }
   }
-
-  $effect(() => {
-    void loadSeries(activeMod?.path ?? null)
-  })
 
   $effect(() => {
     void loadData(modsStore.activeSeriesPath)
@@ -163,47 +122,28 @@
     {#if kind === 'game'}
       <span class="truncate px-1.5 font-mono text-[11px] text-muted-foreground">{preset.game}</span>
     {:else}
-      <select class={inputClass} bind:value={preset.game} aria-label={$_('managePresets.colGame')}>
-        <option value="">{$_(kind === 'series' ? 'managePresets.noGame' : 'managePresets.songGame')}</option>
-        {#each data?.games ?? [] as game}
-          <option value={game.id}>{game.name}</option>
-        {/each}
-        {#if preset.game && !data?.games.some((g) => g.id === preset.game)}
-          <option value={preset.game}>{preset.game}</option>
-        {/if}
-      </select>
+      <GameSelect
+        bind:value={preset.game}
+        games={data?.games ?? []}
+        label={$_('managePresets.colGame')}
+        emptyLabel={$_(kind === 'series' ? 'managePresets.noGame' : 'managePresets.songGame')}
+      />
     {/if}
 
-    <textarea class={textareaClass} bind:value={preset.author} placeholder={parent?.author} aria-label={$_('managePresets.colAuthor')}></textarea>
-    <textarea class={textareaClass} bind:value={preset.copyright} placeholder={parent?.copyright} aria-label={$_('managePresets.colCopyright')}></textarea>
+    <textarea class={textareaClass} bind:value={preset.author} placeholder={parent.author} aria-label={$_('managePresets.colAuthor')}></textarea>
+    <textarea class={textareaClass} bind:value={preset.copyright} placeholder={parent.copyright} aria-label={$_('managePresets.colCopyright')}></textarea>
 
     <select class={inputClass} bind:value={preset.record_type} aria-label={$_('managePresets.colRecord')}>
-      {#if parent}
-        <option value="">{$_('managePresets.inherit', { values: { value: recordLabel(parent.record_type) } })}</option>
-      {/if}
+      <option value="">{blankLabel(kind, $_(`orderTracks.record.${parent.record_type}`))}</option>
       {#each RECORD_OPTIONS as option}
-        <option value={option}>{recordLabel(option)}</option>
+        <option value={option}>{$_(`orderTracks.record.${option}`)}</option>
       {/each}
     </select>
 
     <select class={inputClass} bind:value={preset.in_soundtest} aria-label={$_('managePresets.colInSoundtest')}>
-      {#if parent}
-        <option value="">{$_('managePresets.inherit', { values: { value: soundtestLabel(parent.in_soundtest) } })}</option>
-      {/if}
+      <option value="">{blankLabel(kind, soundtestLabel(parent.in_soundtest))}</option>
       <option value="True">{soundtestLabel('True')}</option>
       <option value="False">{soundtestLabel('False')}</option>
-    </select>
-
-    <select class={inputClass} bind:value={preset.pinch_song} aria-label={$_('managePresets.colPinchSong')}>
-      <option value="">
-        {parent ? $_('managePresets.inherit', { values: { value: parent.pinch_song ? pinchLabel(parent.pinch_song) : $_('managePresets.noPinch') } }) : $_('managePresets.noPinch')}
-      </option>
-      {#each pinchOptions as option}
-        <option value={option.value}>{option.title}</option>
-      {/each}
-      {#if preset.pinch_song && !pinchOptions.some((o) => o.value === preset.pinch_song)}
-        <option value={preset.pinch_song}>{preset.pinch_song}</option>
-      {/if}
     </select>
 
     {#if onDelete}
@@ -227,11 +167,14 @@
   <div class="flex h-full min-h-0">
     <SeriesPicker
       {activeMod}
-      {series}
-      {loading}
+      series={selection.series}
+      loading={selection.loading}
       activePath={modsStore.activeSeriesPath}
       onSelect={(path) => (modsStore.activeSeriesPath = path)}
-      onReload={handleReload}
+      onReload={() => {
+        void selection.reload()
+        void loadData(modsStore.activeSeriesPath)
+      }}
     />
 
     <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
@@ -241,15 +184,11 @@
           <GradientIcon>
             <SlidersHorizontal size={18} />
           </GradientIcon>
-          <h2 class="min-w-0 truncate text-sm font-semibold">{data?.seriesName ?? selectedSeries?.name ?? $_('managePresets.title')}</h2>
+          <h2 class="min-w-0 truncate text-sm font-semibold">{data?.seriesName ?? selection.selected?.name ?? $_('managePresets.title')}</h2>
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
-          <button
-            onclick={() => presets.push(emptyPreset())}
-            class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={!data}
-          >
+          <button onclick={() => presets.push(emptyPreset())} class={toolbarButtonClass} disabled={!data}>
             <Plus size={14} />
             {$_('managePresets.add')}
           </button>
@@ -271,7 +210,7 @@
             {$_('managePresets.loading')}
           </div>
         {:else if data}
-          <div class="min-w-[950px]">
+          <div class="min-w-[800px]">
             <div
               class="sticky top-0 z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
               style={GRID_COLUMNS}

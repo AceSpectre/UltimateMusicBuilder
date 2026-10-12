@@ -60,8 +60,6 @@ namespace UMB.CLI.Desktop
         public string Copyright { get; set; } = "";
         [JsonPropertyName("record_type")] public string RecordType { get; set; } = "";
         [JsonPropertyName("in_soundtest")] public string InSoundtest { get; set; } = "";
-        /// <summary>A song filename or vanilla info id, applied as the song's info1.</summary>
-        [JsonPropertyName("pinch_song")] public string PinchSong { get; set; } = "";
     }
 
     public class SongPresets

@@ -1,23 +1,18 @@
-import type { SongPreset, SongPresets, TrackFields, TrackOrderItem, VanillaSongOption } from '$lib/types/electron'
+import type { SeriesGame, SongPreset, SongPresets, TrackFields } from '$lib/types/electron'
 
 export const RECORD_OPTIONS = ['original', 'arrange', 'new_arrange'] as const
 
-export type PresetValues = Pick<TrackFields, 'game' | 'author' | 'copyright' | 'record_type' | 'in_soundtest'> &
-  Pick<SongPreset, 'pinch_song'>
+export type PresetValues = Pick<TrackFields, 'game' | 'author' | 'copyright' | 'record_type' | 'in_soundtest'>
 
-export interface SongOption {
-  value: string
-  title: string
-}
-
-export function recordLabelKey(value: string): string {
-  if (value === 'arrange') return 'orderTracks.recordArrange'
-  if (value === 'new_arrange') return 'orderTracks.recordNewArrange'
-  return 'orderTracks.recordOriginal'
+/** An Apply Preset menu entry; `label` is the game or preset name. */
+export interface PresetChoice {
+  kind: 'series' | 'game' | 'preset'
+  label: string
+  preset: SongPreset
 }
 
 export function emptyPreset(fields: Partial<SongPreset> = {}): SongPreset {
-  return { name: '', game: '', author: '', copyright: '', record_type: '', in_soundtest: '', pinch_song: '', ...fields }
+  return { name: '', game: '', author: '', copyright: '', record_type: '', in_soundtest: '', ...fields }
 }
 
 /**
@@ -33,29 +28,33 @@ export function resolvePreset(presets: SongPresets, songGame: string, preset: So
     author: pick('author'),
     copyright: pick('copyright'),
     record_type: pick('record_type') || 'original',
-    in_soundtest: pick('in_soundtest') || 'True',
-    pinch_song: pick('pinch_song')
+    in_soundtest: pick('in_soundtest') || 'True'
   }
 }
 
-/** Songs a pinch link can point at: mod tracks by filename, vanilla songs by info_* id. */
-export function songOptions(items: TrackOrderItem[], vanillaSongs: VanillaSongOption[]): SongOption[] {
+/** Defaults for the fields a song leaves empty: its game default, then the series default. */
+export function missingDefaults(presets: SongPresets, fields: TrackFields): Partial<PresetValues> {
+  const defaults = resolvePreset(presets, fields.game)
+  const keys = (Object.keys(defaults) as (keyof PresetValues)[]).filter((key) => defaults[key] && !fields[key])
+  return Object.fromEntries(keys.map((key) => [key, defaults[key]]))
+}
+
+/** Apply Preset menu order: series default, the song's game, named presets, then the other games. */
+export function presetChoices(presets: SongPresets, games: SeriesGame[], songGame: string): PresetChoice[] {
+  const gameChoice = (game: SeriesGame): PresetChoice => ({
+    kind: 'game',
+    label: game.name,
+    preset: presets.gameDefaults.find((d) => d.game === game.id) ?? emptyPreset({ game: game.id })
+  })
   return [
-    ...items.filter((item) => item.fields && item.filename).map((item) => ({ value: item.filename, title: item.fields?.title || item.filename })),
-    ...vanillaSongs.map((song) => ({ value: song.infoId, title: song.name }))
+    { kind: 'series', label: '', preset: presets.seriesDefault },
+    ...games.filter((g) => g.id === songGame).map(gameChoice),
+    ...presets.presets.map((preset): PresetChoice => ({ kind: 'preset', label: preset.name, preset })),
+    ...games.filter((g) => g.id !== songGame).map(gameChoice)
   ]
 }
 
-/** The song options some series song already uses as its pinch song. */
-export function pinchSongOptions(items: TrackOrderItem[], vanillaSongs: VanillaSongOption[]): SongOption[] {
-  const used = new Set(items.map((item) => item.fields?.info1?.trim() ?? '').filter(Boolean))
-  return songOptions(items, vanillaSongs).filter((option) => used.has(option.value))
-}
-
-/** One row per series game (existing default or a blank one), then defaults for games no longer listed. */
-export function gameDefaultRows(games: { id: string }[], gameDefaults: SongPreset[]): SongPreset[] {
-  return [
-    ...games.map((g) => gameDefaults.find((d) => d.game === g.id) ?? emptyPreset({ game: g.id })),
-    ...gameDefaults.filter((d) => !games.some((g) => g.id === d.game))
-  ]
+/** The values a menu choice gives a song; the series default skips game defaults. */
+export function applyChoice(presets: SongPresets, songGame: string, choice: PresetChoice): PresetValues {
+  return resolvePreset(choice.kind === 'series' ? { ...presets, gameDefaults: [] } : presets, songGame, choice.preset)
 }

@@ -57,7 +57,7 @@ namespace UMB.CLI.Services
         /// <summary>The series dB boost ([default-track-data] volume-db); 0 when unset.</summary>
         public static double VolumeDb(string text)
         {
-            var volume = Regex.Match(TableSection(text, "default-track-data") ?? "", $@"^\s*{VolumeDbKey}\s*=\s*(-?[0-9.]+)", RegexOptions.Multiline);
+            var volume = Regex.Match(TableSection(text, DefaultTrackDataTable) ?? "", $@"^\s*{VolumeDbKey}\s*=\s*(-?[0-9.]+)", RegexOptions.Multiline);
             return volume.Success && double.TryParse(volume.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0;
         }
 
@@ -73,9 +73,12 @@ namespace UMB.CLI.Services
         {
             var path = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
             if (!File.Exists(path)) return;
-            WriteLines(path, UpsertTable(ReadLines(path), "default-track-data",
+            WriteLines(path, UpsertTable(ReadLines(path), DefaultTrackDataTable,
                 new[] { new Entry(VolumeDbKey, VolumeDbLine(db)) }, createIfMissing: true));
         }
+
+        /// <summary>The series default song values and dB boost.</summary>
+        public const string DefaultTrackDataTable = "default-track-data";
 
         /// <summary>The [default-track-data] key holding the series dB boost.</summary>
         public const string VolumeDbKey = "volume-db";
@@ -107,7 +110,9 @@ namespace UMB.CLI.Services
                 .ToList();
         }
 
-        public static string[] ReadLines(string path) => Regex.Split(File.ReadAllText(path), @"\r?\n");
+        public static string[] ReadLines(string path) => SplitLines(File.ReadAllText(path));
+
+        public static string[] SplitLines(string text) => Regex.Split(text, @"\r?\n");
 
         public static void WriteLines(string path, IEnumerable<string> lines) =>
             File.WriteAllText(path, string.Join("\n", lines));

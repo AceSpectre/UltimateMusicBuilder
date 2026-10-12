@@ -35,18 +35,10 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public object Songs { get; set; }
     }
 
-    public class FolderDefaultTrackDataConfig
-    {
-        public string Game { get; set; }
-        public string Author { get; set; }
-        public string Copyright { get; set; }
-        public string RecordType { get; set; } = "original";
-        public bool InSoundtest { get; set; } = true;
-        public string PinchSong { get; set; }
-        public float VolumeDb { get; set; }
-    }
-
-    /// <summary>A [[game-defaults]] or [[presets]] block; only the desktop app applies these.</summary>
+    /// <summary>
+    /// A song preset ([[game-defaults]], [[presets]]). Only the desktop app applies these; they are
+    /// modelled so series.toml still parses.
+    /// </summary>
     public class FolderSongPresetConfig
     {
         public string Name { get; set; }
@@ -54,8 +46,13 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public string Author { get; set; }
         public string Copyright { get; set; }
         public string RecordType { get; set; }
-        public bool InSoundtest { get; set; } = true;
-        public string PinchSong { get; set; }
+        public string InSoundtest { get; set; }
+    }
+
+    /// <summary>The series default preset plus the series dB boost.</summary>
+    public class FolderDefaultTrackDataConfig : FolderSongPresetConfig
+    {
+        public float VolumeDb { get; set; }
     }
 
     /// <summary>Root POCO for series.toml deserialization.</summary>

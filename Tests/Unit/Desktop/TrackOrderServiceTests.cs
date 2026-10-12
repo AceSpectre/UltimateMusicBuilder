@@ -204,11 +204,9 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void Load_SeriesDefaultFallsBackWithoutSeriesToml()
+        public void Load_PresetsAreEmptyWithoutSeriesToml()
         {
-            var seriesDefault = _service.Load(_ws.WriteSeries("m", "s", FullCsv)).Presets.SeriesDefault;
-
-            Assert.Equal(("", "original", "True"), (seriesDefault.Game, seriesDefault.RecordType, seriesDefault.InSoundtest));
+            Assert.Equivalent(new SongPresets(), _service.Load(_ws.WriteSeries("m", "s", FullCsv)).Presets, strict: true);
         }
 
         [Fact]

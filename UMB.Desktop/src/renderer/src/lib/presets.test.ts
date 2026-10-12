@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { SongPresets, TrackOrderItem } from '$lib/types/electron'
-import { emptyPreset, gameDefaultRows, pinchSongOptions, resolvePreset } from './presets'
+import type { SongPresets, TrackFields } from '$lib/types/electron'
+import { applyChoice, emptyPreset, missingDefaults, presetChoices, resolvePreset } from './presets'
 
 const presets = (over: Partial<SongPresets> = {}): SongPresets => ({
   seriesDefault: emptyPreset({ game: 'g1', author: 'Series Author', copyright: 'Series Co', record_type: 'original', in_soundtest: 'True' }),
-  gameDefaults: [emptyPreset({ game: 'g2', author: 'G2 Author', record_type: 'arrange', pinch_song: 'g2_pinch.nus3audio' })],
+  gameDefaults: [emptyPreset({ game: 'g2', author: 'G2 Author', record_type: 'arrange' })],
   presets: [],
   ...over
 })
@@ -16,8 +16,7 @@ describe('resolvePreset', () => {
       author: 'G2 Author',
       copyright: 'Series Co',
       record_type: 'arrange',
-      in_soundtest: 'True',
-      pinch_song: 'g2_pinch.nus3audio'
+      in_soundtest: 'True'
     })
   })
 
@@ -37,8 +36,7 @@ describe('resolvePreset', () => {
       author: 'G2 Author',
       copyright: 'Series Co',
       record_type: 'new_arrange',
-      in_soundtest: 'False',
-      pinch_song: 'g2_pinch.nus3audio'
+      in_soundtest: 'False'
     })
   })
 
@@ -49,34 +47,48 @@ describe('resolvePreset', () => {
   })
 })
 
-describe('gameDefaultRows', () => {
-  it('gives every game a row and keeps defaults for unlisted games last', () => {
-    const orphan = emptyPreset({ game: 'gone', author: 'x' })
-    const rows = gameDefaultRows([{ id: 'g1' }, { id: 'g2' }], [orphan, presets().gameDefaults[0]])
+describe('presetChoices', () => {
+  const games = [{ id: 'g1', name: 'Game One' }, { id: 'g2', name: 'Game Two' }, { id: 'g3', name: 'Game Three' }]
 
-    expect(rows.map((r) => [r.game, r.author])).toEqual([['g1', ''], ['g2', 'G2 Author'], ['gone', 'x']])
+  it('orders series default, the song game, named presets, then the other games', () => {
+    const choices = presetChoices(presets({ presets: [emptyPreset({ name: 'Remix' })] }), games, 'g2')
+
+    expect(choices.map((c) => [c.kind, c.label])).toEqual([
+      ['series', ''],
+      ['game', 'Game Two'],
+      ['preset', 'Remix'],
+      ['game', 'Game One'],
+      ['game', 'Game Three']
+    ])
+    expect(choices[1].preset.author).toBe('G2 Author')
+    expect(choices[3].preset).toEqual(emptyPreset({ game: 'g1' }))
   })
 })
 
-describe('pinchSongOptions', () => {
-  const song = (filename: string, title: string, info1 = ''): TrackOrderItem => ({
-    id: filename,
-    title,
-    subtitle: '',
-    bgmId: '',
-    filename,
-    isLocked: false,
-    originalIndex: 0,
-    fields: { title, game: 'g1', author: '', copyright: '', record_type: 'original', special_category: '', info1, in_soundtest: 'True' }
+describe('applyChoice', () => {
+  it('applies the series default without the song game default', () => {
+    const [series] = presetChoices(presets(), [], 'g2')
+
+    expect(applyChoice(presets(), 'g2', series)).toMatchObject({ game: 'g1', author: 'Series Author', record_type: 'original' })
   })
 
-  it('lists only the mod and vanilla songs some song already uses as its pinch song', () => {
-    const items = [song('a.nus3audio', 'A', 'a_pinch.nus3audio'), song('a_pinch.nus3audio', 'A Pinch'), song('b.nus3audio', 'B', 'info_v2')]
-    const vanilla = [{ infoId: 'info_v1', name: 'V1' }, { infoId: 'info_v2', name: 'V2' }]
+  it('applies another game default, switching the song to that game', () => {
+    const choice = presetChoices(presets(), [{ id: 'g2', name: 'Game Two' }], 'g1')[1]
 
-    expect(pinchSongOptions(items, vanilla)).toEqual([
-      { value: 'a_pinch.nus3audio', title: 'A Pinch' },
-      { value: 'info_v2', title: 'V2' }
-    ])
+    expect(applyChoice(presets(), 'g1', choice)).toMatchObject({ game: 'g2', author: 'G2 Author', record_type: 'arrange' })
+  })
+})
+
+describe('missingDefaults', () => {
+  const fields = (over: Partial<TrackFields> = {}): TrackFields => ({
+    title: 't', game: 'g2', author: '', copyright: '', record_type: 'original', special_category: '', info1: '', in_soundtest: 'True', ...over
+  })
+
+  it('fills only empty fields from the song game default, then the series default', () => {
+    expect(missingDefaults(presets(), fields({ copyright: 'Mine' }))).toEqual({ author: 'G2 Author' })
+  })
+
+  it('gives a song without a game the series default game', () => {
+    expect(missingDefaults(presets(), fields({ game: '', author: 'x', copyright: 'y' }))).toEqual({ game: 'g1' })
   })
 })

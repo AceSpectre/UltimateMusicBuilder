@@ -31,7 +31,8 @@ test('UI: a preset saved in Manage Presets is written to series.toml and applied
 
   await page.getByText('Manage Songs').first().click()
   await page.getByLabel('Title').first().click()
-  await page.getByLabel('Apply Preset').selectOption({ label: 'Remix' })
+  await page.getByRole('button', { name: 'Apply Preset' }).click()
+  await page.getByRole('menuitem', { name: 'Remix' }).click()
   await expect(page.getByLabel('Author').first()).toHaveValue('Preset Author')
   await expect(page.getByLabel('Record', { exact: true }).first()).toHaveValue('arrange')
 })

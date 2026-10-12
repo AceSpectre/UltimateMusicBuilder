@@ -10,14 +10,12 @@ namespace Tests.Unit.Desktop
     {
         private const string Header = "[series]\nid = \"s\"\n\n[[games]]\nid = \"g1\"\nname = \"Game One\"\n";
 
-        private static string[] Lines(string text) => text.Split('\n');
-
-        private static string Write(string text, SongPresets presets) => string.Join("\n", SongPresetsToml.Write(Lines(text), presets));
+        private static string Write(string text, SongPresets presets) => string.Join("\n", SongPresetsToml.Write(text.Split('\n'), presets));
 
         private static SongPresets Sample() => new()
         {
             SeriesDefault = new SongPreset { Game = "g1", Author = "Nobuo", Copyright = "Square", RecordType = "arrange", InSoundtest = "False" },
-            GameDefaults = { new SongPreset { Game = "g1", Author = "Uematsu", PinchSong = "battle_pinch.nus3audio" } },
+            GameDefaults = { new SongPreset { Game = "g1", Author = "Uematsu" } },
             Presets = { new SongPreset { Name = "Remix \"B\"", Game = "g1", RecordType = "new_arrange", InSoundtest = "True" } }
         };
 
@@ -34,9 +32,8 @@ namespace Tests.Unit.Desktop
         {
             var toml = Write(Header, Sample());
 
-            Assert.Contains("[[game-defaults]]\ngame = \"g1\"\nauthor = \"Uematsu\"\npinch-song = \"battle_pinch.nus3audio\"\n", toml);
-            Assert.Contains("[[presets]]\nname = \"Remix \\\"B\\\"\"\ngame = \"g1\"\nrecord-type = \"new_arrange\"\nin-soundtest = true", toml);
-            Assert.Contains("in-soundtest = false", toml);
+            Assert.Contains("[[game-defaults]]\ngame = \"g1\"\nauthor = \"Uematsu\"\n", toml);
+            Assert.Contains("[[presets]]\nname = \"Remix \\\"B\\\"\"\ngame = \"g1\"\nrecord-type = \"new_arrange\"\nin-soundtest = \"True\"", toml);
         }
 
         [Fact]
@@ -58,18 +55,18 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void Write_CreatesTheSeriesDefaultTableOnlyForNonDefaultValues()
+        public void Write_CreatesTheSeriesDefaultTableOnlyWhenAValueIsSet()
         {
             Assert.DoesNotContain("[default-track-data]", Write(Header, new SongPresets()));
             Assert.Contains("[default-track-data]", Write(Header, new SongPresets { SeriesDefault = { InSoundtest = "False" } }));
         }
 
         [Fact]
-        public void Read_FillsSeriesDefaultFallbacks_AndLeavesPresetKeysEmpty()
+        public void Read_LeavesUnsetKeysEmpty()
         {
             var read = SongPresetsToml.Read(Header + "\n[[presets]]\nname = \"Blank\"\n");
 
-            Assert.Equal(("original", "True"), (read.SeriesDefault.RecordType, read.SeriesDefault.InSoundtest));
+            Assert.Equivalent(new SongPreset(), read.SeriesDefault, strict: true);
             Assert.Equal(("", ""), (read.Presets[0].RecordType, read.Presets[0].InSoundtest));
         }
 
@@ -80,8 +77,8 @@ namespace Tests.Unit.Desktop
 
             var config = Toml.ToModel<FolderSeriesFileConfig>(Write(Header, Sample()), options: options);
 
-            Assert.Equal(("battle_pinch.nus3audio", "Remix \"B\""), (config.GameDefaults[0].PinchSong, config.Presets[0].Name));
-            Assert.False(config.DefaultTrackData.InSoundtest);
+            Assert.Equal(("Uematsu", "Remix \"B\""), (config.GameDefaults[0].Author, config.Presets[0].Name));
+            Assert.Equal("False", config.DefaultTrackData.InSoundtest);
         }
     }
 }

@@ -67,8 +67,6 @@ export interface SongPreset {
   copyright: string
   record_type: string
   in_soundtest: string
-  /** Mod track filename or vanilla info_* id, applied as the song's info1. */
-  pinch_song: string
 }
 
 // series.toml presets: [default-track-data], [[game-defaults]] and [[presets]].
