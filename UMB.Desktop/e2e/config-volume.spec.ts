@@ -24,8 +24,11 @@ test('analyze returns per-track LUFS + auto-gain matching the CLI gain formula',
 
   expect(data.ffmpegAvailable).toBe(true)
   expect(data.items.length).toBe(13)
-  expect(data.targetLufs).toBe(-14)
-  expect(data.maxGainDb).toBe(12)
+  // The app runs the dev CLI, so its appsettings.json holds the expected LUFS options.
+  const settingsText = readFileSync(join(repoRoot(), 'UMB.CLI', 'bin', 'Debug', 'net8.0', 'appsettings.json'), 'utf8')
+  const lufs = JSON.parse(settingsText.replace(/^﻿/, '')).Sma5hMusic.LufsNormalization
+  expect(data.targetLufs).toBe(lufs.TargetLufs)
+  expect(data.maxGainDb).toBe(lufs.MaxGainDb)
 
   for (const item of data.items) {
     expect(item.hasMeasurement).toBe(true)
