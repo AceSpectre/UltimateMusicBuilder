@@ -317,6 +317,8 @@
 
   const inputClass =
     'w-full rounded border border-input bg-background px-1.5 py-0.5 text-[12.5px] outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+  // Multiline: credits support newlines in-game.
+  const textareaClass = `${inputClass} resize-none overflow-hidden whitespace-pre [field-sizing:content]`
 </script>
 
 <div class="flex-1 overflow-hidden">
@@ -468,12 +470,11 @@
 
                   {#if item.fields}
                     {@const f = item.fields}
-                    <input
-                      type="text"
-                      class={inputClass}
+                    <textarea
+                      class={textareaClass}
                       bind:value={f.title}
                       aria-label={$_('orderTracks.colTitle')}
-                    />
+                    ></textarea>
 
                     {#if orderData.games.length > 0}
                       <select class={inputClass} bind:value={f.game} aria-label={$_('orderTracks.colGame')}>
@@ -488,8 +489,8 @@
                       <input type="text" class={inputClass} bind:value={f.game} aria-label={$_('orderTracks.colGame')} />
                     {/if}
 
-                    <input type="text" class={inputClass} bind:value={f.author} aria-label={$_('orderTracks.colAuthor')} />
-                    <input type="text" class={inputClass} bind:value={f.copyright} aria-label={$_('orderTracks.colCopyright')} />
+                    <textarea class={textareaClass} bind:value={f.author} aria-label={$_('orderTracks.colAuthor')}></textarea>
+                    <textarea class={textareaClass} bind:value={f.copyright} aria-label={$_('orderTracks.colCopyright')}></textarea>
 
                     <select class={inputClass} bind:value={f.record_type} aria-label={$_('orderTracks.colRecord')}>
                       {#each RECORD_OPTIONS as option}
