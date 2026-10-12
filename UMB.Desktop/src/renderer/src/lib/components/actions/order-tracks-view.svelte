@@ -1,24 +1,27 @@
 <script lang="ts">
-  import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Eye, EyeOff, Lock, Music4, Palette, Volume2, Wand2 } from '@lucide/svelte'
+  import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Eye, EyeOff, Lock, Music4, ListChecks, Palette, Wand2 } from '@lucide/svelte'
+  import { DropdownMenu } from 'bits-ui'
   import { _ } from 'svelte-i18n'
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
   import { modsStore } from '$lib/stores/mods.svelte'
-  import { createSeriesLoader } from '$lib/series-loader'
+  import { createSeriesSelection } from '$lib/series-selection.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
+  import GameSelect from '$lib/components/ui/game-select.svelte'
   import Modal from '$lib/components/ui/modal.svelte'
   import { inSoundtest, overlayLegend, overlayStyle, seriesGameIds } from '$lib/song-overlay'
   import { nextSort, sortBy, type SortKey, type SortState } from '$lib/table-sort'
-  import type { ModInfo, ModSeriesInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
+  import { RECORD_OPTIONS, applyChoice, missingDefaults, presetChoices, type PresetChoice } from '$lib/presets'
+  import { inputClass, secondaryButtonClass, textareaClass, toolbarButtonClass } from '$lib/ui-classes'
+  import type { ModInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
   const PINCH_CATEGORY = 'sf_situationlink'
-  const RECORD_OPTIONS = ['original', 'arrange', 'new_arrange'] as const
   const GRID_COLUMNS =
-    'grid-template-columns: 52px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px 60px minmax(160px,1fr) 84px;'
+    'grid-template-columns: 52px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px minmax(160px,1fr) 84px;'
   // Header columns in grid order; `index` is the series' real track order.
   const COLUMNS = [
     { id: 'index', label: 'orderTracks.colIndex' },
@@ -27,22 +30,15 @@
     { id: 'author', label: 'orderTracks.colAuthor' },
     { id: 'copyright', label: 'orderTracks.colCopyright' },
     { id: 'record', label: 'orderTracks.colRecord' },
-    { id: 'isPinch', label: 'orderTracks.colIsPinch' },
     { id: 'pinchSong', label: 'orderTracks.colPinchSong' },
     { id: 'soundtest', label: 'orderTracks.colInSoundtest' }
   ] as const
   type SortColumn = (typeof COLUMNS)[number]['id']
-  const CENTERED_COLUMNS = new Set<SortColumn>(['isPinch', 'soundtest'])
-  const toolbarButtonClass =
-    'inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60'
+  const CENTERED_COLUMNS = new Set<SortColumn>(['soundtest'])
 
-  let {
-    activeMod,
-    onNavigate
-  }: { activeMod: ModInfo | null; onNavigate?: (actionId: string) => void } = $props()
+  let { activeMod }: { activeMod: ModInfo | null } = $props()
 
-  let loading = $state(false)
-  let series = $state<ModSeriesInfo[]>([])
+  const selection = createSeriesSelection(() => activeMod)
   let orderData = $state<TrackOrderData | null>(null)
   let dndItems = $state<TrackOrderItem[]>([])
   let orderLoading = $state(false)
@@ -53,7 +49,6 @@
   let overlayOn = $state(false)
   let hideVanilla = $state(false)
   let sort = $state<SortState<SortColumn>>({ column: 'index', desc: false })
-  const seriesLoader = createSeriesLoader((v) => (loading = v))
 
   function snapshot(items: TrackOrderItem[]): string {
     return JSON.stringify(items.map((item) => ({ id: item.id, fields: item.fields })))
@@ -97,7 +92,6 @@
     author: (item) => item.fields?.author ?? '',
     copyright: (item) => item.fields?.copyright ?? '',
     record: (item) => (item.fields ? recordLabel(item.fields.record_type) : ''),
-    isPinch: (item) => isPinchTarget(item),
     pinchSong: (item) => pinchTitle(item.fields?.info1 ?? ''),
     soundtest: (item) => Boolean(item.fields && inSoundtest(item.fields))
   }
@@ -111,9 +105,6 @@
     return sortBy(visible, sort.desc, sortKeys[sort.column])
   })
 
-  const selectedSeries = $derived(
-    series.find((entry) => entry.path === modsStore.activeSeriesPath) ?? null
-  )
 
   function isPinchTarget(item: TrackOrderItem): boolean {
     return Boolean(item.filename) && pinchTargets.has(item.filename)
@@ -161,26 +152,29 @@
   const legend = $derived(overlayOn ? overlayLegend(gameIds, gameName) : [])
 
   const selectedItem = $derived(dndItems.find((item) => item.id === selectedItemId) ?? null)
-  const canUseDefaults = $derived(Boolean(orderData?.defaultTrackData) && selectedItem?.fields != null)
 
-  function applyDefaults() {
-    const defaults = orderData?.defaultTrackData
-    if (!defaults || !selectedItem?.fields) {
+  const choices = $derived(
+    orderData && selectedItem?.fields ? presetChoices(orderData.presets, orderData.games, selectedItem.fields.game) : []
+  )
+
+  function applyPreset(choice: PresetChoice) {
+    if (!orderData || !selectedItem?.fields) {
       return
     }
-    selectedItem.fields.game = defaults.game
-    selectedItem.fields.author = defaults.author
-    selectedItem.fields.copyright = defaults.copyright
-    selectedItem.fields.record_type = defaults.record_type
+    Object.assign(selectedItem.fields, applyChoice(orderData.presets, selectedItem.fields.game, choice))
   }
 
-  function openVolConfig() {
-    if (!modsStore.activeSeriesPath) {
+  // Fills only the fields each song leaves empty.
+  function fillDefaults() {
+    if (!orderData) {
       return
     }
-    modsStore.pendingConfigVolumePath = modsStore.activeSeriesPath
-    onNavigate?.('config-volume')
+    for (const item of dndItems) {
+      if (!item.fields) continue
+      Object.assign(item.fields, missingDefaults(orderData.presets, item.fields))
+    }
   }
+
 
   $effect(() => {
     dndItems = orderData ? orderData.items : []
@@ -200,26 +194,6 @@
     dndItems = event.detail.items
     if (orderData) {
       orderData = { ...orderData, items: event.detail.items }
-    }
-  }
-
-  async function loadSeries(modPath: string | null) {
-    if (!modPath) {
-      seriesLoader.invalidate()
-      series = []
-      modsStore.activeSeriesPath = null
-      orderData = null
-      return
-    }
-
-    const nextSeries = await seriesLoader.load(modPath)
-    if (nextSeries === null) {
-      return
-    }
-
-    series = nextSeries
-    if (!nextSeries.some((entry) => entry.path === modsStore.activeSeriesPath)) {
-      modsStore.activeSeriesPath = nextSeries[0]?.path ?? null
     }
   }
 
@@ -276,7 +250,7 @@
   }
 
   function handleReload() {
-    void loadSeries(activeMod?.path ?? null)
+    void selection.reload()
     void loadOrderData(modsStore.activeSeriesPath)
   }
 
@@ -302,29 +276,18 @@
   }
 
   $effect(() => {
-    void loadSeries(activeMod?.path ?? null)
-  })
-
-  $effect(() => {
     void loadOrderData(modsStore.activeSeriesPath)
   })
 
-  function recordLabel(value: string): string {
-    if (value === 'arrange') return $_('orderTracks.recordArrange')
-    if (value === 'new_arrange') return $_('orderTracks.recordNewArrange')
-    return $_('orderTracks.recordOriginal')
-  }
-
-  const inputClass =
-    'w-full rounded border border-input bg-background px-1.5 py-0.5 text-[12.5px] outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
+  const recordLabel = (value: string): string => $_(`orderTracks.record.${value}`, { default: value })
 </script>
 
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
     <SeriesPicker
       {activeMod}
-      {series}
-      {loading}
+      series={selection.series}
+      loading={selection.loading}
       activePath={modsStore.activeSeriesPath}
       onSelect={requestSelectSeries}
       onReload={handleReload}
@@ -337,7 +300,7 @@
           <GradientIcon>
             <ArrowUpDown size={18} />
           </GradientIcon>
-          <h2 class="min-w-0 truncate text-sm font-semibold">{orderData?.seriesName ?? selectedSeries?.name ?? $_('orderTracks.title')}</h2>
+          <h2 class="min-w-0 truncate text-sm font-semibold">{orderData?.seriesName ?? selection.selected?.name ?? $_('orderTracks.title')}</h2>
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
@@ -363,24 +326,36 @@
           </button>
 
           <button
-            onclick={openVolConfig}
-            class={toolbarButtonClass}
+            onclick={fillDefaults}
+            class={secondaryButtonClass}
             disabled={!orderData}
-            title={$_('orderTracks.volConfigHint')}
+            title={$_('orderTracks.fillDefaultsHint')}
           >
-            <Volume2 size={14} />
-            {$_('orderTracks.volConfig')}
+            <ListChecks size={14} />
+            {$_('orderTracks.fillDefaults')}
           </button>
 
-          <button
-            onclick={applyDefaults}
-            class={toolbarButtonClass}
-            disabled={!canUseDefaults}
-            title={$_('orderTracks.useDefaultsHint')}
-          >
-            <Wand2 size={14} />
-            {$_('orderTracks.useDefaults')}
-          </button>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger class={toolbarButtonClass} disabled={!selectedItem?.fields} title={$_('orderTracks.applyPresetHint')}>
+              <Wand2 size={14} />
+              {$_('orderTracks.applyPreset')}
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content align="end" sideOffset={4} class="z-50 min-w-[160px] rounded-lg border border-border bg-card p-1 text-[12.5px] shadow-lg">
+                {#each choices as choice, index}
+                  {#if index > 0 && choices[index - 1].kind !== choice.kind}
+                    <DropdownMenu.Separator class="my-1 h-px bg-border" />
+                  {/if}
+                  <DropdownMenu.Item
+                    class="cursor-pointer rounded px-2 py-1.5 outline-none data-[highlighted]:bg-muted"
+                    onSelect={() => applyPreset(choice)}
+                  >
+                    {choice.kind === 'series' ? $_('orderTracks.presetSeriesDefault') : choice.label || $_('managePresets.unnamed')}
+                  </DropdownMenu.Item>
+                {/each}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
 
           <SaveButton
             {saveState}
@@ -468,46 +443,27 @@
 
                   {#if item.fields}
                     {@const f = item.fields}
-                    <input
-                      type="text"
-                      class="{inputClass} {item.isVanilla ? 'italic' : ''}"
+                    <textarea
+                      class="{textareaClass} {item.isVanilla ? 'italic' : ''}"
                       bind:value={f.title}
                       title={item.isVanilla ? $_('orderTracks.vanillaHint') : ''}
                       aria-label={$_('orderTracks.colTitle')}
-                    />
+                    ></textarea>
 
                     {#if orderData.games.length > 0}
-                      <select class={inputClass} bind:value={f.game} aria-label={$_('orderTracks.colGame')}>
-                        {#each orderData.games as game}
-                          <option value={game.id}>{game.name}</option>
-                        {/each}
-                        {#if !orderData.games.some((g) => g.id === f.game)}
-                          <option value={f.game}>{f.game}</option>
-                        {/if}
-                      </select>
+                      <GameSelect bind:value={f.game} games={orderData.games} label={$_('orderTracks.colGame')} />
                     {:else}
                       <input type="text" class={inputClass} bind:value={f.game} aria-label={$_('orderTracks.colGame')} />
                     {/if}
 
-                    <input type="text" class={inputClass} bind:value={f.author} aria-label={$_('orderTracks.colAuthor')} />
-                    <input type="text" class={inputClass} bind:value={f.copyright} aria-label={$_('orderTracks.colCopyright')} />
+                    <textarea class={textareaClass} bind:value={f.author} aria-label={$_('orderTracks.colAuthor')}></textarea>
+                    <textarea class={textareaClass} bind:value={f.copyright} aria-label={$_('orderTracks.colCopyright')}></textarea>
 
                     <select class={inputClass} bind:value={f.record_type} aria-label={$_('orderTracks.colRecord')}>
                       {#each RECORD_OPTIONS as option}
                         <option value={option}>{recordLabel(option)}</option>
                       {/each}
                     </select>
-
-                    <div class="flex items-center justify-center">
-                      <input
-                        type="checkbox"
-                        class="h-4 w-4 accent-[hsl(var(--gradient-from))]"
-                        checked={isPinchTarget(item)}
-                        disabled
-                        aria-label={$_('orderTracks.isPinchAria')}
-                        title={isPinchTarget(item) ? $_('orderTracks.pinchTargetHint') : ''}
-                      />
-                    </div>
 
                     <input
                       type="text"
@@ -549,7 +505,6 @@
                     <span></span>
                     <span></span>
                     <span></span>
-                    <span></span>
                     <span class="justify-self-center self-center rounded-full border border-border bg-background/80 px-2 py-0.5 text-[10.5px] text-muted-foreground">{$_('orderTracks.locked')}</span>
                   {/if}
                 </div>
@@ -572,7 +527,7 @@
         <h3 class="text-sm font-semibold">{$_('orderTracks.unsavedTitle')}</h3>
         <p class="pt-1.5 text-[13px] text-muted-foreground">
           {$_('orderTracks.unsavedBodyBefore')}
-          <span class="font-medium text-foreground">{orderData?.seriesName ?? selectedSeries?.name}</span>{$_('orderTracks.unsavedBodyAfter')}
+          <span class="font-medium text-foreground">{orderData?.seriesName ?? selection.selected?.name}</span>{$_('orderTracks.unsavedBodyAfter')}
         </p>
       </div>
       <div class="flex flex-col gap-2 border-t border-border px-5 py-4">

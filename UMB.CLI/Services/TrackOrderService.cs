@@ -172,6 +172,17 @@ namespace UMB.CLI.Services
             return Load(resolvedSeriesPath);
         }
 
+        /// <summary>Writes the series' song presets to series.toml.</summary>
+        public TrackOrderData SavePresets(string seriesPath, SongPresets presets)
+        {
+            var resolvedSeriesPath = ModPaths.ResolveUnderMods(_musicConfig, seriesPath, "Invalid series path.");
+            var tomlPath = SeriesFiles.Of(resolvedSeriesPath).SeriesToml;
+            if (!File.Exists(tomlPath))
+                throw new DesktopApiException("This series has no series.toml to store presets in.");
+            SeriesToml.WriteLines(tomlPath, SongPresetsToml.Write(SeriesToml.ReadLines(tomlPath), presets));
+            return Load(resolvedSeriesPath);
+        }
+
         private record SeriesFiles(string Csv, string SeriesToml, string SongOrder)
         {
             public static SeriesFiles Of(string seriesPath) => new(
@@ -203,23 +214,17 @@ namespace UMB.CLI.Services
 
             var items = OrderItems(BuildModItems(rows), rows, songOrder, ResolveVanillaTitle);
             var data = new TrackOrderData(Path.GetFileName(seriesPath), seriesPath, series.ExistingSeries, songOrder.Count > 0,
-                games, vanillaSongs, series.DefaultTrackData, items);
+                games, vanillaSongs, series.Presets, items);
             return (data, rows, headers);
         }
 
-        private record SeriesInfo(string Id, bool ExistingSeries, List<SeriesGame> Games, DefaultTrackData DefaultTrackData);
+        private record SeriesInfo(string Id, bool ExistingSeries, List<SeriesGame> Games, SongPresets Presets);
 
         private static SeriesInfo ReadSeriesToml(string path)
         {
-            if (!File.Exists(path))
-                return new SeriesInfo(null, false, new List<SeriesGame>(), null);
-
-            var text = File.ReadAllText(path);
+            var text = File.Exists(path) ? File.ReadAllText(path) : "";
             var header = SeriesToml.ReadHeader(text);
-            var defaults = SeriesToml.ReadDefaults(text) is { } d
-                ? new DefaultTrackData { Game = d.Game, Author = d.Author, Copyright = d.Copyright, RecordType = d.RecordType }
-                : null;
-            return new SeriesInfo(header.Id, header.ExistingSeries, SeriesToml.Games(text), defaults);
+            return new SeriesInfo(header.Id, header.ExistingSeries, SeriesToml.Games(text), SongPresetsToml.Read(text));
         }
 
         private static List<TrackOrderItem> BuildModItems(List<CsvRow> rows)

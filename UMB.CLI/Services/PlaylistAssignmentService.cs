@@ -85,7 +85,7 @@ namespace UMB.CLI.Services
                     .ToList();
 
                 var tomlPath = Path.Combine(s.Dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
-                SeriesToml.WriteLines(tomlPath, SeriesToml.RewritePlaylists(SeriesToml.ReadLines(tomlPath), blocks));
+                SeriesToml.WriteLines(tomlPath, SeriesToml.RewriteArrayTables(SeriesToml.ReadLines(tomlPath), "playlists", blocks));
             }
 
             return Load(resolvedModPath);

@@ -150,9 +150,9 @@ namespace Tests.Unit.Desktop
             _service.Create(_modPath, OneGame(i => i.Games = new() { new("first_game", "First"), new("second_game", "Second") }));
 
             var fields = _service.Load(_modPath).Items.Single(i => i.SeriesId == "my_series").Fields;
-            Assert.Equal("first_game", fields.DefaultGame);
             Assert.Equal(new[] { new SeriesGame("first_game", "First"), new SeriesGame("second_game", "Second") }, fields.Games);
-            Assert.Equal("original", fields.DefaultRecordType);
+            var seriesDefault = SongPresetsToml.Read(SeriesToml("my_series")).SeriesDefault;
+            Assert.Equal(("first_game", "original"), (seriesDefault.Game, seriesDefault.RecordType));
         }
 
         [Fact]
@@ -264,7 +264,7 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void Load_ParsesSeriesAndDefaultTrackDataFields()
+        public void Load_ParsesSeriesFields()
         {
             WriteCustomSeries("da", RichToml);
 
@@ -274,10 +274,6 @@ namespace Tests.Unit.Desktop
             Assert.Equal("bgmmario", fields.SeriesPlaylist);
             Assert.Equal(100, fields.PlaylistIncidence);
             Assert.Equal(new[] { new SeriesGame("g1", "Game One") }, fields.Games);
-            Assert.Equal("g1", fields.DefaultGame);
-            Assert.Equal("", fields.DefaultAuthor);
-            Assert.Equal("", fields.DefaultCopyright);
-            Assert.Equal("original", fields.DefaultRecordType);
         }
 
         [Fact]
@@ -368,45 +364,15 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void Save_WritesDefaultTrackData_KeepingTheSeriesBoost()
+        public void Save_LeavesSongDefaultsAndTheSeriesBoostAlone()
         {
-            WriteCustomSeries("da", RichToml + "volume-db = -2.5\n");
-
-            SaveEdited(f =>
-            {
-                f.DefaultGame = "g1";
-                f.DefaultAuthor = "Nobuo";
-                f.DefaultRecordType = "arrange";
-            });
-
-            var toml = SeriesToml("da");
-            Assert.Contains("author = \"Nobuo\"", toml);
-            Assert.Contains("record-type = \"arrange\"", toml);
-            Assert.Contains("volume-db = -2.5", toml);
-            var reloaded = _service.Load(_modPath).Items[0].Fields;
-            Assert.Equal(("Nobuo", "arrange"), (reloaded.DefaultAuthor, reloaded.DefaultRecordType));
-        }
-
-        [Fact]
-        public void Save_CreatesDefaultTrackData_WhenADefaultIsSet()
-        {
-            WriteCustomSeries("da", "[series]\nid = \"a\"\nname = \"A\"\n");
-
-            SaveEdited(f => f.DefaultAuthor = "Composer");
-
-            var toml = SeriesToml("da");
-            Assert.Contains("[default-track-data]", toml);
-            Assert.Contains("author = \"Composer\"", toml);
-        }
-
-        [Fact]
-        public void Save_LeavesDefaultTrackDataOut_WhenNoDefaultsAreSet()
-        {
-            WriteCustomSeries("da", "[series]\nid = \"a\"\nname = \"A\"\n");
+            WriteCustomSeries("da", RichToml + "author = \"Nobuo\"\nvolume-db = -2.5\n");
 
             SaveEdited(f => f.Name = "A2");
 
-            Assert.DoesNotContain("[default-track-data]", SeriesToml("da"));
+            var toml = SeriesToml("da");
+            Assert.Contains("author = \"Nobuo\"", toml);
+            Assert.Contains("volume-db = -2.5", toml);
         }
 
         // ── Vanilla series ───────────────────────────────────────────────────
@@ -429,7 +395,7 @@ namespace Tests.Unit.Desktop
             Assert.Empty(data.Items);
             var mario = Assert.Single(data.VanillaItems);
             Assert.Equal(("vanilla:mario", "mario", "", true), (mario.Id, mario.SeriesId, mario.SeriesPath, mario.IsVanilla));
-            Assert.Equal(("Super Mario Bros.", "bgmmario", "smb"), (mario.Fields.Name, mario.Fields.SeriesPlaylist, mario.Fields.DefaultGame));
+            Assert.Equal(("Super Mario Bros.", "bgmmario"), (mario.Fields.Name, mario.Fields.SeriesPlaylist));
             Assert.Equal(new[] { "smb", "smb3" }, mario.Fields.Games.Select(g => g.Id));
             Assert.Equal(new[] { "smb", "smb3" }, mario.LockedGameIds);
         }
@@ -437,13 +403,13 @@ namespace Tests.Unit.Desktop
         [Fact]
         public void Load_UsesTheFolderOfAVanillaSeriesInTheMod()
         {
-            var dir = WriteCustomSeries("mario", "[series]\nid = \"mario\"\nname = \"Mario\"\nexisting-series = true\n\n[default-track-data]\nauthor = \"Kondo\"\n");
+            var dir = WriteCustomSeries("mario", "[series]\nid = \"mario\"\nname = \"Mario\"\nexisting-series = true\nseries-playlist = \"bgmcustom\"\n");
 
             var data = VanillaService().Load(_modPath);
 
             Assert.Empty(data.Items);
             var mario = Assert.Single(data.VanillaItems);
-            Assert.Equal((dir, "Kondo"), (mario.SeriesPath, mario.Fields.DefaultAuthor));
+            Assert.Equal((dir, "bgmcustom"), (mario.SeriesPath, mario.Fields.SeriesPlaylist));
         }
 
         [Fact]
@@ -460,13 +426,14 @@ namespace Tests.Unit.Desktop
             var service = VanillaService();
             SaveVanillaEdited(service, f =>
             {
-                f.DefaultAuthor = "Koji Kondo";
+                f.PlaylistIncidence = 42;
                 f.Games.Add(new SeriesGame("smb_wonder", "Super Mario Bros. Wonder"));
             });
 
             var toml = SeriesToml("mario");
             Assert.Contains("existing-series = true", toml);
-            Assert.Contains("author = \"Koji Kondo\"", toml);
+            Assert.Contains("playlist-incidence = 42", toml);
+            Assert.Contains("game = \"smb\"", toml);
             Assert.Contains("id = \"smb_wonder\"", toml);
             Assert.Equal(Path.Combine(_modPath, "mario"), service.Load(_modPath).VanillaItems.Single().SeriesPath);
         }

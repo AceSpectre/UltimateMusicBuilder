@@ -26,6 +26,7 @@ import type {
   SaveSeriesItem,
   SaveTrackItem,
   SeriesOrderData,
+  SongPresets,
   SuspiciousVolumeTrack,
   TrackOrderData,
   VolumeConfigData,
@@ -45,6 +46,7 @@ export interface UmbApi {
   resetAllVolumes(): Promise<void>
   loadTrackOrder(seriesPath: string): Promise<TrackOrderData>
   saveTrackOrder(seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData>
+  saveSongPresets(seriesPath: string, presets: SongPresets): Promise<TrackOrderData>
   loadSeriesOrder(modPath: string): Promise<SeriesOrderData>
   saveSeriesOrder(modPath: string, items: SaveSeriesItem[]): Promise<SeriesOrderData>
   createSeries(modPath: string, input: CreateSeriesInput): Promise<SeriesOrderData>

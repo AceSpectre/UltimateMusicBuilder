@@ -32,11 +32,11 @@ namespace UMB.CLI.Services
                 .Select(block => Regex.Split(block, @"^\s*\[", RegexOptions.Multiline)[0])
                 .ToList();
 
-        /// <summary>Reads <c>key = "value"</c> from a table body ("" when absent).</summary>
+        /// <summary>Reads <c>key = "value"</c> from a table body, undoing <see cref="Escape"/> ("" when absent).</summary>
         public static string String(string section, string key)
         {
-            var match = Regex.Match(section ?? "", $@"^\s*{Regex.Escape(key)}\s*=\s*""([^""]*)""", RegexOptions.Multiline);
-            return match.Success ? match.Groups[1].Value : "";
+            var match = Regex.Match(section ?? "", $@"^\s*{Regex.Escape(key)}\s*=\s*""((?:[^""\\]|\\.)*)""", RegexOptions.Multiline);
+            return match.Success ? Regex.Replace(match.Groups[1].Value, @"\\(.)", "$1") : "";
         }
 
         /// <summary>Like <see cref="String"/> but null when the key is absent or empty.</summary>
@@ -54,24 +54,18 @@ namespace UMB.CLI.Services
                 existing.Success && existing.Groups[1].Value == "true");
         }
 
-        public record TrackDefaults(string Game, string Author, string Copyright, string RecordType, double VolumeDb);
-
-        /// <summary>The [default-track-data] table, or null when absent.</summary>
-        public static TrackDefaults ReadDefaults(string text)
+        /// <summary>The series dB boost ([default-track-data] volume-db); 0 when unset.</summary>
+        public static double VolumeDb(string text)
         {
-            var section = TableSection(text, "default-track-data");
-            if (section == null) return null;
-            var volume = Regex.Match(section, $@"^\s*{VolumeDbKey}\s*=\s*(-?[0-9.]+)", RegexOptions.Multiline);
-            return new TrackDefaults(String(section, "game"), String(section, "author"), String(section, "copyright"),
-                CliUtil.FirstNonEmpty(String(section, "record-type"), "original"),
-                volume.Success && double.TryParse(volume.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0);
+            var volume = Regex.Match(TableSection(text, DefaultTrackDataTable) ?? "", $@"^\s*{VolumeDbKey}\s*=\s*(-?[0-9.]+)", RegexOptions.Multiline);
+            return volume.Success && double.TryParse(volume.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0;
         }
 
-        /// <summary>The series dB boost ([default-track-data] volume-db); 0 when unset or there is no series.toml.</summary>
+        /// <summary>The series dB boost, or 0 when there is no series.toml.</summary>
         public static double ReadVolumeDb(string seriesDir)
         {
             var path = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
-            return File.Exists(path) ? ReadDefaults(File.ReadAllText(path))?.VolumeDb ?? 0 : 0;
+            return File.Exists(path) ? VolumeDb(File.ReadAllText(path)) : 0;
         }
 
         /// <summary>Upserts the series dB boost; a series without series.toml is left alone.</summary>
@@ -79,9 +73,12 @@ namespace UMB.CLI.Services
         {
             var path = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
             if (!File.Exists(path)) return;
-            WriteLines(path, UpsertTable(ReadLines(path), "default-track-data",
+            WriteLines(path, UpsertTable(ReadLines(path), DefaultTrackDataTable,
                 new[] { new Entry(VolumeDbKey, VolumeDbLine(db)) }, createIfMissing: true));
         }
+
+        /// <summary>The series default song values and dB boost.</summary>
+        public const string DefaultTrackDataTable = "default-track-data";
 
         /// <summary>The [default-track-data] key holding the series dB boost.</summary>
         public const string VolumeDbKey = "volume-db";
@@ -113,7 +110,9 @@ namespace UMB.CLI.Services
                 .ToList();
         }
 
-        public static string[] ReadLines(string path) => Regex.Split(File.ReadAllText(path), @"\r?\n");
+        public static string[] ReadLines(string path) => SplitLines(File.ReadAllText(path));
+
+        public static string[] SplitLines(string text) => Regex.Split(text, @"\r?\n");
 
         public static void WriteLines(string path, IEnumerable<string> lines) =>
             File.WriteAllText(path, string.Join("\n", lines));
@@ -165,7 +164,9 @@ namespace UMB.CLI.Services
                     body.Add(lines[i]);
                 }
             }
-            body.AddRange(entries.Where(e => !handled.Contains(e.Key) && e.Line != null).Select(e => e.Line));
+            // New keys go before the blank lines that separate this table from the next.
+            body.InsertRange(body.FindLastIndex(l => l.Trim() != "") + 1,
+                entries.Where(e => !handled.Contains(e.Key) && e.Line != null).Select(e => e.Line));
 
             return lines.Take(headerIndex + 1).Concat(body).Concat(lines.Skip(endIndex)).ToList();
         }
@@ -238,10 +239,10 @@ namespace UMB.CLI.Services
         }
 
         /// <summary>
-        /// Replaces all [[playlists]] blocks with <paramref name="blocks"/>, in place; when there
+        /// Replaces all [[name]] blocks with <paramref name="blocks"/>, in place; when there
         /// were none they are appended to the end of the file.
         /// </summary>
-        public static List<string> RewritePlaylists(IReadOnlyList<string> lines, IReadOnlyList<List<string>> blocks)
+        public static List<string> RewriteArrayTables(IReadOnlyList<string> lines, string name, IReadOnlyList<List<string>> blocks)
         {
             var flat = new List<string>();
             for (var b = 0; b < blocks.Count; b++)
@@ -250,7 +251,7 @@ namespace UMB.CLI.Services
                 flat.AddRange(blocks[b]);
             }
 
-            var (kept, insertIndex) = StripArrayTables(lines, "playlists");
+            var (kept, insertIndex) = StripArrayTables(lines, name);
             if (flat.Count == 0) return kept;
             if (insertIndex < 0)
             {

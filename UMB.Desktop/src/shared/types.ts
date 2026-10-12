@@ -61,11 +61,21 @@ export interface VanillaSongOption {
   name: string
 }
 
-export interface DefaultTrackData {
+// Song values a preset fills in; '' inherits (game default, then series default).
+export interface SongPreset {
+  name: string
   game: string
   author: string
   copyright: string
   record_type: string
+  in_soundtest: string
+}
+
+// series.toml presets: [default-track-data], [[game-defaults]] and [[presets]].
+export interface SongPresets {
+  seriesDefault: SongPreset
+  gameDefaults: SongPreset[]
+  presets: SongPreset[]
 }
 
 export interface TrackOrderData {
@@ -75,21 +85,17 @@ export interface TrackOrderData {
   hasSongOrder: boolean
   games: SeriesGame[]
   vanillaSongs: VanillaSongOption[]
-  defaultTrackData: DefaultTrackData | null
+  presets: SongPresets
   items: TrackOrderItem[]
 }
 
 // Editable series.toml fields (series id stays read-only — it is the identity). Covers the
-// [series] table, the [[games]] array, and the [default-track-data] table (song defaults).
+// [series] table and the [[games]] array.
 export interface SeriesFields {
   name: string
   seriesPlaylist: string
   playlistIncidence: number
   games: SeriesGame[]
-  defaultGame: string
-  defaultAuthor: string
-  defaultCopyright: string
-  defaultRecordType: string
 }
 
 export interface SeriesOrderItem {
