@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Lock, Music4, Palette, Volume2, Wand2 } from '@lucide/svelte'
+  import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Eye, EyeOff, Lock, Music4, Palette, Volume2, Wand2 } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
@@ -10,7 +10,7 @@
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import Modal from '$lib/components/ui/modal.svelte'
-  import { inSoundtest, nextOverlayMode, overlayLegend, overlayStyle, seriesGameIds, type OverlayMode } from '$lib/song-overlay'
+  import { inSoundtest, overlayLegend, overlayStyle, seriesGameIds } from '$lib/song-overlay'
   import { nextSort, sortBy, type SortKey, type SortState } from '$lib/table-sort'
   import type { ModInfo, ModSeriesInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
 
@@ -50,7 +50,8 @@
   let pendingSeriesPath = $state<string | null>(null)
   let baselineSnapshot = $state('')
   let selectedItemId = $state<string | null>(null)
-  let overlayMode = $state<OverlayMode>('off')
+  let overlayOn = $state(false)
+  let hideVanilla = $state(false)
   let sort = $state<SortState<SortColumn>>({ column: 'index', desc: false })
   const seriesLoader = createSeriesLoader((v) => (loading = v))
 
@@ -101,9 +102,14 @@
     soundtest: (item) => Boolean(item.fields && inSoundtest(item.fields))
   }
 
-  // Sorting is display-only; dragging is allowed only in the real track order.
-  const isNaturalOrder = $derived(sort.column === 'index' && !sort.desc)
-  const displayItems = $derived(isNaturalOrder ? dndItems : sortBy(dndItems, sort.desc, sortKeys[sort.column]))
+  // Sorting and hiding are display-only; dragging needs the full list in real track order.
+  const canDrag = $derived(sort.column === 'index' && !sort.desc && !hideVanilla)
+  const hasVanilla = $derived(dndItems.some((item) => !item.fields))
+  const displayItems = $derived.by(() => {
+    if (canDrag) return dndItems
+    const visible = hideVanilla ? dndItems.filter((item) => item.fields) : dndItems
+    return sortBy(visible, sort.desc, sortKeys[sort.column])
+  })
 
   const selectedSeries = $derived(
     series.find((entry) => entry.path === modsStore.activeSeriesPath) ?? null
@@ -152,7 +158,7 @@
   }
 
   const gameIds = $derived(seriesGameIds(orderData?.games ?? [], dndItems))
-  const legend = $derived(overlayLegend(overlayMode, gameIds, gameName, $_))
+  const legend = $derived(overlayOn ? overlayLegend(gameIds, gameName) : [])
 
   const selectedItem = $derived(dndItems.find((item) => item.id === selectedItemId) ?? null)
   const canUseDefaults = $derived(Boolean(orderData?.defaultTrackData) && selectedItem?.fields != null)
@@ -340,27 +346,29 @@
           <GradientIcon>
             <ArrowUpDown size={18} />
           </GradientIcon>
-          <div class="min-w-0">
-            <h2 class="truncate text-sm font-semibold">{orderData?.seriesName ?? selectedSeries?.name ?? $_('orderTracks.title')}</h2>
-            <p class="truncate text-[12.5px] text-muted-foreground">
-              {selectedSeries
-                ? orderData?.hasSongOrder
-                  ? $_('orderTracks.dragHintLocked')
-                  : $_('orderTracks.dragHint')
-                : $_('orderTracks.pickSeriesHint')}
-            </p>
-          </div>
+          <h2 class="min-w-0 truncate text-sm font-semibold">{orderData?.seriesName ?? selectedSeries?.name ?? $_('orderTracks.title')}</h2>
         </div>
 
         <div class="flex shrink-0 items-center gap-2">
           <button
-            onclick={() => (overlayMode = nextOverlayMode(overlayMode))}
-            class={toolbarButtonClass}
+            onclick={() => (overlayOn = !overlayOn)}
+            class="{toolbarButtonClass} {overlayOn ? 'bg-muted' : ''}"
             disabled={!orderData}
+            aria-pressed={overlayOn}
             title={$_('orderTracks.overlayHint')}
           >
             <Palette size={14} />
-            {$_(`orderTracks.overlayModes.${overlayMode}`)}
+            {$_('orderTracks.overlay')}
+          </button>
+
+          <button
+            onclick={() => (hideVanilla = !hideVanilla)}
+            class="{toolbarButtonClass} w-[130px] justify-center"
+            disabled={!hasVanilla}
+            aria-pressed={hideVanilla}
+          >
+            {#if hideVanilla}<Eye size={14} />{:else}<EyeOff size={14} />{/if}
+            {$_(hideVanilla ? 'orderTracks.showVanilla' : 'orderTracks.hideVanilla')}
           </button>
 
           <button
@@ -435,7 +443,7 @@
 
             <div
               class="grid gap-0.5"
-              use:dragHandleZone={{ items: displayItems, flipDurationMs: FLIP_MS, dropTargetStyle: {}, dragDisabled: !isNaturalOrder }}
+              use:dragHandleZone={{ items: displayItems, flipDurationMs: FLIP_MS, dropTargetStyle: {}, dragDisabled: !canDrag }}
               onconsider={handleConsider}
               onfinalize={handleFinalize}
             >
@@ -444,7 +452,7 @@
                 <div
                   animate:flip={{ duration: FLIP_MS }}
                   class="grid items-center gap-1 rounded border px-1 py-0.5 {item.isLocked ? 'border-border bg-background/75 opacity-80' : isSelected ? 'border-transparent bg-background ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border bg-background/75'}"
-                  style="{GRID_COLUMNS} {overlayStyle(overlayMode, item, gameIds)}"
+                  style="{GRID_COLUMNS} {overlayOn ? overlayStyle(item, gameIds) : ''}"
                   role="listitem"
                   onfocusincapture={() => { if (!item.isLocked) selectedItemId = item.id }}
                   onpointerdown={() => { if (!item.isLocked) selectedItemId = item.id }}
@@ -459,8 +467,8 @@
                       <div
                         use:dragHandle
                         aria-label={$_('orderTracks.dragAria')}
-                        title={isNaturalOrder ? '' : $_('orderTracks.sortedDragHint')}
-                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground {isNaturalOrder ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-50'}"
+                        title={canDrag ? '' : $_('orderTracks.sortedDragHint')}
+                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground {canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-50'}"
                       >
                         <GripVertical size={14} />
                       </div>
