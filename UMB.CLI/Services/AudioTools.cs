@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using UMB.CLI.Desktop;
 
 namespace UMB.CLI.Services
@@ -16,7 +17,11 @@ namespace UMB.CLI.Services
     {
         public record RawLoop(long Start, long End, double NoteDistance, double LoudnessDiff, double Score);
 
-        private static readonly TimeSpan PymusiclooperTimeout = TimeSpan.FromMinutes(2);
+        private static readonly TimeSpan MinPymusiclooperTimeout = TimeSpan.FromMinutes(2);
+
+        /// <summary>Analysis time grows with track length, so allow one second per second of audio (two minutes minimum).</summary>
+        public static TimeSpan PymusiclooperTimeout(double durationSeconds) =>
+            TimeSpan.FromSeconds(Math.Max(MinPymusiclooperTimeout.TotalSeconds, durationSeconds));
 
         public static string Tool(string name) => ToolPathResolver.Resolve(null, null, name) ?? name;
 
@@ -32,7 +37,7 @@ namespace UMB.CLI.Services
             return (rate, duration);
         }
 
-        /// <summary>pymusiclooper's top loop candidates, best score first; empty when it finds none or fails.</summary>
+        /// <summary>pymusiclooper's top loop candidates, best score first; empty when it finds none. Throws when it fails or times out.</summary>
         public static List<RawLoop> FindLoops(string filePath, LoopAnalysisOptions options = null)
         {
             var args = $"export-points --path \"{filePath}\" --alt-export-top 10 --fmt samples --export-to stdout";
@@ -43,9 +48,13 @@ namespace UMB.CLI.Services
             if (options?.DisablePruning == true)
                 args += " --disable-pruning";
 
+            var result = ProcessRunner.Run(Tool("pymusiclooper"), args, PymusiclooperTimeout(Probe(filePath).Duration));
+            if (FailureMessage(result) is { } error)
+                throw new InvalidOperationException($"pymusiclooper failed: {error}");
+
             var loops = new List<RawLoop>();
             // Format: loop_start loop_end note_distance loudness_difference score
-            foreach (var line in TryRun(Tool("pymusiclooper"), args, PymusiclooperTimeout).Split('\n', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var line in result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 if (parts.Length >= 5
@@ -61,6 +70,18 @@ namespace UMB.CLI.Services
             // pymusiclooper usually emits sorted output; re-sort defensively.
             loops.Sort((a, b) => b.Score.CompareTo(a.Score));
             return loops;
+        }
+
+        /// <summary>
+        /// Why a pymusiclooper run failed, or null when it succeeded or found no loops.
+        /// It reports errors as an "ERROR" line on stdout with exit code 0.
+        /// </summary>
+        public static string FailureMessage(ProcessResult result)
+        {
+            var error = result.StandardOutput.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith("ERROR"));
+            if (error != null)
+                return error.Contains("No loop points found") ? null : error["ERROR".Length..].Trim();
+            return result.ExitCode != 0 ? $"exited with code {result.ExitCode}" : null;
         }
 
         /// <summary>A tool's stdout, or "" when it can't be started or times out.</summary>
