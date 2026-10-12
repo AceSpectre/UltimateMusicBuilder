@@ -48,6 +48,7 @@ const ANALYZE_RESULT = {
   seriesDb: -2,
   targetLufs: -14,
   maxGainDb: 12,
+  bankBaseDb: 2.7,
   ffmpegAvailable: true,
   lufsCacheExists: true,
   items: [
@@ -141,6 +142,7 @@ describe('loadVolumeConfig', () => {
       seriesDb: 0,
       targetLufs: -14,
       maxGainDb: 12,
+      bankBaseDb: 0,
       ffmpegAvailable: false,
       lufsCacheExists: false,
       items: []

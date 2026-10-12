@@ -134,7 +134,7 @@ Fields:
   * `songs` - `"*"` for all, or a TOML array of filenames. Stem-tolerant: `"Destroyer"` matches `Destroyer.nus3audio`. Pre-build validation warns on no-match entries; `Cleanup` prunes them.
 * `[default-track-data]` - defaults applied to rows `Scaffold` adds to `tracks.csv`, plus `volume-db`: the series dB boost (+ or -) added to every track in the series. Edit it in Config Volume.
 
-Volumes are dB boosts (0 = unchanged): the build adds the global boost (`GlobalVolumeDb` in settings), the series `volume-db`, LUFS auto-gain and the track's `volume_db` column in `tracks.csv`. Older mods that stored linear `volume` multipliers are converted automatically the next time the CLI starts.
+Volumes are dB boosts (0 = unchanged): the build adds the global boost (`GlobalVolumeDb` in settings), the series `volume-db`, LUFS auto-gain and the track's `volume_db` column in `tracks.csv`. Older mods that stored linear `volume` multipliers are converted automatically the next time the CLI starts. Vanilla songs are left alone unless the experimental `ApplyVolumeToVanilla` setting is on, in which case they get the global boost plus their series' boost (never LUFS auto-gain).
 
 ## series.toml - existing in-game series
 

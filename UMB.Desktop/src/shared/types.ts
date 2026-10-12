@@ -203,6 +203,8 @@ export interface VolumeConfigData {
   seriesDb: number
   targetLufs: number
   maxGainDb: number
+  /** nus3bank volume (dB) of a track with no boosts. */
+  bankBaseDb: number
   ffmpegAvailable: boolean
   lufsCacheExists: boolean
   items: VolumeRowItem[]
@@ -241,6 +243,8 @@ export interface ExtractIconsResult {
 
 export interface AppSettings {
   globalVolumeDb: number
+  /** Experimental: apply the global and series dB boosts to vanilla songs. */
+  applyVolumeToVanilla: boolean
 }
 
 export interface MergeSeriesSource {

@@ -64,6 +64,10 @@ export default {
     saved: 'Saved',
     cancel: 'Cancel',
     resetVolumes: 'Reset All Volumes',
+    tabGeneral: 'General',
+    tabExperimental: 'Experimental',
+    applyVolumeToVanilla: 'Apply Volume Settings to Vanilla Songs',
+    applyVolumeToVanillaWarning: "Vanilla songs are already normalised to sound correct, their volumes should not be changed unless you know what you're doing (:",
     resetModal: {
       title: 'Reset All Volumes?',
       description:
@@ -277,7 +281,8 @@ export default {
     ffmpegWarning: 'FFmpeg is not available — auto-gain values cannot be measured. You can still set dB boosts, but they will not be informed by loudness measurement.',
     globalLabel: 'Global {value}',
     globalHint: 'Global dB boost, set in Settings.',
-    seriesLabel: 'Series {value}',
+    globalCaption: 'global',
+    seriesCaption: 'series',
     trackHint: 'Track dB boost, saved to tracks.csv.',
     seriesDb: 'Series dB boost',
     seriesDbHint: 'Added to every track in this series, in dB (+ or -). Default is 0 dB.',
@@ -286,9 +291,10 @@ export default {
     colMeasured: 'LUFS',
     colAutoGain: 'Auto gain',
     colNormalised: 'Normalised',
-    colNormalisedHint: 'Loudness after auto-gain (measured LUFS + auto-gain). Below target means auto-gain hit its maximum.',
+    colNormalisedHint: 'nus3bank volume after LUFS auto-gain alone, before the global, series and track boosts.',
     colOverride: 'dB boosts',
-    colFinal: 'Final boost',
+    colFinal: 'Final',
+    colFinalHint: 'nus3bank volume the built mod uses: base + global + series + auto-gain + track dB.',
     clampWarning: 'Auto-gain hit the safe maximum. Source may be too quiet — consider replacing it.',
     play: 'Play at final volume',
     stop: 'Stop'

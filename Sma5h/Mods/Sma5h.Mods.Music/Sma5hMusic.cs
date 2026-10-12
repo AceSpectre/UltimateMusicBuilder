@@ -35,6 +35,8 @@ namespace Sma5h.Mods.Music
 
         public override string ModName => "Sma5hMusic";
 
+        private readonly Dictionary<string, float> _seriesVolumeDb = new();
+
         public Sma5hMusic(IOptionsMonitor<Sma5hMusicOptions> config, IMusicModManagerService musicModManagerService, IAudioStateService audioStateService,
             INus3AudioService nus3AudioService, IProcessService processService, ILufsAnalysisService lufsService, IStateManager state, ILogger<Sma5hMusic> logger)
             : base(state)
@@ -87,6 +89,8 @@ namespace Sma5h.Mods.Music
                     _audioStateService.AddPlaylistEntry(playlistEntry);
                 foreach (var ordering in musicModEntries.SeriesSongOrderings)
                     _audioStateService.RegisterSeriesSongOrdering(ordering.Key, ordering.Value);
+                foreach (var seriesDb in musicModEntries.SeriesVolumeDb)
+                    _seriesVolumeDb[seriesDb.Key] = seriesDb.Value;
             }
 
             return true;
@@ -181,9 +185,11 @@ namespace Sma5h.Mods.Music
                 }
             }
 
+            string BankOutputFile(string toneId) => Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3BANK_FILE, toneId));
+
             foreach (var bgmPropertyEntry in _audioStateService.GetModBgmPropertyEntries())
             {
-                var nusBankOutputFile = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3BANK_FILE, bgmPropertyEntry.NameId));
+                var nusBankOutputFile = BankOutputFile(bgmPropertyEntry.NameId);
                 var nusAudioOutputFile = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3AUDIO_FILE, bgmPropertyEntry.NameId));
 
                 var finalVolume = bgmPropertyEntry.AudioVolume + globalDb;
@@ -211,6 +217,15 @@ namespace Sma5h.Mods.Music
                 _logger.LogInformation("Generating or Copying Nus3Audio for {NameId}", bgmPropertyEntry.NameId);
                 if (!ConvertNus3Audio(useCache, bgmPropertyEntry, nusAudioOutputFile))
                     _logger.LogError("Error! The song with ToneId {NameId}, File {Filename} could not be processed.", bgmPropertyEntry.NameId, bgmPropertyEntry.Filename);
+            }
+
+            // Vanilla audio is kept; only its nus3bank is regenerated with the boosted volume.
+            if (_config.CurrentValue.Sma5hMusic.ApplyVolumeToVanilla)
+            {
+                var vanillaBoosts = VanillaVolumeHelper.BoostsByToneId(_audioStateService, globalDb, _seriesVolumeDb);
+                _logger.LogWarning("Applying volume settings to {Count} vanilla song(s).", vanillaBoosts.Count);
+                foreach (var entry in _audioStateService.GetBgmPropertyEntries().Where(p => vanillaBoosts.ContainsKey(p.NameId)))
+                    _nus3AudioService.GenerateNus3Bank(entry.NameId, entry.AudioVolume + vanillaBoosts[entry.NameId], BankOutputFile(entry.NameId));
             }
 
             if (lufsEnabled)

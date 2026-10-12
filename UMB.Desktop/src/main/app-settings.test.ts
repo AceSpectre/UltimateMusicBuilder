@@ -38,6 +38,13 @@ describe('getAppSettings', () => {
     expect(getAppSettings(ws.root).globalVolumeDb).toBe(0)
   })
 
+  it('reads the experimental vanilla flag, defaulting to off', () => {
+    writeSettings(JSON.stringify({ Sma5hMusic: { ApplyVolumeToVanilla: true } }))
+    expect(getAppSettings(ws.root).applyVolumeToVanilla).toBe(true)
+    writeSettings(JSON.stringify({ Sma5hMusic: {} }))
+    expect(getAppSettings(ws.root).applyVolumeToVanilla).toBe(false)
+  })
+
   it('tolerates a UTF-8 BOM prefix', () => {
     writeSettings('﻿' + JSON.stringify({ Sma5hMusic: { GlobalVolumeDb: 3 } }))
     expect(getAppSettings(ws.root).globalVolumeDb).toBe(3)
@@ -72,10 +79,11 @@ describe('saveAppSettings', () => {
   it('persists the global dB boost while preserving other keys', () => {
     writeSettings(JSON.stringify({ OutputPath: 'ArcOutput', Sma5hMusic: { Foo: 1 } }))
 
-    saveAppSettings(ws.root, { globalVolumeDb: 3 })
+    saveAppSettings(ws.root, { globalVolumeDb: 3, applyVolumeToVanilla: true })
 
     const raw = JSON.parse(readFileSync(join(SETTINGS_DIR(ws.root), 'appsettings.json'), 'utf8'))
     expect(raw.Sma5hMusic.GlobalVolumeDb).toBe(3)
+    expect(raw.Sma5hMusic.ApplyVolumeToVanilla).toBe(true)
     expect(raw.Sma5hMusic.Foo).toBe(1)
     expect(raw.OutputPath).toBe('ArcOutput')
     expect(getAppSettings(ws.root).globalVolumeDb).toBe(3)
@@ -83,7 +91,7 @@ describe('saveAppSettings', () => {
 
   it('creates the Sma5hMusic section if absent', () => {
     writeSettings(JSON.stringify({ OutputPath: 'ArcOutput' }))
-    saveAppSettings(ws.root, { globalVolumeDb: 2 })
+    saveAppSettings(ws.root, { globalVolumeDb: 2, applyVolumeToVanilla: false })
     expect(getAppSettings(ws.root).globalVolumeDb).toBe(2)
   })
 })

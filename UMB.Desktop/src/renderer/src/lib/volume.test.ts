@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { dbToGain, formatDb, parseDb } from './volume'
+import { dbToGain, formatBankDb, formatDb, parseDb } from './volume'
 
 describe('formatDb', () => {
   it('signs positive boosts and keeps one decimal', () => {
     expect(formatDb(3.456)).toBe('+3.5 dB')
     expect(formatDb(0)).toBe('0.0 dB')
     expect(formatDb(-6)).toBe('-6.0 dB')
+  })
+})
+
+describe('formatBankDb', () => {
+  it('shows the absolute volume without a sign', () => {
+    expect(formatBankDb(2.7)).toBe('2.7 dB')
+    expect(formatBankDb(-1.5)).toBe('-1.5 dB')
   })
 })
 

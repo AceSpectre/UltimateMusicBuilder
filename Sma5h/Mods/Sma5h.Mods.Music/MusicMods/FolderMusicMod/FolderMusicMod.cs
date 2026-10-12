@@ -185,6 +185,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 }
 
                 var seriesDb = seriesFile.DefaultTrackData?.VolumeDb ?? 0f;
+                output.SeriesVolumeDb[uiSeriesId] = seriesDb;
                 var playlistTracks = new List<(string uiBgmId, int incidence)>();
                 var filenameByUiBgmId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var filenameToInfoId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

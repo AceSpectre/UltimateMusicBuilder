@@ -18,6 +18,8 @@ namespace Sma5h.Mods.Music
             public string ModPath { get; set; }
             public string CachePath { get; set; }
             public float GlobalVolumeDb { get; set; }
+            /// <summary>Experimental: also apply the global and series dB boosts to vanilla songs.</summary>
+            public bool ApplyVolumeToVanilla { get; set; }
             public LufsNormalizationOptions LufsNormalization { get; set; } = new();
         }
 

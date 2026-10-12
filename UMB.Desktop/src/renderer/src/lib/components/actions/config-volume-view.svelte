@@ -5,7 +5,7 @@
   import { logStore } from '$lib/stores/logs.svelte'
   import { modsStore } from '$lib/stores/mods.svelte'
   import { createSeriesLoader } from '$lib/series-loader'
-  import { DB_INPUT, dbToGain, formatDb, parseDb } from '$lib/volume'
+  import { DB_INPUT, dbToGain, formatBankDb, formatDb, parseDb } from '$lib/volume'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
@@ -248,6 +248,13 @@
   })
 </script>
 
+{#snippet boost(db: number, caption: string, hint: string)}
+  <div class="flex flex-col items-end text-muted-foreground" title={hint}>
+    <span>{formatDb(db)}</span>
+    <span class="font-sans text-[11px]">{caption}</span>
+  </div>
+{/snippet}
+
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
     <SeriesPicker
@@ -389,13 +396,13 @@
             <table class="w-full border-collapse text-[12.5px]">
               <thead class="sticky top-0">
                 <tr style="background: hsl(var(--muted) / .5);">
-                  <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colTrack')}</th>
-                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colMeasured')}</th>
-                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colAutoGain')}</th>
-                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" title={$_('configVolume.colNormalisedHint')}>{$_('configVolume.colNormalised')}</th>
-                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colOverride')}</th>
-                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colFinal')}</th>
-                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"></th>
+                  <th class="w-full px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colTrack')}</th>
+                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colMeasured')}</th>
+                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colAutoGain')}</th>
+                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" title={$_('configVolume.colNormalisedHint')}>{$_('configVolume.colNormalised')}</th>
+                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colOverride')}</th>
+                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" title={$_('configVolume.colFinalHint')}>{$_('configVolume.colFinal')}</th>
+                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"></th>
                 </tr>
               </thead>
               <tbody>
@@ -403,16 +410,16 @@
                   {@const isPlaying = playingIndex === row.originalIndex}
                   {@const isPreviewLoading = previewLoadingIndex === row.originalIndex}
                   <tr class="border-t border-border transition-colors hover:bg-muted/40">
-                    <td class="px-3 py-2">
+                    <td class="w-full max-w-0 px-3 py-2">
                       <div class="flex min-w-0 flex-col">
                         <span class="truncate font-semibold">{row.title}</span>
                         <span class="truncate text-[11px] text-muted-foreground">{row.filename}</span>
                       </div>
                     </td>
-                    <td class="px-3 py-2 text-right font-mono text-[12px]">
+                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px]">
                       {row.hasMeasurement ? `${row.measuredLufs.toFixed(1)} LUFS` : '—'}
                     </td>
-                    <td class="px-3 py-2 text-right">
+                    <td class="whitespace-nowrap px-3 py-2 text-right">
                       <div class="flex items-center justify-end gap-1.5">
                         {#if row.wasClamped}
                           <span title={$_('configVolume.clampWarning')} style="color: hsl(38 92% 45%);">
@@ -422,15 +429,15 @@
                         <span class="font-mono text-[12px]">{row.hasMeasurement ? formatDb(row.autoGainDb) : '—'}</span>
                       </div>
                     </td>
-                    <td class="px-3 py-2 text-right font-mono text-[12px]">
-                      {row.hasMeasurement ? `${(row.measuredLufs + row.autoGainDb).toFixed(1)} LUFS` : '—'}
+                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px]">
+                      {row.hasMeasurement ? formatBankDb((data?.bankBaseDb ?? 0) + row.autoGainDb) : '—'}
                     </td>
-                    <td class="px-3 py-2 text-right">
-                      <div class="flex items-center justify-end gap-1.5 font-mono text-[12px]">
-                        <span class="text-muted-foreground" title={$_('configVolume.globalHint')}>{$_('configVolume.globalLabel', { values: { value: formatDb(data?.globalDb ?? 0) } })}</span>
-                        <span class="text-muted-foreground">·</span>
-                        <span class="text-muted-foreground" title={$_('configVolume.seriesDbHint')}>{$_('configVolume.seriesLabel', { values: { value: formatDb(seriesDb) } })}</span>
-                        <span class="text-muted-foreground">·</span>
+                    <td class="whitespace-nowrap px-3 py-2 text-right">
+                      <div class="flex items-center justify-end gap-2 font-mono text-[12px]">
+                        {@render boost(data?.globalDb ?? 0, $_('configVolume.globalCaption'), $_('configVolume.globalHint'))}
+                        <span class="text-muted-foreground">+</span>
+                        {@render boost(seriesDb, $_('configVolume.seriesCaption'), $_('configVolume.seriesDbHint'))}
+                        <span class="text-muted-foreground">+</span>
                         <input
                           type="number"
                           {...DB_INPUT}
@@ -441,8 +448,8 @@
                         />
                       </div>
                     </td>
-                    <td class="px-3 py-2 text-right font-mono text-[12px] font-semibold">{formatDb(effectiveDb(row))}</td>
-                    <td class="px-3 py-2 text-right">
+                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px] font-semibold">{formatBankDb((data?.bankBaseDb ?? 0) + effectiveDb(row))}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right">
                       <button
                         onclick={() => togglePreview(row)}
                         disabled={isPreviewLoading}

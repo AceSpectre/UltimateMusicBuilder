@@ -320,8 +320,9 @@ namespace Tests.Integration
             File.WriteAllText(Path.Combine(dir, "tracks.csv"), "filename,game,title,volume_db\nsong.flac,g,Song,-1.5\n");
             File.WriteAllBytes(Path.Combine(dir, "song.flac"), new byte[] { 0x01 });
 
-            var prop = CreateMod(Path.GetDirectoryName(dir)).GetMusicModEntries().BgmPropertyEntries.Single();
-            Assert.Equal(MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB + 3f, prop.AudioVolume, precision: 3);
+            var entries = CreateMod(Path.GetDirectoryName(dir)).GetMusicModEntries();
+            Assert.Equal(MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB + 3f, entries.BgmPropertyEntries.Single().AudioVolume, precision: 3);
+            Assert.Equal(4.5f, entries.SeriesVolumeDb["ui_series_dev"]);
         }
 
         // ── Edge cases ─────────────────────────────────────────────────────

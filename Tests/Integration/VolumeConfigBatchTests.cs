@@ -198,6 +198,7 @@ namespace Tests.Integration
             var result = ReadResult(outputPath);
             Assert.Equal("dev", result.SeriesName);
             Assert.True(result.FfmpegAvailable);
+            Assert.Equal(MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB, result.BankBaseDb);
             Assert.Equal(2, result.Items.Count);
             Assert.All(result.Items, item =>
             {

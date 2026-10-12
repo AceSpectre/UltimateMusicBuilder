@@ -69,6 +69,8 @@ namespace UMB.CLI.Services
         public double SeriesDb { get; set; }
         public float TargetLufs { get; set; }
         public float MaxGainDb { get; set; }
+        /// <summary>nus3bank volume (dB) of a track with no boosts; the boosts are added to it.</summary>
+        public float BankBaseDb { get; set; } = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB;
         public bool FfmpegAvailable { get; set; }
         /// <summary>True if a LUFS cache file already exists for the series directory.</summary>
         public bool LufsCacheExists { get; set; }

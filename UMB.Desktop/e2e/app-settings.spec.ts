@@ -68,7 +68,7 @@ test('getAppSettings falls back to the default when GlobalVolumeDb is missing', 
 
 test('saveAppSettings rewrites the global dB boost and preserves every other key', async () => {
   const page = await firstWindow(app)
-  await page.evaluate(() => window.electron.umb.saveAppSettings({ globalVolumeDb: 0.8 }))
+  await page.evaluate(() => window.electron.umb.saveAppSettings({ globalVolumeDb: 0.8, applyVolumeToVanilla: false }))
 
   const raw = readSettings()
   expect(raw.Sma5hMusic.GlobalVolumeDb).toBe(0.8)
@@ -83,7 +83,7 @@ test('saveAppSettings rewrites the global dB boost and preserves every other key
 test('saveAppSettings creates the Sma5hMusic section when it does not exist', async () => {
   writeSettings({ OutputPath: 'ArcOutput' })
   const page = await firstWindow(app)
-  await page.evaluate(() => window.electron.umb.saveAppSettings({ globalVolumeDb: 3 }))
+  await page.evaluate(() => window.electron.umb.saveAppSettings({ globalVolumeDb: 3, applyVolumeToVanilla: false }))
 
   expect(readSettings().Sma5hMusic.GlobalVolumeDb).toBe(3)
 })

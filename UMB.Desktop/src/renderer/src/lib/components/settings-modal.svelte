@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AlertTriangle, RotateCcw, Settings, Volume2 } from '@lucide/svelte'
+  import { AlertTriangle, FlaskConical, RotateCcw, Settings, SlidersHorizontal, Volume2 } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import Modal from '$lib/components/ui/modal.svelte'
   import { DB_INPUT, parseDb } from '$lib/volume'
@@ -7,6 +7,8 @@
   let { open, onClose }: { open: boolean; onClose: () => void } = $props()
 
   let globalVolumeDb = $state(0)
+  let applyVolumeToVanilla = $state(false)
+  let tab = $state<'general' | 'experimental'>('general')
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let loaded = $state(false)
   let resetConfirmOpen = $state(false)
@@ -17,19 +19,21 @@
     if (open && !loaded) {
       void window.electron.umb.getAppSettings().then((s) => {
         globalVolumeDb = s.globalVolumeDb
+        applyVolumeToVanilla = s.applyVolumeToVanilla
         loaded = true
       })
     }
     if (!open) {
       loaded = false
       saveState = 'idle'
+      tab = 'general'
     }
   })
 
   async function handleSave() {
     saveState = 'saving'
     try {
-      await window.electron.umb.saveAppSettings({ globalVolumeDb: parseDb(String(globalVolumeDb)) })
+      await window.electron.umb.saveAppSettings({ globalVolumeDb: parseDb(String(globalVolumeDb)), applyVolumeToVanilla })
       saveState = 'saved'
       setTimeout(() => onClose(), 600)
     } catch {
@@ -41,7 +45,7 @@
     resetting = true
     resetFailed = false
     try {
-      await window.electron.umb.saveAppSettings({ globalVolumeDb: 0 })
+      await window.electron.umb.saveAppSettings({ globalVolumeDb: 0, applyVolumeToVanilla })
       globalVolumeDb = 0
       await window.electron.umb.resetAllVolumes()
       resetConfirmOpen = false
@@ -56,6 +60,16 @@
     if (saveState !== 'saving') onClose()
   }
 </script>
+
+{#snippet tabButton(id: 'general' | 'experimental', Icon: typeof Settings, label: string)}
+  <button
+    onclick={() => (tab = id)}
+    class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors {tab === id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60'}"
+  >
+    <Icon size={13} />
+    {label}
+  </button>
+{/snippet}
 
 {#if open}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -84,31 +98,57 @@
         </div>
       </div>
 
-      <div class="px-5 py-5 flex flex-col gap-4">
-        <div class="flex flex-col gap-1.5">
-          <label for="global-volume" class="flex items-center gap-1.5 text-[12.5px] font-medium">
-            <Volume2 size={13} class="text-muted-foreground" />
-            {$_('settings.globalVolume')}
-          </label>
-          <input
-            id="global-volume"
-            type="number"
-            {...DB_INPUT}
-            bind:value={globalVolumeDb}
-            oninput={() => { if (saveState === 'saved') saveState = 'idle' }}
-            class="rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-mono outline-none focus:border-ring"
-          />
-          <p class="text-[11.5px] text-muted-foreground">{$_('settings.globalVolumeHint')}</p>
-        </div>
-        <button
-          onclick={() => { resetFailed = false; resetConfirmOpen = true }}
-          disabled={saveState === 'saving'}
-          class="btn-danger self-start"
-        >
-          <RotateCcw size={14} />
-          {$_('settings.resetVolumes')}
-        </button>
+      <div class="flex items-center gap-1 border-b border-border px-2 py-1.5">
+        {@render tabButton('general', SlidersHorizontal, $_('settings.tabGeneral'))}
+        {@render tabButton('experimental', FlaskConical, $_('settings.tabExperimental'))}
       </div>
+
+      {#if tab === 'general'}
+        <div class="px-5 py-5 flex flex-col gap-4">
+          <div class="flex flex-col gap-1.5">
+            <label for="global-volume" class="flex items-center gap-1.5 text-[12.5px] font-medium">
+              <Volume2 size={13} class="text-muted-foreground" />
+              {$_('settings.globalVolume')}
+            </label>
+            <input
+              id="global-volume"
+              type="number"
+              {...DB_INPUT}
+              bind:value={globalVolumeDb}
+              oninput={() => { if (saveState === 'saved') saveState = 'idle' }}
+              class="rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-mono outline-none focus:border-ring"
+            />
+            <p class="text-[11.5px] text-muted-foreground">{$_('settings.globalVolumeHint')}</p>
+          </div>
+          <button
+            onclick={() => { resetFailed = false; resetConfirmOpen = true }}
+            disabled={saveState === 'saving'}
+            class="btn-danger self-start"
+          >
+            <RotateCcw size={14} />
+            {$_('settings.resetVolumes')}
+          </button>
+        </div>
+      {:else}
+        <div class="px-5 py-5 flex flex-col gap-1.5">
+          <div class="flex items-center justify-between gap-3">
+            <span id="apply-vanilla-label" class="text-[12.5px] font-medium">{$_('settings.applyVolumeToVanilla')}</span>
+            <button
+              role="switch"
+              aria-checked={applyVolumeToVanilla}
+              aria-labelledby="apply-vanilla-label"
+              onclick={() => { applyVolumeToVanilla = !applyVolumeToVanilla; if (saveState === 'saved') saveState = 'idle' }}
+              class="relative h-5 w-9 shrink-0 rounded-full transition-colors {applyVolumeToVanilla ? 'bg-destructive' : 'bg-muted-foreground/30'}"
+            >
+              <span class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform {applyVolumeToVanilla ? 'translate-x-4' : ''}"></span>
+            </button>
+          </div>
+          <p class="flex items-start gap-1.5 text-[11.5px] text-destructive">
+            <AlertTriangle size={13} class="mt-0.5 shrink-0" />
+            {$_('settings.applyVolumeToVanillaWarning')}
+          </p>
+        </div>
+      {/if}
 
       <div class="border-t border-border px-5 py-4 flex items-center justify-end gap-2">
         <button
