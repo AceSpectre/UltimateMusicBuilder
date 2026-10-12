@@ -42,7 +42,6 @@ export interface TrackOrderItem {
   isLocked: boolean
   originalIndex: number | null
   fields: TrackFields | null
-  isPinchTarget: boolean
 }
 
 export interface SeriesGame {
