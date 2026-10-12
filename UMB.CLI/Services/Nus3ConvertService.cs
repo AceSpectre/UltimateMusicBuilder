@@ -455,8 +455,18 @@ namespace UMB.CLI.Services
             }
         }
 
-        private static List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)> RunPymusiclooper(string filePath) =>
-            AudioTools.FindLoops(filePath).Select(l => (l.Start, l.End, l.NoteDistance, l.LoudnessDiff, l.Score)).ToList();
+        private List<(long loopStart, long loopEnd, double noteDistance, double loudnessDiff, double score)> RunPymusiclooper(string filePath)
+        {
+            try
+            {
+                return AudioTools.FindLoops(filePath).Select(l => (l.Start, l.End, l.NoteDistance, l.LoudnessDiff, l.Score)).ToList();
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning("  Loop analysis failed for '{File}': {Msg}", Path.GetFileName(filePath), e.Message);
+                return new();
+            }
+        }
 
         private long GetWavSampleCount(string filePath)
         {
