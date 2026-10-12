@@ -109,27 +109,26 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 var uiSeriesId = MusicConstants.InternalIds.SERIES_ID_PREFIX + seriesFile.Series.Id;
                 var isExistingSeries = seriesFile.Series.ExistingSeries;
 
+                var iconPath = Path.Combine(subfolder, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
+                if (!File.Exists(iconPath))
+                    iconPath = null;
+
                 // ── SeriesEntry (skip for existing in-game series) ────────
                 if (!isExistingSeries)
                 {
                     var seriesEntry = new SeriesEntry(uiSeriesId, EntrySource.Mod)
                     {
-                        NameId = seriesFile.Series.Id
+                        NameId = seriesFile.Series.Id,
+                        IconPath = iconPath
                     };
                     seriesEntry.MSBTTitle["en_us"] = seriesFile.Series.Name ?? seriesFile.Series.Id;
-
-                    // ── Icon (optional) ────────────────────────────────────
-                    var iconPath = Path.Combine(subfolder, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
-                    if (File.Exists(iconPath))
-                    {
-                        seriesEntry.IconPath = iconPath;
-                        _logger.LogInformation("Found icon.png for series {SeriesId}.", uiSeriesId);
-                    }
                     output.SeriesEntries.Add(seriesEntry);
                 }
                 else
                 {
                     _logger.LogInformation("Series {SeriesId} is flagged as existing — skipping SeriesEntry creation.", uiSeriesId);
+                    if (iconPath != null)
+                        output.VanillaSeriesIcons[uiSeriesId] = iconPath;
 
                     // Optional song_order.toml: lets the user interleave modded songs with vanilla
                     // ones in the Sound Test / My Music ordering. Only meaningful for existing series.
@@ -189,7 +188,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 var playlistTracks = new List<(string uiBgmId, int incidence)>();
                 var filenameByUiBgmId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var filenameToInfoId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                var deferredInfo1 = new List<(BgmStreamSetEntry streamSet, string info1Filename)>();
+                var deferredInfo1 = new List<(string id, Action<string> setInfo1, string info1Filename)>();
 
                 foreach (var row in tracks)
                 {
@@ -211,6 +210,26 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     if (!gameIdLookup.TryGetValue(row.Game, out var uiGameTitleId))
                     {
                         _logger.LogError("Skipping {Filename}: game '{Game}' not found in series.toml [[games]].", row.Filename, row.Game);
+                        continue;
+                    }
+
+                    if (IsVanillaBgmId(row.Filename))
+                    {
+                        var vanilla = new VanillaBgmOverride
+                        {
+                            UiBgmId = row.Filename,
+                            UiGameTitleId = uiGameTitleId,
+                            Title = row.Title,
+                            Author = row.Author,
+                            Copyright = row.Copyright,
+                            RecordType = NormalizeRecordType(row.RecordType),
+                            SpecialCategory = row.SpecialCategory ?? "",
+                            InSoundtest = row.InSoundtest,
+                            VolumeDb = row.VolumeDb
+                        };
+                        output.VanillaBgmOverrides.Add(vanilla);
+                        if (!string.IsNullOrEmpty(row.Info1))
+                            deferredInfo1.Add((row.Filename, info1 => vanilla.Info1 = info1, row.Info1));
                         continue;
                     }
 
@@ -259,7 +278,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
 
                     filenameToInfoId[row.Filename] = infoId;
                     if (!string.IsNullOrEmpty(row.Info1))
-                        deferredInfo1.Add((streamSet, row.Info1));
+                        deferredInfo1.Add((setId, info1 => streamSet.Info1 = info1, row.Info1));
 
                     // BgmAssignedInfoEntry (defaults set by constructor)
                     var assignedInfo = new BgmAssignedInfoEntry(infoId, this)
@@ -312,20 +331,20 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 }
 
                 // ── Resolve info1 references ─────────────────────────────
-                foreach (var (streamSet, info1Filename) in deferredInfo1)
+                foreach (var (id, setInfo1, info1Filename) in deferredInfo1)
                 {
                     if (info1Filename.StartsWith("info_"))
                     {
                         // Direct base game info ID reference
-                        streamSet.Info1 = info1Filename;
+                        setInfo1(info1Filename);
                     }
                     else if (filenameToInfoId.TryGetValue(info1Filename, out var info1Id))
                     {
-                        streamSet.Info1 = info1Id;
+                        setInfo1(info1Id);
                     }
                     else
                     {
-                        _logger.LogWarning("Track {StreamSetId}: info1 references '{Info1Filename}' which was not found in this series.", streamSet.StreamSetId, info1Filename);
+                        _logger.LogWarning("Track {Id}: info1 references '{Info1Filename}' which was not found in this series.", id, info1Filename);
                     }
                 }
 
@@ -465,6 +484,10 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             }
             return Array.Empty<string>();
         }
+
+        /// <summary>A tracks.csv filename naming a vanilla song (its ui_bgm id) rather than an audio file.</summary>
+        public static bool IsVanillaBgmId(string filename) =>
+            filename != null && filename.StartsWith(MusicConstants.InternalIds.UI_BGM_ID_PREFIX) && !Path.HasExtension(filename);
 
         public static string DeriveToneId(string filename)
         {

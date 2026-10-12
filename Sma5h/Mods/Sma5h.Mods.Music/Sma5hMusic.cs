@@ -36,6 +36,7 @@ namespace Sma5h.Mods.Music
         public override string ModName => "Sma5hMusic";
 
         private readonly Dictionary<string, float> _seriesVolumeDb = new();
+        private readonly Dictionary<string, float> _vanillaTrackDb = new();
 
         public Sma5hMusic(IOptionsMonitor<Sma5hMusicOptions> config, IMusicModManagerService musicModManagerService, IAudioStateService audioStateService,
             INus3AudioService nus3AudioService, IProcessService processService, ILufsAnalysisService lufsService, IStateManager state, ILogger<Sma5hMusic> logger)
@@ -67,6 +68,8 @@ namespace Sma5h.Mods.Music
             _logger.LogInformation("Loading Sma5hMusic Mods");
             var musicMods = _musicModManagerService.RefreshMusicMods();
 
+            var vanillaOverrides = new List<VanillaBgmOverride>();
+            var vanillaSeriesIcons = new Dictionary<string, string>();
             foreach (var musicMod in musicMods)
             {
                 //Add to Audio State Service
@@ -91,7 +94,15 @@ namespace Sma5h.Mods.Music
                     _audioStateService.RegisterSeriesSongOrdering(ordering.Key, ordering.Value);
                 foreach (var seriesDb in musicModEntries.SeriesVolumeDb)
                     _seriesVolumeDb[seriesDb.Key] = seriesDb.Value;
+                vanillaOverrides.AddRange(musicModEntries.VanillaBgmOverrides);
+                foreach (var icon in musicModEntries.VanillaSeriesIcons)
+                    vanillaSeriesIcons[icon.Key] = icon.Value;
             }
+
+            VanillaOverrideHelper.Apply(_audioStateService, vanillaOverrides, _config.CurrentValue.Sma5hMusic.DefaultLocale, _logger);
+            VanillaOverrideHelper.ApplySeriesIcons(_audioStateService, vanillaSeriesIcons);
+            foreach (var edit in vanillaOverrides)
+                _vanillaTrackDb[edit.UiBgmId] = edit.VolumeDb;
 
             return true;
         }
@@ -220,13 +231,12 @@ namespace Sma5h.Mods.Music
             }
 
             // Vanilla audio is kept; only its nus3bank is regenerated with the boosted volume.
-            if (_config.CurrentValue.Sma5hMusic.ApplyVolumeToVanilla)
-            {
-                var vanillaBoosts = VanillaVolumeHelper.BoostsByToneId(_audioStateService, globalDb, _seriesVolumeDb);
-                _logger.LogWarning("Applying volume settings to {Count} vanilla song(s).", vanillaBoosts.Count);
-                foreach (var entry in _audioStateService.GetBgmPropertyEntries().Where(p => vanillaBoosts.ContainsKey(p.NameId)))
-                    _nus3AudioService.GenerateNus3Bank(entry.NameId, entry.AudioVolume + vanillaBoosts[entry.NameId], BgmOutputFile(MusicConstants.GameResources.NUS3BANK_FILE, entry.NameId));
-            }
+            var vanillaBoosts = VanillaVolumeHelper.BoostsByToneId(_audioStateService, globalDb, _seriesVolumeDb, _vanillaTrackDb,
+                _config.CurrentValue.Sma5hMusic.ApplyVolumeToVanilla);
+            if (vanillaBoosts.Count > 0)
+                _logger.LogInformation("Applying volume settings to {Count} vanilla song(s).", vanillaBoosts.Count);
+            foreach (var entry in _audioStateService.GetBgmPropertyEntries().Where(p => vanillaBoosts.ContainsKey(p.NameId)))
+                _nus3AudioService.GenerateNus3Bank(entry.NameId, entry.AudioVolume + vanillaBoosts[entry.NameId], BgmOutputFile(MusicConstants.GameResources.NUS3BANK_FILE, entry.NameId));
 
             if (lufsEnabled)
                 _lufsService.SaveCache();

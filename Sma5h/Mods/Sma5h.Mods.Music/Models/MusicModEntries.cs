@@ -15,6 +15,9 @@ namespace Sma5h.Mods.Music.Models
         public Dictionary<string, List<string>> SeriesSongOrderings { get; }
         /// <summary>Series dB boost by UiSeriesId.</summary>
         public Dictionary<string, float> SeriesVolumeDb { get; }
+        public List<VanillaBgmOverride> VanillaBgmOverrides { get; }
+        /// <summary>icon.png path by UiSeriesId, for vanilla series.</summary>
+        public Dictionary<string, string> VanillaSeriesIcons { get; }
 
         public MusicModEntries()
         {
@@ -28,6 +31,8 @@ namespace Sma5h.Mods.Music.Models
             PlaylistEntries = new List<PlaylistEntry>();
             SeriesSongOrderings = new Dictionary<string, List<string>>();
             SeriesVolumeDb = new Dictionary<string, float>();
+            VanillaBgmOverrides = new List<VanillaBgmOverride>();
+            VanillaSeriesIcons = new Dictionary<string, string>();
         }
     }
 }

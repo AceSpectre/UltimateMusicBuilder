@@ -851,12 +851,12 @@ namespace Sma5h.Mods.Music.Services
             return output;
         }
 
-        private string ConvertFromGameTextTag(string input)
+        public static string ConvertFromGameTextTag(string input)
         {
             return input.Replace("\u000e\u0000\u0002\u0002P", "{{").Replace("\u000e\u0000\u0002\u0002d", "}}");
         }
 
-        private string ConvertToGameTextTag(string input)
+        public static string ConvertToGameTextTag(string input)
         {
             return input.Replace("{{", "\u000e\u0000\u0002\u0002P").Replace("}}", "\u000e\u0000\u0002\u0002d");
         }

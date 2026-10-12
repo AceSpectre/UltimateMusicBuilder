@@ -1,4 +1,4 @@
-using Moq;
+﻿using Moq;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
 using Sma5h.Mods.Music.Models;
@@ -51,10 +51,12 @@ namespace Tests.Unit
             return state.Object;
         }
 
+        private static readonly Dictionary<string, float> NoTrackDb = new();
+
         [Fact]
         public void BoostsByToneId_AddsTheSeriesBoostToTheGlobalBoost_ForVanillaSongsOnly()
         {
-            var boosts = VanillaVolumeHelper.BoostsByToneId(State(), 1f, new Dictionary<string, float> { ["ui_series_mario"] = -3f });
+            var boosts = VanillaVolumeHelper.BoostsByToneId(State(), 1f, new Dictionary<string, float> { ["ui_series_mario"] = -3f }, NoTrackDb, true);
 
             Assert.Equal(new Dictionary<string, float> { ["a"] = -2f, ["b"] = 1f }, boosts);
         }
@@ -62,9 +64,27 @@ namespace Tests.Unit
         [Fact]
         public void BoostsByToneId_LeavesOutSongsWithNoBoost()
         {
-            var boosts = VanillaVolumeHelper.BoostsByToneId(State(), 0f, new Dictionary<string, float> { ["ui_series_zelda"] = 2f });
+            var boosts = VanillaVolumeHelper.BoostsByToneId(State(), 0f, new Dictionary<string, float> { ["ui_series_zelda"] = 2f }, NoTrackDb, true);
 
             Assert.Equal(new Dictionary<string, float> { ["b"] = 2f }, boosts);
+        }
+
+        [Fact]
+        public void BoostsByToneId_AppliesOnlyTrackBoostsWhenGlobalAndSeriesAreOff()
+        {
+            var boosts = VanillaVolumeHelper.BoostsByToneId(State(), 1f, new Dictionary<string, float> { ["ui_series_mario"] = -3f },
+                new Dictionary<string, float> { ["ui_bgm_b"] = 4f, ["ui_bgm_m"] = 5f }, false);
+
+            Assert.Equal(new Dictionary<string, float> { ["b"] = 4f }, boosts);
+        }
+
+        [Fact]
+        public void BoostsByToneId_AddsTrackBoostsToGlobalAndSeries()
+        {
+            var boosts = VanillaVolumeHelper.BoostsByToneId(State(), 1f, new Dictionary<string, float> { ["ui_series_mario"] = -3f },
+                new Dictionary<string, float> { ["ui_bgm_a"] = 2f }, true);
+
+            Assert.Equal(new Dictionary<string, float> { ["b"] = 1f }, boosts);
         }
     }
 }
