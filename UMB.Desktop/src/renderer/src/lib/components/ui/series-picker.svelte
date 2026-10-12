@@ -1,6 +1,9 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
-  import { Folder, PanelLeftClose, PanelLeftOpen, RefreshCw } from '@lucide/svelte'
+  import Folder from '@lucide/svelte/icons/folder'
+  import PanelLeftClose from '@lucide/svelte/icons/panel-left-close'
+  import PanelLeftOpen from '@lucide/svelte/icons/panel-left-open'
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw'
   import { _ } from 'svelte-i18n'
   import GradientIcon from './gradient-icon.svelte'
   import IconButton from './icon-button.svelte'

@@ -2,6 +2,8 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: 'e2e',
+  // *.test.ts files in e2e/ are Vitest unit tests for the E2E helpers.
+  testMatch: '*.spec.ts',
   // Refuses to run against a stale/missing dist/ build. See e2e/global-setup.ts.
   globalSetup: './e2e/global-setup.ts',
   timeout: 120_000,

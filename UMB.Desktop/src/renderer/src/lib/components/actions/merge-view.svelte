@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { GitMerge, RefreshCw, Check, AlertTriangle } from '@lucide/svelte'
+  import GitMerge from '@lucide/svelte/icons/git-merge'
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw'
+  import Check from '@lucide/svelte/icons/check'
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'

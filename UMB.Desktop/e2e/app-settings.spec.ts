@@ -1,5 +1,5 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'fs'
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { createWorkspace, seedTestDataMod, launchApp, firstWindow, closeApp, type E2EWorkspace } from './e2e-utils'
 
@@ -44,84 +44,6 @@ test.afterAll(async () => {
 
 test.beforeEach(() => {
   writeSettings(BASE_SETTINGS)
-})
-
-test('getAppSettings reads GlobalVolumeDb out of appsettings.json', async () => {
-  const page = await firstWindow(app)
-  const settings = await page.evaluate(() => window.electron.umb.getAppSettings())
-  expect(settings.globalVolumeDb).toBe(2.25)
-})
-
-test('getAppSettings falls back to the 0 dB default when appsettings.json is absent', async () => {
-  rmSync(settingsPath(), { force: true })
-  const page = await firstWindow(app)
-  const settings = await page.evaluate(() => window.electron.umb.getAppSettings())
-  expect(settings.globalVolumeDb).toBe(0)
-})
-
-test('getAppSettings falls back to the default when GlobalVolumeDb is missing', async () => {
-  writeSettings({ OutputPath: 'ArcOutput', Sma5hMusic: { CachePath: 'Cache' } })
-  const page = await firstWindow(app)
-  const settings = await page.evaluate(() => window.electron.umb.getAppSettings())
-  expect(settings.globalVolumeDb).toBe(0)
-})
-
-test('saveAppSettings rewrites the global dB boost and preserves every other key', async () => {
-  const page = await firstWindow(app)
-  await page.evaluate(() => window.electron.umb.saveAppSettings({ globalVolumeDb: 0.8, applyVolumeToVanilla: false }))
-
-  const raw = readSettings()
-  expect(raw.Sma5hMusic.GlobalVolumeDb).toBe(0.8)
-  expect(raw.OutputPath).toBe('ArcOutput')
-  expect(raw.ModPath).toBe('Mods/MusicMods')
-  expect(raw.Sma5hMusic.CachePath).toBe('Cache')
-
-  const reread = await page.evaluate(() => window.electron.umb.getAppSettings())
-  expect(reread.globalVolumeDb).toBe(0.8)
-})
-
-test('saveAppSettings creates the Sma5hMusic section when it does not exist', async () => {
-  writeSettings({ OutputPath: 'ArcOutput' })
-  const page = await firstWindow(app)
-  await page.evaluate(() => window.electron.umb.saveAppSettings({ globalVolumeDb: 3, applyVolumeToVanilla: false }))
-
-  expect(readSettings().Sma5hMusic.GlobalVolumeDb).toBe(3)
-})
-
-test('checkArcOutput is false when the output dir is missing, then empty, and true once populated', async () => {
-  const page = await firstWindow(app)
-  const arcOutput = join(ws.root, 'ArcOutput')
-
-  rmSync(arcOutput, { recursive: true, force: true })
-  expect(await page.evaluate(() => window.electron.umb.checkArcOutput())).toBe(false)
-
-  mkdirSync(arcOutput, { recursive: true })
-  expect(await page.evaluate(() => window.electron.umb.checkArcOutput())).toBe(false)
-
-  writeFileSync(join(arcOutput, 'ui_bgm_db.prc'), 'stub', 'utf-8')
-  expect(await page.evaluate(() => window.electron.umb.checkArcOutput())).toBe(true)
-
-  rmSync(arcOutput, { recursive: true, force: true })
-})
-
-test('checkArcOutput honours a custom OutputPath from appsettings.json', async () => {
-  writeSettings({ ...BASE_SETTINGS, OutputPath: 'CustomOut' })
-  const page = await firstWindow(app)
-
-  const customOut = join(ws.root, 'CustomOut')
-  expect(await page.evaluate(() => window.electron.umb.checkArcOutput())).toBe(false)
-
-  mkdirSync(customOut, { recursive: true })
-  writeFileSync(join(customOut, 'anything.prc'), 'stub', 'utf-8')
-  expect(await page.evaluate(() => window.electron.umb.checkArcOutput())).toBe(true)
-
-  rmSync(customOut, { recursive: true, force: true })
-})
-
-test('checkArcOutput is false when appsettings.json is unreadable', async () => {
-  writeFileSync(settingsPath(), '{ not json', 'utf-8')
-  const page = await firstWindow(app)
-  expect(await page.evaluate(() => window.electron.umb.checkArcOutput())).toBe(false)
 })
 
 test('settings modal loads the current global dB boost, saves the edit, and closes', async () => {

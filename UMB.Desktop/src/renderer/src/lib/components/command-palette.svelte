@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Search } from '@lucide/svelte'
+  import Search from '@lucide/svelte/icons/search'
   import { _ } from 'svelte-i18n'
   import { actions } from '$lib/actions'
   import type { ModInfo } from '$lib/types/electron'

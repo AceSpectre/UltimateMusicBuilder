@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { AlertTriangle, FlaskConical, RotateCcw, Settings, SlidersHorizontal, Volume2 } from '@lucide/svelte'
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle'
+  import FlaskConical from '@lucide/svelte/icons/flask-conical'
+  import RotateCcw from '@lucide/svelte/icons/rotate-ccw'
+  import Settings from '@lucide/svelte/icons/settings'
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal'
+  import Volume2 from '@lucide/svelte/icons/volume-2'
   import { _ } from 'svelte-i18n'
   import Modal from '$lib/components/ui/modal.svelte'
   import { DB_INPUT, clampDb } from '$lib/volume'

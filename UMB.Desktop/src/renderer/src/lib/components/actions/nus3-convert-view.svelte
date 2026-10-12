@@ -1,8 +1,11 @@
 <script lang="ts">
-  import {
-    AudioWaveform, CheckCircle, X, Play,
-    Trash2, RefreshCw, Settings
-  } from '@lucide/svelte'
+  import AudioWaveform from '@lucide/svelte/icons/audio-waveform'
+  import CheckCircle from '@lucide/svelte/icons/check-circle'
+  import X from '@lucide/svelte/icons/x'
+  import Play from '@lucide/svelte/icons/play'
+  import Trash2 from '@lucide/svelte/icons/trash-2'
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw'
+  import Settings from '@lucide/svelte/icons/settings'
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
   import { modsStore } from '$lib/stores/mods.svelte'
