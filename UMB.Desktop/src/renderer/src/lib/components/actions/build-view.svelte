@@ -4,6 +4,7 @@
   import { logStore } from '$lib/stores/logs.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import Modal from '$lib/components/ui/modal.svelte'
+  import { formatDb } from '$lib/volume'
   import type { ModInfo, SuspiciousVolumeTrack } from '$lib/types/electron'
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
@@ -377,7 +378,7 @@
             <span class="min-w-0 flex-1 truncate" title={track.filename}>
               <span class="text-muted-foreground">{track.seriesName} /</span> {track.title || track.filename}
             </span>
-            <span class="shrink-0 font-mono">{track.effectiveVolume}×</span>
+            <span class="shrink-0 font-mono">{formatDb(track.effectiveDb)}</span>
           </li>
         {/each}
       </ul>

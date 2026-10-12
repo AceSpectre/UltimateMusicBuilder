@@ -2,7 +2,7 @@ using System;
 
 namespace Sma5h.Mods.Music.Helpers
 {
-    /// <summary>nus3bank volume is dB; user-facing volumes are linear multipliers.</summary>
+    /// <summary>Conversions between dB and linear gain (legacy multipliers, preview playback).</summary>
     public static class VolumeHelper
     {
         private const float MUTED_NUS3BANK_VOLUME_DB = -90f;

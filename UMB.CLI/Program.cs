@@ -2,6 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Console;
+using Microsoft.Extensions.Options;
+using Sma5h.Mods.Music;
 using Spectre.Console;
 using System;
 using System.Collections.Generic;
@@ -58,9 +60,11 @@ namespace UMB.CLI
                     Directory.SetCurrentDirectory(appRoot.FullName);
             }
 
+            Services.VolumeDbMigration.MigrateSettings(Path.Combine(AppContext.BaseDirectory, "appsettings.json"));
             var services = new ServiceCollection();
             ConfigureServices(services, args);
             var serviceProvider = services.BuildServiceProvider();
+            Services.VolumeDbMigration.MigrateMods(serviceProvider.GetRequiredService<IOptionsMonitor<Sma5hMusicOptions>>().CurrentValue.Sma5hMusic.ModPath);
 
             // Persistent daemon mode: keep one process alive and service headless
             // batch requests over stdin. Avoids paying process-spawn + DI bootstrap

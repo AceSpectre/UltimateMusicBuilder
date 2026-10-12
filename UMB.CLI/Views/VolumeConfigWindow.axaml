@@ -8,7 +8,7 @@
 
     <DockPanel Margin="16">
         <TextBlock DockPanel.Dock="Top"
-                   Text="Per-track loudness preview. Auto-gain shows the multiplier LUFS normalization will apply to hit the target loudness. Override lets you nudge individual tracks up or down on top of that — the final bank volume is global × auto × override. Press ▶ to hear the track at the exact volume the built mod will produce; adjusting the override while playing updates loudness in real time."
+                   Text="Per-track loudness preview. Auto-gain shows the dB boost LUFS normalization will apply to hit the target loudness. The track dB boost nudges individual tracks up or down on top of that, so the final boost is global + series + auto + track dB. Press ▶ to hear the track at the exact volume the built mod will produce; adjusting the boost while playing updates loudness in real time."
                    Margin="0,0,0,12"
                    TextWrapping="Wrap"
                    FontSize="13" />
@@ -18,7 +18,7 @@
                     HorizontalAlignment="Right"
                     Margin="0,12,0,0"
                     Spacing="8">
-            <Button x:Name="SaveButton" Content="Save Overrides" Click="OnSave" />
+            <Button x:Name="SaveButton" Content="Save Boosts" Click="OnSave" />
             <Button x:Name="CancelButton" Content="Cancel" Click="OnCancel" />
         </StackPanel>
 
@@ -27,7 +27,7 @@
             <TextBlock Grid.Column="0" Text="Track" FontWeight="Bold" FontSize="12" />
             <TextBlock Grid.Column="1" Text="Measured (LUFS)" FontWeight="Bold" FontSize="12" HorizontalAlignment="Right" />
             <TextBlock Grid.Column="2" Text="Auto gain" FontWeight="Bold" FontSize="12" HorizontalAlignment="Right" />
-            <TextBlock Grid.Column="3" Text="Override" FontWeight="Bold" FontSize="12" HorizontalAlignment="Right" />
+            <TextBlock Grid.Column="3" Text="Track dB" FontWeight="Bold" FontSize="12" HorizontalAlignment="Right" />
             <TextBlock Grid.Column="4" Text="Final" FontWeight="Bold" FontSize="12" HorizontalAlignment="Right" />
             <TextBlock Grid.Column="5" Text="" FontSize="12" />
         </Grid>
@@ -74,11 +74,11 @@
                                                VerticalAlignment="Center" />
                                 </StackPanel>
                                 <NumericUpDown Grid.Column="3"
-                                               Value="{Binding UserOverrideDecimal, Mode=TwoWay}"
-                                               Minimum="0"
-                                               Maximum="10"
-                                               Increment="0.1"
-                                               FormatString="0.###"
+                                               Value="{Binding TrackDbDecimal, Mode=TwoWay}"
+                                               Minimum="-30"
+                                               Maximum="20"
+                                               Increment="0.5"
+                                               FormatString="0.##"
                                                HorizontalAlignment="Right"
                                                VerticalAlignment="Center"
                                                Width="86" />

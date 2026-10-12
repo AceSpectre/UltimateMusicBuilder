@@ -6,7 +6,8 @@ import type { AppSettings } from '../shared/types'
 export type { AppSettings } from '../shared/types'
 
 const DEFAULTS: AppSettings = {
-  globalVolumeMultiplier: 1.0
+  globalVolumeDb: 0,
+  applyVolumeToVanilla: false
 }
 
 // The CLI loads appsettings.json from its own directory (AppContext.BaseDirectory):
@@ -29,7 +30,8 @@ export function getAppSettings(workspace: string): AppSettings {
     const raw = readJson(settingsPath(workspace)) as Record<string, unknown>
     const music = raw?.Sma5hMusic as Record<string, unknown> | undefined
     return {
-      globalVolumeMultiplier: (music?.GlobalVolumeMultiplier as number) ?? DEFAULTS.globalVolumeMultiplier
+      globalVolumeDb: (music?.GlobalVolumeDb as number) ?? DEFAULTS.globalVolumeDb,
+      applyVolumeToVanilla: (music?.ApplyVolumeToVanilla as boolean) ?? DEFAULTS.applyVolumeToVanilla
     }
   } catch {
     return { ...DEFAULTS }
@@ -51,6 +53,7 @@ export function saveAppSettings(workspace: string, settings: AppSettings): void 
   const path = settingsPath(workspace)
   const raw = readJson(path) as Record<string, Record<string, unknown>>
   raw.Sma5hMusic ??= {}
-  raw.Sma5hMusic.GlobalVolumeMultiplier = settings.globalVolumeMultiplier
+  raw.Sma5hMusic.GlobalVolumeDb = settings.globalVolumeDb
+  raw.Sma5hMusic.ApplyVolumeToVanilla = settings.applyVolumeToVanilla
   writeFileSync(path, JSON.stringify(raw, null, 2), 'utf-8')
 }

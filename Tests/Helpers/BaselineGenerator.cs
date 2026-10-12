@@ -166,10 +166,10 @@ namespace Tests.Helpers
                 $"author = \"Test\"\n" +
                 $"copyright = \"\"\n" +
                 $"record-type = \"original\"\n" +
-                $"volume = 1.0\n");
+                $"volume-db = 0.0\n");
 
             File.WriteAllText(Path.Combine(seriesDir, "tracks.csv"),
-                "filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\n" +
+                "filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest\n" +
                 $"gamma_track_01.flac,{seriesId}_game,Gamma Track 1,Test,,original,,1.0,,True\n");
 
             File.WriteAllBytes(Path.Combine(seriesDir, "gamma_track_01.flac"), Array.Empty<byte>());

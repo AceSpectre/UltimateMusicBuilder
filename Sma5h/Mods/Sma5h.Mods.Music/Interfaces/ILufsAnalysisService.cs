@@ -1,5 +1,3 @@
-using Sma5h.Mods.Music.Helpers;
-
 namespace Sma5h.Mods.Music.Interfaces
 {
     public interface ILufsAnalysisService
@@ -11,7 +9,7 @@ namespace Sma5h.Mods.Music.Interfaces
         /// caller wants existing LUFS data but must not trigger (potentially long) analysis.
         /// </summary>
         LufsMeasurement MeasureCached(string audioFilePath);
-        GainResult CalculateGain(LufsMeasurement measurement, float targetLufs, float maxMultiplier);
+        GainResult CalculateGain(LufsMeasurement measurement, float targetLufs, float maxGainDb);
         bool IsAvailable { get; }
         /// <summary>
         /// The resolved FFmpeg executable path (configured path if it exists on disk,
@@ -33,7 +31,6 @@ namespace Sma5h.Mods.Music.Interfaces
     public readonly struct GainResult
     {
         public float Db { get; }
-        public float Multiplier => VolumeHelper.DbToMultiplier(Db);
         public bool WasClamped { get; }
 
         public GainResult(float db, bool wasClamped)

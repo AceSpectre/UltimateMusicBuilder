@@ -5,6 +5,7 @@
   import { logStore } from '$lib/stores/logs.svelte'
   import { modsStore } from '$lib/stores/mods.svelte'
   import { createSeriesLoader } from '$lib/series-loader'
+  import { DB_INPUT, dbToGain, formatBankDb, formatDb, parseDb } from '$lib/volume'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
@@ -24,7 +25,11 @@
   let rows = $state<VolumeRowItem[]>([])
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let baseline = new Map<number, number>()
+  let seriesDb = $state(0)
+  let baselineSeriesDb = $state(0)
   const seriesLoader = createSeriesLoader((v) => (loading = v))
+  const thClass = 'px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'
+  const dbInputClass = 'h-8 w-[88px] rounded-lg border border-input bg-background px-2 text-right font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-ring'
 
   // Web Audio preview
   let audioCtx: AudioContext | null = null
@@ -36,14 +41,15 @@
 
   const seriesPath = $derived(selectedPath)
   const selectedSeries = $derived(series.find((e) => e.path === selectedPath) ?? null)
-  const isDirty = $derived(rows.some((r) => Math.abs((baseline.get(r.originalIndex) ?? r.userOverride) - r.userOverride) > 0.0001))
+  const seriesDbDirty = $derived(Math.abs(seriesDb - baselineSeriesDb) > 0.0001)
+  const isDirty = $derived(seriesDbDirty || rows.some((r) => Math.abs((baseline.get(r.originalIndex) ?? r.trackDb) - r.trackDb) > 0.0001))
   // Highlighted when no LUFS cache exists yet.
   const canAnalyze = $derived(!!data && !!selectedPath && data.ffmpegAvailable && !analyzing && !loadingConfig)
   const needsAnalysis = $derived(!!data && !data.lufsCacheExists)
 
-  function effective(row: VolumeRowItem): number {
-    const global = data?.globalVolumeMultiplier ?? 1
-    return global * row.autoGain * row.userOverride
+  // Total boost the build applies: global + series + auto-gain + track.
+  function effectiveDb(row: VolumeRowItem): number {
+    return (data?.globalDb ?? 0) + seriesDb + row.autoGainDb + row.trackDb
   }
 
   async function loadSeries(modPath: string | null) {
@@ -80,7 +86,8 @@
       if (path !== selectedPath) return
       data = result
       rows = result.items.map((item) => ({ ...item }))
-      baseline = new Map(result.items.map((item) => [item.originalIndex, item.userOverride]))
+      baseline = new Map(result.items.map((item) => [item.originalIndex, item.trackDb]))
+      seriesDb = baselineSeriesDb = result.seriesDb
     } catch (err) {
       logStore.log('error', `Volume analysis failed: ${err instanceof Error ? err.message : String(err)}`)
       data = null
@@ -108,18 +115,26 @@
     if (seriesPath) void loadConfig(seriesPath)
   }
 
-  function clampOverride(value: number): number {
-    if (Number.isNaN(value)) return 1
-    return Math.max(0, Math.min(10, value))
+  // Keeps a playing preview at the edited loudness.
+  function refreshPreviewGain() {
+    const playing = rows.find((r) => r.originalIndex === playingIndex)
+    if (playing && gainNode) gainNode.gain.value = dbToGain(effectiveDb(playing))
   }
 
-  function onOverrideInput(row: VolumeRowItem, raw: string) {
-    const next = clampOverride(parseFloat(raw))
-    rows = rows.map((r) => (r.originalIndex === row.originalIndex ? { ...r, userOverride: next } : r))
-    if (playingIndex === row.originalIndex && gainNode) {
-      gainNode.gain.value = (data?.globalVolumeMultiplier ?? 1) * row.autoGain * next
-    }
+  function onBoostEdited() {
+    refreshPreviewGain()
     if (saveState === 'saved') saveState = 'idle'
+  }
+
+  function onTrackDbInput(row: VolumeRowItem, raw: string) {
+    const next = parseDb(raw)
+    rows = rows.map((r) => (r.originalIndex === row.originalIndex ? { ...r, trackDb: next } : r))
+    onBoostEdited()
+  }
+
+  function onSeriesDbInput(raw: string) {
+    seriesDb = parseDb(raw)
+    onBoostEdited()
   }
 
   async function handleSave() {
@@ -128,9 +143,11 @@
     try {
       await window.electron.umb.saveVolumeConfig(
         seriesPath,
-        rows.map((r) => ({ originalIndex: r.originalIndex, volume: r.userOverride }))
+        rows.map((r) => ({ originalIndex: r.originalIndex, db: r.trackDb })),
+        seriesDbDirty ? seriesDb : undefined
       )
-      baseline = new Map(rows.map((r) => [r.originalIndex, r.userOverride]))
+      baseline = new Map(rows.map((r) => [r.originalIndex, r.trackDb]))
+      baselineSeriesDb = seriesDb
       saveState = 'saved'
     } catch (err) {
       logStore.log('error', `Save failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -180,7 +197,7 @@
       if (audioCtx.state === 'suspended') await audioCtx.resume()
 
       gainNode = audioCtx.createGain()
-      gainNode.gain.value = effective(row)
+      gainNode.gain.value = dbToGain(effectiveDb(row))
       sourceNode = audioCtx.createBufferSource()
       sourceNode.buffer = buffer
       sourceNode.connect(gainNode).connect(audioCtx.destination)
@@ -237,6 +254,13 @@
   })
 </script>
 
+{#snippet boost(db: number, caption: string, hint: string)}
+  <div class="flex flex-col items-end text-muted-foreground" title={hint}>
+    <span>{formatDb(db)}</span>
+    <span class="font-sans text-[11px]">{caption}</span>
+  </div>
+{/snippet}
+
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
     <SeriesPicker
@@ -247,12 +271,6 @@
       activePath={selectedPath}
       onSelect={selectSeries}
       onReload={handleReload}
-      heading={$_('configVolume.seriesHeading')}
-      subtitleFallback={$_('configVolume.selectModSubtitle')}
-      chooseModText={$_('configVolume.chooseMod')}
-      loadingText={$_('configVolume.loadingSeries')}
-      emptyText={$_('configVolume.noSeries')}
-      reloadTitle={$_('configVolume.reload')}
     />
 
     <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
@@ -272,7 +290,7 @@
         <div class="flex items-center gap-2">
           {#if data && rows.length > 0}
             <span class="shrink-0 inline-flex h-[22px] items-center rounded-full border border-border bg-muted px-2 text-[11px] font-medium text-muted-foreground">
-              {$_('configVolume.globalLabel', { values: { value: data.globalVolumeMultiplier.toFixed(2) } })}
+              {$_('configVolume.globalLabel', { values: { value: formatDb(data.globalDb) } })}
             </span>
             <span class="shrink-0 inline-flex h-[22px] items-center rounded-full border border-border bg-muted px-2 text-[11px] font-medium text-muted-foreground">
               {$_('configVolume.targetLabel', { values: { value: data.targetLufs.toFixed(1) } })}
@@ -349,6 +367,19 @@
         <div class="min-h-0 flex-1 overflow-auto bg-background px-5 py-3">
           <p class="mb-3 max-w-[820px] text-[12.5px] leading-relaxed text-muted-foreground">{$_('configVolume.intro')}</p>
 
+          <div class="mb-3 flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2">
+            <label for="series-db" class="text-[12.5px] font-semibold">{$_('configVolume.seriesDb')}</label>
+            <input
+              id="series-db"
+              type="number"
+              {...DB_INPUT}
+              value={seriesDb}
+              oninput={(e) => onSeriesDbInput(e.currentTarget.value)}
+              class={dbInputClass}
+            />
+            <span class="text-[12px] text-muted-foreground">{$_('configVolume.seriesDbHint')}</span>
+          </div>
+
           {#if data && !data.ffmpegAvailable}
             <div class="mb-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px]" style="border-color: hsl(38 92% 50% / .4); background: hsl(38 92% 50% / .1); color: hsl(38 92% 35%);">
               <AlertTriangle size={15} class="mt-0.5 shrink-0" />
@@ -365,12 +396,13 @@
             <table class="w-full border-collapse text-[12.5px]">
               <thead class="sticky top-0">
                 <tr style="background: hsl(var(--muted) / .5);">
-                  <th class="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colTrack')}</th>
-                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colMeasured')}</th>
-                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colAutoGain')}</th>
-                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colOverride')}</th>
-                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colFinal')}</th>
-                  <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"></th>
+                  <th class="w-full text-left {thClass}">{$_('configVolume.colTrack')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}">{$_('configVolume.colMeasured')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}">{$_('configVolume.colAutoGain')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}" title={$_('configVolume.colNormalisedHint')}>{$_('configVolume.colNormalised')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}">{$_('configVolume.colOverride')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}" title={$_('configVolume.colFinalHint')}>{$_('configVolume.colFinal')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}"></th>
                 </tr>
               </thead>
               <tbody>
@@ -378,38 +410,46 @@
                   {@const isPlaying = playingIndex === row.originalIndex}
                   {@const isPreviewLoading = previewLoadingIndex === row.originalIndex}
                   <tr class="border-t border-border transition-colors hover:bg-muted/40">
-                    <td class="px-3 py-2">
+                    <td class="w-full max-w-0 px-3 py-2">
                       <div class="flex min-w-0 flex-col">
                         <span class="truncate font-semibold">{row.title}</span>
                         <span class="truncate text-[11px] text-muted-foreground">{row.filename}</span>
                       </div>
                     </td>
-                    <td class="px-3 py-2 text-right font-mono text-[12px]">
+                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px]">
                       {row.hasMeasurement ? `${row.measuredLufs.toFixed(1)} LUFS` : '—'}
                     </td>
-                    <td class="px-3 py-2 text-right">
+                    <td class="whitespace-nowrap px-3 py-2 text-right">
                       <div class="flex items-center justify-end gap-1.5">
                         {#if row.wasClamped}
                           <span title={$_('configVolume.clampWarning')} style="color: hsl(38 92% 45%);">
                             <AlertTriangle size={13} />
                           </span>
                         {/if}
-                        <span class="font-mono text-[12px]">{row.hasMeasurement ? `${row.autoGain.toFixed(2)}×` : '—'}</span>
+                        <span class="font-mono text-[12px]">{row.hasMeasurement ? formatDb(row.autoGainDb) : '—'}</span>
                       </div>
                     </td>
-                    <td class="px-3 py-2 text-right">
-                      <input
-                        type="number"
-                        min="0"
-                        max="10"
-                        step="0.1"
-                        value={row.userOverride}
-                        oninput={(e) => onOverrideInput(row, e.currentTarget.value)}
-                        class="h-8 w-[88px] rounded-lg border border-input bg-background px-2 text-right font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-ring"
-                      />
+                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px]">
+                      {row.hasMeasurement ? formatBankDb((data?.bankBaseDb ?? 0) + row.autoGainDb) : '—'}
                     </td>
-                    <td class="px-3 py-2 text-right font-mono text-[12px] font-semibold">{effective(row).toFixed(2)}×</td>
-                    <td class="px-3 py-2 text-right">
+                    <td class="whitespace-nowrap px-3 py-2 text-right">
+                      <div class="flex items-center justify-end gap-2 font-mono text-[12px]">
+                        {@render boost(data?.globalDb ?? 0, $_('configVolume.globalCaption'), $_('configVolume.globalHint'))}
+                        <span class="text-muted-foreground">+</span>
+                        {@render boost(seriesDb, $_('configVolume.seriesCaption'), $_('configVolume.seriesDbHint'))}
+                        <span class="text-muted-foreground">+</span>
+                        <input
+                          type="number"
+                          {...DB_INPUT}
+                          value={row.trackDb}
+                          oninput={(e) => onTrackDbInput(row, e.currentTarget.value)}
+                          title={$_('configVolume.trackHint')}
+                          class={dbInputClass}
+                        />
+                      </div>
+                    </td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px] font-semibold">{formatBankDb((data?.bankBaseDb ?? 0) + effectiveDb(row))}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right">
                       <button
                         onclick={() => togglePreview(row)}
                         disabled={isPreviewLoading}

@@ -89,7 +89,7 @@ Every action below is reachable interactively through the terminal menu or direc
 * **Cleanup** (`cleanup`) - removes `tracks.csv` rows that point at deleted files, prunes dead filenames out of `[[playlists]] songs` array. Safe to run any time.
 * **Order Series** (`order-series`) - drag-and-drop reorder for the custom-series display order across a mod. Writes `series-order.toml` at mod root.
 * **Order Tracks** (`order-tracks`) - drag-and-drop reorder for tracks within series. `existing-series` mods can interleave tracks with vanilla songs.
-* **Config Volume** (`config-volume`) - preview tracks at their post-build loudness (after LUFS normalization) and override per-track gain.
+* **Config Volume** (`config-volume`) - preview tracks at their post-build loudness (after LUFS normalization) and set the series and per-track dB boosts.
 * **Dump Stages** (`dump-stages`) - diagnostic. Loads vanilla state and prints every stage's `UiStageId` / `UiSeriesId` / `BgmSetId`, then writes `stages_dump.csv`, for debug purposes.
 
 ---
@@ -119,7 +119,7 @@ game = "the-finals"
 author = "Embark Studios"
 copyright = "© 2023 Embark Studios"
 record-type = "original"
-volume = 1.0
+volume-db = 0.0
 ```
 
 Fields:
@@ -132,7 +132,9 @@ Fields:
   * `id` - playlist identifier (existing stage playlist, or a new one UMB will create).
   * `incidence` - random-roll weight for this block's songs.
   * `songs` - `"*"` for all, or a TOML array of filenames. Stem-tolerant: `"Destroyer"` matches `Destroyer.nus3audio`. Pre-build validation warns on no-match entries; `Cleanup` prunes them.
-* `[default-track-data]` - defaults applied to rows `Scaffold` adds to `tracks.csv`.
+* `[default-track-data]` - defaults applied to rows `Scaffold` adds to `tracks.csv`, plus `volume-db`: the series dB boost (+ or -) added to every track in the series. Edit it in Config Volume.
+
+Volumes are dB boosts (0 = unchanged): the build adds the global boost (`GlobalVolumeDb` in settings), the series `volume-db`, LUFS auto-gain and the track's `volume_db` column in `tracks.csv`. Older mods that stored linear `volume` multipliers are converted automatically the next time the CLI starts. Vanilla songs are left alone unless the experimental `ApplyVolumeToVanilla` setting is on, in which case they get the global boost plus their series' boost (never LUFS auto-gain).
 
 ## series.toml - existing in-game series
 

@@ -44,9 +44,11 @@ function stubCli(produce?: (input: any) => void): void {
 
 const ANALYZE_RESULT = {
   seriesName: 'dev',
-  globalVolumeMultiplier: 1.5,
+  globalDb: 3.5,
+  seriesDb: -2,
   targetLufs: -14,
-  maxMultiplier: 4,
+  maxGainDb: 12,
+  bankBaseDb: 2.7,
   ffmpegAvailable: true,
   lufsCacheExists: true,
   items: [
@@ -56,9 +58,9 @@ const ANALYZE_RESULT = {
       filename: 'karts.flac',
       hasMeasurement: true,
       measuredLufs: -18.5,
-      autoGain: 1.68,
+      autoGainDb: 4.5,
       wasClamped: false,
-      userOverride: 1
+      trackDb: 0
     }
   ]
 }
@@ -113,9 +115,9 @@ describe('loadVolumeConfig', () => {
         input.outputPath,
         JSON.stringify({
           seriesName: 'dev',
-          globalVolumeMultiplier: 1.5,
+          globalDb: 3.5,
           targetLufs: -14,
-          maxMultiplier: 4,
+          maxGainDb: 12,
           ffmpegAvailable: true
         }),
         'utf-8'
@@ -135,9 +137,11 @@ describe('loadVolumeConfig', () => {
     expect(data).toEqual({
       seriesName: 'dev',
       seriesPath: SERIES,
-      globalVolumeMultiplier: 1,
+      globalDb: 0,
+      seriesDb: 0,
       targetLufs: -14,
-      maxMultiplier: 4,
+      maxGainDb: 12,
+      bankBaseDb: 0,
       ffmpegAvailable: false,
       lufsCacheExists: false,
       items: []
@@ -183,29 +187,29 @@ describe('loadVolumeConfig', () => {
 })
 
 describe('saveVolumeConfig', () => {
-  it('sends the overrides to config-volume-save', async () => {
+  it('sends the overrides and series dB boost to config-volume-save', async () => {
     stubCli()
     const overrides = [
-      { originalIndex: 0, volume: 0.5 },
-      { originalIndex: 3, volume: 2 }
+      { originalIndex: 0, db: 0.5 },
+      { originalIndex: 3, db: 2 }
     ]
 
-    await saveVolumeConfig(WS, SERIES, overrides, onLine)
+    await saveVolumeConfig(WS, SERIES, overrides, -2, onLine)
 
     expect(captured!.action).toBe('config-volume-save')
-    expect(captured!.input).toEqual({ seriesPath: SERIES, overrides })
+    expect(captured!.input).toEqual({ seriesPath: SERIES, overrides, seriesDb: -2 })
     expect(captured!.onLine).toBe(onLine)
   })
 
   it('sends an empty override list unchanged', async () => {
     stubCli()
-    await saveVolumeConfig(WS, SERIES, [], onLine)
+    await saveVolumeConfig(WS, SERIES, [], undefined, onLine)
     expect(captured!.input.overrides).toEqual([])
   })
 
   it('deletes the temp input file afterwards', async () => {
     stubCli()
-    await saveVolumeConfig(WS, SERIES, [{ originalIndex: 0, volume: 1 }], onLine)
+    await saveVolumeConfig(WS, SERIES, [{ originalIndex: 0, db: 1 }], undefined, onLine)
     expect(existsSync(captured!.inputPath)).toBe(false)
   })
 
@@ -216,7 +220,7 @@ describe('saveVolumeConfig', () => {
       throw new Error('boom')
     })
 
-    await expect(saveVolumeConfig(WS, SERIES, [], onLine)).rejects.toThrow('boom')
+    await expect(saveVolumeConfig(WS, SERIES, [], undefined, onLine)).rejects.toThrow('boom')
     expect(existsSync(inputPath)).toBe(false)
   })
 })

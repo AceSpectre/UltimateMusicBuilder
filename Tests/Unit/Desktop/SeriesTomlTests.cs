@@ -55,5 +55,33 @@ namespace Tests.Unit.Desktop
                 File.Delete(path);
             }
         }
+
+        [Fact]
+        public void WriteVolumeDb_UpsertsIntoDefaultTrackData_AndReadVolumeDbReadsItBack()
+        {
+            var dir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), $"umb-series-{Guid.NewGuid():N}")).FullName;
+            try
+            {
+                Assert.Equal(0, SeriesToml.ReadVolumeDb(dir));
+                SeriesToml.WriteVolumeDb(dir, -3);
+                Assert.False(File.Exists(Path.Combine(dir, "series.toml")));
+
+                File.WriteAllText(Path.Combine(dir, "series.toml"), Sample);
+                Assert.Equal(0, SeriesToml.ReadVolumeDb(dir));
+
+                SeriesToml.WriteVolumeDb(dir, -1.25);
+                var toml = File.ReadAllText(Path.Combine(dir, "series.toml"));
+                Assert.Contains("record-type = \"arrange\"", toml);
+                Assert.Contains("volume-db = -1.25", toml);
+                Assert.Equal(-1.25, SeriesToml.ReadVolumeDb(dir));
+
+                SeriesToml.WriteVolumeDb(dir, 6);
+                Assert.Contains("volume-db = 6.0", File.ReadAllText(Path.Combine(dir, "series.toml")));
+            }
+            finally
+            {
+                Directory.Delete(dir, true);
+            }
+        }
     }
 }

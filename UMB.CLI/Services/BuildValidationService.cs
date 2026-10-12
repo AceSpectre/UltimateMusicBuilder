@@ -19,8 +19,8 @@ namespace UMB.CLI.Services
     /// <summary>Pre-build checks of the mods' series.toml / tracks.csv files.</summary>
     public class BuildValidationService
     {
-        /// <summary>Global x track volume at or above this is rarely intentional (2x is about +6 dB).</summary>
-        public const float SuspiciousVolume = 2.0f;
+        /// <summary>A global + series + track boost at or above this is rarely intentional.</summary>
+        public const float SuspiciousDb = 6.0f;
 
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
         private readonly ILogger _logger;
@@ -41,7 +41,7 @@ namespace UMB.CLI.Services
         {
             var warnings = new List<string>();
             var volumes = new List<SuspiciousVolumeTrack>();
-            var globalVolume = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
+            var globalDb = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeDb;
 
             foreach (var modDir in activeMods)
             {
@@ -121,6 +121,7 @@ namespace UMB.CLI.Services
                         warnings.Add($"  {prefix}: custom series \"{seriesConfig.Series.Id}\" is not listed in series-order.toml. Its in-game position will be unpredictable. Run 'Scaffold' to append it, or use 'Order Series' to place it manually.");
                     }
 
+                    var seriesDb = seriesConfig?.DefaultTrackData?.VolumeDb ?? 0f;
                     var csvFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     try
                     {
@@ -131,7 +132,7 @@ namespace UMB.CLI.Services
                         csv.ReadHeader();
                         var headers = csv.HeaderRecord;
                         bool hasOrderColumn = headers.Contains("order");
-                        bool hasVolumeColumn = headers.Contains("volume");
+                        bool hasVolumeColumn = headers.Contains(TracksCsv.VolumeDbColumn);
 
                         int rowNum = 0;
                         while (csv.Read())
@@ -146,12 +147,12 @@ namespace UMB.CLI.Services
 
                             csvFilenames.Add(filename);
 
-                            var volume = hasVolumeColumn ? VolumeConfigService.ParseVolume(csv.GetField("volume")) : 1f;
-                            var effectiveVolume = globalVolume * volume;
-                            if (effectiveVolume >= SuspiciousVolume)
+                            var trackDb = hasVolumeColumn ? VolumeConfigService.ParseDb(csv.GetField(TracksCsv.VolumeDbColumn)) : 0f;
+                            var effectiveDb = globalDb + seriesDb + trackDb;
+                            if (effectiveDb >= SuspiciousDb)
                             {
-                                volumes.Add(new SuspiciousVolumeTrack(modName, seriesName, filename, title, effectiveVolume));
-                                warnings.Add($"  {prefix}: \"{title}\" ({filename}) plays at {effectiveVolume}x (global {globalVolume}x, track {volume}x); track volumes above 1 may be legacy values");
+                                volumes.Add(new SuspiciousVolumeTrack(modName, seriesName, filename, title, effectiveDb));
+                                warnings.Add($"  {prefix}: \"{title}\" ({filename}) is boosted {effectiveDb:+0.0} dB (global {globalDb:+0.0}, series {seriesDb:+0.0}, track {trackDb:+0.0})");
                             }
 
                             if (validGameIds.Count > 0 && !string.IsNullOrWhiteSpace(game)

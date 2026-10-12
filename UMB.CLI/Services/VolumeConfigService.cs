@@ -33,12 +33,14 @@ namespace UMB.CLI.Services
     {
         public string SeriesPath { get; set; }
         public List<VolumeOverride> Overrides { get; set; }
+        /// <summary>Series dB boost to write to series.toml; null leaves it unchanged.</summary>
+        public double? SeriesDb { get; set; }
     }
 
     public class VolumeOverride
     {
         public int OriginalIndex { get; set; }
-        public float Volume { get; set; }
+        public float Db { get; set; }
     }
 
     public class VolumePreviewBatchInput
@@ -55,17 +57,20 @@ namespace UMB.CLI.Services
         public string Filename { get; set; }
         public bool HasMeasurement { get; set; }
         public float MeasuredLufs { get; set; }
-        public float AutoGain { get; set; }
+        public float AutoGainDb { get; set; }
         public bool WasClamped { get; set; }
-        public float UserOverride { get; set; }
+        public float TrackDb { get; set; }
     }
 
     public class VolumeAnalyzeResultDto
     {
         public string SeriesName { get; set; }
-        public float GlobalVolumeMultiplier { get; set; }
+        public float GlobalDb { get; set; }
+        public double SeriesDb { get; set; }
         public float TargetLufs { get; set; }
-        public float MaxMultiplier { get; set; }
+        public float MaxGainDb { get; set; }
+        /// <summary>nus3bank volume (dB) of a track with no boosts; the boosts are added to it.</summary>
+        public float BankBaseDb { get; set; } = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB;
         public bool FfmpegAvailable { get; set; }
         /// <summary>True if a LUFS cache file already exists for the series directory.</summary>
         public bool LufsCacheExists { get; set; }
@@ -124,10 +129,11 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            var globalMult = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
+            // The window has no series control, so the series boost is folded into the global one.
+            var globalDb = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeDb + (float)SeriesToml.ReadVolumeDb(seriesDir);
             var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization ?? new();
             var target = lufsOpts.TargetLufs;
-            var maxMult = lufsOpts.MaxGainMultiplier;
+            var maxGainDb = lufsOpts.MaxGainDb;
 
             if (!_lufsService.IsAvailable)
             {
@@ -141,17 +147,17 @@ namespace UMB.CLI.Services
                 {
                     Parallel.For(0, rows.Count, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
                     {
-                        var dto = AnalyzeRow(rows[i], i, seriesDir, target, maxMult, useCacheOnly: false);
+                        var dto = AnalyzeRow(rows[i], i, seriesDir, target, maxGainDb, useCacheOnly: false);
                         viewModels[i] = new VolumeRowViewModel
                         {
                             OriginalIndex = dto.OriginalIndex,
                             Title = dto.Title,
                             Filename = dto.Filename,
                             SourcePath = string.IsNullOrEmpty(dto.Filename) ? "" : Path.Combine(seriesDir, dto.Filename),
-                            UserOverride = dto.UserOverride,
-                            GlobalVolumeMultiplier = globalMult,
+                            TrackDb = dto.TrackDb,
+                            GlobalDb = globalDb,
                             MeasuredLufs = dto.MeasuredLufs,
-                            AutoGain = dto.AutoGain,
+                            AutoGainDb = dto.AutoGainDb,
                             WasClamped = dto.WasClamped,
                             HasMeasurement = dto.HasMeasurement,
                         };
@@ -184,13 +190,13 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            if (!headers.Contains("volume"))
-                headers = headers.Append("volume").ToArray();
+            if (!headers.Contains(TracksCsv.VolumeDbColumn))
+                headers = headers.Append(TracksCsv.VolumeDbColumn).ToArray();
 
             foreach (var vm in result)
             {
                 if (vm.OriginalIndex < 0 || vm.OriginalIndex >= rows.Count) continue;
-                rows[vm.OriginalIndex]["volume"] = vm.UserOverride.ToString("0.###", CultureInfo.InvariantCulture);
+                rows[vm.OriginalIndex][TracksCsv.VolumeDbColumn] = CliUtil.FormatDb(vm.TrackDb);
             }
 
             WriteCsvRows(csvPath, rows, headers);
@@ -202,7 +208,7 @@ namespace UMB.CLI.Services
         /// the batch path. useCacheOnly reads cached measurements without re-analysis.
         /// </summary>
         private VolumeRowDto AnalyzeRow(Dictionary<string, string> row, int index, string seriesDir,
-            float target, float maxMult, bool useCacheOnly)
+            float target, float maxGainDb, bool useCacheOnly)
         {
             var filename = row.GetValueOrDefault("filename", "");
             var title = row.GetValueOrDefault("title", filename);
@@ -213,8 +219,7 @@ namespace UMB.CLI.Services
                 OriginalIndex = index,
                 Title = title,
                 Filename = filename,
-                UserOverride = ParseVolume(row.GetValueOrDefault("volume", "1.0")),
-                AutoGain = 1.0f,
+                TrackDb = ParseDb(row.GetValueOrDefault(TracksCsv.VolumeDbColumn, "")),
             };
 
             if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
@@ -222,9 +227,9 @@ namespace UMB.CLI.Services
                 var measurement = useCacheOnly ? _lufsService.MeasureCached(sourcePath) : _lufsService.Measure(sourcePath);
                 if (measurement.IsValid)
                 {
-                    var gain = _lufsService.CalculateGain(measurement, target, maxMult);
+                    var gain = _lufsService.CalculateGain(measurement, target, maxGainDb);
                     dto.MeasuredLufs = measurement.IntegratedLufs;
-                    dto.AutoGain = gain.Multiplier;
+                    dto.AutoGainDb = gain.Db;
                     dto.WasClamped = gain.WasClamped;
                     dto.HasMeasurement = true;
                 }
@@ -263,10 +268,9 @@ namespace UMB.CLI.Services
 
             var (rows, _) = ReadCsvRows(csvPath);
 
-            var globalMult = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
             var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization ?? new();
             var target = lufsOpts.TargetLufs;
-            var maxMult = lufsOpts.MaxGainMultiplier;
+            var maxGainDb = lufsOpts.MaxGainDb;
             var lufsCacheName = string.IsNullOrWhiteSpace(lufsOpts.LufsCacheFileName) ? "LUFS.csv" : lufsOpts.LufsCacheFileName;
             var lufsCacheExists = File.Exists(Path.Combine(seriesDir, lufsCacheName));
 
@@ -277,7 +281,7 @@ namespace UMB.CLI.Services
             var completed = 0;
             Parallel.For(0, rows.Count, new ParallelOptions { MaxDegreeOfParallelism = 4 }, i =>
             {
-                var dto = AnalyzeRow(rows[i], i, seriesDir, target, maxMult, useCacheOnly: !input.Analyze);
+                var dto = AnalyzeRow(rows[i], i, seriesDir, target, maxGainDb, useCacheOnly: !input.Analyze);
                 dtos[i] = dto;
 
                 if (input.Analyze)
@@ -297,9 +301,10 @@ namespace UMB.CLI.Services
             WriteAnalyzeResult(input.OutputPath, new VolumeAnalyzeResultDto
             {
                 SeriesName = Path.GetFileName(seriesDir),
-                GlobalVolumeMultiplier = globalMult,
+                GlobalDb = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeDb,
+                SeriesDb = SeriesToml.ReadVolumeDb(seriesDir),
                 TargetLufs = target,
-                MaxMultiplier = maxMult,
+                MaxGainDb = maxGainDb,
                 FfmpegAvailable = _lufsService.IsAvailable,
                 LufsCacheExists = lufsCacheExists,
                 Items = dtos.ToList(),
@@ -309,8 +314,9 @@ namespace UMB.CLI.Services
 
         /// <summary>
         /// Non-interactive save for the desktop app. Reads
-        /// { "seriesPath": "...", "overrides": [{ "originalIndex": 0, "volume": 1.2 }] }
-        /// and persists each override into the tracks.csv `volume` column.
+        /// { "seriesPath": "...", "overrides": [{ "originalIndex": 0, "db": 1.5 }] }
+        /// and persists each track boost into the tracks.csv `volume_db` column, plus the optional
+        /// seriesDb into series.toml.
         /// </summary>
         public void RunSaveBatch(string jsonPath)
         {
@@ -321,6 +327,9 @@ namespace UMB.CLI.Services
                 return;
             }
 
+            if (input.SeriesDb is { } seriesDb)
+                SeriesToml.WriteVolumeDb(input.SeriesPath, seriesDb);
+
             var csvPath = Path.Combine(input.SeriesPath, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
             if (!File.Exists(csvPath))
             {
@@ -329,17 +338,17 @@ namespace UMB.CLI.Services
             }
 
             var (rows, headers) = ReadCsvRows(csvPath);
-            if (!headers.Contains("volume"))
-                headers = headers.Append("volume").ToArray();
+            if (!headers.Contains(TracksCsv.VolumeDbColumn))
+                headers = headers.Append(TracksCsv.VolumeDbColumn).ToArray();
 
             foreach (var ov in input.Overrides ?? new List<VolumeOverride>())
             {
                 if (ov.OriginalIndex < 0 || ov.OriginalIndex >= rows.Count) continue;
-                rows[ov.OriginalIndex]["volume"] = ov.Volume.ToString("0.###", CultureInfo.InvariantCulture);
+                rows[ov.OriginalIndex][TracksCsv.VolumeDbColumn] = CliUtil.FormatDb(ov.Db);
             }
 
             WriteCsvRows(csvPath, rows, headers);
-            _logger.LogInformation("Volume overrides saved to {Path}.", csvPath);
+            _logger.LogInformation("Track dB boosts saved to {Path}.", csvPath);
         }
 
         /// <summary>
@@ -398,31 +407,30 @@ namespace UMB.CLI.Services
             File.WriteAllText(outputPath, json);
         }
 
-        /// <summary>Sets every tracks.csv volume in every mod to 1.</summary>
+        /// <summary>Sets every series and track dB boost in every mod to 0.</summary>
         public void ResetAllVolumes()
         {
             var changed = 0;
-            var csvPaths = ModPaths.VisibleDirs(_musicConfig.CurrentValue.Sma5hMusic.ModPath)
-                .SelectMany(ModPaths.VisibleDirs)
-                .Select(d => Path.Combine(d, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE))
-                .Where(File.Exists);
-            foreach (var csvPath in csvPaths)
+            foreach (var seriesDir in ModPaths.VisibleDirs(_musicConfig.CurrentValue.Sma5hMusic.ModPath).SelectMany(ModPaths.VisibleDirs))
             {
+                if (SeriesToml.ReadVolumeDb(seriesDir) != 0)
+                    SeriesToml.WriteVolumeDb(seriesDir, 0);
+
+                var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
+                if (!File.Exists(csvPath)) continue;
                 var (rows, headers) = ReadCsvRows(csvPath);
-                var rowsToReset = headers.Contains("volume") ? rows.Where(r => ParseVolume(r["volume"]) != 1f).ToList() : new();
+                var rowsToReset = headers.Contains(TracksCsv.VolumeDbColumn) ? rows.Where(r => ParseDb(r[TracksCsv.VolumeDbColumn]) != 0f).ToList() : new();
                 if (rowsToReset.Count == 0) continue;
-                rowsToReset.ForEach(r => r["volume"] = "1");
+                rowsToReset.ForEach(r => r[TracksCsv.VolumeDbColumn] = CliUtil.FormatDb(0));
                 WriteCsvRows(csvPath, rows, headers);
                 changed += rowsToReset.Count;
             }
-            _logger.LogInformation("Reset {Count} track volume(s) to 1.", changed);
+            _logger.LogInformation("Reset {Count} track dB boost(s) to 0.", changed);
         }
 
-        internal static float ParseVolume(string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw)) return 1.0f;
-            return float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 1.0f;
-        }
+        internal static float ParseDb(string raw) =>
+            float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0f;
+
 
         private (List<Dictionary<string, string>> rows, string[] headers) ReadCsvRows(string csvPath)
         {

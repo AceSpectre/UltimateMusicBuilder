@@ -175,9 +175,8 @@ namespace Tests.Integration
             var csvPath = Path.Combine(modDir, "dev", "tracks.csv");
 
             var lines = File.ReadAllLines(csvPath).ToList();
-            // Change volume of first track (column index 7)
             var cols = lines[1].Split(',');
-            cols[7] = "0.5";
+            cols[7] = "-6";
             lines[1] = string.Join(',', cols);
             File.WriteAllLines(csvPath, lines);
 
@@ -188,7 +187,7 @@ namespace Tests.Integration
 
             var entries = mod.GetMusicModEntries();
             var first = entries.BgmPropertyEntries.First();
-            Assert.Equal(2.7f - 6.0206f, first.AudioVolume, precision: 3);
+            Assert.Equal(2.7f - 6f, first.AudioVolume, precision: 3);
         }
 
         // ── In-memory ordering reflected after Init/Build ──────────────────

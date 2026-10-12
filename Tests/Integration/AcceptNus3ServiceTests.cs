@@ -75,7 +75,7 @@ namespace Tests.Integration
                 $"\n[default-track-data]\ngame = \"{seriesName}\"\n");
 
             var csvRows = new System.Text.StringBuilder();
-            csvRows.AppendLine("filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest");
+            csvRows.AppendLine("filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest");
             foreach (var (nus3FileName, srcExt) in tracks)
             {
                 var basename = Path.GetFileNameWithoutExtension(nus3FileName);

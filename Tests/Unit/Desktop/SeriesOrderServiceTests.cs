@@ -140,7 +140,7 @@ namespace Tests.Unit.Desktop
             Assert.Contains("series-playlist = \"bgm_my_series\"", toml);
             Assert.Contains("[[games]]", toml);
             Assert.Contains("id = \"first_game\"", toml);
-            Assert.Equal("filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest",
+            Assert.Equal("filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest",
                 File.ReadAllText(Path.Combine(_modPath, "my_series", "tracks.csv")).Trim());
         }
 
@@ -153,7 +153,14 @@ namespace Tests.Unit.Desktop
             Assert.Equal("first_game", fields.DefaultGame);
             Assert.Equal(new[] { new SeriesGame("first_game", "First"), new SeriesGame("second_game", "Second") }, fields.Games);
             Assert.Equal("original", fields.DefaultRecordType);
-            Assert.Equal(1, fields.DefaultVolume);
+        }
+
+        [Fact]
+        public void Create_StartsTheSeriesBoostAtZero()
+        {
+            _service.Create(_modPath, OneGame());
+            Assert.Contains("volume-db = 0.0", SeriesToml("my_series"));
+            Assert.Equal(0, _service.Load(_modPath).Items.Single(i => i.SeriesId == "my_series").VolumeDb);
         }
 
         [Fact]
@@ -271,7 +278,15 @@ namespace Tests.Unit.Desktop
             Assert.Equal("", fields.DefaultAuthor);
             Assert.Equal("", fields.DefaultCopyright);
             Assert.Equal("original", fields.DefaultRecordType);
-            Assert.Equal(1, fields.DefaultVolume);
+        }
+
+        [Fact]
+        public void Load_ExposesTheSeriesPathAndDbBoost()
+        {
+            var seriesDir = WriteCustomSeries("da", RichToml + "volume-db = -2.5\n");
+
+            var item = _service.Load(_modPath).Items[0];
+            Assert.Equal((seriesDir, -2.5), (item.SeriesPath, item.VolumeDb));
         }
 
         [Fact]
@@ -353,24 +368,23 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void Save_WritesDefaultTrackData()
+        public void Save_WritesDefaultTrackData_KeepingTheSeriesBoost()
         {
-            WriteCustomSeries("da", RichToml);
+            WriteCustomSeries("da", RichToml + "volume-db = -2.5\n");
 
             SaveEdited(f =>
             {
                 f.DefaultGame = "g1";
                 f.DefaultAuthor = "Nobuo";
                 f.DefaultRecordType = "arrange";
-                f.DefaultVolume = 0.8;
             });
 
             var toml = SeriesToml("da");
             Assert.Contains("author = \"Nobuo\"", toml);
             Assert.Contains("record-type = \"arrange\"", toml);
-            Assert.Contains("volume = 0.8", toml);
+            Assert.Contains("volume-db = -2.5", toml);
             var reloaded = _service.Load(_modPath).Items[0].Fields;
-            Assert.Equal(("Nobuo", "arrange", 0.8), (reloaded.DefaultAuthor, reloaded.DefaultRecordType, reloaded.DefaultVolume));
+            Assert.Equal(("Nobuo", "arrange"), (reloaded.DefaultAuthor, reloaded.DefaultRecordType));
         }
 
         [Fact]

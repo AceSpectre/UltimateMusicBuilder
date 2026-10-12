@@ -18,7 +18,7 @@ test.beforeAll(async () => {
   writeFileSync(join(bDev, 'series.toml'),
     '[series]\nid = "dev"\nname = "Dev B"\n\n[[games]]\nid = "dev_b"\nname = "Dev B"\n', 'utf8')
   writeFileSync(join(bDev, 'tracks.csv'),
-    'filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\n' +
+    'filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest\n' +
     'b-only.flac,dev_b,B Only,,,original,,1,,True\n', 'utf8')
   writeFileSync(join(bDev, 'b-only.flac'), 'B')
   const bCustom = join(modB, 'custom')

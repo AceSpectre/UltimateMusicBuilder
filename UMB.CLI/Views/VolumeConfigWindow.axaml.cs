@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using NAudio.Wave;
 using NAudio.Wave.SampleProviders;
+using Sma5h.Mods.Music.Helpers;
 using UMB.CLI.Services;
 using System;
 using System.Collections.Generic;
@@ -45,7 +46,7 @@ namespace UMB.CLI.Views
 
         private void OnRowPropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(VolumeRowViewModel.UserOverride)) return;
+            if (e.PropertyName != nameof(VolumeRowViewModel.TrackDb)) return;
             // live volume update while playing
             if (_playingRow != null && _volumeProvider != null && ReferenceEquals(sender, _playingRow))
             {
@@ -176,43 +177,46 @@ namespace UMB.CLI.Views
 
         public bool HasMeasurement { get; set; }
         public float MeasuredLufs { get; set; }
-        public float GlobalVolumeMultiplier { get; set; }
-        public float AutoGain { get; set; } = 1.0f;
+        public float GlobalDb { get; set; }
+        public float AutoGainDb { get; set; }
         public bool WasClamped { get; set; }
 
-        private float _userOverride = 1.0f;
-        public float UserOverride
+        private float _trackDb;
+        public float TrackDb
         {
-            get => _userOverride;
+            get => _trackDb;
             set
             {
-                if (Math.Abs(_userOverride - value) < 0.0001f) return;
-                _userOverride = value;
+                if (Math.Abs(_trackDb - value) < 0.0001f) return;
+                _trackDb = value;
                 OnPropertyChanged();
-                OnPropertyChanged(nameof(UserOverrideDecimal));
+                OnPropertyChanged(nameof(TrackDbDecimal));
                 OnPropertyChanged(nameof(EffectiveBankVolume));
                 OnPropertyChanged(nameof(EffectiveDisplay));
             }
         }
 
-        // Avalonia's NumericUpDown binds to decimal? — bridge to/from float here.
-        public decimal? UserOverrideDecimal
+        // Avalonia's NumericUpDown binds to decimal?, so bridge to/from float here.
+        public decimal? TrackDbDecimal
         {
-            get => (decimal)_userOverride;
-            set => UserOverride = value.HasValue ? (float)value.Value : 1.0f;
+            get => (decimal)_trackDb;
+            set => TrackDb = value.HasValue ? (float)value.Value : 0f;
         }
 
-        public float EffectiveBankVolume => GlobalVolumeMultiplier * AutoGain * UserOverride;
+        public float EffectiveDb => GlobalDb + AutoGainDb + TrackDb;
+
+        /// <summary>Linear playback gain for NAudio.</summary>
+        public float EffectiveBankVolume => VolumeHelper.DbToMultiplier(EffectiveDb);
 
         public string MeasuredDisplay => HasMeasurement
             ? MeasuredLufs.ToString("0.0", CultureInfo.InvariantCulture) + " LUFS"
             : "—";
 
-        public string AutoGainDisplay => HasMeasurement
-            ? AutoGain.ToString("0.00", CultureInfo.InvariantCulture) + "×"
-            : "—";
+        public string AutoGainDisplay => HasMeasurement ? FormatDb(AutoGainDb) : "—";
 
-        public string EffectiveDisplay => EffectiveBankVolume.ToString("0.00", CultureInfo.InvariantCulture) + "×";
+        public string EffectiveDisplay => FormatDb(EffectiveDb);
+
+        private static string FormatDb(float db) => db.ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + " dB";
 
         private string _playButtonText = "▶";
         public string PlayButtonText
