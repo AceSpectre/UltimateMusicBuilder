@@ -138,6 +138,9 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.SET_SERIES_ICON, (_event, modPath: string, seriesId: string, iconDataUrl: string) =>
     api('series-set-icon', { modPath, seriesId, iconDataUrl }))
 
+  ipcMain.handle(IPC.ENSURE_VANILLA_SERIES, (_event, modPath: string, seriesId: string) =>
+    api('series-ensure-vanilla', { modPath, seriesId }))
+
   ipcMain.handle(IPC.LIST_NUS3_SOURCES, (_event, seriesPath: string) => api('nus3-list-sources', { seriesPath }))
 
   ipcMain.handle(IPC.ANALYZE_LOOP_POINTS, (_event, seriesPath: string, filename: string, options?: LoopAnalysisOptions) =>

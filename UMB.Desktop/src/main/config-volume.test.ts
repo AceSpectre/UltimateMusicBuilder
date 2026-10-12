@@ -48,7 +48,7 @@ const ANALYZE_RESULT = {
   seriesDb: -2,
   targetLufs: -14,
   maxGainDb: 12,
-  bankBaseDb: 2.7,
+  applyVolumeToVanilla: true,
   ffmpegAvailable: true,
   lufsCacheExists: true,
   items: [
@@ -60,7 +60,9 @@ const ANALYZE_RESULT = {
       measuredLufs: -18.5,
       autoGainDb: 4.5,
       wasClamped: false,
-      trackDb: 0
+      trackDb: 0,
+      bankBaseDb: 2.7,
+      isVanilla: false
     }
   ]
 }
@@ -141,7 +143,7 @@ describe('loadVolumeConfig', () => {
       seriesDb: 0,
       targetLufs: -14,
       maxGainDb: 12,
-      bankBaseDb: 0,
+      applyVolumeToVanilla: false,
       ffmpegAvailable: false,
       lufsCacheExists: false,
       items: []

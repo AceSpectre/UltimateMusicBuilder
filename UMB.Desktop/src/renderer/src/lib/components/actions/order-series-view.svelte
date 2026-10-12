@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ListOrdered, GripVertical, Gamepad2, Image, Plus, RefreshCw, Settings2, Upload, Volume2, X } from '@lucide/svelte'
+  import { ArrowUpDown, ListOrdered, GripVertical, Gamepad2, Image, Plus, RefreshCw, Settings2, Upload, Volume2, X } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
@@ -20,10 +20,20 @@
     onNavigate
   }: { activeMod: ModInfo | null; onNavigate?: (actionId: string) => void } = $props()
 
-  // The series dB boost is edited only in Config Volume.
-  function openConfigVolume(seriesPath: string) {
-    modsStore.pendingConfigVolumePath = seriesPath
-    onNavigate?.('config-volume')
+  // A vanilla series gets its folder in the mod the first time another view needs it.
+  async function seriesPathOf(item: SeriesOrderItem): Promise<string> {
+    return item.seriesPath || (await window.electron.umb.ensureVanillaSeries(activeMod!.path, item.seriesId))
+  }
+
+  async function openIn(item: SeriesOrderItem, actionId: 'config-volume' | 'order-tracks') {
+    try {
+      const path = await seriesPathOf(item)
+      if (actionId === 'config-volume') modsStore.pendingConfigVolumePath = path
+      else modsStore.activeSeriesPath = path
+      onNavigate?.(actionId)
+    } catch (error) {
+      panelError = error instanceof Error ? error.message : String(error)
+    }
   }
 
   let panelTab = $state<'settings' | 'games'>('settings')
@@ -41,6 +51,7 @@
   let loading = $state(false)
   let orderData = $state<SeriesOrderData | null>(null)
   let dndItems = $state<SeriesOrderItem[]>([])
+  let vanillaItems = $state<SeriesOrderItem[]>([])
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let baselineSnapshot = $state('')
   let selectedItemId = $state<string | null>(null)
@@ -49,8 +60,8 @@
     return JSON.stringify(items.map((item) => ({ id: item.id, fields: item.fields })))
   }
 
-  const isDirty = $derived(Boolean(orderData) && snapshot(dndItems) !== baselineSnapshot)
-  const selectedItem = $derived(dndItems.find((item) => item.id === selectedItemId) ?? null)
+  const isDirty = $derived(Boolean(orderData) && snapshot([...dndItems, ...vanillaItems]) !== baselineSnapshot)
+  const selectedItem = $derived([...dndItems, ...vanillaItems].find((item) => item.id === selectedItemId) ?? null)
 
   const trimmedNewGameId = $derived(newGameId.trim())
   const newGameValid = $derived(
@@ -86,7 +97,7 @@
   let nsIconDataUrl = $state<string | null>(null)
 
   let panelIconBusy = $state(false)
-  let panelIconError = $state<string | null>(null)
+  let panelError = $state<string | null>(null)
 
   function readPngDataUrl(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -119,19 +130,19 @@
     const file = input.files?.[0]
     input.value = ''
     if (!file || !selectedItem || !activeMod) return
-    panelIconError = null
+    panelError = null
     let dataUrl: string
     try {
       dataUrl = await readPngDataUrl(file)
     } catch {
-      panelIconError = $_('orderSeries.iconNotPng')
+      panelError = $_('orderSeries.iconNotPng')
       return
     }
     panelIconBusy = true
     try {
       selectedItem.iconDataUrl = await window.electron.umb.setSeriesIcon(activeMod.path, selectedItem.seriesId, dataUrl)
     } catch (error) {
-      panelIconError = error instanceof Error ? error.message : String(error)
+      panelError = error instanceof Error ? error.message : String(error)
     } finally {
       panelIconBusy = false
     }
@@ -139,7 +150,7 @@
 
   const nsTrimmedId = $derived(nsId.trim())
   const nsIdValid = $derived(SERIES_ID_RE.test(nsTrimmedId) && nsTrimmedId !== 'etc')
-  const nsIdTaken = $derived((orderData?.items ?? []).some((item) => item.seriesId === nsTrimmedId))
+  const nsIdTaken = $derived([...dndItems, ...vanillaItems].some((item) => item.seriesId === nsTrimmedId))
   const nsTrimmedGameId = $derived(nsGameId.trim())
   const nsGameValid = $derived(
     Boolean(nsTrimmedGameId) && Boolean(nsGameName.trim()) && !nsGames.some((game) => game.id === nsTrimmedGameId)
@@ -192,7 +203,7 @@
         iconDataUrl: nsIconDataUrl
       })
       orderData = result
-      baselineSnapshot = snapshot(result.items)
+      baselineSnapshot = snapshot([...result.items, ...result.vanillaItems])
       selectedItemId = result.items.find((item) => item.seriesId === nsTrimmedId)?.id ?? null
       showNewSeries = false
     } catch (error) {
@@ -204,6 +215,7 @@
 
   $effect(() => {
     dndItems = orderData ? orderData.items : []
+    vanillaItems = orderData ? orderData.vanillaItems : []
   })
 
   $effect(() => {
@@ -212,7 +224,7 @@
 
   $effect(() => {
     void selectedItemId
-    panelIconError = null
+    panelError = null
   })
 
   function handleConsider(event: CustomEvent<DndEvent<SeriesOrderItem>>) {
@@ -237,7 +249,7 @@
     showAddGame = false
     try {
       orderData = await window.electron.umb.loadSeriesOrder(modPath)
-      baselineSnapshot = snapshot(orderData.items)
+      baselineSnapshot = snapshot([...orderData.items, ...orderData.vanillaItems])
     } finally {
       loading = false
     }
@@ -253,13 +265,13 @@
     saveState = 'saving'
     // Plain objects — Svelte $state proxies cannot be structured-cloned over IPC. Deep-copy the
     // nested games array too (a shallow spread would leave it a proxy and the IPC clone would fail).
-    const payload = dndItems.map((item) => ({
+    const payload = [...dndItems, ...vanillaItems].map((item) => ({
       id: item.id,
       fields: { ...item.fields, games: item.fields.games.map((game) => ({ ...game })) }
     }))
     try {
       orderData = await window.electron.umb.saveSeriesOrder(activeMod.path, payload)
-      baselineSnapshot = snapshot(orderData.items)
+      baselineSnapshot = snapshot([...orderData.items, ...orderData.vanillaItems])
       saveState = 'saved'
     } catch (error) {
       console.error('saveSeriesOrder failed', error)
@@ -273,7 +285,24 @@
 
   const inputClass =
     'w-full rounded-md border border-input bg-background px-2 py-1.5 text-[13px] outline-none focus:border-ring focus:ring-1 focus:ring-ring'
+
+  const cardClass = (item: SeriesOrderItem): string =>
+    `w-[128px] h-[148px] flex flex-col items-center rounded-xl border bg-background/75 p-2 transition-shadow hover:shadow-md cursor-pointer ${item.id === selectedItemId ? 'border-transparent ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border'}`
 </script>
+
+{#snippet seriesCard(item: SeriesOrderItem)}
+  <div class="w-[80px] h-[80px] rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+    {#if item.iconDataUrl}
+      <img src={item.iconDataUrl} alt={item.fields.name} class="w-full h-full object-contain invert dark:invert-0" draggable="false" />
+    {:else}
+      <Image size={28} class="text-muted-foreground/40" />
+    {/if}
+  </div>
+
+  <div class="mt-1.5 w-full text-center">
+    <span class="block truncate text-[12px] font-medium" title={item.fields.name}>{item.fields.name}</span>
+  </div>
+{/snippet}
 
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
@@ -326,7 +355,10 @@
           <div class="grid h-full min-h-[320px] place-items-center rounded-2xl border border-dashed border-border bg-background/60 text-[13px] text-muted-foreground">
             {$_('orderSeries.loading')}
           </div>
-        {:else if orderData && orderData.items.length > 0}
+        {:else if orderData && (orderData.items.length > 0 || orderData.vanillaItems.length > 0)}
+          {#if dndItems.length === 0}
+            <p class="pb-3 text-[12.5px] text-muted-foreground">{$_('orderSeries.noCustomSeries')}</p>
+          {/if}
           <div
             class="grid gap-3"
             style="grid-template-columns: repeat(auto-fill, 128px);"
@@ -335,13 +367,7 @@
             onfinalize={handleFinalize}
           >
             {#each dndItems as item (item.id)}
-              {@const isSelected = item.id === selectedItemId}
-              <div
-                animate:flip={{ duration: FLIP_MS }}
-                class="w-[128px] h-[148px] flex flex-col items-center rounded-xl border bg-background/75 p-2 transition-shadow hover:shadow-md cursor-pointer {isSelected ? 'border-transparent ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border'}"
-                role="listitem"
-                onpointerdown={() => (selectedItemId = item.id)}
-              >
+              <div animate:flip={{ duration: FLIP_MS }} class={cardClass(item)} role="listitem" onpointerdown={() => (selectedItemId = item.id)}>
                 <div
                   use:dragHandle
                   aria-label={$_('orderSeries.dragAria')}
@@ -349,27 +375,26 @@
                 >
                   <GripVertical size={14} class="text-muted-foreground opacity-60" />
                 </div>
-
-                <div class="w-[80px] h-[80px] rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
-                  {#if item.iconDataUrl}
-                    <img
-                      src={item.iconDataUrl}
-                      alt={item.fields.name}
-                      class="w-full h-full object-contain invert dark:invert-0"
-                      draggable="false"
-                    />
-                  {:else}
-                    <Image size={28} class="text-muted-foreground/40" />
-                  {/if}
-                </div>
-
-                <div class="mt-1.5 w-full text-center">
-                  <span class="block truncate text-[12px] font-medium" title={item.fields.name}>{item.fields.name}</span>
-                </div>
+                {@render seriesCard(item)}
               </div>
             {/each}
           </div>
-        {:else if orderData && orderData.items.length === 0}
+
+          {#if vanillaItems.length > 0}
+            <div class="mt-6 border-t border-border pt-3 pb-3">
+              <h3 class="text-[12.5px] font-semibold">{$_('orderSeries.vanillaHeading')}</h3>
+              <p class="pt-0.5 text-[11.5px] text-muted-foreground">{$_('orderSeries.vanillaHint')}</p>
+            </div>
+            <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, 128px);" aria-label={$_('orderSeries.vanillaHeading')}>
+              {#each vanillaItems as item (item.id)}
+                <div class={cardClass(item)} role="listitem" onpointerdown={() => (selectedItemId = item.id)}>
+                  <span class="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">{$_('orderSeries.vanillaTag')}</span>
+                  {@render seriesCard(item)}
+                </div>
+              {/each}
+            </div>
+          {/if}
+        {:else if orderData}
           <EmptyState dashed title={$_('orderSeries.emptyTitle')} body={$_('orderSeries.emptyBody')}>
             {#snippet icon()}<ListOrdered size={20} />{/snippet}
           </EmptyState>
@@ -440,8 +465,8 @@
                   {$_('orderSeries.changeIcon')}
                   <input type="file" accept="image/png" class="hidden" onchange={panelPickIcon} />
                 </label>
-                {#if panelIconError}
-                  <span class="text-[11px] text-red-500">{panelIconError}</span>
+                {#if panelError}
+                  <span class="text-[11px] text-red-500">{panelError}</span>
                 {:else}
                   <span class="text-[11px] text-muted-foreground">{$_('orderSeries.iconHint')}</span>
                 {/if}
@@ -455,7 +480,11 @@
 
             <label class="flex flex-col gap-1">
               <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldName')}</span>
-              <input type="text" class={inputClass} bind:value={f.name} />
+              {#if selectedItem.isVanilla}
+                <input type="text" class="{inputClass} opacity-60" value={f.name} readonly title={$_('orderSeries.vanillaNameHint')} />
+              {:else}
+                <input type="text" class={inputClass} bind:value={f.name} />
+              {/if}
             </label>
 
             <label class="flex flex-col gap-1">
@@ -471,7 +500,7 @@
             <div class="flex flex-col gap-1">
               <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldVolume')}</span>
               <button
-                onclick={() => openConfigVolume(selectedItem.seriesPath)}
+                onclick={() => openIn(selectedItem, 'config-volume')}
                 title={$_('orderSeries.volumeHint')}
                 class="{inputClass} flex cursor-pointer items-center justify-between text-left text-muted-foreground opacity-60 transition-opacity hover:opacity-100"
               >
@@ -479,6 +508,14 @@
                 <span class="inline-flex items-center gap-1 text-[11.5px]"><Volume2 size={12} />{$_('orderSeries.volumeEdit')}</span>
               </button>
             </div>
+
+            <button
+              onclick={() => openIn(selectedItem, 'order-tracks')}
+              class="inline-flex items-center justify-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted"
+            >
+              <ArrowUpDown size={14} />
+              {$_('orderSeries.editSongs')}
+            </button>
 
             <div class="mt-1 border-t border-border pt-3">
               <h3 class="text-[12.5px] font-semibold">{$_('orderSeries.defaultsHeading')}</h3>
@@ -534,7 +571,11 @@
               {#each f.games as game (game.id)}
                 <div class="flex flex-col gap-1 rounded-md border border-border bg-background/60 p-2">
                   <span class="truncate text-[11px] font-medium text-muted-foreground" title={game.id}>{game.id}</span>
-                  <input type="text" class={inputClass} bind:value={game.name} aria-label={$_('orderSeries.fldGameName')} />
+                  {#if selectedItem.lockedGameIds.includes(game.id)}
+                    <input type="text" class="{inputClass} opacity-60" value={game.name} readonly title={$_('orderSeries.vanillaGameHint')} aria-label={$_('orderSeries.fldGameName')} />
+                  {:else}
+                    <input type="text" class={inputClass} bind:value={game.name} aria-label={$_('orderSeries.fldGameName')} />
+                  {/if}
                 </div>
               {/each}
             {/if}

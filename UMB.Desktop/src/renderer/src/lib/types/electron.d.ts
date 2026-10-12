@@ -49,6 +49,8 @@ export interface UmbApi {
   saveSeriesOrder(modPath: string, items: SaveSeriesItem[]): Promise<SeriesOrderData>
   createSeries(modPath: string, input: CreateSeriesInput): Promise<SeriesOrderData>
   setSeriesIcon(modPath: string, seriesId: string, iconDataUrl: string): Promise<string>
+  /** The folder of a vanilla series in the mod, created with every vanilla song on first use. */
+  ensureVanillaSeries(modPath: string, seriesId: string): Promise<string>
   listNus3Sources(seriesPath: string): Promise<Nus3SourceTrack[]>
   analyzeLoopPoints(seriesPath: string, filename: string, options?: LoopAnalysisOptions): Promise<Nus3AnalysisResult>
   loadNus3Conversions(seriesPath: string): Promise<Record<string, Nus3ConversionMeta>>

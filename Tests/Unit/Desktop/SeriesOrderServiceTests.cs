@@ -431,6 +431,7 @@ namespace Tests.Unit.Desktop
             Assert.Equal(("vanilla:mario", "mario", "", true), (mario.Id, mario.SeriesId, mario.SeriesPath, mario.IsVanilla));
             Assert.Equal(("Super Mario Bros.", "bgmmario", "smb"), (mario.Fields.Name, mario.Fields.SeriesPlaylist, mario.Fields.DefaultGame));
             Assert.Equal(new[] { "smb", "smb3" }, mario.Fields.Games.Select(g => g.Id));
+            Assert.Equal(new[] { "smb", "smb3" }, mario.LockedGameIds);
         }
 
         [Fact]

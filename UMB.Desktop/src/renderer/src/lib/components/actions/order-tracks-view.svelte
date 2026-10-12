@@ -74,7 +74,7 @@
   // songs store their base-game info id (info_*). Both share one searchable dropdown.
   const modPinchOptions = $derived(
     dndItems
-      .filter((item) => item.fields !== null && item.filename)
+      .filter((item) => item.fields !== null && item.filename && !item.isVanilla)
       .map((item) => ({ value: item.filename, title: item.fields?.title || item.filename }))
   )
   const vanillaPinchOptions = $derived(
@@ -104,10 +104,10 @@
 
   // Sorting and hiding are display-only; dragging needs the full list in real track order.
   const canDrag = $derived(sort.column === 'index' && !sort.desc && !hideVanilla)
-  const hasVanilla = $derived(dndItems.some((item) => !item.fields))
+  const hasVanilla = $derived(dndItems.some((item) => item.isVanilla))
   const displayItems = $derived.by(() => {
     if (canDrag) return dndItems
-    const visible = hideVanilla ? dndItems.filter((item) => item.fields) : dndItems
+    const visible = hideVanilla ? dndItems.filter((item) => !item.isVanilla) : dndItems
     return sortBy(visible, sort.desc, sortKeys[sort.column])
   })
 
@@ -470,8 +470,9 @@
                     {@const f = item.fields}
                     <input
                       type="text"
-                      class={inputClass}
+                      class="{inputClass} {item.isVanilla ? 'italic' : ''}"
                       bind:value={f.title}
+                      title={item.isVanilla ? $_('orderTracks.vanillaHint') : ''}
                       aria-label={$_('orderTracks.colTitle')}
                     />
 

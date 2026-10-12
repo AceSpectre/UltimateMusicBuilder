@@ -87,9 +87,9 @@ Every action below is reachable interactively through the terminal menu or direc
 * **Merge** (`merge`) - combines two or more UMB mods into a single output mod, preserving series toml metadata from the priority mod.
 * **Extract Icons** (`extract-icons`) - pulls series icons out of an already-built Sma5h mod's BNTX files.
 * **Cleanup** (`cleanup`) - removes `tracks.csv` rows that point at deleted files, prunes dead filenames out of `[[playlists]] songs` array. Safe to run any time.
-* **Order Series** (`order-series`) - drag-and-drop reorder for the custom-series display order across a mod. Writes `series-order.toml` at mod root.
-* **Order Tracks** (`order-tracks`) - drag-and-drop reorder for tracks within series. `existing-series` mods can interleave tracks with vanilla songs.
-* **Config Volume** (`config-volume`) - preview tracks at their post-build loudness (after LUFS normalization) and set the series and per-track dB boosts.
+* **Order Series** (`order-series`) - drag-and-drop reorder for the custom-series display order across a mod. Writes `series-order.toml` at mod root. The desktop app also lists every vanilla series: editing one (games, song defaults, icon) adds it to the mod as an `existing-series` folder.
+* **Order Tracks** (`order-tracks`) - drag-and-drop reorder for tracks within series. In `existing-series` folders vanilla songs are editable rows too, and can be interleaved with mod songs.
+* **Config Volume** (`config-volume`) - preview tracks at their post-build loudness (after LUFS normalization) and set the series and per-track dB boosts. Vanilla songs take manual track boosts only.
 * **Dump Stages** (`dump-stages`) - diagnostic. Loads vanilla state and prints every stage's `UiStageId` / `UiSeriesId` / `BgmSetId`, then writes `stages_dump.csv`, for debug purposes.
 
 ---
@@ -134,7 +134,7 @@ Fields:
   * `songs` - `"*"` for all, or a TOML array of filenames. Stem-tolerant: `"Destroyer"` matches `Destroyer.nus3audio`. Pre-build validation warns on no-match entries; `Cleanup` prunes them.
 * `[default-track-data]` - defaults applied to rows `Scaffold` adds to `tracks.csv`, plus `volume-db`: the series dB boost (+ or -) added to every track in the series. Edit it in Config Volume.
 
-Volumes are dB boosts (0 = unchanged): the build adds the global boost (`GlobalVolumeDb` in settings), the series `volume-db`, LUFS auto-gain and the track's `volume_db` column in `tracks.csv`. Older mods that stored linear `volume` multipliers are converted automatically the next time the CLI starts. Vanilla songs are left alone unless the experimental `ApplyVolumeToVanilla` setting is on, in which case they get the global boost plus their series' boost (never LUFS auto-gain).
+Volumes are dB boosts (0 = unchanged): the build adds the global boost (`GlobalVolumeDb` in settings), the series `volume-db`, LUFS auto-gain and the track's `volume_db` column in `tracks.csv`. Older mods that stored linear `volume` multipliers are converted automatically the next time the CLI starts. Vanilla songs never get LUFS auto-gain: they get their `volume_db` row boost (see below), plus the global and series boosts only when the experimental `ApplyVolumeToVanilla` setting is on.
 
 ## series.toml - existing in-game series
 
@@ -162,6 +162,15 @@ When `existing-series = true`:
 * Game-title entries are still emitted. Vanilla duplicates are deduped; custom sub-games get registered.
 * `series-playlist` points at the vanilla stage playlist, so your songs join the random rotation on every stage using it.
 * Optional `song_order.toml` (written by `Order Tracks`) interleaves your songs with vanilla in Sound Test / My Music.
+* An `icon.png` replaces the vanilla series icon.
+
+### Editing vanilla songs
+
+A `tracks.csv` row whose `filename` is a vanilla song's id (e.g. `ui_bgm_a01_smb_chijyou`, no extension) edits that song instead of adding one. The desktop app writes a row for every vanilla song of the series when the folder is created or opened in Manage Songs / Config Volume. Edited columns:
+
+* `title`, `author`, `copyright` - a changed value replaces the text in every language; an unchanged one keeps the game's translations.
+* `game`, `record_type`, `in_soundtest`, and `special_category` / `info1` (pinch song).
+* `volume_db` - the song's dB boost; its nus3bank is regenerated with it.
 
 ---
 

@@ -23,8 +23,12 @@ namespace UMB.CLI.Desktop
         public string DefaultRecordType { get; set; } = "original";
     }
 
-    /// <summary>VolumeDb is the read-only series dB boost; Config Volume edits it via SeriesPath.</summary>
-    public record SeriesOrderItem(string Id, string Name, string SeriesId, string SeriesPath, double VolumeDb, string IconDataUrl, int OriginalIndex, SeriesFields Fields, bool IsVanilla);
+    /// <summary>
+    /// VolumeDb is the read-only series dB boost; Config Volume edits it via SeriesPath.
+    /// LockedGameIds are the vanilla games of a vanilla series, whose names the build cannot change.
+    /// </summary>
+    public record SeriesOrderItem(string Id, string Name, string SeriesId, string SeriesPath, double VolumeDb, string IconDataUrl, int OriginalIndex,
+        SeriesFields Fields, bool IsVanilla, List<string> LockedGameIds);
     /// <summary>Items are the custom series (ordered); VanillaItems every vanilla series, whose SeriesPath is "" until it has a folder.</summary>
     public record SeriesOrderData(string ModName, string ModPath, bool HasSeriesOrder, List<SeriesOrderItem> Items, List<SeriesOrderItem> VanillaItems);
     public record SaveSeriesItem(string Id, SeriesFields Fields);

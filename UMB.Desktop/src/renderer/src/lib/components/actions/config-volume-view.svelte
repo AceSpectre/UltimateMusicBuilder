@@ -45,11 +45,14 @@
   const isDirty = $derived(seriesDbDirty || rows.some((r) => Math.abs((baseline.get(r.originalIndex) ?? r.trackDb) - r.trackDb) > 0.0001))
   // Highlighted when no LUFS cache exists yet.
   const canAnalyze = $derived(!!data && !!selectedPath && data.ffmpegAvailable && !analyzing && !loadingConfig)
-  const needsAnalysis = $derived(!!data && !data.lufsCacheExists)
+  const needsAnalysis = $derived(!!data && !data.lufsCacheExists && rows.some((r) => !r.isVanilla))
+
+  // Vanilla songs only get the global and series boosts with the experimental setting.
+  const sharedBoosts = (row: VolumeRowItem): boolean => !row.isVanilla || Boolean(data?.applyVolumeToVanilla)
 
   // Total boost the build applies: global + series + auto-gain + track.
   function effectiveDb(row: VolumeRowItem): number {
-    return (data?.globalDb ?? 0) + seriesDb + row.autoGainDb + row.trackDb
+    return (sharedBoosts(row) ? (data?.globalDb ?? 0) + seriesDb : 0) + row.autoGainDb + row.trackDb
   }
 
   async function loadSeries(modPath: string | null) {
@@ -413,7 +416,7 @@
                     <td class="w-full max-w-0 px-3 py-2">
                       <div class="flex min-w-0 flex-col">
                         <span class="truncate font-semibold">{row.title}</span>
-                        <span class="truncate text-[11px] text-muted-foreground">{row.filename}</span>
+                        <span class="truncate text-[11px] text-muted-foreground">{row.isVanilla ? `${$_('orderTracks.vanillaTag')} · ` : ''}{row.filename}</span>
                       </div>
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px]">
@@ -430,14 +433,16 @@
                       </div>
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px]">
-                      {row.hasMeasurement ? formatBankDb((data?.bankBaseDb ?? 0) + row.autoGainDb) : '—'}
+                      {row.hasMeasurement || row.isVanilla ? formatBankDb(row.bankBaseDb + row.autoGainDb) : '—'}
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-right">
                       <div class="flex items-center justify-end gap-2 font-mono text-[12px]">
-                        {@render boost(data?.globalDb ?? 0, $_('configVolume.globalCaption'), $_('configVolume.globalHint'))}
-                        <span class="text-muted-foreground">+</span>
-                        {@render boost(seriesDb, $_('configVolume.seriesCaption'), $_('configVolume.seriesDbHint'))}
-                        <span class="text-muted-foreground">+</span>
+                        {#if sharedBoosts(row)}
+                          {@render boost(data?.globalDb ?? 0, $_('configVolume.globalCaption'), $_('configVolume.globalHint'))}
+                          <span class="text-muted-foreground">+</span>
+                          {@render boost(seriesDb, $_('configVolume.seriesCaption'), $_('configVolume.seriesDbHint'))}
+                          <span class="text-muted-foreground">+</span>
+                        {/if}
                         <input
                           type="number"
                           {...DB_INPUT}
@@ -448,7 +453,7 @@
                         />
                       </div>
                     </td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px] font-semibold">{formatBankDb((data?.bankBaseDb ?? 0) + effectiveDb(row))}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px] font-semibold">{formatBankDb(row.bankBaseDb + effectiveDb(row))}</td>
                     <td class="whitespace-nowrap px-3 py-2 text-right">
                       <button
                         onclick={() => togglePreview(row)}
