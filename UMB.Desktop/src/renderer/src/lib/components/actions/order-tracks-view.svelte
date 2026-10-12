@@ -10,17 +10,7 @@
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import Modal from '$lib/components/ui/modal.svelte'
-  import {
-    MODDED_HUE,
-    VANILLA_HUE,
-    gameHue,
-    inSoundtest,
-    nextOverlayMode,
-    overlayStyle,
-    seriesGameIds,
-    tintStyle,
-    type OverlayMode
-  } from '$lib/song-overlay'
+  import { inSoundtest, nextOverlayMode, overlayLegend, overlayStyle, seriesGameIds, type OverlayMode } from '$lib/song-overlay'
   import { nextSort, sortBy, type SortKey, type SortState } from '$lib/table-sort'
   import type { ModInfo, ModSeriesInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
 
@@ -31,17 +21,20 @@
     'grid-template-columns: 52px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px 60px minmax(160px,1fr) 84px;'
   // Header columns in grid order; `index` is the series' real track order.
   const COLUMNS = [
-    { id: 'index', label: '#' },
+    { id: 'index', label: 'orderTracks.colIndex' },
     { id: 'title', label: 'orderTracks.colTitle' },
     { id: 'game', label: 'orderTracks.colGame' },
     { id: 'author', label: 'orderTracks.colAuthor' },
     { id: 'copyright', label: 'orderTracks.colCopyright' },
     { id: 'record', label: 'orderTracks.colRecord' },
-    { id: 'isPinch', label: 'orderTracks.colIsPinch', centered: true },
+    { id: 'isPinch', label: 'orderTracks.colIsPinch' },
     { id: 'pinchSong', label: 'orderTracks.colPinchSong' },
-    { id: 'soundtest', label: 'orderTracks.colInSoundtest', centered: true }
+    { id: 'soundtest', label: 'orderTracks.colInSoundtest' }
   ] as const
   type SortColumn = (typeof COLUMNS)[number]['id']
+  const CENTERED_COLUMNS = new Set<SortColumn>(['isPinch', 'soundtest'])
+  const toolbarButtonClass =
+    'inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60'
 
   let {
     activeMod,
@@ -92,10 +85,14 @@
     return pinchOptions.find((o) => o.value === value)?.title ?? value
   }
 
+  function gameName(id: string): string {
+    return orderData?.games.find((g) => g.id === id)?.name ?? id
+  }
+
   const sortKeys: Record<SortColumn, (item: TrackOrderItem, index: number) => SortKey> = {
     index: (_, index) => index,
     title: (item) => item.fields?.title ?? item.title,
-    game: (item) => orderData?.games.find((g) => g.id === item.fields?.game)?.name ?? item.fields?.game ?? '',
+    game: (item) => gameName(item.fields?.game ?? ''),
     author: (item) => item.fields?.author ?? '',
     copyright: (item) => item.fields?.copyright ?? '',
     record: (item) => (item.fields ? recordLabel(item.fields.record_type) : ''),
@@ -107,7 +104,6 @@
   // Sorting is display-only; dragging is allowed only in the real track order.
   const isNaturalOrder = $derived(sort.column === 'index' && !sort.desc)
   const displayItems = $derived(isNaturalOrder ? dndItems : sortBy(dndItems, sort.desc, sortKeys[sort.column]))
-  const trackNumbers = $derived(new Map(dndItems.map((item, index) => [item.id, index + 1])))
 
   const selectedSeries = $derived(
     series.find((entry) => entry.path === modsStore.activeSeriesPath) ?? null
@@ -156,24 +152,7 @@
   }
 
   const gameIds = $derived(seriesGameIds(orderData?.games ?? [], dndItems))
-  const overlayLegend = $derived.by(() => {
-    if (overlayMode === 'game') {
-      return gameIds.map((id, i) => ({
-        label: orderData?.games.find((g) => g.id === id)?.name ?? id,
-        style: tintStyle(gameHue(i))
-      }))
-    }
-    if (overlayMode === 'source') {
-      return [
-        { label: $_('orderTracks.overlayModded'), style: tintStyle(MODDED_HUE) },
-        { label: $_('orderTracks.vanillaTag'), style: tintStyle(VANILLA_HUE) }
-      ]
-    }
-    if (overlayMode === 'soundtest') {
-      return [{ label: $_('orderTracks.overlayHidden'), style: 'opacity: 0.45;' }]
-    }
-    return []
-  })
+  const legend = $derived(overlayLegend(overlayMode, gameIds, gameName, $_))
 
   const selectedItem = $derived(dndItems.find((item) => item.id === selectedItemId) ?? null)
   const canUseDefaults = $derived(Boolean(orderData?.defaultTrackData) && selectedItem?.fields != null)
@@ -376,17 +355,17 @@
         <div class="flex shrink-0 items-center gap-2">
           <button
             onclick={() => (overlayMode = nextOverlayMode(overlayMode))}
-            class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            class={toolbarButtonClass}
             disabled={!orderData}
             title={$_('orderTracks.overlayHint')}
           >
             <Palette size={14} />
-            {$_('orderTracks.overlay', { values: { mode: $_(`orderTracks.overlayModes.${overlayMode}`) } })}
+            {$_(`orderTracks.overlayModes.${overlayMode}`)}
           </button>
 
           <button
             onclick={openVolConfig}
-            class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            class={toolbarButtonClass}
             disabled={!orderData}
             title={$_('orderTracks.volConfigHint')}
           >
@@ -396,7 +375,7 @@
 
           <button
             onclick={applyDefaults}
-            class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            class={toolbarButtonClass}
             disabled={!canUseDefaults}
             title={$_('orderTracks.useDefaultsHint')}
           >
@@ -415,9 +394,9 @@
         </div>
       </div>
 
-      {#if orderData && overlayLegend.length > 0}
+      {#if orderData && legend.length > 0}
         <div class="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-4 py-1.5">
-          {#each overlayLegend as entry}
+          {#each legend as entry}
             <span class="rounded border border-border bg-background px-2 py-0.5 text-[11px]" style={entry.style}>{entry.label}</span>
           {/each}
         </div>
@@ -443,10 +422,10 @@
               {#each COLUMNS as column}
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1 uppercase tracking-wide hover:text-foreground {'centered' in column ? 'justify-center' : ''}"
+                  class="inline-flex items-center gap-1 uppercase tracking-wide hover:text-foreground {CENTERED_COLUMNS.has(column.id) ? 'justify-center' : ''}"
                   onclick={() => (sort = nextSort(sort, column.id))}
                 >
-                  {column.id === 'index' ? column.label : $_(column.label)}
+                  {$_(column.label)}
                   {#if sort.column === column.id}
                     {#if sort.desc}<ArrowDown size={11} />{:else}<ArrowUp size={11} />{/if}
                   {/if}
@@ -471,7 +450,7 @@
                   onpointerdown={() => { if (!item.isLocked) selectedItemId = item.id }}
                 >
                   <div class="flex items-center gap-1">
-                    <span class="w-6 text-right text-[11px] tabular-nums text-muted-foreground">{trackNumbers.get(item.id)}</span>
+                    <span class="w-6 text-right text-[11px] tabular-nums text-muted-foreground">{dndItems.indexOf(item) + 1}</span>
                     {#if item.isLocked}
                       <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted/70 text-muted-foreground" title={$_('orderTracks.locked')}>
                         <Lock size={13} />

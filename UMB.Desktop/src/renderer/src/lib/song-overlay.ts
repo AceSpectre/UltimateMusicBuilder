@@ -4,8 +4,14 @@ import type { SeriesGame, TrackFields, TrackOrderItem } from '$lib/types/electro
 export const OVERLAY_MODES = ['off', 'game', 'source', 'soundtest'] as const
 export type OverlayMode = (typeof OVERLAY_MODES)[number]
 
-export const MODDED_HUE = 210
-export const VANILLA_HUE = 35
+export interface LegendEntry {
+  label: string
+  style: string
+}
+
+const MODDED_HUE = 210
+const VANILLA_HUE = 35
+const HIDDEN_STYLE = 'opacity: 0.45;'
 
 export const nextOverlayMode = (mode: OverlayMode): OverlayMode =>
   OVERLAY_MODES[(OVERLAY_MODES.indexOf(mode) + 1) % OVERLAY_MODES.length]
@@ -13,10 +19,10 @@ export const nextOverlayMode = (mode: OverlayMode): OverlayMode =>
 export const inSoundtest = (fields: TrackFields): boolean => fields.in_soundtest.toLowerCase() === 'true'
 
 // Golden-angle steps keep neighbouring games' hues far apart.
-export const gameHue = (index: number): number => Math.round((200 + index * 137.508) % 360)
+const gameHue = (index: number): number => Math.round((200 + index * 137.508) % 360)
 
-// Left stripe plus a faint wash, layered over the row's own background.
-export const tintStyle = (hue: number): string =>
+// background-image so the tint stacks on the row bg and doesn't clash with the selection ring.
+const tintStyle = (hue: number): string =>
   `background-image: linear-gradient(to right, hsl(${hue} 70% 50%) 3px, hsl(${hue} 70% 50% / 0.14) 3px);`
 
 // Declared series games first, then any other game ids the songs use.
@@ -33,8 +39,29 @@ export function overlayStyle(mode: OverlayMode, item: TrackOrderItem, gameIds: s
     case 'source':
       return tintStyle(item.fields ? MODDED_HUE : VANILLA_HUE)
     case 'soundtest':
-      return item.fields && !inSoundtest(item.fields) ? 'opacity: 0.45;' : ''
+      return item.fields && !inSoundtest(item.fields) ? HIDDEN_STYLE : ''
     default:
       return ''
+  }
+}
+
+export function overlayLegend(
+  mode: OverlayMode,
+  gameIds: string[],
+  gameName: (id: string) => string,
+  t: (key: string) => string
+): LegendEntry[] {
+  switch (mode) {
+    case 'game':
+      return gameIds.map((id, index) => ({ label: gameName(id), style: tintStyle(gameHue(index)) }))
+    case 'source':
+      return [
+        { label: t('orderTracks.overlayModded'), style: tintStyle(MODDED_HUE) },
+        { label: t('orderTracks.vanillaTag'), style: tintStyle(VANILLA_HUE) }
+      ]
+    case 'soundtest':
+      return [{ label: t('orderTracks.overlayHidden'), style: HIDDEN_STYLE }]
+    default:
+      return []
   }
 }

@@ -1,4 +1,4 @@
-// Click-to-sort table headers: first click sorts ascending, repeat clicks flip direction.
+// Click-to-sort table headers.
 export interface SortState<C extends string> {
   column: C
   desc: boolean
