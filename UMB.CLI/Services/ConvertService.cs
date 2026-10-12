@@ -375,7 +375,7 @@ namespace UMB.CLI.Services
             csv.WriteField("copyright");
             csv.WriteField("record_type");
             csv.WriteField("special_category");
-            csv.WriteField("volume_db");
+            csv.WriteField(TracksCsv.VolumeDbColumn);
             csv.WriteField("info1");
             csv.WriteField("in_soundtest");
             csv.WriteField("order");
@@ -391,7 +391,7 @@ namespace UMB.CLI.Services
                 csv.WriteField(t.Copyright);
                 csv.WriteField(t.RecordType);
                 csv.WriteField(t.SpecialCategory ?? "");
-                csv.WriteField(t.VolumeDb);
+                csv.WriteField(CliUtil.FormatDb(t.VolumeDb));
                 csv.WriteField(t.Info1 ?? "");
                 csv.WriteField(t.InSoundtest);
                 csv.WriteField(i);

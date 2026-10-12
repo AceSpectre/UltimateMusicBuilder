@@ -6,7 +6,6 @@ using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using Sma5h.Helpers;
 using Sma5h.Interfaces;
-using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
 using System;
 using System.Collections.Concurrent;
@@ -108,22 +107,11 @@ namespace Sma5h.Mods.Music.Services
             var dirCache = _dirCaches.GetOrAdd(dir, d => new DirectoryCache(d, GetCsvFileName()));
             dirCache.EnsureLoaded(_logger);
 
-            var lufsOpts = _config.CurrentValue.Sma5hMusic?.LufsNormalization ?? new();
-            var currentTarget = lufsOpts.TargetLufs;
-            var maxGainDb = lufsOpts.MaxGainDb;
-
             // Cache hit: size + mtime match.
             if (dirCache.TryGet(filename, out var entry)
                 && entry.FileSize == fileSize
                 && entry.MtimeUnix == mtime)
             {
-                // Target drift: recompute multiplier from the (still-valid) measured LUFS.
-                // No ffmpeg needed.
-                if (Math.Abs(entry.TargetLufs - currentTarget) > 0.001f)
-                {
-                    var newMult = VolumeHelper.DbToMultiplier(ComputeGainDb(entry.MeasuredLufs, currentTarget, maxGainDb).db);
-                    dirCache.UpdateDerived(filename, newMult, currentTarget, _logger);
-                }
                 return new LufsMeasurement
                 {
                     IntegratedLufs = entry.MeasuredLufs,
@@ -140,13 +128,10 @@ namespace Sma5h.Mods.Music.Services
             var measurement = RunFfmpegLoudnorm(audioFilePath);
             if (measurement.IsValid)
             {
-                var mult = VolumeHelper.DbToMultiplier(ComputeGainDb(measurement.IntegratedLufs, currentTarget, maxGainDb).db);
                 dirCache.Upsert(new LufsCacheEntry
                 {
                     Filename = filename,
                     MeasuredLufs = measurement.IntegratedLufs,
-                    Multiplier = mult,
-                    TargetLufs = currentTarget,
                     FileSize = fileSize,
                     MtimeUnix = mtime
                 }, _logger);
@@ -291,14 +276,11 @@ namespace Sma5h.Mods.Music.Services
         private static LufsMeasurement InvalidMeasurement() => new() { IsValid = false };
     }
 
-    // CSV row schema as documented in the plan:
-    //   filename,measured_lufs,multiplier,target_lufs,file_size,mtime_unix
+    // LUFS.csv row: filename,measured_lufs,file_size,mtime_unix (older caches' extra columns are ignored).
     public class LufsCacheEntry
     {
         public string Filename { get; set; }
         public float MeasuredLufs { get; set; }
-        public float Multiplier { get; set; }
-        public float TargetLufs { get; set; }
         public long FileSize { get; set; }
         public long MtimeUnix { get; set; }
     }
@@ -309,8 +291,6 @@ namespace Sma5h.Mods.Music.Services
         {
             Map(m => m.Filename).Name("filename");
             Map(m => m.MeasuredLufs).Name("measured_lufs");
-            Map(m => m.Multiplier).Name("multiplier");
-            Map(m => m.TargetLufs).Name("target_lufs");
             Map(m => m.FileSize).Name("file_size");
             Map(m => m.MtimeUnix).Name("mtime_unix");
         }
@@ -384,20 +364,6 @@ namespace Sma5h.Mods.Music.Services
             lock (_lock)
             {
                 _entries[entry.Filename] = entry;
-                _dirty = true;
-                FlushLocked(logger);
-            }
-        }
-
-        // Update only the derived fields (multiplier, target_lufs) without recomputing measurement.
-        // Used when TargetLufs config changes — the underlying measured_lufs is still valid.
-        public void UpdateDerived(string filename, float newMultiplier, float newTargetLufs, ILogger logger)
-        {
-            lock (_lock)
-            {
-                if (!_entries.TryGetValue(filename, out var existing)) return;
-                existing.Multiplier = newMultiplier;
-                existing.TargetLufs = newTargetLufs;
                 _dirty = true;
                 FlushLocked(logger);
             }

@@ -2,7 +2,7 @@
   import { AlertTriangle, FlaskConical, RotateCcw, Settings, SlidersHorizontal, Volume2 } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import Modal from '$lib/components/ui/modal.svelte'
-  import { DB_INPUT, parseDb } from '$lib/volume'
+  import { DB_INPUT, clampDb } from '$lib/volume'
 
   let { open, onClose }: { open: boolean; onClose: () => void } = $props()
 
@@ -30,10 +30,14 @@
     }
   })
 
+  function markEdited() {
+    if (saveState === 'saved') saveState = 'idle'
+  }
+
   async function handleSave() {
     saveState = 'saving'
     try {
-      await window.electron.umb.saveAppSettings({ globalVolumeDb: parseDb(String(globalVolumeDb)), applyVolumeToVanilla })
+      await window.electron.umb.saveAppSettings({ globalVolumeDb: clampDb(globalVolumeDb), applyVolumeToVanilla })
       saveState = 'saved'
       setTimeout(() => onClose(), 600)
     } catch {
@@ -115,7 +119,7 @@
               type="number"
               {...DB_INPUT}
               bind:value={globalVolumeDb}
-              oninput={() => { if (saveState === 'saved') saveState = 'idle' }}
+              oninput={markEdited}
               class="rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-mono outline-none focus:border-ring"
             />
             <p class="text-[11.5px] text-muted-foreground">{$_('settings.globalVolumeHint')}</p>
@@ -137,7 +141,7 @@
               role="switch"
               aria-checked={applyVolumeToVanilla}
               aria-labelledby="apply-vanilla-label"
-              onclick={() => { applyVolumeToVanilla = !applyVolumeToVanilla; if (saveState === 'saved') saveState = 'idle' }}
+              onclick={() => { applyVolumeToVanilla = !applyVolumeToVanilla; markEdited() }}
               class="relative h-5 w-9 shrink-0 rounded-full transition-colors {applyVolumeToVanilla ? 'bg-destructive' : 'bg-muted-foreground/30'}"
             >
               <span class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform {applyVolumeToVanilla ? 'translate-x-4' : ''}"></span>

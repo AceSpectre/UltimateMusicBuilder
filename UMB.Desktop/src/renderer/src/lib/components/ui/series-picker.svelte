@@ -8,8 +8,7 @@
   import { matchesSearch } from '$lib/search'
   import type { ModInfo, ModSeriesInfo } from '$lib/types/electron'
 
-  // Left-hand series sidebar shared by Manage Songs / Volume Config / Nus3 Convert.
-  // All display strings come in as props so each view keeps its own locale keys.
+  // Left-hand series sidebar shared by Manage Songs / Config Volume / Nus3 Convert.
   let {
     activeMod,
     series,
@@ -17,11 +16,6 @@
     activePath,
     onSelect,
     onReload,
-    heading,
-    chooseModText,
-    loadingText,
-    emptyText,
-    reloadTitle,
     spinning = loading,
     actions
   }: {
@@ -31,11 +25,6 @@
     activePath: string | null
     onSelect: (path: string) => void
     onReload: () => void
-    heading: string
-    chooseModText: string
-    loadingText: string
-    emptyText: string
-    reloadTitle: string
     spinning?: boolean
     actions?: Snippet
   } = $props()
@@ -65,11 +54,11 @@
         <GradientIcon>
           <Folder size={18} />
         </GradientIcon>
-        <h2 class="min-w-0 flex-1 truncate text-sm font-semibold">{heading}</h2>
+        <h2 class="min-w-0 flex-1 truncate text-sm font-semibold">{$_('seriesPicker.heading')}</h2>
         {#if actions}
           {@render actions()}
         {/if}
-        <IconButton onclick={onReload} title={reloadTitle}>
+        <IconButton onclick={onReload} title={$_('seriesPicker.reload')}>
           <RefreshCw size={14} class={spinning ? 'animate-spin' : ''} />
         </IconButton>
         <IconButton onclick={() => (collapsed = true)} title={$_('seriesPicker.collapse')}>
@@ -90,19 +79,9 @@
       />
     {:else}
       <div class="min-h-0 flex-1 overflow-auto p-2">
-        {#if !activeMod}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {chooseModText}
-          </div>
-        {:else if loading}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {loadingText}
-          </div>
-        {:else}
-          <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {emptyText}
-          </div>
-        {/if}
+        <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
+          {$_(!activeMod ? 'seriesPicker.chooseMod' : loading ? 'seriesPicker.loading' : 'seriesPicker.noSeries')}
+        </div>
       </div>
     {/if}
   {/if}

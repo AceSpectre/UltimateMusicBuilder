@@ -9,7 +9,6 @@ using Sma5h.Mods.Music.Models;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -22,12 +21,6 @@ namespace UMB.CLI.Services
     public class ScaffoldService
     {
         private const string DefaultLocale = "en_us";
-
-        private static readonly string[] ExpectedCsvColumns =
-        {
-            "filename", "game", "title", "author", "copyright",
-            "record_type", "special_category", "volume_db", "info1", "in_soundtest"
-        };
 
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
@@ -89,8 +82,7 @@ namespace UMB.CLI.Services
                     }
                     if (!File.Exists(csvPath))
                     {
-                        var csvContent = "filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest\n";
-                        File.WriteAllText(csvPath, csvContent);
+                        File.WriteAllText(csvPath, TracksCsv.Header);
                         _logger.LogInformation("Created {Path}", csvPath);
                         wasScaffolded = true;
                     }
@@ -141,10 +133,10 @@ namespace UMB.CLI.Services
                         .ToList();
 
                     var currentHeaderSet = new HashSet<string>(existingHeaders, StringComparer.OrdinalIgnoreCase);
-                    bool needsColumnUpdate = ExpectedCsvColumns.Any(h => !currentHeaderSet.Contains(h));
+                    bool needsColumnUpdate = TracksCsv.Columns.Any(h => !currentHeaderSet.Contains(h));
                     if (needsColumnUpdate)
                         existingHeaders = existingHeaders
-                            .Concat(ExpectedCsvColumns.Where(h => !currentHeaderSet.Contains(h)))
+                            .Concat(TracksCsv.Columns.Where(h => !currentHeaderSet.Contains(h)))
                             .ToArray();
 
                     foreach (var filename in newFiles)
@@ -158,7 +150,7 @@ namespace UMB.CLI.Services
                         row["author"] = defaults?.Author ?? "";
                         row["copyright"] = defaults?.Copyright ?? "";
                         row["record_type"] = defaults?.RecordType ?? "original";
-                        row["volume_db"] = "0";
+                        row[TracksCsv.VolumeDbColumn] = CliUtil.FormatDb(0);
                         existingRows.Add(row);
                     }
 
@@ -176,7 +168,7 @@ namespace UMB.CLI.Services
 
                     if (needsColumnUpdate)
                     {
-                        var addedColumns = ExpectedCsvColumns.Where(h => !currentHeaderSet.Contains(h)).ToList();
+                        var addedColumns = TracksCsv.Columns.Where(h => !currentHeaderSet.Contains(h)).ToList();
                         _logger.LogInformation("Added column(s) {Columns} to {Path}", string.Join(", ", addedColumns), csvPath);
                         totalColumnsUpdated++;
                     }
@@ -445,7 +437,7 @@ namespace UMB.CLI.Services
             sb.AppendLine("author = \"\"");
             sb.AppendLine("copyright = \"\"");
             sb.AppendLine("record-type = \"original\"");
-            sb.AppendLine("volume-db = 0.0");
+            sb.AppendLine(SeriesToml.VolumeDbLine(0));
         }
 
         /// <summary>

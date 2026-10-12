@@ -22,14 +22,13 @@ namespace UMB.CLI.Services
     /// </summary>
     public class MergeService
     {
-        private static readonly string[] TrackColumns =
-            { "filename", "game", "title", "author", "copyright", "record_type", "special_category", "volume_db", "info1", "in_soundtest", "order" };
+        private static readonly string[] TrackColumns = TracksCsv.Columns.Append("order").ToArray();
 
         // Values for columns a source tracks.csv doesn't have (others default to "").
         private static readonly Dictionary<string, string> ColumnDefaults = new()
         {
             ["record_type"] = "original",
-            ["volume_db"] = "0",
+            [TracksCsv.VolumeDbColumn] = CliUtil.FormatDb(0),
             ["in_soundtest"] = "True"
         };
 
@@ -301,7 +300,7 @@ namespace UMB.CLI.Services
                 if (!string.IsNullOrEmpty(d.Copyright))
                     sb.AppendLine($"copyright = \"{CliUtil.EscapeToml(d.Copyright)}\"");
                 sb.AppendLine($"record-type = \"{CliUtil.EscapeToml(d.RecordType ?? "original")}\"");
-                sb.AppendLine(string.Format(CultureInfo.InvariantCulture, "volume-db = {0}", d.VolumeDb));
+                sb.AppendLine(SeriesToml.VolumeDbLine(d.VolumeDb));
                 sb.AppendLine();
             }
 

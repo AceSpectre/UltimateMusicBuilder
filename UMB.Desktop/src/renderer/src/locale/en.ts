@@ -194,7 +194,6 @@ export default {
     iconNotPng: 'Please choose a PNG image.'
   },
   nus3Convert: {
-    reload: 'Reload series',
     kicker1: 'NUS3 CONVERT · STEP 1 of 2 · SELECTING LOOP POINTS',
     kicker2: 'NUS3 CONVERT · STEP 2 of 2 · REVIEWING CONVERTED LOOPS',
     tabConvert: 'Convert',
@@ -257,19 +256,19 @@ export default {
     settingsClose: 'Close'
   },
   seriesPicker: {
+    heading: 'Series',
+    reload: 'Reload series',
+    chooseMod: 'Choose a mod from the app bar to start.',
+    loading: 'Loading series...',
+    noSeries: 'No series with tracks.csv were found in this mod.',
     search: 'Search series...',
-    count: '{count, plural, one {# series} other {# series}}',
+    count: '{count} series',
     noMatch: 'No series match your search.',
     collapse: 'Collapse series list',
     expand: 'Expand series list'
   },
   configVolume: {
     title: 'Config Volume',
-    seriesHeading: 'Series',
-    chooseMod: 'Choose a mod from the app bar to start.',
-    loadingSeries: 'Loading series...',
-    noSeries: 'No series with tracks.csv were found in this mod.',
-    reload: 'Reload',
     save: 'Save Boosts',
     saving: 'Saving...',
     saved: 'Saved',
@@ -404,11 +403,6 @@ export default {
   },
   orderTracks: {
     title: 'Manage Songs',
-    seriesHeading: 'Series',
-    chooseMod: 'Choose a mod from the app bar to start.',
-    loadingSeries: 'Loading series...',
-    noSeries: 'No series with tracks.csv were found in this mod.',
-    reload: 'Reload series',
     dragHintLocked:
       'Edit song details below, or drag the handle to reorder. Locked vanilla entries are preserved from song_order.toml.',
     dragHint: 'Edit each song’s details, or drag the handle to reorder the tracks.csv entries for this series.',

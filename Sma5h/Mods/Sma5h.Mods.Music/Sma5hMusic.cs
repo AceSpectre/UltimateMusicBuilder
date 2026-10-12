@@ -185,12 +185,12 @@ namespace Sma5h.Mods.Music
                 }
             }
 
-            string BankOutputFile(string toneId) => Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3BANK_FILE, toneId));
+            string BgmOutputFile(string fileFormat, string toneId) => Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(fileFormat, toneId));
 
             foreach (var bgmPropertyEntry in _audioStateService.GetModBgmPropertyEntries())
             {
-                var nusBankOutputFile = BankOutputFile(bgmPropertyEntry.NameId);
-                var nusAudioOutputFile = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3AUDIO_FILE, bgmPropertyEntry.NameId));
+                var nusBankOutputFile = BgmOutputFile(MusicConstants.GameResources.NUS3BANK_FILE, bgmPropertyEntry.NameId);
+                var nusAudioOutputFile = BgmOutputFile(MusicConstants.GameResources.NUS3AUDIO_FILE, bgmPropertyEntry.NameId);
 
                 var finalVolume = bgmPropertyEntry.AudioVolume + globalDb;
                 if (lufsEnabled && !string.IsNullOrEmpty(bgmPropertyEntry.Filename) && File.Exists(bgmPropertyEntry.Filename))
@@ -225,7 +225,7 @@ namespace Sma5h.Mods.Music
                 var vanillaBoosts = VanillaVolumeHelper.BoostsByToneId(_audioStateService, globalDb, _seriesVolumeDb);
                 _logger.LogWarning("Applying volume settings to {Count} vanilla song(s).", vanillaBoosts.Count);
                 foreach (var entry in _audioStateService.GetBgmPropertyEntries().Where(p => vanillaBoosts.ContainsKey(p.NameId)))
-                    _nus3AudioService.GenerateNus3Bank(entry.NameId, entry.AudioVolume + vanillaBoosts[entry.NameId], BankOutputFile(entry.NameId));
+                    _nus3AudioService.GenerateNus3Bank(entry.NameId, entry.AudioVolume + vanillaBoosts[entry.NameId], BgmOutputFile(MusicConstants.GameResources.NUS3BANK_FILE, entry.NameId));
             }
 
             if (lufsEnabled)

@@ -109,7 +109,7 @@ describe('loadVolumeConfig', () => {
     expect(data.seriesName).toBe('dev')
   })
 
-  it('defaults seriesDb, lufsCacheExists and items when the CLI omits them', async () => {
+  it('defaults lufsCacheExists and items when the CLI omits them', async () => {
     stubCli((input) =>
       writeFileSync(
         input.outputPath,
@@ -125,7 +125,6 @@ describe('loadVolumeConfig', () => {
     )
 
     const data = await loadVolumeConfig(WS, SERIES, true, onLine)
-    expect(data.seriesDb).toBe(0)
     expect(data.lufsCacheExists).toBe(false)
     expect(data.items).toEqual([])
   })

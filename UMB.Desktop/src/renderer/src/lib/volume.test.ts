@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dbToGain, formatBankDb, formatDb, parseDb } from './volume'
+import { clampDb, dbToGain, formatBankDb, formatDb, parseDb } from './volume'
 
 describe('formatDb', () => {
   it('signs positive boosts and keeps one decimal', () => {
@@ -21,6 +21,14 @@ describe('dbToGain', () => {
     expect(dbToGain(0)).toBe(1)
     expect(dbToGain(20)).toBeCloseTo(10)
     expect(dbToGain(-6)).toBeCloseTo(0.501, 3)
+  })
+})
+
+describe('clampDb', () => {
+  it('clamps to the editable range and treats NaN as no boost', () => {
+    expect(clampDb(25)).toBe(20)
+    expect(clampDb(-3)).toBe(-3)
+    expect(clampDb(NaN)).toBe(0)
   })
 })
 

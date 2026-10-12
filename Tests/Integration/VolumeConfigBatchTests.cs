@@ -101,7 +101,7 @@ namespace Tests.Integration
 
             var csv = File.ReadAllText(Path.Combine(seriesDir, "tracks.csv"));
             Assert.Contains("a.nus3audio,a,1.5", csv);
-            Assert.Contains("b.nus3audio,b,-3", csv);
+            Assert.Contains("b.nus3audio,b,-3.0", csv);
         }
 
         [Fact]
@@ -133,8 +133,8 @@ namespace Tests.Integration
             CreateService().RunSaveBatch(json);
 
             var csv = File.ReadAllText(Path.Combine(seriesDir, "tracks.csv"));
-            Assert.Contains("volume_db", csv.Split('\n')[0]); // header gained the column
-            Assert.Contains("a.nus3audio,a,2", csv);
+            Assert.Contains("volume_db", csv.Split('\n')[0]);
+            Assert.Contains("a.nus3audio,a,2.0", csv);
         }
 
         [Fact]
@@ -156,7 +156,7 @@ namespace Tests.Integration
 
             Assert.Null(ex);
             var csv = File.ReadAllText(Path.Combine(seriesDir, "tracks.csv"));
-            Assert.Contains("a.nus3audio,a,3", csv);
+            Assert.Contains("a.nus3audio,a,3.0", csv);
             Assert.DoesNotContain("9.9", csv);
         }
 

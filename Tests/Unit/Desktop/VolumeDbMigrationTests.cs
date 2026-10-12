@@ -48,7 +48,7 @@ namespace Tests.Unit.Desktop
             var toml = File.ReadAllText(Path.Combine(series, "series.toml"));
             Assert.Contains("volume-db = 6.02", toml);
             Assert.DoesNotContain("volume = ", toml);
-            Assert.Equal("filename,title,volume_db,in_soundtest\na.flac,A,-6.02,True\nb.flac,B,,True\nc.flac,C,0,True\n",
+            Assert.Equal("filename,title,volume_db,in_soundtest\na.flac,A,-6.02,True\nb.flac,B,,True\nc.flac,C,0.0,True\n",
                 File.ReadAllText(Path.Combine(series, "tracks.csv")).Replace("\r\n", "\n"));
         }
 

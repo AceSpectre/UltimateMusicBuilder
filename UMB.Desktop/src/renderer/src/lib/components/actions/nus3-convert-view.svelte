@@ -515,11 +515,6 @@
       activePath={modsStore.activeSeriesPath}
       onSelect={(path) => { modsStore.activeSeriesPath = path; void loadSources(path) }}
       onReload={handleReload}
-      heading={$_('orderTracks.seriesHeading')}
-      chooseModText={$_('orderTracks.chooseMod')}
-      loadingText={$_('orderTracks.loadingSeries')}
-      emptyText={$_('orderTracks.noSeries')}
-      reloadTitle={$_('nus3Convert.reload')}
     >
       {#snippet actions()}
         <IconButton onclick={openSettings} title={$_('nus3Convert.settingsTitle')}>

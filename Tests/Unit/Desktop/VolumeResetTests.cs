@@ -26,8 +26,8 @@ namespace Tests.Unit.Desktop
             var mario = _ws.WriteSeries("mario", "mario", "filename,title,volume_db\nc.nus3audio,C,-6\n");
 
             _service.ResetAllVolumes();
-            Assert.Equal("filename,title,volume_db\na.nus3audio,A,0\nb.nus3audio,B,0\n", ReadCsv(persona));
-            Assert.Equal("filename,title,volume_db\nc.nus3audio,C,0\n", ReadCsv(mario));
+            Assert.Equal("filename,title,volume_db\na.nus3audio,A,0.0\nb.nus3audio,B,0\n", ReadCsv(persona));
+            Assert.Equal("filename,title,volume_db\nc.nus3audio,C,0.0\n", ReadCsv(mario));
         }
 
         [Fact]

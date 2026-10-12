@@ -173,7 +173,7 @@ namespace Tests.Integration
             Assert.Contains("flowerhead", row); // game name_id
             // record_type "record_original" has its "record_" prefix stripped
             Assert.Contains("original", row);
-            Assert.Equal("0", row.Split(',')[Array.IndexOf(lines[0].Split(','), "volume_db")]);
+            Assert.Equal("0.0", row.Split(',')[Array.IndexOf(lines[0].Split(','), "volume_db")]);
         }
 
         [Fact]

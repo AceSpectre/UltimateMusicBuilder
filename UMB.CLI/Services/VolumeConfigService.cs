@@ -190,13 +190,13 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            if (!headers.Contains(VolumeColumn))
-                headers = headers.Append(VolumeColumn).ToArray();
+            if (!headers.Contains(TracksCsv.VolumeDbColumn))
+                headers = headers.Append(TracksCsv.VolumeDbColumn).ToArray();
 
             foreach (var vm in result)
             {
                 if (vm.OriginalIndex < 0 || vm.OriginalIndex >= rows.Count) continue;
-                rows[vm.OriginalIndex][VolumeColumn] = FormatDb(vm.TrackDb);
+                rows[vm.OriginalIndex][TracksCsv.VolumeDbColumn] = CliUtil.FormatDb(vm.TrackDb);
             }
 
             WriteCsvRows(csvPath, rows, headers);
@@ -219,7 +219,7 @@ namespace UMB.CLI.Services
                 OriginalIndex = index,
                 Title = title,
                 Filename = filename,
-                TrackDb = ParseDb(row.GetValueOrDefault(VolumeColumn, "")),
+                TrackDb = ParseDb(row.GetValueOrDefault(TracksCsv.VolumeDbColumn, "")),
             };
 
             if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
@@ -338,13 +338,13 @@ namespace UMB.CLI.Services
             }
 
             var (rows, headers) = ReadCsvRows(csvPath);
-            if (!headers.Contains(VolumeColumn))
-                headers = headers.Append(VolumeColumn).ToArray();
+            if (!headers.Contains(TracksCsv.VolumeDbColumn))
+                headers = headers.Append(TracksCsv.VolumeDbColumn).ToArray();
 
             foreach (var ov in input.Overrides ?? new List<VolumeOverride>())
             {
                 if (ov.OriginalIndex < 0 || ov.OriginalIndex >= rows.Count) continue;
-                rows[ov.OriginalIndex][VolumeColumn] = FormatDb(ov.Db);
+                rows[ov.OriginalIndex][TracksCsv.VolumeDbColumn] = CliUtil.FormatDb(ov.Db);
             }
 
             WriteCsvRows(csvPath, rows, headers);
@@ -419,22 +419,18 @@ namespace UMB.CLI.Services
                 var csvPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
                 if (!File.Exists(csvPath)) continue;
                 var (rows, headers) = ReadCsvRows(csvPath);
-                var rowsToReset = headers.Contains(VolumeColumn) ? rows.Where(r => ParseDb(r[VolumeColumn]) != 0f).ToList() : new();
+                var rowsToReset = headers.Contains(TracksCsv.VolumeDbColumn) ? rows.Where(r => ParseDb(r[TracksCsv.VolumeDbColumn]) != 0f).ToList() : new();
                 if (rowsToReset.Count == 0) continue;
-                rowsToReset.ForEach(r => r[VolumeColumn] = "0");
+                rowsToReset.ForEach(r => r[TracksCsv.VolumeDbColumn] = CliUtil.FormatDb(0));
                 WriteCsvRows(csvPath, rows, headers);
                 changed += rowsToReset.Count;
             }
             _logger.LogInformation("Reset {Count} track dB boost(s) to 0.", changed);
         }
 
-        /// <summary>The tracks.csv column holding each track's dB boost.</summary>
-        public const string VolumeColumn = "volume_db";
-
         internal static float ParseDb(string raw) =>
             float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0f;
 
-        private static string FormatDb(float db) => db.ToString("0.##", CultureInfo.InvariantCulture);
 
         private (List<Dictionary<string, string>> rows, string[] headers) ReadCsvRows(string csvPath)
         {

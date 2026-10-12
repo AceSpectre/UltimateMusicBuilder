@@ -1,6 +1,5 @@
 using Sma5h.Mods.Music.Helpers;
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -12,8 +11,7 @@ namespace UMB.CLI.Services
 {
     /// <summary>
     /// One-time conversion of the legacy linear volume multipliers (1 = unchanged) to dB boosts
-    /// (0 = unchanged) in appsettings.json, series.toml and tracks.csv. Files already using the
-    /// dB keys are left alone.
+    /// (0 = unchanged) in appsettings.json, series.toml and tracks.csv.
     /// </summary>
     public static class VolumeDbMigration
     {
@@ -45,8 +43,7 @@ namespace UMB.CLI.Services
         {
             if (!obj.TryGetPropertyValue(legacyKey, out var legacy)) return false;
             obj.Remove(legacyKey);
-            if (!obj.ContainsKey(dbKey) && legacy != null)
-                obj[dbKey] = ToDb(legacy.GetValue<double>());
+            obj[dbKey] = ToDb(legacy.GetValue<double>());
             return true;
         }
 
@@ -58,13 +55,12 @@ namespace UMB.CLI.Services
             var legacy = Regex.Match(section, @"^\s*volume\s*=\s*([0-9.]+)", RegexOptions.Multiline);
             if (!legacy.Success) return;
 
-            var entries = new List<SeriesToml.Entry> { new("volume", null) };
-            if (!Regex.IsMatch(section, @"^\s*volume-db\s*=", RegexOptions.Multiline))
+            var db = ToDb(double.Parse(legacy.Groups[1].Value, CultureInfo.InvariantCulture));
+            SeriesToml.WriteLines(path, SeriesToml.UpsertTable(SeriesToml.ReadLines(path), "default-track-data", new[]
             {
-                var db = ToDb(double.Parse(legacy.Groups[1].Value, CultureInfo.InvariantCulture));
-                entries.Add(new("volume-db", $"volume-db = {SeriesToml.FormatDb(db)}"));
-            }
-            SeriesToml.WriteLines(path, SeriesToml.UpsertTable(SeriesToml.ReadLines(path), "default-track-data", entries, createIfMissing: false));
+                new SeriesToml.Entry("volume", null),
+                new SeriesToml.Entry(SeriesToml.VolumeDbKey, SeriesToml.VolumeDbLine(db))
+            }, createIfMissing: false));
         }
 
         private static void MigrateTracksCsv(string seriesDir)
@@ -72,16 +68,13 @@ namespace UMB.CLI.Services
             var path = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
             if (!File.Exists(path)) return;
             var (rows, headers) = TracksCsv.Read(path);
-            if (!headers.Contains(LegacyCsvColumn) || headers.Contains(VolumeConfigService.VolumeColumn)) return;
+            if (!headers.Contains(LegacyCsvColumn)) return;
 
             foreach (var row in rows)
-            {
-                var legacy = row.Get(LegacyCsvColumn).Trim();
-                row[VolumeConfigService.VolumeColumn] = double.TryParse(legacy, NumberStyles.Float, CultureInfo.InvariantCulture, out var m)
-                    ? ToDb(m).ToString(CultureInfo.InvariantCulture)
+                row[TracksCsv.VolumeDbColumn] = double.TryParse(row.Get(LegacyCsvColumn).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var m)
+                    ? CliUtil.FormatDb(ToDb(m))
                     : "";
-            }
-            TracksCsv.Write(path, rows, headers.Select(h => h == LegacyCsvColumn ? VolumeConfigService.VolumeColumn : h).ToList());
+            TracksCsv.Write(path, rows, headers.Select(h => h == LegacyCsvColumn ? TracksCsv.VolumeDbColumn : h).ToList());
         }
 
         private static double ToDb(double multiplier) => Math.Round(VolumeHelper.MultiplierToDb((float)multiplier), 2);

@@ -1,12 +1,3 @@
-<script lang="ts" module>
-  export interface ListItem {
-    id: string
-    label: string
-    /** Optional count shown as a pill when above zero. */
-    badge?: number
-  }
-</script>
-
 <script lang="ts">
   import { Search } from '@lucide/svelte'
 
@@ -21,7 +12,8 @@
     countText,
     emptyText
   }: {
-    items: ListItem[]
+    /** badge: optional count shown as a pill when above zero. */
+    items: { id: string; label: string; badge?: number }[]
     activeId: string | null
     onSelect: (id: string) => void
     search?: string

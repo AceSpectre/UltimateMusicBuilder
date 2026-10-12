@@ -56,7 +56,7 @@ export async function loadVolumeConfig(
       seriesName: result.seriesName || basename(seriesPath),
       seriesPath,
       globalDb: result.globalDb,
-      seriesDb: result.seriesDb ?? 0,
+      seriesDb: result.seriesDb,
       targetLufs: result.targetLufs,
       maxGainDb: result.maxGainDb,
       bankBaseDb: result.bankBaseDb,

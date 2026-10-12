@@ -11,12 +11,7 @@ using Xunit;
 
 namespace Tests.Unit
 {
-    /// <summary>
-    /// The gain formula and the loudnorm-JSON parser — the two pure pieces of
-    /// LufsAnalysisService. CalculateGain is public; the ComputeGainDb clamp is
-    /// reached through it. ParseLoudnormJson/ParseFloat
-    /// are private and reached via reflection.
-    /// </summary>
+    /// <summary>The gain formula and the loudnorm-JSON parser of LufsAnalysisService.</summary>
     public class LufsGainTests
     {
         private static LufsAnalysisService CreateService()

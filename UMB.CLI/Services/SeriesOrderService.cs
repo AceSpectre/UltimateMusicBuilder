@@ -25,10 +25,6 @@ namespace UMB.CLI.Services
             "# Listed series appear after official series, before \"Other\"\n" +
             "# Unlisted custom series will be placed after these\n";
 
-        // Header-only tracks.csv: the series exists but has no songs yet.
-        private const string TracksCsvHeader =
-            "filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest\n";
-
         private static readonly Regex SeriesIdPattern = new("^[a-z0-9_]+$");
         private static readonly Regex PngDataUrl = new("^data:image/png;base64,([A-Za-z0-9+/=]+)$");
 
@@ -121,7 +117,7 @@ namespace UMB.CLI.Services
         {
             series = SortedCustomSeries(resolvedModPath);
             var items = series
-                .Select((s, index) => new SeriesOrderItem($"series:{index}", s.Name, s.Id, s.Dir, SeriesToml.ReadVolumeDb(s.Dir), s.IconDataUrl, index, s.Fields))
+                .Select((s, index) => new SeriesOrderItem($"series:{index}", s.Name, s.Id, s.Dir, s.VolumeDb, s.IconDataUrl, index, s.Fields))
                 .ToList();
             var hasSeriesOrder = SeriesToml.ReadIdList(SeriesOrderPath(resolvedModPath)).Count > 0;
             return new SeriesOrderData(Path.GetFileName(resolvedModPath), resolvedModPath, hasSeriesOrder, items);
@@ -190,10 +186,10 @@ namespace UMB.CLI.Services
             lines.Add("");
             foreach (var game in games)
                 lines.AddRange(new[] { "[[games]]", $"id = \"{SeriesToml.Escape(game.Id)}\"", $"name = \"{SeriesToml.Escape(game.Name)}\"", "" });
-            lines.AddRange(new[] { "[default-track-data]", $"game = \"{SeriesToml.Escape(games[0].Id)}\"", "author = \"\"", "copyright = \"\"", "record-type = \"original\"", "volume-db = 0.0", "" });
+            lines.AddRange(new[] { "[default-track-data]", $"game = \"{SeriesToml.Escape(games[0].Id)}\"", "author = \"\"", "copyright = \"\"", "record-type = \"original\"", SeriesToml.VolumeDbLine(0), "" });
 
             SeriesToml.WriteLines(Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), lines);
-            File.WriteAllText(Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE), TracksCsvHeader);
+            File.WriteAllText(Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE), TracksCsv.Header);
             if (!string.IsNullOrEmpty(input.IconDataUrl))
                 WriteSeriesIcon(seriesDir, input.IconDataUrl);
 
@@ -210,7 +206,7 @@ namespace UMB.CLI.Services
             return PngDataUrlOf(Path.Combine(series.Dir, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE));
         }
 
-        private record CustomSeries(string Dir, string Id, string Name, string IconPath, SeriesFields Fields)
+        private record CustomSeries(string Dir, string Id, string Name, string IconPath, SeriesFields Fields, double VolumeDb)
         {
             public string IconDataUrl => IconPath == null ? null : PngDataUrlOf(IconPath);
         }
@@ -244,7 +240,7 @@ namespace UMB.CLI.Services
 
                 var iconPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
                 results.Add(new CustomSeries(seriesDir, header.Id, header.Name ?? header.Id,
-                    File.Exists(iconPath) ? iconPath : null, ReadFields(text, header)));
+                    File.Exists(iconPath) ? iconPath : null, ReadFields(text, header), SeriesToml.ReadDefaults(text)?.VolumeDb ?? 0));
             }
             return results;
         }

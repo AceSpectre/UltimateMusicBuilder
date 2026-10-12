@@ -175,7 +175,6 @@ namespace Tests.Integration
             var csvPath = Path.Combine(modDir, "dev", "tracks.csv");
 
             var lines = File.ReadAllLines(csvPath).ToList();
-            // Change the dB boost of the first track (column index 7)
             var cols = lines[1].Split(',');
             cols[7] = "-6";
             lines[1] = string.Join(',', cols);

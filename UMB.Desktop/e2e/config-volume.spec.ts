@@ -46,6 +46,6 @@ test('save writes the per-track dB boost into the tracks.csv volume_db column', 
   const header = csv[0].split(',')
   const volIdx = header.indexOf('volume_db')
   expect(volIdx).toBeGreaterThanOrEqual(0)
-  expect(csv[1].split(',')[volIdx]).toBe('-6')
+  expect(csv[1].split(',')[volIdx]).toBe('-6.0')
   expect(csv[2].split(',')[volIdx]).toBe('0')
 })

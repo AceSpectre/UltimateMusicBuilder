@@ -51,7 +51,7 @@ export function prepareIsolatedBuild(): IsolatedBuild {
       EnableAudioCaching: false,
       AudioConversionFormat: 'idsp',
       DefaultLocale: 'en_us',
-      // dB equivalent of the 1.5x multiplier the build baselines were generated with.
+      // Matches TestEnvironment.GlobalVolumeDb.
       GlobalVolumeDb: 20 * Math.log10(1.5),
       PlaylistMapping: { GenerationMode: 'Manual', AutoMappingIncidence: 0, AutoMapping: {} },
       LufsNormalization: { Enabled: false, TargetLufs: -14, MaxGainDb: 12, LufsCacheFileName: 'LUFS.csv' }

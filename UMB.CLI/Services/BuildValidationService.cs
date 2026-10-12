@@ -132,7 +132,7 @@ namespace UMB.CLI.Services
                         csv.ReadHeader();
                         var headers = csv.HeaderRecord;
                         bool hasOrderColumn = headers.Contains("order");
-                        bool hasVolumeColumn = headers.Contains("volume_db");
+                        bool hasVolumeColumn = headers.Contains(TracksCsv.VolumeDbColumn);
 
                         int rowNum = 0;
                         while (csv.Read())
@@ -147,7 +147,7 @@ namespace UMB.CLI.Services
 
                             csvFilenames.Add(filename);
 
-                            var trackDb = hasVolumeColumn ? VolumeConfigService.ParseDb(csv.GetField("volume_db")) : 0f;
+                            var trackDb = hasVolumeColumn ? VolumeConfigService.ParseDb(csv.GetField(TracksCsv.VolumeDbColumn)) : 0f;
                             var effectiveDb = globalDb + seriesDb + trackDb;
                             if (effectiveDb >= SuspiciousDb)
                             {

@@ -28,6 +28,8 @@
   let seriesDb = $state(0)
   let baselineSeriesDb = $state(0)
   const seriesLoader = createSeriesLoader((v) => (loading = v))
+  const thClass = 'px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'
+  const dbInputClass = 'h-8 w-[88px] rounded-lg border border-input bg-background px-2 text-right font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-ring'
 
   // Web Audio preview
   let audioCtx: AudioContext | null = null
@@ -117,18 +119,22 @@
   function refreshPreviewGain() {
     const playing = rows.find((r) => r.originalIndex === playingIndex)
     if (playing && gainNode) gainNode.gain.value = dbToGain(effectiveDb(playing))
+  }
+
+  function onBoostEdited() {
+    refreshPreviewGain()
     if (saveState === 'saved') saveState = 'idle'
   }
 
   function onTrackDbInput(row: VolumeRowItem, raw: string) {
     const next = parseDb(raw)
     rows = rows.map((r) => (r.originalIndex === row.originalIndex ? { ...r, trackDb: next } : r))
-    refreshPreviewGain()
+    onBoostEdited()
   }
 
   function onSeriesDbInput(raw: string) {
     seriesDb = parseDb(raw)
-    refreshPreviewGain()
+    onBoostEdited()
   }
 
   async function handleSave() {
@@ -265,11 +271,6 @@
       activePath={selectedPath}
       onSelect={selectSeries}
       onReload={handleReload}
-      heading={$_('configVolume.seriesHeading')}
-      chooseModText={$_('configVolume.chooseMod')}
-      loadingText={$_('configVolume.loadingSeries')}
-      emptyText={$_('configVolume.noSeries')}
-      reloadTitle={$_('configVolume.reload')}
     />
 
     <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
@@ -374,7 +375,7 @@
               {...DB_INPUT}
               value={seriesDb}
               oninput={(e) => onSeriesDbInput(e.currentTarget.value)}
-              class="h-8 w-[88px] rounded-lg border border-input bg-background px-2 text-right font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-ring"
+              class={dbInputClass}
             />
             <span class="text-[12px] text-muted-foreground">{$_('configVolume.seriesDbHint')}</span>
           </div>
@@ -395,13 +396,13 @@
             <table class="w-full border-collapse text-[12.5px]">
               <thead class="sticky top-0">
                 <tr style="background: hsl(var(--muted) / .5);">
-                  <th class="w-full px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colTrack')}</th>
-                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colMeasured')}</th>
-                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colAutoGain')}</th>
-                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" title={$_('configVolume.colNormalisedHint')}>{$_('configVolume.colNormalised')}</th>
-                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{$_('configVolume.colOverride')}</th>
-                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground" title={$_('configVolume.colFinalHint')}>{$_('configVolume.colFinal')}</th>
-                  <th class="whitespace-nowrap px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"></th>
+                  <th class="w-full text-left {thClass}">{$_('configVolume.colTrack')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}">{$_('configVolume.colMeasured')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}">{$_('configVolume.colAutoGain')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}" title={$_('configVolume.colNormalisedHint')}>{$_('configVolume.colNormalised')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}">{$_('configVolume.colOverride')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}" title={$_('configVolume.colFinalHint')}>{$_('configVolume.colFinal')}</th>
+                  <th class="whitespace-nowrap text-right {thClass}"></th>
                 </tr>
               </thead>
               <tbody>
@@ -443,7 +444,7 @@
                           value={row.trackDb}
                           oninput={(e) => onTrackDbInput(row, e.currentTarget.value)}
                           title={$_('configVolume.trackHint')}
-                          class="h-8 w-[88px] rounded-lg border border-input bg-background px-2 text-right font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-ring"
+                          class={dbInputClass}
                         />
                       </div>
                     </td>

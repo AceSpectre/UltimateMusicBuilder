@@ -13,7 +13,7 @@ namespace Sma5h.Mods.Music.Models
         public List<SeriesEntry> SeriesEntries { get; }
         public List<PlaylistEntry> PlaylistEntries { get; }
         public Dictionary<string, List<string>> SeriesSongOrderings { get; }
-        /// <summary>Series dB boost by UiSeriesId, used for vanilla songs in existing series.</summary>
+        /// <summary>Series dB boost by UiSeriesId.</summary>
         public Dictionary<string, float> SeriesVolumeDb { get; }
 
         public MusicModEntries()

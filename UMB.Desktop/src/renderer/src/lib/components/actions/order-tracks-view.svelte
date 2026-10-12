@@ -273,11 +273,6 @@
       activePath={modsStore.activeSeriesPath}
       onSelect={requestSelectSeries}
       onReload={handleReload}
-      heading={$_('orderTracks.seriesHeading')}
-      chooseModText={$_('orderTracks.chooseMod')}
-      loadingText={$_('orderTracks.loadingSeries')}
-      emptyText={$_('orderTracks.noSeries')}
-      reloadTitle={$_('orderTracks.reload')}
     />
 
     <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
