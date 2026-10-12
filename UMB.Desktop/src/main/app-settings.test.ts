@@ -73,6 +73,17 @@ describe('checkArcOutput', () => {
   it('returns false when settings are missing', () => {
     expect(checkArcOutput(ws.root)).toBe(false)
   })
+
+  it('returns false when the output dir does not exist', () => {
+    writeSettings('{}')
+    expect(checkArcOutput(ws.root)).toBe(false)
+  })
+
+  it('returns false when settings are unreadable', () => {
+    writeSettings('{ not json')
+    writeFile(join(ws.root, 'ArcOutput'), 'foo.bin', 'x')
+    expect(checkArcOutput(ws.root)).toBe(false)
+  })
 })
 
 describe('saveAppSettings', () => {

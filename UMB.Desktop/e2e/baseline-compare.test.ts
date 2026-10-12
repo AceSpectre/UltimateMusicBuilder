@@ -1,15 +1,15 @@
-import { test, expect } from '@playwright/test'
+import { afterEach, beforeEach, expect, test } from 'vitest'
 import { cpSync, readFileSync, writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { join, resolve } from 'path'
 import { compareDirs, compareToBaseline, buildManifest } from './baseline-compare'
-import { repoRoot } from './e2e-utils'
 
-const BASELINE = join(repoRoot(), 'Tests', 'TestData', 'baselines', 'default-build')
+const REPO = resolve(import.meta.dirname, '..', '..')
+const BASELINE = join(REPO, 'Tests', 'TestData', 'baselines', 'default-build')
 
 let tmp: string
-test.beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'umb-cmp-')) })
-test.afterEach(() => { rmSync(tmp, { recursive: true, force: true }) })
+beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'umb-cmp-')) })
+afterEach(() => { rmSync(tmp, { recursive: true, force: true }) })
 
 test('compareDirs reports clean when a directory is compared to a copy of itself', () => {
   const copy = join(tmp, 'copy')
@@ -53,7 +53,7 @@ test('compareDirs flags missing and extra hashed files', () => {
 })
 
 test('compareToBaseline diffs nus3 sizes against a committed manifest file', () => {
-  const baselineDir = join(repoRoot(), 'Tests', 'TestData', 'baselines', 'nus3-convert')
+  const baselineDir = join(REPO, 'Tests', 'TestData', 'baselines', 'nus3-convert')
   const manifest = JSON.parse(
     readFileSync(join(baselineDir, 'nus3-manifest.json'), 'utf8')
   ) as Record<string, { Size: number }>
