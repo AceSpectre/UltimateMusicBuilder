@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { PanelBottomClose, PanelBottomOpen, RefreshCw, X, ChevronLeft, ChevronRight } from '@lucide/svelte'
+  import PanelBottomClose from '@lucide/svelte/icons/panel-bottom-close'
+  import PanelBottomOpen from '@lucide/svelte/icons/panel-bottom-open'
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw'
+  import X from '@lucide/svelte/icons/x'
+  import ChevronLeft from '@lucide/svelte/icons/chevron-left'
+  import ChevronRight from '@lucide/svelte/icons/chevron-right'
   import { tick } from 'svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'

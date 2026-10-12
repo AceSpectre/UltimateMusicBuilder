@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { Hammer, FolderTree, Wand2, ArrowLeftRight, Folder, AlertTriangle } from '@lucide/svelte'
+  import Hammer from '@lucide/svelte/icons/hammer'
+  import FolderTree from '@lucide/svelte/icons/folder-tree'
+  import Wand2 from '@lucide/svelte/icons/wand-2'
+  import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right'
+  import Folder from '@lucide/svelte/icons/folder'
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'

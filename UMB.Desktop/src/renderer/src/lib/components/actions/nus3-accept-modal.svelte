@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Trash2, X } from '@lucide/svelte'
+  import Trash2 from '@lucide/svelte/icons/trash-2'
+  import X from '@lucide/svelte/icons/x'
   import { _ } from 'svelte-i18n'
 
   // Accept & save: asks whether to delete the source audio files.

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { X } from '@lucide/svelte'
+  import X from '@lucide/svelte/icons/x'
   import { _ } from 'svelte-i18n'
 
   interface Nus3Settings {

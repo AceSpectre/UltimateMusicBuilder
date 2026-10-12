@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { ListMusic, RefreshCw, Search, AlertTriangle } from '@lucide/svelte'
+  import ListMusic from '@lucide/svelte/icons/list-music'
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw'
+  import Search from '@lucide/svelte/icons/search'
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle'
   import { onMount } from 'svelte'
   import { _ } from 'svelte-i18n'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
