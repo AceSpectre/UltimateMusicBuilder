@@ -12,7 +12,7 @@
   import Modal from '$lib/components/ui/modal.svelte'
   import { inSoundtest, overlayLegend, overlayStyle, seriesGameIds } from '$lib/song-overlay'
   import { nextSort, sortBy, type SortKey, type SortState } from '$lib/table-sort'
-  import type { ModInfo, ModSeriesInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
+  import type { ModInfo, ModSeriesInfo, TrackFields, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
   const PINCH_CATEGORY = 'sf_situationlink'
@@ -319,6 +319,11 @@
     'w-full rounded border border-input bg-background px-1.5 py-0.5 text-[12.5px] outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
 </script>
 
+<!-- Grows one line per Return (in-game credits support newlines); long lines scroll like an input. -->
+{#snippet textField(fields: TrackFields, key: 'title' | 'author' | 'copyright', label: string)}
+  <textarea rows="1" class="{inputClass} block resize-none overflow-hidden whitespace-pre [field-sizing:content]" bind:value={fields[key]} aria-label={$_(label)}></textarea>
+{/snippet}
+
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
     <SeriesPicker
@@ -468,12 +473,7 @@
 
                   {#if item.fields}
                     {@const f = item.fields}
-                    <input
-                      type="text"
-                      class={inputClass}
-                      bind:value={f.title}
-                      aria-label={$_('orderTracks.colTitle')}
-                    />
+                    {@render textField(f, 'title', 'orderTracks.colTitle')}
 
                     {#if orderData.games.length > 0}
                       <select class={inputClass} bind:value={f.game} aria-label={$_('orderTracks.colGame')}>
@@ -488,8 +488,8 @@
                       <input type="text" class={inputClass} bind:value={f.game} aria-label={$_('orderTracks.colGame')} />
                     {/if}
 
-                    <input type="text" class={inputClass} bind:value={f.author} aria-label={$_('orderTracks.colAuthor')} />
-                    <input type="text" class={inputClass} bind:value={f.copyright} aria-label={$_('orderTracks.colCopyright')} />
+                    {@render textField(f, 'author', 'orderTracks.colAuthor')}
+                    {@render textField(f, 'copyright', 'orderTracks.colCopyright')}
 
                     <select class={inputClass} bind:value={f.record_type} aria-label={$_('orderTracks.colRecord')}>
                       {#each RECORD_OPTIONS as option}
