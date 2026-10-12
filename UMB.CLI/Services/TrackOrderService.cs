@@ -72,7 +72,7 @@ namespace UMB.CLI.Services
                     OriginalIndex = item.OriginalIndex ?? -1,
                     Title = item.Title,
                     Subtitle = item.Subtitle,
-                    IsVanilla = item.IsLocked,
+                    IsVanilla = item.IsVanilla,
                     BgmId = item.BgmId,
                 };
                 itemIdByViewModel[vm] = item.Id;
@@ -153,7 +153,7 @@ namespace UMB.CLI.Services
             TracksCsv.Write(files.Csv, reorderedRows, nextHeaders);
 
             // The build only accepts games declared under [[games]]; declare any newly used vanilla ones.
-            EnsureSeriesGames(files.SeriesToml, rows, data.Games);
+            VanillaTracks.EnsureSeriesGames(files.SeriesToml, rows, data.Games);
 
             if (data.IsExistingSeries)
             {
@@ -164,7 +164,7 @@ namespace UMB.CLI.Services
                     "# Listed in the order they will appear in the in-game Sound Test / My Music view.",
                     "song_order = ["
                 };
-                lines.AddRange(ids.Select((item, i) => $"  \"{item.BgmId}\"{(i < ids.Count - 1 ? "," : "")} # {(item.IsLocked ? "vanilla" : "mod")}"));
+                lines.AddRange(ids.Select((item, i) => $"  \"{item.BgmId}\"{(i < ids.Count - 1 ? "," : "")} # {(item.IsVanilla ? "vanilla" : "mod")}"));
                 lines.Add("]");
                 File.WriteAllText(files.SongOrder, string.Join("\n", lines) + "\n");
             }
@@ -183,12 +183,13 @@ namespace UMB.CLI.Services
         private (TrackOrderData data, List<CsvRow> rows, string[] headers) LoadUnchecked(string seriesPath)
         {
             var files = SeriesFiles.Of(seriesPath);
+            var catalog = _catalog.Get();
+            VanillaTracks.Backfill(seriesPath, catalog);
             var (rows, headers) = TracksCsv.Read(files.Csv);
             var series = ReadSeriesToml(files.SeriesToml);
             var songOrder = SeriesToml.ReadIdList(files.SongOrder);
             var uiSeriesId = series.Id != null ? MusicConstants.InternalIds.SERIES_ID_PREFIX + series.Id : null;
 
-            var catalog = _catalog.Get();
             var vanillaGames = catalog?.GameTitles.Where(g => g.SeriesId == uiSeriesId).Select(g => new SeriesGame(g.Id, g.Name)).ToList()
                 ?? new List<SeriesGame>();
             var vanillaSongs = catalog?.Songs.Where(s => s.SeriesId == uiSeriesId).Select(s => new VanillaSongOption(s.InfoId, s.Name)).ToList()
@@ -221,24 +222,6 @@ namespace UMB.CLI.Services
             return new SeriesInfo(header.Id, header.ExistingSeries, SeriesToml.Games(text), defaults);
         }
 
-        /// <summary>Appends [[games]] blocks for known game ids used by rows but not yet declared.</summary>
-        private static void EnsureSeriesGames(string seriesTomlPath, List<CsvRow> rows, List<SeriesGame> knownGames)
-        {
-            if (!File.Exists(seriesTomlPath)) return;
-
-            var text = File.ReadAllText(seriesTomlPath);
-            var declared = SeriesToml.Games(text).Select(g => g.Id).ToHashSet();
-            var nameById = knownGames.GroupBy(g => g.Id).ToDictionary(g => g.Key, g => g.First().Name);
-            var toAdd = rows.Select(r => r.Get("game").Trim()).Where(id => id.Length > 0).Distinct()
-                .Where(id => !declared.Contains(id) && nameById.ContainsKey(id))
-                .ToList();
-            if (toAdd.Count == 0) return;
-
-            var blocks = string.Concat(toAdd.Select(id =>
-                $"\n[[games]]\nid = \"{SeriesToml.Escape(id)}\"\nname = \"{SeriesToml.Escape(nameById[id])}\"\n"));
-            File.WriteAllText(seriesTomlPath, $"{text.TrimEnd()}\n{blocks}");
-        }
-
         private static List<TrackOrderItem> BuildModItems(List<CsvRow> rows)
         {
             // A track is a "pinch target" when another row's info1 references its filename.
@@ -251,11 +234,12 @@ namespace UMB.CLI.Services
                 var filename = row.Get("filename");
                 var title = CliUtil.FirstNonEmpty(row.Get("title"), filename, $"Track {index + 1}");
                 var game = row.Get("game");
-                var bgmId = filename.Length > 0
-                    ? MusicConstants.InternalIds.UI_BGM_ID_PREFIX + FolderMusicMod.DeriveToneId(filename)
+                var isVanilla = FolderMusicMod.IsVanillaBgmId(filename);
+                var bgmId = isVanilla ? filename
+                    : filename.Length > 0 ? MusicConstants.InternalIds.UI_BGM_ID_PREFIX + FolderMusicMod.DeriveToneId(filename)
                     : $"{MusicConstants.InternalIds.UI_BGM_ID_PREFIX}track_{index}";
                 return new TrackOrderItem($"mod:{index}", title, game.Length > 0 ? $"{game} - {filename}" : filename,
-                    bgmId, filename, false, index, BuildFields(row), filename.Length > 0 && referencedFilenames.Contains(filename));
+                    bgmId, filename, false, index, BuildFields(row), filename.Length > 0 && referencedFilenames.Contains(filename), isVanilla);
             }).ToList();
         }
 
@@ -299,7 +283,7 @@ namespace UMB.CLI.Services
                 else
                 {
                     result.Add(new TrackOrderItem($"vanilla:{vanillaIndex++}:{bgmId}", resolveVanillaTitle(bgmId),
-                        "[vanilla] preserved from song_order.toml", bgmId, "", true, null, null, false));
+                        "[vanilla] preserved from song_order.toml", bgmId, "", true, null, null, false, true));
                 }
             }
             result.AddRange(modItems.Where(i => !seen.Contains(i.Id)));

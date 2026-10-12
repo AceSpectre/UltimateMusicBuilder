@@ -295,5 +295,51 @@ namespace Tests.Unit.Desktop
             Assert.Contains(reloaded, i => i.IsPinchTarget);
             Assert.False(row.IsPinchTarget);
         }
+
+        // ── Vanilla songs ────────────────────────────────────────────────────
+
+        private const string MarioToml = "[series]\nid = \"mario\"\nexisting-series = true\n\n[[games]]\nid = \"smb\"\nname = \"Super Mario Bros.\"\n";
+
+        private TrackOrderService VanillaService() =>
+            new(_ws.MusicOptions(), TestCatalog.Service(TestCatalog.Mario()), TestEnvironment.CreateLogger<TrackOrderService>());
+
+        [Fact]
+        public void Load_AddsVanillaSongsOfAnExistingSeriesAsEditableRows()
+        {
+            var seriesPath = _ws.WriteSeries("m", "mario", "filename,title,game\nmine.flac,Mine,smb\n", MarioToml);
+
+            var data = VanillaService().Load(seriesPath);
+
+            Assert.Equal(new[] { "ui_bgm_mine", "ui_bgm_a01_smb_chijyou", "ui_bgm_a05_smb3_hikousen" }, data.Items.Select(i => i.BgmId));
+            var airship = data.Items[2];
+            Assert.Equal((true, false, "ui_bgm_a05_smb3_hikousen"), (airship.IsVanilla, airship.IsLocked, airship.Filename));
+            Assert.Equal(("Airship", "smb3", "arrange", "info_a01_smb_chijyou"),
+                (airship.Fields.Title, airship.Fields.Game, airship.Fields.RecordType, airship.Fields.Info1));
+            Assert.False(data.Items[0].IsVanilla);
+            Assert.Contains("id = \"smb3\"", File.ReadAllText(Path.Combine(seriesPath, "series.toml")));
+        }
+
+        [Fact]
+        public void Load_LeavesCustomSeriesWithoutVanillaRows()
+        {
+            var seriesPath = _ws.WriteSeries("m", "mario", "filename,title,game\nmine.flac,Mine,smb\n", "[series]\nid = \"mario\"\n");
+
+            Assert.Single(VanillaService().Load(seriesPath).Items);
+        }
+
+        [Fact]
+        public void Save_WritesVanillaEditsAndOrdersThemWithModSongs()
+        {
+            var service = VanillaService();
+            var seriesPath = _ws.WriteSeries("m", "mario", "filename,title,game\nmine.flac,Mine,smb\n", MarioToml);
+            var items = PayloadFrom(service.Load(seriesPath));
+            items[1].Fields.Title = "Overworld";
+
+            service.Save(seriesPath, new[] { items[1], items[0], items[2] }.ToList());
+
+            var reloaded = service.Load(seriesPath).Items;
+            Assert.Equal(new[] { "Overworld", "Mine", "Airship" }, reloaded.Select(i => i.Fields.Title));
+            Assert.Contains("\"ui_bgm_a01_smb_chijyou\", # vanilla", File.ReadAllText(Path.Combine(seriesPath, "song_order.toml")));
+        }
     }
 }

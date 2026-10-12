@@ -72,6 +72,28 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
+        public void Catalog_ListsSoundTestSeriesWithNamesAndPlaylists()
+        {
+            if (RepoCatalog()?.Get() is not { } catalog) return;
+
+            var mario = catalog.Series.Single(s => s.Id == "mario");
+            Assert.Equal(("Mario", "bgmmario"), (mario.Name, mario.Playlist));
+            Assert.DoesNotContain(catalog.Series, s => s.Id.StartsWith("ui_series_"));
+        }
+
+        [Fact]
+        public void Catalog_ListsSongDetailsInTracksCsvForm()
+        {
+            if (RepoCatalog()?.Get() is not { } catalog) return;
+
+            var song = catalog.Songs.Single(s => s.BgmId == "ui_bgm_a01_smb_chijyou");
+            Assert.Equal(("a01_smb_chijyou", "mariobros", "arrange"), (song.ToneId, song.GameId, song.RecordType));
+            Assert.NotEmpty(song.Author);
+            Assert.True(song.TestDispOrder >= 0);
+            Assert.All(catalog.Songs.SkipWhile(s => s.TestDispOrder >= 0), s => Assert.True(s.TestDispOrder < 0));
+        }
+
+        [Fact]
         public void Catalog_ListsSongsWithInfoIdsBySeries()
         {
             if (RepoCatalog()?.Get() is not { } catalog) return;

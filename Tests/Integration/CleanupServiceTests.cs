@@ -41,6 +41,18 @@ namespace Tests.Integration
         }
 
         [Fact]
+        public void Cleanup_KeepsVanillaSongEdits()
+        {
+            var modDir = _env.CreateConfiguredMod();
+            File.AppendAllText(Path.Combine(modDir, "mario", "tracks.csv"),
+                "ui_bgm_a01_smb_chijyou,somewhat_good_lofi,Overworld,,,original,,0,,True\n");
+
+            CreateService().Run();
+
+            Assert.Contains("ui_bgm_a01_smb_chijyou", File.ReadAllText(Path.Combine(modDir, "mario", "tracks.csv")));
+        }
+
+        [Fact]
         public void Cleanup_PreservesExistingAudioEntries()
         {
             var modDir = _env.CreateConfiguredMod();

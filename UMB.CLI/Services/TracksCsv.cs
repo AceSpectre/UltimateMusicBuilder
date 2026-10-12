@@ -1,5 +1,6 @@
 using CsvHelper;
 using CsvHelper.Configuration;
+using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -62,12 +63,9 @@ namespace UMB.CLI.Services
             }
         }
 
-        /// <summary>Non-empty lines after the header; 0 when the file is missing or unreadable.</summary>
-        public static int CountDataRows(string csvPath)
-        {
-            try { return Math.Max(0, File.ReadLines(csvPath).Count(l => l.Trim().Length > 0) - 1); }
-            catch (IOException) { return 0; }
-        }
+        /// <summary>Rows other than vanilla song edits; 0 when the file is missing or unreadable.</summary>
+        public static int CountDataRows(string csvPath) =>
+            ReadLenient(csvPath).Count(r => !FolderMusicMod.IsVanillaBgmId(r.Get("filename")));
 
         private static (List<CsvRow> rows, string[] headers) Read(string csvPath, TrimOptions trim)
         {

@@ -75,7 +75,7 @@ namespace UMB.CLI.Services
                     foreach (var row in rows)
                     {
                         var audioFile = Path.Combine(seriesDir, row.Filename);
-                        if (!File.Exists(audioFile))
+                        if (!FolderMusicMod.IsVanillaBgmId(row.Filename) && !File.Exists(audioFile))
                             removedRows.Add(row);
                     }
 

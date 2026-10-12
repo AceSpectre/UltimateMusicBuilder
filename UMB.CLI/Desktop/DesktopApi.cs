@@ -42,6 +42,7 @@ namespace UMB.CLI.Desktop
                 ["series-order-save"] = In<SaveSeriesOrderInput>(i => Get<SeriesOrderService>().Save(i.ModPath, i.Items)),
                 ["series-create"] = In<CreateSeriesRequest>(i => Get<SeriesOrderService>().Create(i.ModPath, i.Input)),
                 ["series-set-icon"] = In<SetSeriesIconInput>(i => Get<SeriesOrderService>().SetIcon(i.ModPath, i.SeriesId, i.IconDataUrl)),
+                ["series-ensure-vanilla"] = In<SeriesIdInput>(i => Get<SeriesOrderService>().EnsureVanillaSeries(i.ModPath, i.SeriesId)),
 
                 ["track-order-load"] = In<SeriesPathInput>(i => Get<TrackOrderService>().Load(i.SeriesPath)),
                 ["track-order-save"] = In<SaveTrackOrderInput>(i => Get<TrackOrderService>().Save(i.SeriesPath, i.Items)),
@@ -109,6 +110,7 @@ namespace UMB.CLI.Desktop
         private record SaveSeriesOrderInput(string ModPath, List<SaveSeriesItem> Items);
         private record CreateSeriesRequest(string ModPath, CreateSeriesInput Input);
         private record SetSeriesIconInput(string ModPath, string SeriesId, string IconDataUrl);
+        private record SeriesIdInput(string ModPath, string SeriesId);
         private record SaveTrackOrderInput(string SeriesPath, List<SaveTrackItem> Items);
         private record MergeInput(List<string> ModPaths, string OutputName, string PriorityModPath);
         private record ExtractIconsInput(string CompiledModPath, string ModPath, string Mode);

@@ -82,6 +82,17 @@ namespace UMB.CLI.Services
             sb.AppendLine();
         }
 
+        /// <summary>Emits a [default-track-data] table with the given game and empty song defaults.</summary>
+        public static void AppendDefaultTrackData(StringBuilder sb, string defaultGameId)
+        {
+            sb.AppendLine("[default-track-data]");
+            sb.AppendLine($"game = \"{EscapeToml(defaultGameId)}\"");
+            sb.AppendLine("author = \"\"");
+            sb.AppendLine("copyright = \"\"");
+            sb.AppendLine("record-type = \"original\"");
+            sb.AppendLine(SeriesToml.VolumeDbLine(0));
+        }
+
         /// <summary>A dB boost as written to series.toml and tracks.csv.</summary>
         public static string FormatDb(double db) => db.ToString("0.0##", CultureInfo.InvariantCulture);
 

@@ -42,6 +42,7 @@ namespace UMB.CLI.Services
             var warnings = new List<string>();
             var volumes = new List<SuspiciousVolumeTrack>();
             var globalDb = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeDb;
+            var applyToVanilla = _musicConfig.CurrentValue.Sma5hMusic.ApplyVolumeToVanilla;
 
             foreach (var modDir in activeMods)
             {
@@ -148,7 +149,8 @@ namespace UMB.CLI.Services
                             csvFilenames.Add(filename);
 
                             var trackDb = hasVolumeColumn ? VolumeConfigService.ParseDb(csv.GetField(TracksCsv.VolumeDbColumn)) : 0f;
-                            var effectiveDb = globalDb + seriesDb + trackDb;
+                            // Vanilla songs only get the global and series boosts with the experimental setting.
+                            var effectiveDb = (FolderMusicMod.IsVanillaBgmId(filename) && !applyToVanilla ? 0f : globalDb + seriesDb) + trackDb;
                             if (effectiveDb >= SuspiciousDb)
                             {
                                 volumes.Add(new SuspiciousVolumeTrack(modName, seriesName, filename, title, effectiveDb));

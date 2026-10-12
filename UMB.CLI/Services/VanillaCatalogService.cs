@@ -6,6 +6,7 @@ using Sma5h.Data.Ui.Param.Database;
 using Sma5h.Data.Ui.Param.Database.PrcUiBgmDatabaseModels;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music.Helpers;
+using Sma5h.Mods.Music.Services;
 using Sma5h.ResourceProviders;
 using Sma5h.ResourceProviders.Constants;
 using System;
@@ -25,7 +26,11 @@ namespace UMB.CLI.Services
     public class VanillaCatalogService
     {
         public record GameTitle(string Id, string Name, string SeriesId);
-        public record Song(string BgmId, string InfoId, string Name, string SeriesId);
+        /// <summary>A sound test series; Id has no ui_series_ prefix, Playlist is its first stage's playlist.</summary>
+        public record Series(string Id, string Name, string Playlist);
+        /// <summary>A vanilla song; GameId and RecordType are in tracks.csv form (no prefix).</summary>
+        public record Song(string BgmId, string InfoId, string Name, string SeriesId, string ToneId, string GameId,
+            string Author, string Copyright, string RecordType, string SpecialCategory, string Info1, short TestDispOrder);
 
         private const string Locale = "us_en";
 
@@ -44,7 +49,7 @@ namespace UMB.CLI.Services
         }
 
         /// <summary>The vanilla catalog, or null when the game files are missing.</summary>
-        public Catalog Get()
+        public virtual Catalog Get()
         {
             var gamePath = Path.GetFullPath(_config.CurrentValue.GameResourcesPath);
             return Cache.GetOrAdd(gamePath, path => new Lazy<Catalog>(() => Load(path))).Value;
@@ -60,6 +65,9 @@ namespace UMB.CLI.Services
         {
             public Dictionary<string, string> BgmTitles { get; init; }
             public List<GameTitle> GameTitles { get; init; }
+            /// <summary>Series with sound test songs, in sound test order.</summary>
+            public List<Series> Series { get; init; }
+            /// <summary>Songs in sound test order, then the hidden ones (TestDispOrder &lt; 0).</summary>
             public List<Song> Songs { get; init; }
             public PlaylistInfoData PlaylistInfo { get; init; }
         }
@@ -70,7 +78,7 @@ namespace UMB.CLI.Services
             var files = new[]
             {
                 Game(PrcExtConstants.PRC_UI_BGM_DB_PATH), Game(PrcExtConstants.PRC_UI_GAMETITLE_DB_PATH),
-                Game(PrcExtConstants.PRC_UI_STAGE_DB_PATH),
+                Game(PrcExtConstants.PRC_UI_STAGE_DB_PATH), Game(PrcExtConstants.PRC_UI_SERIES_DB_PATH),
                 Game(string.Format(MsbtExtConstants.MSBT_BGM, Locale)), Game(string.Format(MsbtExtConstants.MSBT_TITLE, Locale))
             };
             if (!files.All(File.Exists))
@@ -82,14 +90,17 @@ namespace UMB.CLI.Services
             var bgmDb = prc.ReadFile<PrcUiBgmDatabase>(files[0]);
             var gameTitleDb = prc.ReadFile<PrcUiGameTitleDatabase>(files[1]);
             var stageDb = prc.ReadFile<PrcUiStageDatabase>(files[2]);
-            var bgmMsbt = msbt.ReadFile<MsbtDatabase>(files[3]).Entries;
-            var titleMsbt = msbt.ReadFile<MsbtDatabase>(files[4]).Entries;
+            var seriesDb = prc.ReadFile<PrcUiSeriesDatabase>(files[3]);
+            var bgmMsbt = msbt.ReadFile<MsbtDatabase>(files[4]).Entries;
+            var titleMsbt = msbt.ReadFile<MsbtDatabase>(files[5]).Entries;
+            string BgmText(string format, string nameId) =>
+                AudioStateService.ConvertFromGameTextTag(bgmMsbt.GetValueOrDefault(string.Format(format, nameId)) ?? "");
 
             var bgmTitles = new Dictionary<string, string>();
             foreach (var entry in bgmDb.DbRootEntries.Values)
             {
                 if (!string.IsNullOrEmpty(entry.UiBgmId))
-                    bgmTitles[entry.UiBgmId] = CliUtil.FirstNonEmpty(bgmMsbt.GetValueOrDefault("bgm_title_" + entry.NameId), entry.UiBgmId);
+                    bgmTitles[entry.UiBgmId] = CliUtil.FirstNonEmpty(BgmText(MusicConstants.InternalIds.MSBT_BGM_TITLE, entry.NameId), entry.UiBgmId);
             }
 
             var gameTitles = gameTitleDb.DbRootEntries.Values
@@ -107,19 +118,41 @@ namespace UMB.CLI.Services
                 .Where(g => !string.IsNullOrEmpty(g.UiGameTitleId))
                 .ToDictionary(g => g.UiGameTitleId, g => g.UiSeriesId ?? "");
             var songs = new List<Song>();
-            foreach (var entry in bgmDb.DbRootEntries.Values)
+            foreach (var entry in bgmDb.DbRootEntries.Values.OrderBy(e => e.TestDispOrder < 0).ThenBy(e => e.TestDispOrder))
             {
-                if (string.IsNullOrEmpty(entry.UiBgmId)) continue;
-                var infoId = entry.StreamSetId != null && bgmDb.StreamSetEntries.TryGetValue(entry.StreamSetId, out var set) ? set.Info0 : null;
+                if (string.IsNullOrEmpty(entry.UiBgmId) || entry.StreamSetId == null || !bgmDb.StreamSetEntries.TryGetValue(entry.StreamSetId, out var set)) continue;
+                var infoId = set.Info0;
                 if (infoId == null || !infoId.StartsWith("info_")) continue;
+                var streamId = bgmDb.AssignedInfoEntries.GetValueOrDefault(infoId)?.StreamId;
+                var toneId = streamId != null ? bgmDb.StreamPropertyEntries.GetValueOrDefault(streamId)?.DataName0 : null;
                 songs.Add(new Song(entry.UiBgmId, infoId, bgmTitles[entry.UiBgmId],
-                    seriesByGameTitle.GetValueOrDefault(entry.UiGameTitleId ?? "", "")));
+                    seriesByGameTitle.GetValueOrDefault(entry.UiGameTitleId ?? "", ""), toneId,
+                    WithoutPrefix(entry.UiGameTitleId ?? "", MusicConstants.InternalIds.GAME_TITLE_ID_PREFIX),
+                    BgmText(MusicConstants.InternalIds.MSBT_BGM_AUTHOR, entry.NameId), BgmText(MusicConstants.InternalIds.MSBT_BGM_COPYRIGHT, entry.NameId),
+                    WithoutPrefix(entry.RecordType ?? "", MusicConstants.InternalIds.RECORD_TYPE_PREFIX), set.SpecialCategory ?? "", set.Info1 ?? "",
+                    entry.TestDispOrder));
             }
+
+            // A series' playlist is the one its first stage uses.
+            var playlistBySeries = stageDb.DbRootEntries.Values
+                .Where(s => !string.IsNullOrEmpty(s.UiSeriesId) && !string.IsNullOrEmpty(s.BgmSetId))
+                .GroupBy(s => s.UiSeriesId)
+                .ToDictionary(g => g.Key, g => g.First().BgmSetId);
+            var soundTestSeries = songs.Where(s => s.TestDispOrder >= 0).Select(s => s.SeriesId).ToHashSet();
+            var series = seriesDb.DbRootEntries.Values
+                .Where(s => soundTestSeries.Contains(s.UiSeriesId))
+                .OrderBy(s => s.DispOrderSound)
+                .Select(s => new Series(WithoutPrefix(s.UiSeriesId, MusicConstants.InternalIds.SERIES_ID_PREFIX),
+                    CliUtil.FirstNonEmpty(titleMsbt.GetValueOrDefault(string.Format(MusicConstants.InternalIds.MSBT_SERIES_TITLE, s.NameId)),
+                        DisplayNames.Series.GetValueOrDefault(s.UiSeriesId), s.NameId),
+                    playlistBySeries.GetValueOrDefault(s.UiSeriesId, "")))
+                .ToList();
 
             return new Catalog
             {
                 BgmTitles = bgmTitles,
                 GameTitles = gameTitles,
+                Series = series,
                 Songs = songs,
                 PlaylistInfo = BuildPlaylistInfo(bgmDb, stageDb, bgmTitles)
             };
@@ -173,6 +206,8 @@ namespace UMB.CLI.Services
 
             return new PlaylistInfoData(playlists, stageInfos);
         }
+
+        private static string WithoutPrefix(string id, string prefix) => id.StartsWith(prefix) ? id[prefix.Length..] : id;
 
         private static PropertyInfo[] PlaylistProperties(string prefix) =>
             Enumerable.Range(0, 16).Select(i => typeof(PrcBgmPlaylistEntry).GetProperty(prefix + i)).ToArray();

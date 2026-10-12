@@ -330,7 +330,7 @@ namespace UMB.CLI.Services
             foreach (var row in trackRows)
             {
                 var filename = row?.GetValueOrDefault("filename", "");
-                if (string.IsNullOrWhiteSpace(filename))
+                if (string.IsNullOrWhiteSpace(filename) || FolderMusicMod.IsVanillaBgmId(filename))
                     continue;
 
                 var toneId = FolderMusicMod.DeriveToneId(filename);
@@ -384,7 +384,7 @@ namespace UMB.CLI.Services
             CliUtil.AppendSeriesHeader(sb, folderName, folderName,
                 playlistIncidence: 100, seriesPlaylist: $"bgm_{folderName}");
             CliUtil.AppendGameBlock(sb, folderName, folderName);
-            AppendDefaultTrackData(sb, folderName);
+            CliUtil.AppendDefaultTrackData(sb, folderName);
             return sb.ToString();
         }
 
@@ -426,18 +426,8 @@ namespace UMB.CLI.Services
             }
 
             var defaultGameId = games.Count > 0 ? (games[0].NameId ?? games[0].UiGameTitleId) : seriesId;
-            AppendDefaultTrackData(sb, defaultGameId);
+            CliUtil.AppendDefaultTrackData(sb, defaultGameId);
             return sb.ToString();
-        }
-
-        private static void AppendDefaultTrackData(StringBuilder sb, string defaultGameId)
-        {
-            sb.AppendLine("[default-track-data]");
-            sb.AppendLine($"game = \"{CliUtil.EscapeToml(defaultGameId)}\"");
-            sb.AppendLine("author = \"\"");
-            sb.AppendLine("copyright = \"\"");
-            sb.AppendLine("record-type = \"original\"");
-            sb.AppendLine(SeriesToml.VolumeDbLine(0));
         }
 
         /// <summary>
@@ -471,7 +461,7 @@ namespace UMB.CLI.Services
             if (text.Length > 0 && !text.EndsWith("\n"))
                 sb.AppendLine();
             sb.AppendLine();
-            AppendDefaultTrackData(sb, defaultGameId);
+            CliUtil.AppendDefaultTrackData(sb, defaultGameId);
 
             File.AppendAllText(tomlPath, sb.ToString());
             return true;
