@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowUpDown, GripVertical, Lock, Music4, Volume2, Wand2 } from '@lucide/svelte'
+  import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Lock, Music4, Palette, Volume2, Wand2 } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
@@ -10,11 +10,38 @@
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import Modal from '$lib/components/ui/modal.svelte'
+  import {
+    MODDED_HUE,
+    VANILLA_HUE,
+    gameHue,
+    inSoundtest,
+    nextOverlayMode,
+    overlayStyle,
+    seriesGameIds,
+    tintStyle,
+    type OverlayMode
+  } from '$lib/song-overlay'
+  import { nextSort, sortBy, type SortKey, type SortState } from '$lib/table-sort'
   import type { ModInfo, ModSeriesInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
   const PINCH_CATEGORY = 'sf_situationlink'
   const RECORD_OPTIONS = ['original', 'arrange', 'new_arrange'] as const
+  const GRID_COLUMNS =
+    'grid-template-columns: 52px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px 60px minmax(160px,1fr) 84px;'
+  // Header columns in grid order; `index` is the series' real track order.
+  const COLUMNS = [
+    { id: 'index', label: '#' },
+    { id: 'title', label: 'orderTracks.colTitle' },
+    { id: 'game', label: 'orderTracks.colGame' },
+    { id: 'author', label: 'orderTracks.colAuthor' },
+    { id: 'copyright', label: 'orderTracks.colCopyright' },
+    { id: 'record', label: 'orderTracks.colRecord' },
+    { id: 'isPinch', label: 'orderTracks.colIsPinch', centered: true },
+    { id: 'pinchSong', label: 'orderTracks.colPinchSong' },
+    { id: 'soundtest', label: 'orderTracks.colInSoundtest', centered: true }
+  ] as const
+  type SortColumn = (typeof COLUMNS)[number]['id']
 
   let {
     activeMod,
@@ -30,6 +57,8 @@
   let pendingSeriesPath = $state<string | null>(null)
   let baselineSnapshot = $state('')
   let selectedItemId = $state<string | null>(null)
+  let overlayMode = $state<OverlayMode>('off')
+  let sort = $state<SortState<SortColumn>>({ column: 'index', desc: false })
   const seriesLoader = createSeriesLoader((v) => (loading = v))
 
   function snapshot(items: TrackOrderItem[]): string {
@@ -58,6 +87,27 @@
     (orderData?.vanillaSongs ?? []).map((song) => ({ value: song.infoId, title: song.name }))
   )
   const pinchOptions = $derived([...modPinchOptions, ...vanillaPinchOptions])
+
+  function pinchTitle(value: string): string {
+    return pinchOptions.find((o) => o.value === value)?.title ?? value
+  }
+
+  const sortKeys: Record<SortColumn, (item: TrackOrderItem, index: number) => SortKey> = {
+    index: (_, index) => index,
+    title: (item) => item.fields?.title ?? item.title,
+    game: (item) => orderData?.games.find((g) => g.id === item.fields?.game)?.name ?? item.fields?.game ?? '',
+    author: (item) => item.fields?.author ?? '',
+    copyright: (item) => item.fields?.copyright ?? '',
+    record: (item) => (item.fields ? recordLabel(item.fields.record_type) : ''),
+    isPinch: (item) => isPinchTarget(item),
+    pinchSong: (item) => pinchTitle(item.fields?.info1 ?? ''),
+    soundtest: (item) => Boolean(item.fields && inSoundtest(item.fields))
+  }
+
+  // Sorting is display-only; dragging is allowed only in the real track order.
+  const isNaturalOrder = $derived(sort.column === 'index' && !sort.desc)
+  const displayItems = $derived(isNaturalOrder ? dndItems : sortBy(dndItems, sort.desc, sortKeys[sort.column]))
+  const trackNumbers = $derived(new Map(dndItems.map((item, index) => [item.id, index + 1])))
 
   const selectedSeries = $derived(
     series.find((entry) => entry.path === modsStore.activeSeriesPath) ?? null
@@ -104,6 +154,26 @@
       }
     }
   }
+
+  const gameIds = $derived(seriesGameIds(orderData?.games ?? [], dndItems))
+  const overlayLegend = $derived.by(() => {
+    if (overlayMode === 'game') {
+      return gameIds.map((id, i) => ({
+        label: orderData?.games.find((g) => g.id === id)?.name ?? id,
+        style: tintStyle(gameHue(i))
+      }))
+    }
+    if (overlayMode === 'source') {
+      return [
+        { label: $_('orderTracks.overlayModded'), style: tintStyle(MODDED_HUE) },
+        { label: $_('orderTracks.vanillaTag'), style: tintStyle(VANILLA_HUE) }
+      ]
+    }
+    if (overlayMode === 'soundtest') {
+      return [{ label: $_('orderTracks.overlayHidden'), style: 'opacity: 0.45;' }]
+    }
+    return []
+  })
 
   const selectedItem = $derived(dndItems.find((item) => item.id === selectedItemId) ?? null)
   const canUseDefaults = $derived(Boolean(orderData?.defaultTrackData) && selectedItem?.fields != null)
@@ -305,6 +375,16 @@
 
         <div class="flex shrink-0 items-center gap-2">
           <button
+            onclick={() => (overlayMode = nextOverlayMode(overlayMode))}
+            class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={!orderData}
+            title={$_('orderTracks.overlayHint')}
+          >
+            <Palette size={14} />
+            {$_('orderTracks.overlay', { values: { mode: $_(`orderTracks.overlayModes.${overlayMode}`) } })}
+          </button>
+
+          <button
             onclick={openVolConfig}
             class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             disabled={!orderData}
@@ -335,6 +415,14 @@
         </div>
       </div>
 
+      {#if orderData && overlayLegend.length > 0}
+        <div class="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-4 py-1.5">
+          {#each overlayLegend as entry}
+            <span class="rounded border border-border bg-background px-2 py-0.5 text-[11px]" style={entry.style}>{entry.label}</span>
+          {/each}
+        </div>
+      {/if}
+
       <div class="min-h-0 flex-1 overflow-auto p-1">
         {#if orderLoading}
           <div class="grid h-full min-h-[320px] place-items-center rounded-2xl border border-dashed border-border bg-background/60 text-[13px] text-muted-foreground">
@@ -350,48 +438,55 @@
           <div class="min-w-[1000px]">
             <div
               class="sticky z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-              style="grid-template-columns: 24px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px 60px minmax(160px,1fr) 84px; top: -5px"
+              style="{GRID_COLUMNS} top: -5px"
             >
-              <span></span>
-              <span>{$_('orderTracks.colTitle')}</span>
-              <span>{$_('orderTracks.colGame')}</span>
-              <span>{$_('orderTracks.colAuthor')}</span>
-              <span>{$_('orderTracks.colCopyright')}</span>
-              <span>{$_('orderTracks.colRecord')}</span>
-              <span class="text-center">{$_('orderTracks.colIsPinch')}</span>
-              <span>{$_('orderTracks.colPinchSong')}</span>
-              <span class="text-center">{$_('orderTracks.colInSoundtest')}</span>
+              {#each COLUMNS as column}
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 uppercase tracking-wide hover:text-foreground {'centered' in column ? 'justify-center' : ''}"
+                  onclick={() => (sort = nextSort(sort, column.id))}
+                >
+                  {column.id === 'index' ? column.label : $_(column.label)}
+                  {#if sort.column === column.id}
+                    {#if sort.desc}<ArrowDown size={11} />{:else}<ArrowUp size={11} />{/if}
+                  {/if}
+                </button>
+              {/each}
             </div>
 
             <div
               class="grid gap-0.5"
-              use:dragHandleZone={{ items: dndItems, flipDurationMs: FLIP_MS, dropTargetStyle: {} }}
+              use:dragHandleZone={{ items: displayItems, flipDurationMs: FLIP_MS, dropTargetStyle: {}, dragDisabled: !isNaturalOrder }}
               onconsider={handleConsider}
               onfinalize={handleFinalize}
             >
-              {#each dndItems as item, index (item.id)}
+              {#each displayItems as item (item.id)}
                 {@const isSelected = !item.isLocked && item.id === selectedItemId}
                 <div
                   animate:flip={{ duration: FLIP_MS }}
                   class="grid items-center gap-1 rounded border px-1 py-0.5 {item.isLocked ? 'border-border bg-background/75 opacity-80' : isSelected ? 'border-transparent bg-background ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border bg-background/75'}"
-                  style="grid-template-columns: 24px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px 60px minmax(160px,1fr) 84px;"
+                  style="{GRID_COLUMNS} {overlayStyle(overlayMode, item, gameIds)}"
                   role="listitem"
                   onfocusincapture={() => { if (!item.isLocked) selectedItemId = item.id }}
                   onpointerdown={() => { if (!item.isLocked) selectedItemId = item.id }}
                 >
-                  {#if item.isLocked}
-                    <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted/70 text-muted-foreground" title={$_('orderTracks.locked')}>
-                      <Lock size={13} />
-                    </div>
-                  {:else}
-                    <div
-                      use:dragHandle
-                      aria-label={$_('orderTracks.dragAria')}
-                      class="flex h-6 w-6 shrink-0 cursor-grab items-center justify-center rounded bg-muted text-muted-foreground active:cursor-grabbing"
-                    >
-                      <GripVertical size={14} />
-                    </div>
-                  {/if}
+                  <div class="flex items-center gap-1">
+                    <span class="w-6 text-right text-[11px] tabular-nums text-muted-foreground">{trackNumbers.get(item.id)}</span>
+                    {#if item.isLocked}
+                      <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted/70 text-muted-foreground" title={$_('orderTracks.locked')}>
+                        <Lock size={13} />
+                      </div>
+                    {:else}
+                      <div
+                        use:dragHandle
+                        aria-label={$_('orderTracks.dragAria')}
+                        title={isNaturalOrder ? '' : $_('orderTracks.sortedDragHint')}
+                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground {isNaturalOrder ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-50'}"
+                      >
+                        <GripVertical size={14} />
+                      </div>
+                    {/if}
+                  </div>
 
                   {#if item.fields}
                     {@const f = item.fields}
@@ -446,13 +541,13 @@
                         : isPinchTarget(item)
                           ? $_('orderTracks.pinchTargetHint')
                           : ''}
-                      value={pinchOptions.find((o) => o.value === f.info1)?.title ?? f.info1}
+                      value={pinchTitle(f.info1)}
                       onchange={(event) => {
                         const text = event.currentTarget.value.trim()
                         const match = pinchOptions.find((o) => o.title === text && o.value !== item.filename)
                         setPinchSong(item, text === '' ? '' : match?.value ?? '')
                         // Reset display so an unmatched free-text entry doesn't linger.
-                        event.currentTarget.value = pinchOptions.find((o) => o.value === f.info1)?.title ?? f.info1
+                        event.currentTarget.value = pinchTitle(f.info1)
                       }}
                     />
 
@@ -460,7 +555,7 @@
                       <input
                         type="checkbox"
                         class="h-4 w-4 accent-[hsl(var(--gradient-from))]"
-                        checked={f.in_soundtest.toLowerCase() === 'true'}
+                        checked={inSoundtest(f)}
                         aria-label={$_('orderTracks.colInSoundtest')}
                         onchange={(event) => {
                           f.in_soundtest = event.currentTarget.checked ? 'True' : 'False'
