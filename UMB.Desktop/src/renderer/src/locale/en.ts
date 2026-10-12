@@ -256,10 +256,16 @@ export default {
     settingsSave: 'Apply',
     settingsClose: 'Close'
   },
+  seriesPicker: {
+    search: 'Search series...',
+    count: '{count, plural, one {# series} other {# series}}',
+    noMatch: 'No series match your search.',
+    collapse: 'Collapse series list',
+    expand: 'Expand series list'
+  },
   configVolume: {
     title: 'Config Volume',
     seriesHeading: 'Series',
-    selectModSubtitle: 'Select a mod to browse series.',
     chooseMod: 'Choose a mod from the app bar to start.',
     loadingSeries: 'Loading series...',
     noSeries: 'No series with tracks.csv were found in this mod.',
@@ -399,13 +405,10 @@ export default {
   orderTracks: {
     title: 'Manage Songs',
     seriesHeading: 'Series',
-    selectModSubtitle: 'Select a mod to browse series.',
     chooseMod: 'Choose a mod from the app bar to start.',
     loadingSeries: 'Loading series...',
     noSeries: 'No series with tracks.csv were found in this mod.',
     reload: 'Reload series',
-    collapseSeries: 'Collapse series list',
-    expandSeries: 'Expand series list',
     dragHintLocked:
       'Edit song details below, or drag the handle to reorder. Locked vanilla entries are preserved from song_order.toml.',
     dragHint: 'Edit each song’s details, or drag the handle to reorder the tracks.csv entries for this series.',

@@ -274,14 +274,10 @@
       onSelect={requestSelectSeries}
       onReload={handleReload}
       heading={$_('orderTracks.seriesHeading')}
-      subtitleFallback={$_('orderTracks.selectModSubtitle')}
       chooseModText={$_('orderTracks.chooseMod')}
       loadingText={$_('orderTracks.loadingSeries')}
       emptyText={$_('orderTracks.noSeries')}
       reloadTitle={$_('orderTracks.reload')}
-      collapsible
-      collapseTitle={$_('orderTracks.collapseSeries')}
-      expandTitle={$_('orderTracks.expandSeries')}
     />
 
     <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">

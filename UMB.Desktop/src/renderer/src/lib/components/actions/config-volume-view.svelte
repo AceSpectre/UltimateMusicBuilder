@@ -266,7 +266,6 @@
       onSelect={selectSeries}
       onReload={handleReload}
       heading={$_('configVolume.seriesHeading')}
-      subtitleFallback={$_('configVolume.selectModSubtitle')}
       chooseModText={$_('configVolume.chooseMod')}
       loadingText={$_('configVolume.loadingSeries')}
       emptyText={$_('configVolume.noSeries')}

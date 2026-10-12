@@ -516,7 +516,6 @@
       onSelect={(path) => { modsStore.activeSeriesPath = path; void loadSources(path) }}
       onReload={handleReload}
       heading={$_('orderTracks.seriesHeading')}
-      subtitleFallback={$_('orderTracks.selectModSubtitle')}
       chooseModText={$_('orderTracks.chooseMod')}
       loadingText={$_('orderTracks.loadingSeries')}
       emptyText={$_('orderTracks.noSeries')}
