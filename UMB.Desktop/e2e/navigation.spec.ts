@@ -13,6 +13,7 @@ const NAV_ITEMS: Array<{ id: string; label: string }> = [
   { id: 'config-volume', label: 'Config Volume' },
   { id: 'order-series', label: 'Manage Series' },
   { id: 'order-tracks', label: 'Manage Songs' },
+  { id: 'manage-presets', label: 'Manage Presets' },
   { id: 'manage-playlists', label: 'Manage Playlists' },
   { id: 'merge', label: 'Merge' },
   { id: 'extract-icons', label: 'Extract Icons' },

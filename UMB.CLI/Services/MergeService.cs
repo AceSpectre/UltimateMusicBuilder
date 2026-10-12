@@ -199,6 +199,7 @@ namespace UMB.CLI.Services
         {
             var tomlOptions = CliUtil.KebabTomlOptions();
             FolderSeriesFileConfig priorityConfig = null;
+            string priorityText = null;
             var mergedGames = new List<FolderGameConfig>();
             var mergedPlaylists = new List<FolderPlaylistOverrideConfig>();
 
@@ -206,9 +207,11 @@ namespace UMB.CLI.Services
             {
                 var tomlPath = Path.Combine(srcDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
                 FolderSeriesFileConfig config;
+                string text;
                 try
                 {
-                    config = Toml.ToModel<FolderSeriesFileConfig>(File.ReadAllText(tomlPath), options: tomlOptions);
+                    text = File.ReadAllText(tomlPath);
+                    config = Toml.ToModel<FolderSeriesFileConfig>(text, options: tomlOptions);
                 }
                 catch (Exception e)
                 {
@@ -216,6 +219,7 @@ namespace UMB.CLI.Services
                     continue;
                 }
 
+                priorityText ??= text;
                 priorityConfig ??= config;
                 foreach (var game in config.Games.Where(g => !string.IsNullOrEmpty(g.Id)))
                 {
@@ -236,6 +240,8 @@ namespace UMB.CLI.Services
             }
 
             WriteMergedSeriesToml(outputDir, priorityConfig, mergedGames, mergedPlaylists);
+            var outputToml = Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
+            SeriesToml.WriteLines(outputToml, SongPresetsToml.Write(SeriesToml.ReadLines(outputToml), SongPresetsToml.Read(priorityText)));
 
             var allTracks = new List<CsvRow>();
             var seenFilenames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -290,16 +296,10 @@ namespace UMB.CLI.Services
                 sb.AppendLine();
             }
 
+            // The song values in [default-track-data] are written with the other presets.
             if (priorityConfig.DefaultTrackData is { } d)
             {
                 sb.AppendLine("[default-track-data]");
-                if (!string.IsNullOrEmpty(d.Game))
-                    sb.AppendLine($"game = \"{CliUtil.EscapeToml(d.Game)}\"");
-                if (!string.IsNullOrEmpty(d.Author))
-                    sb.AppendLine($"author = \"{CliUtil.EscapeToml(d.Author)}\"");
-                if (!string.IsNullOrEmpty(d.Copyright))
-                    sb.AppendLine($"copyright = \"{CliUtil.EscapeToml(d.Copyright)}\"");
-                sb.AppendLine($"record-type = \"{CliUtil.EscapeToml(d.RecordType ?? "original")}\"");
                 sb.AppendLine(SeriesToml.VolumeDbLine(d.VolumeDb));
                 sb.AppendLine();
             }

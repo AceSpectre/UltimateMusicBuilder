@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Eye, EyeOff, Lock, Music4, Palette, Volume2, Wand2 } from '@lucide/svelte'
+  import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Eye, EyeOff, Lock, Music4, Palette, Volume2 } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
@@ -12,11 +12,11 @@
   import Modal from '$lib/components/ui/modal.svelte'
   import { inSoundtest, overlayLegend, overlayStyle, seriesGameIds } from '$lib/song-overlay'
   import { nextSort, sortBy, type SortKey, type SortState } from '$lib/table-sort'
+  import { RECORD_OPTIONS, recordLabelKey, resolvePreset, songOptions } from '$lib/presets'
   import type { ModInfo, ModSeriesInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
   const PINCH_CATEGORY = 'sf_situationlink'
-  const RECORD_OPTIONS = ['original', 'arrange', 'new_arrange'] as const
   const GRID_COLUMNS =
     'grid-template-columns: 52px minmax(160px,1.4fr) minmax(130px,1fr) minmax(110px,1fr) minmax(140px,1fr) 116px 60px minmax(160px,1fr) 84px;'
   // Header columns in grid order; `index` is the series' real track order.
@@ -70,17 +70,8 @@
     )
   )
 
-  // Songs selectable as a pinch target. Mod tracks store their filename in info1; vanilla
-  // songs store their base-game info id (info_*). Both share one searchable dropdown.
-  const modPinchOptions = $derived(
-    dndItems
-      .filter((item) => item.fields !== null && item.filename)
-      .map((item) => ({ value: item.filename, title: item.fields?.title || item.filename }))
-  )
-  const vanillaPinchOptions = $derived(
-    (orderData?.vanillaSongs ?? []).map((song) => ({ value: song.infoId, title: song.name }))
-  )
-  const pinchOptions = $derived([...modPinchOptions, ...vanillaPinchOptions])
+  // Songs selectable as a pinch target; mod and vanilla songs share one searchable dropdown.
+  const pinchOptions = $derived(songOptions(dndItems, orderData?.vanillaSongs ?? []))
 
   function pinchTitle(value: string): string {
     return pinchOptions.find((o) => o.value === value)?.title ?? value
@@ -161,17 +152,19 @@
   const legend = $derived(overlayOn ? overlayLegend(gameIds, gameName) : [])
 
   const selectedItem = $derived(dndItems.find((item) => item.id === selectedItemId) ?? null)
-  const canUseDefaults = $derived(Boolean(orderData?.defaultTrackData) && selectedItem?.fields != null)
 
-  function applyDefaults() {
-    const defaults = orderData?.defaultTrackData
-    if (!defaults || !selectedItem?.fields) {
+  // `value` is 'default' or the index of a named preset.
+  function applyPreset(value: string) {
+    if (!orderData || !selectedItem?.fields) {
       return
     }
-    selectedItem.fields.game = defaults.game
-    selectedItem.fields.author = defaults.author
-    selectedItem.fields.copyright = defaults.copyright
-    selectedItem.fields.record_type = defaults.record_type
+    const preset = value === 'default' ? null : orderData.presets.presets[Number(value)]
+    const { pinch_song, ...values } = resolvePreset(orderData.presets, selectedItem.fields.game, preset)
+    Object.assign(selectedItem.fields, values)
+    // A preset never clears an existing pinch link, and a song cannot be its own pinch song.
+    if (pinch_song && pinch_song !== selectedItem.filename && !pinchDisabled(selectedItem)) {
+      setPinchSong(selectedItem, pinch_song)
+    }
   }
 
   function openVolConfig() {
@@ -309,11 +302,7 @@
     void loadOrderData(modsStore.activeSeriesPath)
   })
 
-  function recordLabel(value: string): string {
-    if (value === 'arrange') return $_('orderTracks.recordArrange')
-    if (value === 'new_arrange') return $_('orderTracks.recordNewArrange')
-    return $_('orderTracks.recordOriginal')
-  }
+  const recordLabel = (value: string): string => $_(recordLabelKey(value))
 
   const inputClass =
     'w-full rounded border border-input bg-background px-1.5 py-0.5 text-[12.5px] outline-none focus:border-ring focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50'
@@ -374,15 +363,23 @@
             {$_('orderTracks.volConfig')}
           </button>
 
-          <button
-            onclick={applyDefaults}
-            class={toolbarButtonClass}
-            disabled={!canUseDefaults}
-            title={$_('orderTracks.useDefaultsHint')}
+          <select
+            class="{toolbarButtonClass} w-[150px]"
+            value=""
+            disabled={!selectedItem?.fields}
+            aria-label={$_('orderTracks.applyPreset')}
+            title={$_('orderTracks.applyPresetHint')}
+            onchange={(event) => {
+              applyPreset(event.currentTarget.value)
+              event.currentTarget.value = ''
+            }}
           >
-            <Wand2 size={14} />
-            {$_('orderTracks.useDefaults')}
-          </button>
+            <option value="" disabled hidden>{$_('orderTracks.applyPreset')}</option>
+            <option value="default">{$_('orderTracks.presetDefault')}</option>
+            {#each orderData?.presets.presets ?? [] as preset, index}
+              <option value={String(index)}>{preset.name || $_('managePresets.unnamed')}</option>
+            {/each}
+          </select>
 
           <SaveButton
             {saveState}

@@ -8,7 +8,7 @@ import { getAppSettings, saveAppSettings, checkArcOutput } from './app-settings'
 import { IPC } from '../shared/ipc-channels'
 import type {
   AppSettings, CreateSeriesInput, LoopAnalysisOptions, Nus3TrackDecision, PlaylistAssignmentInput,
-  SaveSeriesItem, SaveTrackItem, VolumeOverride
+  SaveSeriesItem, SaveTrackItem, SongPresets, VolumeOverride
 } from '../shared/types'
 
 let mainWindow: BrowserWindow | null = null
@@ -126,6 +126,9 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.SAVE_TRACK_ORDER, (_event, seriesPath: string, items: SaveTrackItem[]) =>
     api('track-order-save', { seriesPath, items }))
+
+  ipcMain.handle(IPC.SAVE_SONG_PRESETS, (_event, seriesPath: string, presets: SongPresets) =>
+    api('song-presets-save', { seriesPath, presets }))
 
   ipcMain.handle(IPC.LOAD_SERIES_ORDER, (_event, modPath: string) => api('series-order-load', { modPath }))
 

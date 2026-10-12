@@ -6,6 +6,7 @@
   import CommandPalette from '$lib/components/command-palette.svelte'
   import BuildView from '$lib/components/actions/build-view.svelte'
   import OrderTracksView from '$lib/components/actions/order-tracks-view.svelte'
+  import ManagePresetsView from '$lib/components/actions/manage-presets-view.svelte'
   import OrderSeriesView from '$lib/components/actions/order-series-view.svelte'
   import Nus3ConvertView from '$lib/components/actions/nus3-convert-view.svelte'
   import ConfigVolumeView from '$lib/components/actions/config-volume-view.svelte'
@@ -147,6 +148,8 @@
         <ConfigVolumeView activeMod={activeMod} />
       {:else if activeTab === 'order-tracks'}
         <OrderTracksView activeMod={activeMod} onNavigate={selectAction} />
+      {:else if activeTab === 'manage-presets'}
+        <ManagePresetsView activeMod={activeMod} />
       {:else if activeTab === 'manage-playlists'}
         <ManagePlaylistsView activeMod={activeMod} />
       {:else if activeTab === 'extract-icons'}

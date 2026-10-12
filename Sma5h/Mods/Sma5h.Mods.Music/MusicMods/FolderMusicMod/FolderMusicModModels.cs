@@ -41,7 +41,21 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public string Author { get; set; }
         public string Copyright { get; set; }
         public string RecordType { get; set; } = "original";
+        public bool InSoundtest { get; set; } = true;
+        public string PinchSong { get; set; }
         public float VolumeDb { get; set; }
+    }
+
+    /// <summary>A [[game-defaults]] or [[presets]] block; only the desktop app applies these.</summary>
+    public class FolderSongPresetConfig
+    {
+        public string Name { get; set; }
+        public string Game { get; set; }
+        public string Author { get; set; }
+        public string Copyright { get; set; }
+        public string RecordType { get; set; }
+        public bool InSoundtest { get; set; } = true;
+        public string PinchSong { get; set; }
     }
 
     /// <summary>Root POCO for series.toml deserialization.</summary>
@@ -51,6 +65,8 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public List<FolderGameConfig> Games { get; set; } = new();
         public List<FolderPlaylistOverrideConfig> Playlists { get; set; } = new();
         public FolderDefaultTrackDataConfig DefaultTrackData { get; set; }
+        public List<FolderSongPresetConfig> GameDefaults { get; set; } = new();
+        public List<FolderSongPresetConfig> Presets { get; set; } = new();
     }
 
     // ── CSV models (CsvHelper mapping) ───────────────────────────────────────

@@ -190,20 +190,49 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void Load_ReadsDefaultTrackData()
+        public void Load_ReadsSongPresets()
         {
             var toml = SeriesTomlWithGames +
-                "\n[default-track-data]\ngame = \"g2\"\nauthor = \"Nobuo\"\ncopyright = \"Square\"\nrecord-type = \"arrange\"\nvolume-db = 0.0\n";
+                "\n[default-track-data]\ngame = \"g2\"\nauthor = \"Nobuo\"\nrecord-type = \"arrange\"\n" +
+                "\n[[game-defaults]]\ngame = \"g1\"\ncopyright = \"Square\"\n\n[[presets]]\nname = \"Remix\"\n";
 
-            var defaults = _service.Load(_ws.WriteSeries("m", "s", FullCsv, toml)).DefaultTrackData;
+            var presets = _service.Load(_ws.WriteSeries("m", "s", FullCsv, toml)).Presets;
 
-            Assert.Equal(("g2", "Nobuo", "Square", "arrange"), (defaults.Game, defaults.Author, defaults.Copyright, defaults.RecordType));
+            Assert.Equal(("g2", "Nobuo", "arrange"), (presets.SeriesDefault.Game, presets.SeriesDefault.Author, presets.SeriesDefault.RecordType));
+            Assert.Equal(("g1", "Square"), (presets.GameDefaults.Single().Game, presets.GameDefaults.Single().Copyright));
+            Assert.Equal("Remix", presets.Presets.Single().Name);
         }
 
         [Fact]
-        public void Load_DefaultTrackDataIsNullWithoutTheTable()
+        public void Load_SeriesDefaultFallsBackWithoutSeriesToml()
         {
-            Assert.Null(_service.Load(_ws.WriteSeries("m", "s", FullCsv, SeriesTomlWithGames)).DefaultTrackData);
+            var seriesDefault = _service.Load(_ws.WriteSeries("m", "s", FullCsv)).Presets.SeriesDefault;
+
+            Assert.Equal(("", "original", "True"), (seriesDefault.Game, seriesDefault.RecordType, seriesDefault.InSoundtest));
+        }
+
+        [Fact]
+        public void SavePresets_WritesSeriesTomlAndReturnsTheReloadedData()
+        {
+            var seriesPath = _ws.WriteSeries("m", "s", FullCsv, SeriesTomlWithGames);
+            var presets = new SongPresets
+            {
+                SeriesDefault = new SongPreset { Game = "g1", Author = "Nobuo" },
+                GameDefaults = { new SongPreset { Game = "g2", RecordType = "arrange" } },
+                Presets = { new SongPreset { Name = "Hidden", InSoundtest = "False" } }
+            };
+
+            var saved = _service.SavePresets(seriesPath, presets).Presets;
+
+            Assert.Equal("Nobuo", saved.SeriesDefault.Author);
+            Assert.Equal("arrange", saved.GameDefaults.Single().RecordType);
+            Assert.Equal(("Hidden", "False"), (saved.Presets.Single().Name, saved.Presets.Single().InSoundtest));
+        }
+
+        [Fact]
+        public void SavePresets_RejectsASeriesWithoutSeriesToml()
+        {
+            Assert.Throws<DesktopApiException>(() => _service.SavePresets(_ws.WriteSeries("m", "s", FullCsv), new SongPresets()));
         }
 
         [Fact]
