@@ -88,13 +88,15 @@ export interface SeriesFields {
   defaultAuthor: string
   defaultCopyright: string
   defaultRecordType: string
-  defaultVolume: number
 }
 
 export interface SeriesOrderItem {
   id: string
   name: string
   seriesId: string
+  seriesPath: string
+  /** Read-only series dB boost; edited in Config Volume. */
+  volumeDb: number
   iconDataUrl: string | null
   originalIndex: number
   fields: SeriesFields
@@ -188,17 +190,20 @@ export interface VolumeRowItem {
   filename: string
   hasMeasurement: boolean
   measuredLufs: number
-  autoGain: number
+  autoGainDb: number
   wasClamped: boolean
-  userOverride: number
+  trackDb: number
 }
 
 export interface VolumeConfigData {
   seriesName: string
   seriesPath: string
-  globalVolumeMultiplier: number
+  globalDb: number
+  seriesDb: number
   targetLufs: number
-  maxMultiplier: number
+  maxGainDb: number
+  /** nus3bank volume (dB) of a track with no boosts. */
+  bankBaseDb: number
   ffmpegAvailable: boolean
   lufsCacheExists: boolean
   items: VolumeRowItem[]
@@ -206,7 +211,7 @@ export interface VolumeConfigData {
 
 export interface VolumeOverride {
   originalIndex: number
-  volume: number
+  db: number
 }
 
 export interface VolumeProgress {
@@ -236,7 +241,9 @@ export interface ExtractIconsResult {
 }
 
 export interface AppSettings {
-  globalVolumeMultiplier: number
+  globalVolumeDb: number
+  /** Experimental: apply the global and series dB boosts to vanilla songs. */
+  applyVolumeToVanilla: boolean
 }
 
 export interface MergeSeriesSource {
@@ -341,7 +348,7 @@ export interface SuspiciousVolumeTrack {
   seriesName: string
   filename: string
   title: string
-  effectiveVolume: number
+  effectiveDb: number
 }
 
 export interface DebugPingResult {

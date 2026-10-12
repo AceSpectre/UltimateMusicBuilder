@@ -181,8 +181,8 @@ function registerIpcHandlers(): void {
     })
   )
 
-  ipcMain.handle(IPC.SAVE_VOLUME_CONFIG, (_event, seriesPath: string, overrides: VolumeOverride[]) =>
-    saveVolumeConfig(workspace, seriesPath, overrides, sendLog)
+  ipcMain.handle(IPC.SAVE_VOLUME_CONFIG, (_event, seriesPath: string, overrides: VolumeOverride[], seriesDb?: number) =>
+    saveVolumeConfig(workspace, seriesPath, overrides, seriesDb, sendLog)
   )
 
   ipcMain.handle(IPC.DECODE_TRACK_PREVIEW, (_event, seriesPath: string, filename: string) =>

@@ -11,12 +11,7 @@ using Xunit;
 
 namespace Tests.Unit
 {
-    /// <summary>
-    /// The gain formula and the loudnorm-JSON parser — the two pure pieces of
-    /// LufsAnalysisService. CalculateGain is public; the ComputeMultiplier guard
-    /// branches (NaN/Inf/≤0) are reached through it. ParseLoudnormJson/ParseFloat
-    /// are private and reached via reflection.
-    /// </summary>
+    /// <summary>The gain formula and the loudnorm-JSON parser of LufsAnalysisService.</summary>
     public class LufsGainTests
     {
         private static LufsAnalysisService CreateService()
@@ -28,10 +23,10 @@ namespace Tests.Unit
                     LufsNormalization = new Sma5hMusicOptions.LufsNormalizationOptions
                     {
                         TargetLufs = -14.0f,
-                        MaxGainMultiplier = 4.0f,
+                        MaxGainDb = 12.0f,
                         Enabled = true
                     },
-                    GlobalVolumeMultiplier = 1.5f
+                    GlobalVolumeDb = 3.5f
                 }
             };
             var optMock = new Mock<IOptionsMonitor<Sma5hMusicOptions>>();
@@ -43,18 +38,18 @@ namespace Tests.Unit
                 new Mock<ILogger<ILufsAnalysisService>>().Object);
         }
 
-        // ── CalculateGain / ComputeMultiplier ───────────────────────────────
+        // ── CalculateGain / ComputeGainDb ───────────────────────────────────
 
         [Theory]
-        [InlineData(-20.0f, -14.0f, 4.0f, 1.995f)]  // +6 dB → ~2.0×
-        [InlineData(-14.0f, -14.0f, 4.0f, 1.0f)]    //  0 dB → 1.0×
-        [InlineData(-10.0f, -14.0f, 4.0f, 0.6309f)] // -4 dB → ~0.63×
-        public void CalculateGain_AppliesFormula(float measured, float target, float max, float expected)
+        [InlineData(-20.0f, -14.0f, 12.0f, 6.0f)]
+        [InlineData(-14.0f, -14.0f, 12.0f, 0.0f)]
+        [InlineData(-10.0f, -14.0f, 12.0f, -4.0f)]
+        public void CalculateGain_AppliesFormula(float measured, float target, float maxDb, float expected)
         {
             var gain = CreateService().CalculateGain(
-                new LufsMeasurement { IntegratedLufs = measured, IsValid = true }, target, max);
+                new LufsMeasurement { IntegratedLufs = measured, IsValid = true }, target, maxDb);
 
-            Assert.InRange(gain.Multiplier, expected - 0.01f, expected + 0.01f);
+            Assert.Equal(expected, gain.Db, precision: 3);
             Assert.False(gain.WasClamped);
         }
 
@@ -62,26 +57,26 @@ namespace Tests.Unit
         public void CalculateGain_ClampsAtMax()
         {
             var gain = CreateService().CalculateGain(
-                new LufsMeasurement { IntegratedLufs = -40.0f, IsValid = true }, -14.0f, 1.5f);
+                new LufsMeasurement { IntegratedLufs = -40.0f, IsValid = true }, -14.0f, 3.5f);
 
-            Assert.Equal(1.5f, gain.Multiplier, precision: 3);
+            Assert.Equal(3.5f, gain.Db, precision: 3);
             Assert.True(gain.WasClamped);
         }
 
         [Fact]
-        public void CalculateGain_InvalidMeasurementReturnsUnity()
+        public void CalculateGain_InvalidMeasurementReturnsZero()
         {
             var gain = CreateService().CalculateGain(
-                new LufsMeasurement { IsValid = false }, -14.0f, 4.0f);
-            Assert.Equal(1.0f, gain.Multiplier);
+                new LufsMeasurement { IsValid = false }, -14.0f, 12.0f);
+            Assert.Equal(0f, gain.Db);
             Assert.False(gain.WasClamped);
         }
 
         [Fact]
-        public void CalculateGain_NullMeasurementReturnsUnity()
+        public void CalculateGain_NullMeasurementReturnsZero()
         {
-            var gain = CreateService().CalculateGain(null, -14.0f, 4.0f);
-            Assert.Equal(1.0f, gain.Multiplier);
+            var gain = CreateService().CalculateGain(null, -14.0f, 12.0f);
+            Assert.Equal(0f, gain.Db);
             Assert.False(gain.WasClamped);
         }
 
@@ -89,9 +84,9 @@ namespace Tests.Unit
         public void CalculateGain_NearSilentSourceIsClampedToMax()
         {
             var gain = CreateService().CalculateGain(
-                new LufsMeasurement { IntegratedLufs = -1000f, IsValid = true }, 0.0f, 4.0f);
+                new LufsMeasurement { IntegratedLufs = -1000f, IsValid = true }, 0.0f, 12.0f);
 
-            Assert.Equal(4.0f, gain.Multiplier, precision: 3);
+            Assert.Equal(12.0f, gain.Db, precision: 3);
             Assert.True(gain.WasClamped);
         }
 

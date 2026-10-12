@@ -140,7 +140,7 @@
       {#if activeTab === 'build'}
         <BuildView activeMod={activeMod} />
       {:else if activeTab === 'order-series'}
-        <OrderSeriesView activeMod={activeMod} />
+        <OrderSeriesView activeMod={activeMod} onNavigate={selectAction} />
       {:else if activeTab === 'nus3-convert'}
         <Nus3ConvertView activeMod={activeMod} />
       {:else if activeTab === 'config-volume'}

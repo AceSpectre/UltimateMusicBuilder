@@ -116,7 +116,7 @@ test('createSeries writes a new series folder (series.toml + header-only tracks.
   expect(toml).toContain('game = "ipc_game"')
 
   const csv = readFileSync(join(modDir, 'ipc_series', 'tracks.csv'), 'utf8')
-  expect(csv.trim()).toBe('filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest')
+  expect(csv.trim()).toBe('filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest')
 })
 
 test('UI: New Series modal creates a series (playlist auto-filled, one game required)', async () => {
@@ -145,7 +145,7 @@ test('UI: New Series modal creates a series (playlist auto-filled, one game requ
   expect(toml).toContain('game = "ui_game"')
 
   const csv = readFileSync(join(modDir, 'ui_series', 'tracks.csv'), 'utf8')
-  expect(csv.trim()).toBe('filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest')
+  expect(csv.trim()).toBe('filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest')
 })
 
 // 1x1 transparent PNG.

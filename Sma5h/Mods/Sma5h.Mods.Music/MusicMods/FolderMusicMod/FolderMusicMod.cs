@@ -184,6 +184,8 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     continue;
                 }
 
+                var seriesDb = seriesFile.DefaultTrackData?.VolumeDb ?? 0f;
+                output.SeriesVolumeDb[uiSeriesId] = seriesDb;
                 var playlistTracks = new List<(string uiBgmId, int incidence)>();
                 var filenameByUiBgmId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var filenameToInfoId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -276,7 +278,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     // BgmPropertyEntry
                     var bgmProp = new BgmPropertyEntry(toneId, audioFile, this)
                     {
-                        AudioVolume = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB + VolumeHelper.MultiplierToDb(row.Volume)
+                        AudioVolume = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB + seriesDb + row.VolumeDb
                     };
                     try
                     {

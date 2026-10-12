@@ -985,9 +985,9 @@ ID,NUS3Bank Name,Volume
 0x0436,bgm_sp08a_sp_imanuraneba_short,4
 0x0437,bgm_sp27a_sp2_nowornever_short,3.1
 0x0438,bgm_sp28a_sp2_imanuraneba_short,3.9
-0x0439,bgm_rr09_xbd2_sentou,-0.5
-0x043a,bgm_rr10_xbd2_soredemomaeesusume,1.3
-0x043b,bgm_rr11_xbd2_yukutewohabamumonotachi,1.8
+0x0439,bgm_rr09_xbd2_sentou,1.8
+0x043a,bgm_rr10_xbd2_soredemomaeesusume,2.1
+0x043b,bgm_rr11_xbd2_yukutewohabamumonotachi,2.4
 0x043c,bgm_crs2_42_crazyhand,4.7
 0x043d,bgm_crs2_43_masterhand_crazyhand,3.7
 0x043f,bgm_crs2_45_adv_map_dark_subcommon,2.8
@@ -1241,5 +1241,5 @@ ID,NUS3Bank Name,Volume
 0x054b,bgm_kh07_kh15_scherzodinotte,4.5
 0x054c,bgm_kh08_kh25_fragmentsofsorrow,5.9
 0x054d,bgm_kh09_kh1_destati,5.3
-0x054e,bgm_khmm_dearlybeloved,4.5
+0x054e,bgm_kh10_khmm_dearlybeloved,4.5
 0x054f,bgm_zz08_f_trail,9.7

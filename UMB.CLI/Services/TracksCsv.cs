@@ -19,6 +19,16 @@ namespace UMB.CLI.Services
     /// <summary>Reads and writes tracks.csv with every column and cell preserved.</summary>
     public static class TracksCsv
     {
+        /// <summary>The column holding each track's dB boost.</summary>
+        public const string VolumeDbColumn = "volume_db";
+
+        /// <summary>The standard columns, in order.</summary>
+        public static readonly string[] Columns =
+            { "filename", "game", "title", "author", "copyright", "record_type", "special_category", VolumeDbColumn, "info1", "in_soundtest" };
+
+        /// <summary>Header line of a new, empty tracks.csv.</summary>
+        public static string Header => string.Join(",", Columns) + "\n";
+
         private static readonly char[] CharsNeedingQuotes = { ',', '"', '\r', '\n' };
 
         /// <summary>Untrimmed read for lossless round-trips, with the header order.</summary>

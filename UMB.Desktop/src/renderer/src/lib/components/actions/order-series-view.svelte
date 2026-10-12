@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ListOrdered, GripVertical, Gamepad2, Image, Plus, RefreshCw, Settings2, Upload, X } from '@lucide/svelte'
+  import { ListOrdered, GripVertical, Gamepad2, Image, Plus, RefreshCw, Settings2, Upload, Volume2, X } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
@@ -8,12 +8,23 @@
   import IconButton from '$lib/components/ui/icon-button.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import Modal from '$lib/components/ui/modal.svelte'
+  import { modsStore } from '$lib/stores/mods.svelte'
+  import { formatDb } from '$lib/volume'
   import type { ModInfo, SeriesOrderData, SeriesOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
   const RECORD_OPTIONS = ['original', 'arrange', 'new_arrange'] as const
 
-  let { activeMod }: { activeMod: ModInfo | null } = $props()
+  let {
+    activeMod,
+    onNavigate
+  }: { activeMod: ModInfo | null; onNavigate?: (actionId: string) => void } = $props()
+
+  // The series dB boost is edited only in Config Volume.
+  function openConfigVolume(seriesPath: string) {
+    modsStore.pendingConfigVolumePath = seriesPath
+    onNavigate?.('config-volume')
+  }
 
   let panelTab = $state<'settings' | 'games'>('settings')
   let showAddGame = $state(false)
@@ -457,6 +468,18 @@
               <input type="number" min="0" class={inputClass} bind:value={f.playlistIncidence} />
             </label>
 
+            <div class="flex flex-col gap-1">
+              <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldVolume')}</span>
+              <button
+                onclick={() => openConfigVolume(selectedItem.seriesPath)}
+                title={$_('orderSeries.volumeHint')}
+                class="{inputClass} flex cursor-pointer items-center justify-between text-left text-muted-foreground opacity-60 transition-opacity hover:opacity-100"
+              >
+                <span class="font-mono">{formatDb(selectedItem.volumeDb)}</span>
+                <span class="inline-flex items-center gap-1 text-[11.5px]"><Volume2 size={12} />{$_('orderSeries.volumeEdit')}</span>
+              </button>
+            </div>
+
             <div class="mt-1 border-t border-border pt-3">
               <h3 class="text-[12.5px] font-semibold">{$_('orderSeries.defaultsHeading')}</h3>
               <p class="pt-0.5 text-[11.5px] text-muted-foreground">{$_('orderSeries.defaultsHint')}</p>
@@ -492,11 +515,6 @@
                   <option value={option}>{recordLabel(option)}</option>
                 {/each}
               </select>
-            </label>
-
-            <label class="flex flex-col gap-1">
-              <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldDefaultVolume')}</span>
-              <input type="number" min="0" step="0.1" class={inputClass} bind:value={f.defaultVolume} />
             </label>
           </div>
         {:else}

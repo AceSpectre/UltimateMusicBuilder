@@ -1,12 +1,14 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
   import { Folder, PanelLeftClose, PanelLeftOpen, RefreshCw } from '@lucide/svelte'
+  import { _ } from 'svelte-i18n'
   import GradientIcon from './gradient-icon.svelte'
   import IconButton from './icon-button.svelte'
+  import SearchableList from './searchable-list.svelte'
+  import { matchesSearch } from '$lib/search'
   import type { ModInfo, ModSeriesInfo } from '$lib/types/electron'
 
-  // Left-hand series sidebar shared by Manage Songs / Volume Config / Nus3 Convert.
-  // All display strings come in as props so each view keeps its own locale keys.
+  // Left-hand series sidebar shared by Manage Songs / Config Volume / Nus3 Convert.
   let {
     activeMod,
     series,
@@ -14,16 +16,7 @@
     activePath,
     onSelect,
     onReload,
-    heading,
-    subtitleFallback,
-    chooseModText,
-    loadingText,
-    emptyText,
-    reloadTitle,
     spinning = loading,
-    collapsible = false,
-    collapseTitle = '',
-    expandTitle = '',
     actions
   }: {
     activeMod: ModInfo | null
@@ -32,29 +25,22 @@
     activePath: string | null
     onSelect: (path: string) => void
     onReload: () => void
-    heading: string
-    subtitleFallback: string
-    chooseModText: string
-    loadingText: string
-    emptyText: string
-    reloadTitle: string
     spinning?: boolean
-    collapsible?: boolean
-    collapseTitle?: string
-    expandTitle?: string
     actions?: Snippet
   } = $props()
 
   let collapsed = $state(false)
+  let search = $state('')
+  const filtered = $derived(series.filter((item) => matchesSearch(search, item.name)))
 </script>
 
 <section
-  class="flex h-full min-h-0 shrink-0 flex-col border border-border bg-card overflow-hidden transition-[width] duration-150 {collapsed ? 'w-[46px]' : 'w-[280px]'}"
+  class="flex h-full min-h-0 shrink-0 flex-col border border-border bg-card overflow-hidden transition-[width] duration-150 {collapsed ? 'w-[46px]' : 'w-[220px]'}"
 >
   <div class="gradient-strip h-[3px] shrink-0"></div>
   {#if collapsed}
     <div class="flex flex-1 flex-col items-center gap-2 py-3">
-      <IconButton onclick={() => (collapsed = false)} title={expandTitle}>
+      <IconButton onclick={() => (collapsed = false)} title={$_('seriesPicker.expand')}>
         <PanelLeftOpen size={15} />
       </IconButton>
       <GradientIcon size="sm">
@@ -68,56 +54,35 @@
         <GradientIcon>
           <Folder size={18} />
         </GradientIcon>
-        <div class="min-w-0 flex-1">
-          <h2 class="text-sm font-semibold">{heading}</h2>
-          <p class="truncate text-[12.5px] text-muted-foreground">
-            {activeMod?.name ?? subtitleFallback}
-          </p>
-        </div>
-        <span class="shrink-0 text-[12px] text-muted-foreground">{series.length}</span>
+        <h2 class="min-w-0 flex-1 truncate text-sm font-semibold">{$_('seriesPicker.heading')}</h2>
         {#if actions}
           {@render actions()}
         {/if}
-        <IconButton onclick={onReload} title={reloadTitle}>
+        <IconButton onclick={onReload} title={$_('seriesPicker.reload')}>
           <RefreshCw size={14} class={spinning ? 'animate-spin' : ''} />
         </IconButton>
-        {#if collapsible}
-          <IconButton onclick={() => (collapsed = true)} title={collapseTitle}>
-            <PanelLeftClose size={14} />
-          </IconButton>
-        {/if}
+        <IconButton onclick={() => (collapsed = true)} title={$_('seriesPicker.collapse')}>
+          <PanelLeftClose size={14} />
+        </IconButton>
       </div>
     </div>
 
-    <div class="min-h-0 flex-1 overflow-auto p-2">
-      {#if !activeMod}
+    {#if activeMod && series.length > 0}
+      <SearchableList
+        items={filtered.map((item) => ({ id: item.path, label: item.name }))}
+        activeId={activePath}
+        {onSelect}
+        bind:search
+        placeholder={$_('seriesPicker.search')}
+        countText={$_('seriesPicker.count', { values: { count: filtered.length } })}
+        emptyText={$_('seriesPicker.noMatch')}
+      />
+    {:else}
+      <div class="min-h-0 flex-1 overflow-auto p-2">
         <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-          {chooseModText}
+          {$_(!activeMod ? 'seriesPicker.chooseMod' : loading ? 'seriesPicker.loading' : 'seriesPicker.noSeries')}
         </div>
-      {:else if loading && series.length === 0}
-        <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-          {loadingText}
-        </div>
-      {:else if series.length === 0}
-        <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-          {emptyText}
-        </div>
-      {:else}
-        <div class="grid gap-1.5">
-          {#each series as item}
-            {@const isActive = activePath === item.path}
-            <button
-              onclick={() => onSelect(item.path)}
-              class="w-full rounded-lg border px-2 py-1.5 text-left transition-colors {isActive ? 'border-transparent' : 'border-border bg-background/70 hover:bg-muted'}"
-              style={isActive
-                ? 'background: linear-gradient(135deg, hsl(var(--gradient-from) / .15), hsl(var(--gradient-to) / .18));'
-                : ''}
-            >
-              <div class="truncate text-[13.5px] font-semibold">{item.name}</div>
-            </button>
-          {/each}
-        </div>
-      {/if}
-    </div>
+      </div>
+    {/if}
   {/if}
 </section>

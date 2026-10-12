@@ -85,8 +85,8 @@ namespace Tests.Integration
                 $"game = \"{seriesId}\"\n");
 
             File.WriteAllText(Path.Combine(seriesDir, "tracks.csv"),
-                "filename,game,title,author,copyright,record_type,special_category,volume,info1,in_soundtest\n" +
-                $"{trackFilename},{seriesId},Title from {modName},,,,original,,1.0,,True\n");
+                "filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest\n" +
+                $"{trackFilename},{seriesId},Title from {modName},,,,original,,0,,True\n");
 
             File.WriteAllBytes(Path.Combine(seriesDir, trackFilename), audioBytes);
             return modDir;

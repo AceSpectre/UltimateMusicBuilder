@@ -21,10 +21,10 @@ namespace UMB.CLI.Desktop
         public string DefaultAuthor { get; set; } = "";
         public string DefaultCopyright { get; set; } = "";
         public string DefaultRecordType { get; set; } = "original";
-        public double DefaultVolume { get; set; } = 1;
     }
 
-    public record SeriesOrderItem(string Id, string Name, string SeriesId, string IconDataUrl, int OriginalIndex, SeriesFields Fields);
+    /// <summary>VolumeDb is the read-only series dB boost; Config Volume edits it via SeriesPath.</summary>
+    public record SeriesOrderItem(string Id, string Name, string SeriesId, string SeriesPath, double VolumeDb, string IconDataUrl, int OriginalIndex, SeriesFields Fields);
     public record SeriesOrderData(string ModName, string ModPath, bool HasSeriesOrder, List<SeriesOrderItem> Items);
     public record SaveSeriesItem(string Id, SeriesFields Fields);
 
@@ -134,5 +134,5 @@ namespace UMB.CLI.Desktop
     public record PlaylistAssignmentInput(string PlaylistId, string SeriesId, string Filename, double Incidence);
 
     // ── Build pre-checks ───────────────────────────────────────────────────
-    public record SuspiciousVolumeTrack(string ModName, string SeriesName, string Filename, string Title, float EffectiveVolume);
+    public record SuspiciousVolumeTrack(string ModName, string SeriesName, string Filename, string Title, float EffectiveDb);
 }

@@ -41,7 +41,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public string Author { get; set; }
         public string Copyright { get; set; }
         public string RecordType { get; set; } = "original";
-        public float Volume { get; set; } = 1.0f;
+        public float VolumeDb { get; set; }
     }
 
     /// <summary>Root POCO for series.toml deserialization.</summary>
@@ -64,7 +64,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public string Copyright { get; set; }
         public string RecordType { get; set; }
         public string SpecialCategory { get; set; }
-        public float Volume { get; set; } = 1.0f;
+        public float VolumeDb { get; set; }
         public string Info1 { get; set; }
         public bool InSoundtest { get; set; } = true;
     }
@@ -80,7 +80,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             Map(m => m.Copyright).Name("copyright").Optional();
             Map(m => m.RecordType).Name("record_type").Optional().Default("original");
             Map(m => m.SpecialCategory).Name("special_category").Optional();
-            Map(m => m.Volume).Name("volume").Optional().Default(1.0f);
+            Map(m => m.VolumeDb).Name("volume_db").Optional().Default(0f);
             Map(m => m.Info1).Name("info1").Optional().Default("");
             Map(m => m.InSoundtest).Name("in_soundtest").Optional().Default(true);
         }

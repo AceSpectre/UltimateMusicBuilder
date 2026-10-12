@@ -82,6 +82,9 @@ namespace UMB.CLI.Services
             sb.AppendLine();
         }
 
+        /// <summary>A dB boost as written to series.toml and tracks.csv.</summary>
+        public static string FormatDb(double db) => db.ToString("0.0##", CultureInfo.InvariantCulture);
+
         public static string MakeSafeFileName(string name)
         {
             var sb = new StringBuilder(name.Length);

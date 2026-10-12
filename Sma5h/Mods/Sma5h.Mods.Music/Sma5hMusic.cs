@@ -35,6 +35,8 @@ namespace Sma5h.Mods.Music
 
         public override string ModName => "Sma5hMusic";
 
+        private readonly Dictionary<string, float> _seriesVolumeDb = new();
+
         public Sma5hMusic(IOptionsMonitor<Sma5hMusicOptions> config, IMusicModManagerService musicModManagerService, IAudioStateService audioStateService,
             INus3AudioService nus3AudioService, IProcessService processService, ILufsAnalysisService lufsService, IStateManager state, ILogger<Sma5hMusic> logger)
             : base(state)
@@ -87,6 +89,8 @@ namespace Sma5h.Mods.Music
                     _audioStateService.AddPlaylistEntry(playlistEntry);
                 foreach (var ordering in musicModEntries.SeriesSongOrderings)
                     _audioStateService.RegisterSeriesSongOrdering(ordering.Key, ordering.Value);
+                foreach (var seriesDb in musicModEntries.SeriesVolumeDb)
+                    _seriesVolumeDb[seriesDb.Key] = seriesDb.Value;
             }
 
             return true;
@@ -129,14 +133,13 @@ namespace Sma5h.Mods.Music
                 Directory.CreateDirectory(_config.CurrentValue.Sma5hMusic.CachePath);
 
             //Save NUS3Audio/Nus3Bank
-            var globalMult = _config.CurrentValue.Sma5hMusic.GlobalVolumeMultiplier;
-            var globalDb = VolumeHelper.MultiplierToDb(globalMult);
-            _logger.LogInformation("Global volume multiplier: {Mult}x ({Db:+0.0;-0.0} dB)", globalMult, globalDb);
+            var globalDb = _config.CurrentValue.Sma5hMusic.GlobalVolumeDb;
+            _logger.LogInformation("Global dB boost: {Db:+0.0;-0.0} dB", globalDb);
 
             var lufsOpts = _config.CurrentValue.Sma5hMusic.LufsNormalization;
             var lufsEnabled = lufsOpts != null && lufsOpts.Enabled && _lufsService.IsAvailable;
             if (lufsEnabled)
-                _logger.LogInformation("LUFS normalization enabled. Target: {Target} LUFS, max gain: {Max}x", lufsOpts.TargetLufs, lufsOpts.MaxGainMultiplier);
+                _logger.LogInformation("LUFS normalization enabled. Target: {Target} LUFS, max gain: {Max:+0.0} dB", lufsOpts.TargetLufs, lufsOpts.MaxGainDb);
 
             // Pre-warm the LUFS cache in parallel before the (serial) main build loop.
             // First-time measurements dominate build time; running them concurrently turns
@@ -182,10 +185,12 @@ namespace Sma5h.Mods.Music
                 }
             }
 
+            string BgmOutputFile(string fileFormat, string toneId) => Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(fileFormat, toneId));
+
             foreach (var bgmPropertyEntry in _audioStateService.GetModBgmPropertyEntries())
             {
-                var nusBankOutputFile = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3BANK_FILE, bgmPropertyEntry.NameId));
-                var nusAudioOutputFile = Path.Combine(_config.CurrentValue.OutputPath, "stream;", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3AUDIO_FILE, bgmPropertyEntry.NameId));
+                var nusBankOutputFile = BgmOutputFile(MusicConstants.GameResources.NUS3BANK_FILE, bgmPropertyEntry.NameId);
+                var nusAudioOutputFile = BgmOutputFile(MusicConstants.GameResources.NUS3AUDIO_FILE, bgmPropertyEntry.NameId);
 
                 var finalVolume = bgmPropertyEntry.AudioVolume + globalDb;
                 if (lufsEnabled && !string.IsNullOrEmpty(bgmPropertyEntry.Filename) && File.Exists(bgmPropertyEntry.Filename))
@@ -193,11 +198,11 @@ namespace Sma5h.Mods.Music
                     var measurement = _lufsService.Measure(bgmPropertyEntry.Filename);
                     if (measurement.IsValid)
                     {
-                        var gain = _lufsService.CalculateGain(measurement, lufsOpts.TargetLufs, lufsOpts.MaxGainMultiplier);
+                        var gain = _lufsService.CalculateGain(measurement, lufsOpts.TargetLufs, lufsOpts.MaxGainDb);
                         finalVolume = bgmPropertyEntry.AudioVolume + globalDb + gain.Db;
                         if (gain.WasClamped)
-                            _logger.LogWarning("Song {NameId}: LUFS gain clamped to {Max}x (source measured {Measured:F1} LUFS). Source is too quiet to reach target loudness — consider replacing with a louder master.",
-                                bgmPropertyEntry.NameId, lufsOpts.MaxGainMultiplier, measurement.IntegratedLufs);
+                            _logger.LogWarning("Song {NameId}: LUFS gain clamped to {Max:+0.0} dB (source measured {Measured:F1} LUFS). Source is too quiet to reach target loudness — consider replacing with a louder master.",
+                                bgmPropertyEntry.NameId, lufsOpts.MaxGainDb, measurement.IntegratedLufs);
                         else
                             _logger.LogDebug("Song {NameId}: measured {Measured:F1} LUFS, applying {Gain:+0.0;-0.0} dB gain (final bank volume {Final:F2} dB).",
                                 bgmPropertyEntry.NameId, measurement.IntegratedLufs, gain.Db, finalVolume);
@@ -212,6 +217,15 @@ namespace Sma5h.Mods.Music
                 _logger.LogInformation("Generating or Copying Nus3Audio for {NameId}", bgmPropertyEntry.NameId);
                 if (!ConvertNus3Audio(useCache, bgmPropertyEntry, nusAudioOutputFile))
                     _logger.LogError("Error! The song with ToneId {NameId}, File {Filename} could not be processed.", bgmPropertyEntry.NameId, bgmPropertyEntry.Filename);
+            }
+
+            // Vanilla audio is kept; only its nus3bank is regenerated with the boosted volume.
+            if (_config.CurrentValue.Sma5hMusic.ApplyVolumeToVanilla)
+            {
+                var vanillaBoosts = VanillaVolumeHelper.BoostsByToneId(_audioStateService, globalDb, _seriesVolumeDb);
+                _logger.LogWarning("Applying volume settings to {Count} vanilla song(s).", vanillaBoosts.Count);
+                foreach (var entry in _audioStateService.GetBgmPropertyEntries().Where(p => vanillaBoosts.ContainsKey(p.NameId)))
+                    _nus3AudioService.GenerateNus3Bank(entry.NameId, entry.AudioVolume + vanillaBoosts[entry.NameId], BgmOutputFile(MusicConstants.GameResources.NUS3BANK_FILE, entry.NameId));
             }
 
             if (lufsEnabled)

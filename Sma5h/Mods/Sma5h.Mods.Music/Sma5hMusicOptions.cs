@@ -17,7 +17,9 @@ namespace Sma5h.Mods.Music
             public string DefaultLocale { get; set; }
             public string ModPath { get; set; }
             public string CachePath { get; set; }
-            public float GlobalVolumeMultiplier { get; set; } = 1.0f;
+            public float GlobalVolumeDb { get; set; }
+            /// <summary>Experimental: also apply the global and series dB boosts to vanilla songs.</summary>
+            public bool ApplyVolumeToVanilla { get; set; }
             public LufsNormalizationOptions LufsNormalization { get; set; } = new();
         }
 
@@ -33,7 +35,7 @@ namespace Sma5h.Mods.Music
         {
             public bool Enabled { get; set; } = true;
             public float TargetLufs { get; set; } = -11.0f;
-            public float MaxGainMultiplier { get; set; } = 4.0f;
+            public float MaxGainDb { get; set; } = 12.0f;
             // ffmpeg is resolved from the system PATH only (install via choco/brew/apt).
             // Filename for the per-series cache file. Location is always derived from the
             // audio file's directory — every series folder gets its own copy alongside tracks.csv.
