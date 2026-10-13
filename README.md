@@ -86,7 +86,7 @@ Every action below is reachable interactively through the terminal menu or direc
 * **Convert** (`convert`) - imports an old Sma5hMusic mod (`metadata_mod.json` + audio under `Mods/OldMods/<name>/`) into UMB's folder-based format.
 * **Merge** (`merge`) - combines two or more UMB mods into a single output mod, preserving series toml metadata from the priority mod.
 * **Extract Icons** (`extract-icons`) - pulls series icons out of an already-built Sma5h mod's BNTX files.
-* **Cleanup** (`cleanup`) - removes `tracks.csv` rows that point at deleted files, prunes dead filenames out of `[[playlists]] songs` array. Safe to run any time.
+* **Cleanup** (`cleanup`) - removes `tracks.csv` rows that point at deleted files, prunes dead filenames out of `[[playlists]] songs` array, and drops `playlists.toml` songs that are neither vanilla nor in the mod (needs the game files). Safe to run any time.
 * **Order Series** (`order-series`) - drag-and-drop reorder for the custom-series display order across a mod. Writes `series-order.toml` at mod root. The desktop app also lists every vanilla series: editing one (games, song defaults, icon) adds it to the mod as an `existing-series` folder.
 * **Order Tracks** (`order-tracks`) - drag-and-drop reorder for tracks within series. In `existing-series` folders vanilla songs are editable rows too, and can be interleaved with mod songs.
 * **Config Volume** (`config-volume`) - preview tracks at their post-build loudness (after LUFS normalization) and set the series and per-track dB boosts. Vanilla songs take manual track boosts only.
@@ -136,7 +136,7 @@ Fields:
 * `playlist-incidence` - default random-roll weight for the auto-generated `bgm_gametitle_<id>` playlist. Per-`[[playlists]]` blocks can override with their own `incidence`.
 * `series-playlist` - optional extra playlist that receives every song. Scaffold sets `bgm_<id>` for new series. `bgm_gametitle_<id>` is created regardless.
 * `[[games]]` - one block per "game". Custom series need at least one. `id` is referenced by `tracks.csv`'s `game` column.
-* `[[playlists]]` - extra playlists for this series' songs. Saving in Manage Playlists moves these into [playlists.toml](#playliststoml---playlists-and-stage-playlists).
+* `[[playlists]]` - legacy: extra playlists for this series' songs. Manage Playlists offers to migrate these into [playlists.toml](#playliststoml---playlists-and-stage-playlists).
   * `id` - playlist identifier (existing stage playlist, or a new one UMB will create).
   * `incidence` - random-roll weight for this block's songs.
   * `songs` - `"*"` for all, or a TOML array of filenames. Stem-tolerant: `"Destroyer"` matches `Destroyer.nus3audio`. Pre-build validation warns on no-match entries; `Cleanup` prunes them.
@@ -183,12 +183,13 @@ A `tracks.csv` row whose `filename` is a vanilla song's id (e.g. `ui_bgm_a01_smb
 
 ## playlists.toml - playlists and stage playlists
 
-An optional `playlists.toml` at the mod root holds the playlists and stage assignments edited in the desktop app's Manage Playlists view. Saving there also moves every series' `[[playlists]]` blocks into this file.
+An optional `playlists.toml` at the mod root holds the playlists and stage assignments edited in the desktop app's Manage Playlists view. When a mod still has legacy series.toml `[[playlists]]` blocks, Manage Playlists asks before migrating them here (back up the mod first); a block without a song list becomes a `series` flag.
 
 ```toml
 [[playlists]]
 id = "bgmmymix"                     # a new playlist, or a game/series playlist to replace
 name = "My Mix"                     # only for new playlists
+series = ["the-finals"]             # optional: always holds every song of these series
 tracks = [
     { song = "ui_bgm_a01_smb_chijyou", order = 0, incidence = 100 },
     { song = "ui_bgm_destroyer", order = [1, 1, 1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], incidence = 50 },
@@ -200,9 +201,11 @@ playlist = "bgmmymix"
 order = 0
 ```
 
-* A playlist here replaces the whole playlist of that id. The build then still adds every mod song missing from `bgmsmashbtl` and its series' stage playlists, so new songs join saved playlists too; to keep one off a stage, leave it out of that order instead. Songs are ui_bgm ids; a mod song's id is `ui_bgm_` plus its filename in lowercase with other characters as `_`.
+* A playlist here replaces the whole playlist of that id. The build then still adds the songs it always keeps: every song of a series in its `bgm_gametitle_<id>` and `series-playlist` playlists, and every mod song in `bgmsmashbtl` and its series' stage playlists. New songs therefore join saved playlists too; to keep one off a stage, leave it out of that order instead. Songs are ui_bgm ids; a mod song's id is `ui_bgm_` plus its filename in lowercase with other characters as `_`.
 * Every stage plays one order (0-15) of its playlist. `order` and `incidence` are one value for all 16 orders, or an array with one per order; order `-1` leaves the song out of that order.
+* `series` makes a dedicated series playlist: every song of those series is always in it, without listing them.
 * `[[stages]]` sets the playlist and order a stage plays.
+* Manage Playlists can reset a changed game or series playlist to its default, which removes it from this file. Renaming a series' `series-playlist` in Manage Series renames it here too.
 
 ---
 

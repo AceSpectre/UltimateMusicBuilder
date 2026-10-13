@@ -58,18 +58,27 @@ export function playlistIdError(id: string, existingIds: string[]): 'invalid' | 
   return existingIds.includes(id) ? 'taken' : null
 }
 
-function trackKey(playlist: ManagedPlaylist): string {
-  return JSON.stringify([playlist.name, playlist.tracks.map((t) => [t.bgmId, t.orders, t.incidences])])
+function tracksKey(tracks: PlaylistTrack[]): string {
+  return JSON.stringify(tracks)
 }
 
-/** Each playlist's contents, to tell which ones the user changed. */
-export function playlistSnapshots(playlists: ManagedPlaylist[]): Record<string, string> {
-  return Object.fromEntries(playlists.map((p) => [p.id, trackKey(p)]))
+/** Each playlist's default tracks (its tracks when unchanged), kept as text to compare and reset to. */
+export function playlistDefaults(playlists: ManagedPlaylist[]): Record<string, string> {
+  return Object.fromEntries(playlists.map((p) => [p.id, tracksKey(p.defaultTracks ?? p.tracks)]))
 }
 
-/** What playlists.toml holds: custom playlists, ones it already set, and ones changed since loading. */
-export function playlistsToSave(playlists: ManagedPlaylist[], loaded: Record<string, string>): ManagedPlaylist[] {
-  return playlists.filter((p) => p.kind === 'custom' || p.persisted || loaded[p.id] !== trackKey(p))
+/** A game or series playlist differing from its default. */
+export function isChanged(playlist: ManagedPlaylist, defaults: Record<string, string>): boolean {
+  return playlist.kind !== 'custom' && tracksKey(playlist.tracks) !== defaults[playlist.id]
+}
+
+export function resetToDefault(playlist: ManagedPlaylist, defaults: Record<string, string>): void {
+  playlist.tracks = JSON.parse(defaults[playlist.id])
+}
+
+/** What playlists.toml holds: custom and series-flagged playlists, and game or series playlists differing from their default. */
+export function playlistsToSave(playlists: ManagedPlaylist[], defaults: Record<string, string>): ManagedPlaylist[] {
+  return playlists.filter((p) => p.kind === 'custom' || p.series.length > 0 || isChanged(p, defaults))
 }
 
 /** Stages playing a different playlist or slot than in the game. */

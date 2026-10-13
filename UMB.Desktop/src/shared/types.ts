@@ -340,13 +340,20 @@ export interface PlaylistTrack {
 
 export type PlaylistKind = 'vanilla' | 'series' | 'custom'
 
-// persisted: playlists.toml (or a series.toml [[playlists]] block) sets this playlist.
+export interface SeriesRef {
+  id: string
+  name: string
+}
+
+// series: the series playlists.toml flags this playlist with; it always holds all their songs.
+// defaultTracks: a changed game or series playlist's tracks without playlists.toml, else null.
 export interface ManagedPlaylist {
   id: string
   name: string
   kind: PlaylistKind
-  persisted: boolean
+  series: SeriesRef[]
   tracks: PlaylistTrack[]
+  defaultTracks: PlaylistTrack[] | null
 }
 
 export interface ManagedStage {
@@ -366,6 +373,8 @@ export interface ManagePlaylistsData {
   playlists: ManagedPlaylist[]
   stages: ManagedStage[]
   songs: PlaylistSong[]
+  // series.toml still has legacy [[playlists]] blocks, which saving moves into playlists.toml.
+  legacyBlocks: boolean
 }
 
 export interface StageAssignmentInput {

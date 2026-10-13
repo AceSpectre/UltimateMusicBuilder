@@ -1,5 +1,5 @@
 import { test, expect, type ElectronApplication } from '@playwright/test'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import {
   createWorkspace,
@@ -69,6 +69,39 @@ test('UI: create a playlist, add a song, give it to a stage and save to playlist
   const data = await page.evaluate((mp) => window.electron.umb.loadManagePlaylists(mp), modDir)
   expect(data.playlists.find((p) => p.id === 'bgmeemix')?.tracks.length).toBe(1)
   expect(data.stages.find((s) => s.id === 'ui_stage_battle_field')?.playlistId).toBe('bgmeemix')
+})
+
+test('a changed game playlist comes back with its default for a reset', async () => {
+  const page = await firstWindow(app)
+  const data = await page.evaluate((mp) => window.electron.umb.loadManagePlaylists(mp), modDir)
+  const mario = data.playlists.find((p) => p.id === 'bgmmario')!
+
+  const result = await page.evaluate(
+    ([mp, p]) => window.electron.umb.saveManagePlaylists(mp as string, [{ ...(p as typeof mario), tracks: (p as typeof mario).tracks.slice(1) }], []),
+    [modDir, mario] as const
+  )
+
+  const saved = result.playlists.find((p) => p.id === 'bgmmario')!
+  expect(saved.tracks.length).toBe(mario.tracks.length - 1)
+  expect(saved.defaultTracks?.length).toBe(mario.tracks.length)
+})
+
+test('UI: legacy series.toml playlist blocks ask before migrating', async () => {
+  const page = await firstWindow(app)
+  const seriesToml = join(modDir, 'dev', 'series.toml')
+  writeFileSync(seriesToml, readFileSync(seriesToml, 'utf8') + '\n[[playlists]]\nid = "bgm_dev_mix"\nincidence = 100\n')
+
+  await page.getByRole('button', { name: 'Reload' }).click()
+  await expect(page.getByText('Legacy playlist data found')).toBeVisible({ timeout: 10000 })
+  await page.getByRole('button', { name: 'Not now' }).click()
+  await expect(page.getByRole('button', { name: 'Save Changes' })).toBeDisabled()
+
+  await page.getByRole('button', { name: 'Migrate' }).click()
+  await page.locator('div.fixed.z-50').getByRole('button', { name: 'Migrate' }).click()
+  await expect(page.getByText('Legacy playlist data found')).toBeHidden({ timeout: 10000 })
+
+  expect(readFileSync(seriesToml, 'utf8')).not.toContain('[[playlists]]')
+  expect(readFileSync(join(modDir, 'playlists.toml'), 'utf8')).toMatch(/id = "bgm_dev_mix"\nseries = \["dev"\]/)
 })
 
 test('saving with nothing changed from the game removes playlists.toml', async () => {

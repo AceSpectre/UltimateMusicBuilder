@@ -24,11 +24,13 @@
     ORDER_SLOTS,
     addSongs,
     excludedTracks,
+    isChanged,
+    playlistDefaults,
     playlistIdError,
     playlistIdFromName,
-    playlistSnapshots,
     playlistsToSave,
     removeTrack,
+    resetToDefault,
     setIncluded,
     setSlotOrder,
     silentStages,
@@ -50,7 +52,8 @@
   let loading = $state(false)
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let baselineSnapshot = $state('')
-  let loadedPlaylists: Record<string, string> = {}
+  let defaults = $state.raw<Record<string, string>>({})
+  let showMigrate = $state(false)
   let tab = $state<'playlists' | 'stages'>('playlists')
   let selectedPlaylistId = $state<string | null>(null)
   let slot = $state(0)
@@ -108,7 +111,8 @@
   function setData(next: ManagePlaylistsData) {
     data = next
     baselineSnapshot = snapshot(next)
-    loadedPlaylists = playlistSnapshots(next.playlists)
+    defaults = playlistDefaults(next.playlists)
+    showMigrate = next.legacyBlocks
   }
 
   async function loadData(modPath: string | null) {
@@ -147,7 +151,7 @@
 
   function createPlaylist() {
     if (!data || !creating || createError) return
-    data.playlists = [{ id: creating.id, name: creating.name.trim() || creating.id, kind: 'custom', persisted: false, tracks: [] }, ...data.playlists]
+    data.playlists = [{ id: creating.id, name: creating.name.trim() || creating.id, kind: 'custom', series: [], tracks: [], defaultTracks: null }, ...data.playlists]
     search = ''
     selectPlaylist(creating.id)
     creating = null
@@ -166,7 +170,8 @@
       track.incidences = track.incidences.map((i) => Math.max(0, Math.min(65535, Math.trunc(Number(i)) || 0)))
     }
     try {
-      setData(await window.electron.umb.saveManagePlaylists(activeMod.path, playlistsToSave(plain.playlists, loadedPlaylists), stagesToSave(plain.stages)))
+      showMigrate = false
+      setData(await window.electron.umb.saveManagePlaylists(activeMod.path, playlistsToSave(plain.playlists, defaults), stagesToSave(plain.stages)))
       saveState = 'saved'
     } catch (error) {
       console.error('saveManagePlaylists failed', error)
@@ -220,13 +225,21 @@
           <SaveButton
             {saveState}
             onclick={handleSave}
-            disabled={!data || !isDirty || saveState === 'saving'}
+            disabled={!data || data.legacyBlocks || !isDirty || saveState === 'saving'}
             save={$_('managePlaylists.save')}
             saving={$_('managePlaylists.saving')}
             saved={$_('managePlaylists.saved')}
           />
         </div>
       </div>
+
+      {#if data?.legacyBlocks}
+        <div class="flex shrink-0 items-center gap-2 border-b border-border bg-amber-500/10 px-5 py-2 text-[12.5px] text-amber-700 dark:text-amber-300">
+          <TriangleAlert size={14} class="shrink-0" />
+          <span class="flex-1">{$_('managePlaylists.legacyBanner')}</span>
+          <button onclick={() => (showMigrate = true)} class={toolbarButtonClass}>{$_('managePlaylists.migrate')}</button>
+        </div>
+      {/if}
 
       {#if data && silent.length > 0}
         <div class="flex shrink-0 items-center gap-2 border-b border-border bg-amber-500/10 px-5 py-2 text-[12.5px] text-amber-700 dark:text-amber-300">
@@ -298,7 +311,11 @@
                       <p class="pt-0.5 text-[11.5px] text-muted-foreground">
                         {playlist.id} · {$_(KIND_LABELS[playlist.kind])}
                       </p>
-                      {#if playlist.kind === 'series'}
+                      {#if playlist.series.length > 0}
+                        <p class="pt-1 text-[11.5px] text-muted-foreground">
+                          {$_('managePlaylists.seriesFlag', { values: { series: playlist.series.map((s) => s.name).join(', ') } })}
+                        </p>
+                      {:else if playlist.kind === 'series'}
                         <p class="pt-1 text-[11.5px] text-muted-foreground">{$_('managePlaylists.seriesHint')}</p>
                       {/if}
                     </div>
@@ -307,6 +324,16 @@
                         <Plus size={14} />
                         {$_('managePlaylists.addSong')}
                       </button>
+                      {#if isChanged(playlist, defaults)}
+                        <button
+                          onclick={() => resetToDefault(playlist, defaults)}
+                          class={toolbarButtonClass}
+                          aria-label={$_('managePlaylists.resetPlaylist')}
+                          title={$_('managePlaylists.resetPlaylistHint')}
+                        >
+                          <RotateCcw size={14} />
+                        </button>
+                      {/if}
                       {#if playlist.kind === 'custom'}
                         <button
                           onclick={() => deletePlaylist(playlist)}
@@ -541,6 +568,23 @@
     </div>
     <div class="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-4">
       <button onclick={() => (showAddSong = false)} class={toolbarButtonClass}>{$_('managePlaylists.done')}</button>
+    </div>
+  </Modal>
+{/if}
+
+{#if showMigrate && data}
+  <Modal maxWidth="460px">
+    <div class="flex flex-col gap-3 px-5 py-4">
+      <h3 class="flex items-center gap-2 text-sm font-semibold">
+        <TriangleAlert size={16} class="text-amber-600 dark:text-amber-300" />
+        {$_('managePlaylists.migrateTitle')}
+      </h3>
+      <p class="text-[12.5px] text-muted-foreground">{$_('managePlaylists.migrateBody')}</p>
+      <p class="text-[12.5px] font-medium">{$_('managePlaylists.migrateBackup')}</p>
+    </div>
+    <div class="flex justify-end gap-2 border-t border-border px-5 py-4">
+      <button onclick={() => (showMigrate = false)} class={toolbarButtonClass}>{$_('managePlaylists.notNow')}</button>
+      <button onclick={handleSave} disabled={saveState === 'saving'} class={toolbarButtonClass}>{$_('managePlaylists.migrate')}</button>
     </div>
   </Modal>
 {/if}

@@ -5,7 +5,9 @@ import {
   excludedTracks,
   playlistIdError,
   playlistIdFromName,
-  playlistSnapshots,
+  isChanged,
+  playlistDefaults,
+  resetToDefault,
   playlistsToSave,
   removeTrack,
   setIncluded,
@@ -22,7 +24,8 @@ function playlist(overrides: Partial<ManagedPlaylist> = {}): ManagedPlaylist {
     id: 'bgmmario',
     name: 'Mario',
     kind: 'vanilla',
-    persisted: false,
+    series: [],
+    defaultTracks: null,
     tracks: [
       { bgmId: 'a', orders: all(0), incidences: all(100) },
       { bgmId: 'b', orders: all(1), incidences: all(100) }
@@ -110,15 +113,41 @@ describe('playlist ids', () => {
 })
 
 describe('saving', () => {
-  it('saves custom, already saved and changed playlists', () => {
+  it('saves custom and series-flagged playlists, and ones differing from their default', () => {
     const untouched = playlist({ id: 'bgmzelda' })
     const changed = playlist()
-    const saved = playlist({ id: 'bgmkirby', persisted: true })
+    const saved = playlist({ id: 'bgmkirby', defaultTracks: [] })
     const custom = playlist({ id: 'bgmmine', kind: 'custom' })
-    const loaded = playlistSnapshots([untouched, changed, saved, custom])
+    const flagged = playlist({ id: 'bgm_mix', kind: 'series', series: [{ id: 'dev', name: 'Dev' }] })
+    const defaults = playlistDefaults([untouched, changed, saved, custom, flagged])
     changed.tracks[0].incidences[0] = 5
 
-    expect(playlistsToSave([untouched, changed, saved, custom], loaded).map((p) => p.id)).toEqual(['bgmmario', 'bgmkirby', 'bgmmine'])
+    expect(playlistsToSave([untouched, changed, saved, custom, flagged], defaults).map((p) => p.id)).toEqual([
+      'bgmmario',
+      'bgmkirby',
+      'bgmmine',
+      'bgm_mix'
+    ])
+  })
+
+  it('resets a changed playlist to its default, which is then not saved', () => {
+    const saved = playlist({ defaultTracks: [{ bgmId: 'a', orders: all(0), incidences: all(100) }] })
+    const defaults = playlistDefaults([saved])
+    expect(isChanged(saved, defaults)).toBe(true)
+
+    resetToDefault(saved, defaults)
+
+    expect(ids(saved.tracks)).toEqual(['a'])
+    expect(isChanged(saved, defaults)).toBe(false)
+    expect(playlistsToSave([saved], defaults)).toEqual([])
+  })
+
+  it('never counts a custom playlist as changed', () => {
+    const custom = playlist({ kind: 'custom' })
+    const defaults = playlistDefaults([custom])
+    custom.tracks.pop()
+
+    expect(isChanged(custom, defaults)).toBe(false)
   })
 
   it('saves only stages that differ from the game', () => {
