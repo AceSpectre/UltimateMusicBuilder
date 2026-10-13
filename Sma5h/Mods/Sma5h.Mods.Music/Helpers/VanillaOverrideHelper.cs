@@ -47,9 +47,11 @@ namespace Sma5h.Mods.Music.Helpers
         }
 
         // An unchanged text keeps every translation; a changed one replaces them all.
+        // Line endings and edge whitespace are ignored, as CSV editors and trimming change them.
         private static void SetText(Dictionary<string, string> text, string value, string defaultLocale)
         {
-            if (string.IsNullOrEmpty(value) || text.GetValueOrDefault(VanillaLocale) == value) return;
+            static string Normalized(string s) => s?.Replace("\r\n", "\n").Trim();
+            if (string.IsNullOrEmpty(value) || Normalized(text.GetValueOrDefault(VanillaLocale)) == Normalized(value)) return;
             text.Clear();
             text[defaultLocale] = value;
         }

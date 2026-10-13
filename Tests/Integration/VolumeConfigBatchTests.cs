@@ -29,13 +29,10 @@ namespace Tests.Integration
         private VolumeConfigService CreateService(
             Mock<ILufsAnalysisService> lufs = null,
             Mock<IAudioDecodeService> decode = null,
-            VanillaCatalogService.Catalog catalog = null,
-            bool applyVolumeToVanilla = false)
+            VanillaCatalogService.Catalog catalog = null)
         {
-            var options = _env.CreateMusicOptions();
-            options.CurrentValue.Sma5hMusic.ApplyVolumeToVanilla = applyVolumeToVanilla;
             return new VolumeConfigService(
-                options,
+                _env.CreateMusicOptions(),
                 (lufs ?? new Mock<ILufsAnalysisService>()).Object,
                 (decode ?? new Mock<IAudioDecodeService>()).Object,
                 TestCatalog.Service(catalog),
@@ -190,34 +187,16 @@ namespace Tests.Integration
 
         // ── RunAnalyzeBatch ─────────────────────────────────────────────────
 
-        /// <summary>An existing-series mario folder with one mod track; the catalog adds two vanilla rows.</summary>
-        private string SetupMarioSeries()
+        [Fact]
+        public void RunAnalyzeBatch_ListsVanillaSongsWithTheirBankVolumeAndNoAutoGain()
         {
             var seriesDir = SetupSeries("mario", ("a.nus3audio", "0"));
             File.WriteAllText(Path.Combine(seriesDir, "series.toml"),
                 "[series]\nid = \"mario\"\nexisting-series = true\n\n[[games]]\nid = \"smb\"\nname = \"Super Mario Bros.\"\n");
-            return seriesDir;
-        }
-
-        [Fact]
-        public void RunAnalyzeBatch_HidesVanillaSongsUnlessApplyVolumeToVanilla()
-        {
-            var seriesDir = SetupMarioSeries();
-            var outputPath = Path.Combine(_env.TempDir, "analyze-hidden.json");
-
-            CreateService(ValidLufsMock(lufs: -18.0f, gain: 2.5f, available: true), catalog: TestCatalog.Mario()).RunAnalyzeBatch(WriteJson(new { seriesPath = seriesDir, outputPath }));
-
-            Assert.Equal(new[] { "a.nus3audio" }, ReadResult(outputPath).Items.Select(i => i.Filename));
-        }
-
-        [Fact]
-        public void RunAnalyzeBatch_ListsVanillaSongsWithTheirBankVolumeAndNoAutoGain()
-        {
-            var seriesDir = SetupMarioSeries();
             var outputPath = Path.Combine(_env.TempDir, "analyze-vanilla.json");
             var lufs = ValidLufsMock(lufs: -18.0f, gain: 2.5f, available: true);
 
-            CreateService(lufs, catalog: TestCatalog.Mario(), applyVolumeToVanilla: true).RunAnalyzeBatch(WriteJson(new { seriesPath = seriesDir, outputPath, analyze = true }));
+            CreateService(lufs, catalog: TestCatalog.Mario()).RunAnalyzeBatch(WriteJson(new { seriesPath = seriesDir, outputPath, analyze = true }));
 
             var result = ReadResult(outputPath);
             Assert.Equal(new[] { "a.nus3audio", "ui_bgm_a01_smb_chijyou", "ui_bgm_a05_smb3_hikousen" }, result.Items.Select(i => i.Filename));

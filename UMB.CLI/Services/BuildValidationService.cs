@@ -168,7 +168,7 @@ namespace UMB.CLI.Services
                                 if (rowNum == 1) // only warn once per file
                                     warnings.Add($"  {prefix}: tracks.csv is missing the \"order\" column");
                             }
-                            else
+                            else if (!FolderMusicMod.IsVanillaBgmId(filename))
                             {
                                 var orderVal = csv.GetField("order")?.Trim() ?? "";
                                 if (string.IsNullOrWhiteSpace(orderVal) || !int.TryParse(orderVal, out _))

@@ -4,8 +4,9 @@ import type { LogLine } from './cli'
 
 // spawnCliAction is mocked; asserts the temp-file marshalling and cleanup.
 
-const mocks = vi.hoisted(() => ({ spawnCliAction: vi.fn() }))
+const mocks = vi.hoisted(() => ({ spawnCliAction: vi.fn(), settings: { globalVolumeDb: 3.5, applyVolumeToVanilla: false } }))
 vi.mock('./cli', () => ({ spawnCliAction: mocks.spawnCliAction }))
+vi.mock('./app-settings', () => ({ getAppSettings: () => mocks.settings }))
 
 import { loadVolumeConfig, saveVolumeConfig, decodeTrackPreview } from './config-volume'
 
@@ -44,7 +45,6 @@ function stubCli(produce?: (input: any) => void): void {
 
 const ANALYZE_RESULT = {
   seriesName: 'dev',
-  globalDb: 3.5,
   seriesDb: -2,
   targetLufs: -14,
   maxGainDb: 12,
@@ -68,6 +68,7 @@ const ANALYZE_RESULT = {
 
 beforeEach(() => {
   mocks.spawnCliAction.mockReset()
+  mocks.settings = { globalVolumeDb: 3.5, applyVolumeToVanilla: false }
   captured = null
   lines = []
 })
@@ -98,7 +99,16 @@ describe('loadVolumeConfig', () => {
 
     const data = await loadVolumeConfig(WS, SERIES, true, onLine)
 
-    expect(data).toEqual({ ...ANALYZE_RESULT, seriesPath: SERIES })
+    expect(data).toEqual({ ...ANALYZE_RESULT, seriesPath: SERIES, globalDb: 3.5 })
+  })
+
+  it('lists vanilla songs only when applyVolumeToVanilla is on', async () => {
+    const vanilla = { ...ANALYZE_RESULT.items[0], originalIndex: 1, filename: 'ui_bgm_a01_smb_chijyou', isVanilla: true }
+    stubCli((input) => writeFileSync(input.outputPath, JSON.stringify({ ...ANALYZE_RESULT, items: [...ANALYZE_RESULT.items, vanilla] }), 'utf-8'))
+
+    expect((await loadVolumeConfig(WS, SERIES, false, onLine)).items.map((i) => i.originalIndex)).toEqual([0])
+    mocks.settings.applyVolumeToVanilla = true
+    expect((await loadVolumeConfig(WS, SERIES, false, onLine)).items.map((i) => i.originalIndex)).toEqual([0, 1])
   })
 
   it('falls back to the folder name when the CLI reports no series name', async () => {
@@ -116,7 +126,6 @@ describe('loadVolumeConfig', () => {
         input.outputPath,
         JSON.stringify({
           seriesName: 'dev',
-          globalDb: 3.5,
           targetLufs: -14,
           maxGainDb: 12,
           ffmpegAvailable: true
@@ -138,7 +147,7 @@ describe('loadVolumeConfig', () => {
     expect(data).toEqual({
       seriesName: 'dev',
       seriesPath: SERIES,
-      globalDb: 0,
+      globalDb: 3.5,
       seriesDb: 0,
       targetLufs: -14,
       maxGainDb: 12,

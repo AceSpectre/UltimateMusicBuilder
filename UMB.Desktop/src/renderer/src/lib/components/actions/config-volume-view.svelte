@@ -2,9 +2,10 @@
   import { Volume2, RefreshCw, Play, Square, AlertTriangle, Activity } from '@lucide/svelte'
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
-  import { logStore } from '$lib/stores/logs.svelte'
+  import { logStore } from '$lib/stores/logs.svelte'
   import { trackUnsaved } from '$lib/stores/unsaved.svelte'
   import { modsStore } from '$lib/stores/mods.svelte'
+  import { settingsStore } from '$lib/stores/settings.svelte'
   import { createSeriesLoader } from '$lib/series-loader'
   import { DB_INPUT, dbToGain, formatBankDb, formatDb, parseDb } from '$lib/volume'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
@@ -236,6 +237,21 @@
       modsStore.pendingConfigVolumePath = null
       selectedPath = pending
       void loadConfig(pending)
+    })
+  })
+
+  // Settings changed (global boost, vanilla rows): reload the open series, keeping unsaved edits.
+  $effect(() => {
+    if (!settingsStore.version) return
+    untrack(async () => {
+      const path = selectedPath
+      if (!path || analyzing) return
+      const edits = new Map(rows.map((r) => [r.originalIndex, r.trackDb]))
+      const editedSeriesDb = seriesDb
+      await loadConfig(path)
+      if (path !== selectedPath) return
+      rows = rows.map((r) => ({ ...r, trackDb: edits.get(r.originalIndex) ?? r.trackDb }))
+      seriesDb = editedSeriesDb
     })
   })
 

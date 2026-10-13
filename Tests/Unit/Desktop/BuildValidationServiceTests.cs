@@ -47,6 +47,14 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
+        public void Validate_DoesNotNeedAnOrderForVanillaRows()
+        {
+            _ws.WriteSeries("persona", "persona", "filename,title,game,order\nui_bgm_quiet,Quiet,game,\n");
+
+            Assert.DoesNotContain(_service.Validate("persona").Warnings, w => w.Contains("order number"));
+        }
+
+        [Fact]
         public void Validate_AddsTheGlobalBoost()
         {
             _ws.Options.Sma5hMusic.GlobalVolumeDb = 6f;

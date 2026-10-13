@@ -4,7 +4,7 @@
   import { _ } from 'svelte-i18n'
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
-  import { modsStore } from '$lib/stores/mods.svelte'
+  import { modsStore } from '$lib/stores/mods.svelte'
   import { trackUnsaved } from '$lib/stores/unsaved.svelte'
   import { createSeriesSelection } from '$lib/series-selection.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'

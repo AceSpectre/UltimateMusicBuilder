@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs'
 import { basename } from 'path'
 import { spawnCliAction, type LogLine } from './cli'
+import { getAppSettings } from './app-settings'
 import { tempPath } from './utils'
 import type { VolumeConfigData, VolumeOverride, VolumeRowItem } from '../shared/types'
 
@@ -9,7 +10,6 @@ export type { VolumeConfigData, VolumeOverride, VolumeRowItem } from '../shared/
 /** What the CLI config-volume-analyze action writes to its output file. */
 interface VolumeAnalyzeResult {
   seriesName: string
-  globalDb: number
   seriesDb: number
   targetLufs: number
   maxGainDb: number
@@ -21,6 +21,8 @@ interface VolumeAnalyzeResult {
 /**
  * Runs LUFS analysis for every track in a series via the CLI and returns the
  * per-track loudness / auto-gain / override data for the renderer to display.
+ * The app settings are read here, not by the CLI daemon, which only sees a saved change
+ * once its file watcher fires. Vanilla rows are listed only with applyVolumeToVanilla.
  */
 export async function loadVolumeConfig(
   workspace: string,
@@ -28,6 +30,7 @@ export async function loadVolumeConfig(
   analyze: boolean,
   onLine: (line: LogLine) => void
 ): Promise<VolumeConfigData> {
+  const settings = getAppSettings(workspace)
   const outputPath = tempPath('umb-volume-analyze', 'json')
   const inputPath = tempPath('umb-volume-analyze-in', 'json')
   writeFileSync(inputPath, JSON.stringify({ seriesPath, outputPath, analyze }, null, 2), 'utf-8')
@@ -39,7 +42,7 @@ export async function loadVolumeConfig(
       return {
         seriesName: basename(seriesPath),
         seriesPath,
-        globalDb: 0,
+        globalDb: settings.globalVolumeDb,
         seriesDb: 0,
         targetLufs: -14,
         maxGainDb: 12,
@@ -53,13 +56,13 @@ export async function loadVolumeConfig(
     return {
       seriesName: result.seriesName || basename(seriesPath),
       seriesPath,
-      globalDb: result.globalDb,
+      globalDb: settings.globalVolumeDb,
       seriesDb: result.seriesDb,
       targetLufs: result.targetLufs,
       maxGainDb: result.maxGainDb,
       ffmpegAvailable: result.ffmpegAvailable,
       lufsCacheExists: result.lufsCacheExists ?? false,
-      items: result.items ?? []
+      items: (result.items ?? []).filter((i) => settings.applyVolumeToVanilla || !i.isVanilla)
     }
   } finally {
     try { unlinkSync(inputPath) } catch { /* ignore */ }

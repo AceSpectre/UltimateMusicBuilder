@@ -10,7 +10,9 @@ export function trackUnsaved(isDirty: () => boolean, save: () => Promise<void>):
     unsavedStore.dirty = isDirty()
     unsavedStore.save = save
   })
+  // Only clear our own registration: the next view may already have registered.
   $effect(() => () => {
+    if (unsavedStore.save !== save) return
     unsavedStore.dirty = false
     unsavedStore.save = null
   })

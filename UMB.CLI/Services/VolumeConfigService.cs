@@ -64,14 +64,13 @@ namespace UMB.CLI.Services
         public float TrackDb { get; set; }
         /// <summary>nus3bank volume (dB) of the track with no boosts; the boosts are added to it.</summary>
         public float BankBaseDb { get; set; } = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB;
-        /// <summary>A vanilla song: no auto-gain. Only listed with ApplyVolumeToVanilla.</summary>
+        /// <summary>A vanilla song: no auto-gain, and the desktop app lists it only with ApplyVolumeToVanilla.</summary>
         public bool IsVanilla { get; set; }
     }
 
     public class VolumeAnalyzeResultDto
     {
         public string SeriesName { get; set; }
-        public float GlobalDb { get; set; }
         public double SeriesDb { get; set; }
         public float TargetLufs { get; set; }
         public float MaxGainDb { get; set; }
@@ -301,7 +300,6 @@ namespace UMB.CLI.Services
             var maxGainDb = lufsOpts.MaxGainDb;
             var lufsCacheName = string.IsNullOrWhiteSpace(lufsOpts.LufsCacheFileName) ? "LUFS.csv" : lufsOpts.LufsCacheFileName;
             var lufsCacheExists = File.Exists(Path.Combine(seriesDir, lufsCacheName));
-            var applyToVanilla = _musicConfig.CurrentValue.Sma5hMusic.ApplyVolumeToVanilla;
 
             if (input.Analyze && !_lufsService.IsAvailable)
                 _logger.LogWarning("FFmpeg is not available — auto-gain values cannot be calculated. Overrides can still be edited.");
@@ -330,13 +328,12 @@ namespace UMB.CLI.Services
             WriteAnalyzeResult(input.OutputPath, new VolumeAnalyzeResultDto
             {
                 SeriesName = Path.GetFileName(seriesDir),
-                GlobalDb = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeDb,
                 SeriesDb = SeriesToml.ReadVolumeDb(seriesDir),
                 TargetLufs = target,
                 MaxGainDb = maxGainDb,
                 FfmpegAvailable = _lufsService.IsAvailable,
                 LufsCacheExists = lufsCacheExists,
-                Items = dtos.Where(d => applyToVanilla || !d.IsVanilla).ToList(),
+                Items = dtos.ToList(),
             });
             _logger.LogInformation("Volume analysis written for {Count} track(s).", dtos.Length);
         }

@@ -113,6 +113,10 @@
   async function handleWindowControl(action: 'minimize' | 'fullscreen' | 'close') {
     diagnostics.windowClicks += 1
     diagnostics.lastWindowRequest = action
+    if (action === 'close' && unsavedStore.dirty) {
+      pendingLeave = () => void window.electron.umb.windowClose()
+      return
+    }
     try {
       let result: WindowActionResult
       if (action === 'minimize') {

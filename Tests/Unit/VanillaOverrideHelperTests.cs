@@ -58,6 +58,18 @@ namespace Tests.Unit
         }
 
         [Fact]
+        public void Apply_IgnoresLineEndingAndEdgeWhitespaceDifferences()
+        {
+            _song.Copyright["us_en"] = "Composition: Nintendo\r\nArrangement: HAL";
+            _song.Copyright["jp_ja"] = "作曲: 任天堂";
+            var edit = Edit();
+            edit.Copyright = "Composition: Nintendo\nArrangement: HAL ";
+            Apply(edit);
+
+            Assert.Equal(2, _song.Copyright.Count);
+        }
+
+        [Fact]
         public void Apply_ReplacesEveryTranslationOfAChangedText()
         {
             var edit = Edit();
