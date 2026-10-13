@@ -145,10 +145,6 @@
         e.preventDefault()
         commandPaletteOpen = !commandPaletteOpen
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
-        e.preventDefault()
-        logStore.toggleDrawer()
-      }
     }
 
     window.addEventListener('keydown', handleKeydown)
@@ -207,7 +203,6 @@
         <span class={bridgeFailed ? 'text-destructive dark:text-sb-ink' : ''}>{$_('statusBar.bridge', { values: { status: diagnostics.bridgeStatus } })}</span>
         <span class="flex-1"></span>
         <span>{$_('statusBar.palette')}</span>
-        <span>{$_('statusBar.console')}</span>
       </footer>
     </div>
   </div>

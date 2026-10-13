@@ -163,15 +163,15 @@ test('command palette lists mods and selecting one sets the active mod', async (
   await expect(page.getByText('mod selections: 1 / test-mod')).toBeVisible()
 })
 
-test('bottom panel collapses and re-expands on Ctrl+J', async () => {
+test('bottom panel hides and re-shows from its header buttons', async () => {
   const page = await firstWindow(app)
   await openBottomPanel(page)
 
-  await page.keyboard.press('Control+j')
+  await page.getByRole('button', { name: 'Hide panel' }).click()
   await expect(page.getByRole('button', { name: 'Show panel' })).toBeVisible()
   await expect(page.getByText('Runtime Debug')).toBeHidden()
 
-  await page.keyboard.press('Control+j')
+  await page.getByRole('button', { name: 'Show panel' }).click()
   await expect(page.getByText('Runtime Debug')).toBeVisible()
 })
 

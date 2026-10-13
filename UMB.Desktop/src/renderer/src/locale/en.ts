@@ -146,8 +146,7 @@ export default {
   },
   statusBar: {
     bridge: 'bridge {status}',
-    palette: '^K palette',
-    console: '^J console'
+    palette: '^K palette'
   },
   unsaved: {
     title: 'Unsaved changes',
