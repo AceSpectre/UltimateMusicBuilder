@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
 using Sma5h.Mods.Music.Models;
-using Sma5h.Mods.Music.Models.PlaylistEntryModels;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -28,6 +27,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         private readonly IAudioMetadataService _audioMetadataService;
         private readonly string _modPath;
         private readonly FolderMusicModInformation _modInfo;
+        private readonly bool _readAudioMetadata;
 
         public string Id => _modInfo.Id;
         public string Name => _modInfo.Name;
@@ -40,8 +40,10 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         /// </summary>
         public static Dictionary<string, HashSet<string>> SeriesFilterByMod { get; set; }
 
-        public FolderMusicMod(ILogger<IMusicMod> logger, IAudioMetadataService audioMetadataService, string modPath)
+        /// <param name="readAudioMetadata">False skips reading each song's length and loop points, for callers that only need the entries.</param>
+        public FolderMusicMod(ILogger<IMusicMod> logger, IAudioMetadataService audioMetadataService, string modPath, bool readAudioMetadata = true)
         {
+            _readAudioMetadata = readAudioMetadata;
             _logger = logger;
             _audioMetadataService = audioMetadataService;
             _modPath = modPath;
@@ -53,6 +55,19 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         {
             var output = new MusicModEntries();
             var seenToneIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var playlistsPath = Path.Combine(_modPath, MusicConstants.MusicModFiles.FOLDER_MOD_PLAYLISTS_TOML_FILE);
+            if (File.Exists(playlistsPath))
+            {
+                try
+                {
+                    ReadPlaylistsFile(playlistsPath, output);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "Failed to parse {Path}.", playlistsPath);
+                }
+            }
 
             foreach (var subfolder in Directory.GetDirectories(_modPath).OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
             {
@@ -299,31 +314,32 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     {
                         AudioVolume = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB + seriesDb + row.VolumeDb
                     };
-                    try
-                    {
-                        AudioCuePoints cuePoints = null;
+                    if (_readAudioMetadata)
+                        try
+                        {
+                            AudioCuePoints cuePoints = null;
 
-                        // For .nus3audio files, parse the inner OPUS header directly.
-                        // VGMStream cannot open nus3audio containers, producing NaN-based garbage values.
-                        if (Path.GetExtension(audioFile).Equals(".nus3audio", StringComparison.OrdinalIgnoreCase))
-                            cuePoints = ReadNus3AudioOpusCuePoints(audioFile);
+                            // For .nus3audio files, parse the inner OPUS header directly.
+                            // VGMStream cannot open nus3audio containers, producing NaN-based garbage values.
+                            if (Path.GetExtension(audioFile).Equals(".nus3audio", StringComparison.OrdinalIgnoreCase))
+                                cuePoints = ReadNus3AudioOpusCuePoints(audioFile);
 
-                        // For other formats, use the audio metadata service (VGMStream)
-                        if (cuePoints == null)
-                            cuePoints = _audioMetadataService.GetCuePoints(audioFile).GetAwaiter().GetResult();
+                            // For other formats, use the audio metadata service (VGMStream)
+                            if (cuePoints == null)
+                                cuePoints = _audioMetadataService.GetCuePoints(audioFile).GetAwaiter().GetResult();
 
-                        bgmProp.TotalTimeMs = cuePoints.TotalTimeMs;
-                        bgmProp.TotalSamples = cuePoints.TotalSamples;
-                        bgmProp.LoopStartMs = cuePoints.LoopStartMs;
-                        bgmProp.LoopStartSample = cuePoints.LoopStartSample;
-                        bgmProp.LoopEndMs = cuePoints.LoopEndMs;
-                        bgmProp.LoopEndSample = cuePoints.LoopEndSample;
-                        _logger.LogInformation("Audio metadata for {ToneId}: {TotalTimeMs}ms, {TotalSamples} samples.", toneId, cuePoints.TotalTimeMs, cuePoints.TotalSamples);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Could not read audio metadata for {Filename}. Song length will show as 0.", row.Filename);
-                    }
+                            bgmProp.TotalTimeMs = cuePoints.TotalTimeMs;
+                            bgmProp.TotalSamples = cuePoints.TotalSamples;
+                            bgmProp.LoopStartMs = cuePoints.LoopStartMs;
+                            bgmProp.LoopStartSample = cuePoints.LoopStartSample;
+                            bgmProp.LoopEndMs = cuePoints.LoopEndMs;
+                            bgmProp.LoopEndSample = cuePoints.LoopEndSample;
+                            _logger.LogInformation("Audio metadata for {ToneId}: {TotalTimeMs}ms, {TotalSamples} samples.", toneId, cuePoints.TotalTimeMs, cuePoints.TotalSamples);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Could not read audio metadata for {Filename}. Song length will show as 0.", row.Filename);
+                        }
                     output.BgmPropertyEntries.Add(bgmProp);
 
                     playlistTracks.Add((uiBgmId, seriesFile.Series.PlaylistIncidence));
@@ -352,7 +368,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 if (playlistTracks.Count > 0)
                 {
                     // Invariant: bgm_gametitle_{series_id} is always populated with every song.
-                    var gametitlePlaylistId = "bgm_gametitle_" + seriesFile.Series.Id;
+                    var gametitlePlaylistId = PlaylistHelper.GameTitlePlaylistPrefix + seriesFile.Series.Id;
                     output.PlaylistEntries.Add(BuildPlaylistEntry(gametitlePlaylistId, playlistTracks));
                     _logger.LogInformation("Created playlist {PlaylistId} with {TrackCount} track(s).", gametitlePlaylistId, playlistTracks.Count);
 
@@ -515,33 +531,36 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         private static PlaylistEntry BuildPlaylistEntry(string playlistId, List<(string uiBgmId, int incidence)> tracks)
         {
             var entry = new PlaylistEntry(playlistId);
-            for (var i = 0; i < tracks.Count; i++)
-            {
-                var (uiBgmId, incidence) = tracks[i];
-                var incidenceVal = (ushort)Math.Clamp(incidence, 0, ushort.MaxValue);
-                entry.Tracks.Add(new PlaylistValueEntry
-                {
-                    UiBgmId     = uiBgmId,
-                    Order0      = (short)i,
-                    Incidence0  = incidenceVal,
-                    Order1      = (short)i, Incidence1  = incidenceVal,
-                    Order2      = (short)i, Incidence2  = incidenceVal,
-                    Order3      = (short)i, Incidence3  = incidenceVal,
-                    Order4      = (short)i, Incidence4  = incidenceVal,
-                    Order5      = (short)i, Incidence5  = incidenceVal,
-                    Order6      = (short)i, Incidence6  = incidenceVal,
-                    Order7      = (short)i, Incidence7  = incidenceVal,
-                    Order8      = (short)i, Incidence8  = incidenceVal,
-                    Order9      = (short)i, Incidence9  = incidenceVal,
-                    Order10     = (short)i, Incidence10 = incidenceVal,
-                    Order11     = (short)i, Incidence11 = incidenceVal,
-                    Order12     = (short)i, Incidence12 = incidenceVal,
-                    Order13     = (short)i, Incidence13 = incidenceVal,
-                    Order14     = (short)i, Incidence14 = incidenceVal,
-                    Order15     = (short)i, Incidence15 = incidenceVal
-                });
-            }
+            entry.Tracks.AddRange(tracks.Select((t, i) => PlaylistHelper.Track(t.uiBgmId, (short)i, (ushort)Math.Clamp(t.incidence, 0, ushort.MaxValue))));
             return entry;
+        }
+
+        private static void ReadPlaylistsFile(string tomlPath, MusicModEntries output)
+        {
+            var file = Toml.ToModel<FolderPlaylistsFileConfig>(File.ReadAllText(tomlPath), options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
+            foreach (var playlist in file.Playlists.Where(p => !string.IsNullOrWhiteSpace(p.Id)))
+            {
+                var entry = new PlaylistEntry(playlist.Id, playlist.Name);
+                entry.Tracks.AddRange(playlist.Tracks.Where(t => !string.IsNullOrWhiteSpace(t.Song))
+                    .Select(t => PlaylistHelper.Track(t.Song, Slots<short>(t.Order, 0), Slots<ushort>(t.Incidence, 100))));
+                output.PlaylistOverrides.Add(entry);
+            }
+            foreach (var stage in file.Stages.Where(s => !string.IsNullOrWhiteSpace(s.Id) && !string.IsNullOrWhiteSpace(s.Playlist)))
+                output.StageAssignments.Add(new StagePlaylistAssignment(stage.Id, stage.Playlist, (byte)Math.Clamp(stage.Order, 0, PlaylistHelper.OrderCount - 1)));
+        }
+
+        /// <summary>One value per order slot from a single value or an array (missing slots use the fallback).</summary>
+        private static T[] Slots<T>(object value, T fallback)
+        {
+            var values = value switch
+            {
+                null => Array.Empty<object>(),
+                System.Collections.IEnumerable list and not string => list.Cast<object>().ToArray(),
+                _ => Enumerable.Repeat(value, PlaylistHelper.OrderCount).ToArray()
+            };
+            return Enumerable.Range(0, PlaylistHelper.OrderCount)
+                .Select(i => i < values.Length ? (T)Convert.ChangeType(values[i], typeof(T), CultureInfo.InvariantCulture) : fallback)
+                .ToArray();
         }
 
         private static string ToKebabCase(string name)

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Sma5h;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music;
+using Sma5h.Mods.Music.Interfaces;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using Sma5h.Mods.Music.Services;
 using Spectre.Console;
@@ -121,6 +122,29 @@ namespace Tests.Integration
 
             Assert.True(ArcOutputFiles().Length > 0,
                 "Single-mod non-interactive build should produce ArcOutput files");
+        }
+
+        [Fact]
+        public void Run_AppliesPlaylistsTomlPlaylistsAndStages()
+        {
+            var modDir = _env.CreateConfiguredMod("test-mod");
+            File.WriteAllText(Path.Combine(modDir, "playlists.toml"),
+                "[[playlists]]\nid = \"bgmmine\"\nname = \"Mine\"\ntracks = [\n" +
+                "    { song = \"ui_bgm_a01_smb_chijyou\", order = [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], incidence = 50 },\n" +
+                "]\n\n[[stages]]\nid = \"ui_stage_battle_field\"\nplaylist = \"bgmmine\"\norder = 3\n");
+            var (build, sp) = CreateBuildService();
+            using (sp)
+            {
+                build.Run("test-mod");
+
+                var audioState = sp.GetRequiredService<IAudioStateService>();
+                var mine = audioState.GetPlaylists().Single(p => p.Id == "bgmmine");
+                var stage = audioState.GetStagesEntries().Single(s => s.UiStageId == "ui_stage_battle_field");
+
+                var track = Assert.Single(mine.Tracks);
+                Assert.Equal(("ui_bgm_a01_smb_chijyou", (short)1, (short)0, (ushort)50), (track.UiBgmId, track.Order0, track.Order1, track.Incidence15));
+                Assert.Equal(("bgmmine", (byte)3), (stage.BgmSetId, stage.BgmSettingNo));
+            }
         }
     }
 }

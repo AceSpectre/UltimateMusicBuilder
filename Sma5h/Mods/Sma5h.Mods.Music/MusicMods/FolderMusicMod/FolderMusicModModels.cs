@@ -66,6 +66,38 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         public List<FolderSongPresetConfig> Presets { get; set; } = new();
     }
 
+    /// <summary>
+    /// A playlists.toml track. Order and incidence are one value for every order slot, or an
+    /// array with one value per slot (0-15). Stored as object because Tomlyn maps the two shapes differently.
+    /// </summary>
+    public class FolderPlaylistTrackConfig
+    {
+        public string Song { get; set; }
+        public object Order { get; set; }
+        public object Incidence { get; set; }
+    }
+
+    public class FolderPlaylistConfig
+    {
+        public string Id { get; set; }
+        public string Name { get; set; }
+        public List<FolderPlaylistTrackConfig> Tracks { get; set; } = new();
+    }
+
+    public class FolderStageConfig
+    {
+        public string Id { get; set; }
+        public string Playlist { get; set; }
+        public int Order { get; set; }
+    }
+
+    /// <summary>Root POCO for the mod-level playlists.toml.</summary>
+    public class FolderPlaylistsFileConfig
+    {
+        public List<FolderPlaylistConfig> Playlists { get; set; } = new();
+        public List<FolderStageConfig> Stages { get; set; } = new();
+    }
+
     // ── CSV models (CsvHelper mapping) ───────────────────────────────────────
 
     public class FolderTrackCsvRow
