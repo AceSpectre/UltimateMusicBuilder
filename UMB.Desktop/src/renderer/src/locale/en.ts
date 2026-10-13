@@ -10,6 +10,13 @@ export default {
     cleanupDescription: 'Remove generated output and temporary build files.',
     importButton: 'Import',
     importDescription: 'Import a Sma5h mod into UMB folder format.',
+    importNote: 'Sma5h → UMB',
+    outputNotEmpty: 'ArcOutput/ not empty, will be overwritten',
+    destructive: 'Destructive',
+    facts: {
+      target: 'Target',
+      globalVolume: 'Global dB boost'
+    },
     importModal: {
       title: 'Import Sma5h Mod',
       subtitle: 'Convert a Sma5h mod into UMB folder format.',
@@ -106,9 +113,9 @@ export default {
     mods: 'Mods'
   },
   bottomPanel: {
-    collapsedLabel: 'bottom panel',
     show: 'Show panel',
-    title: 'Bottom Panel',
+    hide: 'Hide panel',
+    clear: 'Clear console',
     logLines: '{count} log lines',
     console: 'Console',
     runtimeDebug: 'Runtime Debug',
@@ -133,6 +140,11 @@ export default {
       windowAck: 'window ack:',
       lastError: 'last error:'
     }
+  },
+  statusBar: {
+    bridge: 'bridge {status}',
+    palette: '^K palette',
+    console: '^J console'
   },
   unsaved: {
     title: 'Unsaved changes',

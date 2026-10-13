@@ -5,9 +5,7 @@
   import Minus from '@lucide/svelte/icons/minus'
   import Square from '@lucide/svelte/icons/square'
   import X from '@lucide/svelte/icons/x'
-  import FolderTree from '@lucide/svelte/icons/folder-tree'
   import ChevronDown from '@lucide/svelte/icons/chevron-down'
-  import Folder from '@lucide/svelte/icons/folder'
   import Sun from '@lucide/svelte/icons/sun'
   import Moon from '@lucide/svelte/icons/moon'
   import Settings from '@lucide/svelte/icons/settings'
@@ -30,6 +28,9 @@
     onSelectMod: (mod: ModInfo) => void
     onWindowControlAttempt: (action: 'minimize' | 'fullscreen' | 'close') => void | Promise<void>
   } = $props()
+
+  const iconButton =
+    'flex h-[26px] w-[26px] items-center justify-center rounded text-dim transition-colors duration-100 hover:bg-accent hover:text-foreground'
 
   let settingsOpen = $state(false)
   let pickerOpen = $state(false)
@@ -91,131 +92,91 @@
   })
 </script>
 
-<div class="drag-region flex flex-col shrink-0">
-  <div class="h-[2px] gradient-strip"></div>
+<div class="drag-region surface-grain flex h-[46px] shrink-0 items-center gap-3 border-b border-border bg-card px-3 {platform === 'darwin' ? 'pl-[84px]' : ''}">
+  <div class="no-drag flex items-baseline gap-[9px]">
+    <span class="text-[13px] font-semibold tracking-[-.01em]">{$_('appBar.brand')}</span>
+    <span class="text-[11.5px] text-dim">{$_('appBar.version', { values: { version } })}</span>
+  </div>
 
-  <div class="h-14 flex items-center gap-3 px-4 bg-card border-b border-border {platform === 'darwin' ? 'pl-[84px]' : ''}">
-    <div class="flex items-center gap-2.5 no-drag">
-      <div
-        class="w-[30px] h-[30px] rounded-lg gradient-bg flex items-center justify-center text-white font-bold text-sm tracking-wider"
-        style="box-shadow: 0 4px 12px -2px hsl(var(--gradient-from) / .4);"
-      >
-        U
-      </div>
-      <div class="flex flex-col leading-tight">
-        <span class="font-bold text-sm tracking-[.02em]">{$_('appBar.brand')}</span>
-        <span class="font-mono text-[10.5px] text-muted-foreground">{$_('appBar.version', { values: { version } })}</span>
-      </div>
-    </div>
-
-    <div bind:this={pickerEl} class="relative no-drag w-[320px] shrink-0">
-      <button
-        onclick={togglePicker}
-        class="flex items-center gap-2 w-full h-9 px-3 rounded-lg border border-input bg-background transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-70"
-        disabled={loading || mods.length === 0}
-      >
-        <Folder size={14} class="text-muted-foreground shrink-0" />
-        <div class="flex flex-col items-start leading-tight flex-1 min-w-0">
-          <span class="font-mono text-[10.5px] text-muted-foreground">{$_('appBar.modsRoot')}</span>
-          <span class="text-[13px] font-semibold truncate w-full text-left">
-            {loading
-              ? $_('appBar.loadingMods')
-              : activeMod?.name ?? $_('appBar.noModSelected')}
-          </span>
-        </div>
-        <ChevronDown size={14} class="text-muted-foreground shrink-0 transition-transform {pickerOpen ? 'rotate-180' : ''}" />
-      </button>
-
-      {#if pickerOpen}
-        <div class="absolute left-0 right-0 top-[calc(100%+8px)] z-40 overflow-hidden rounded-xl border border-border bg-popover shadow-2xl">
-          <div class="border-b border-border px-3 py-2.5">
-            <div class="text-[10.5px] font-semibold uppercase tracking-[.12em] text-muted-foreground">{$_('appBar.selectMod')}</div>
-          </div>
-
-          <div class="max-h-[320px] overflow-y-auto p-2">
-            {#each mods as mod}
-              <button
-                onclick={() => selectMod(mod)}
-                class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-accent {activeMod?.path === mod.path ? 'bg-accent/70' : ''}"
-              >
-                <div
-                  class="flex h-8 w-8 items-center justify-center rounded-lg border border-border"
-                  style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .12), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-                >
-                  <Folder size={14} />
-                </div>
-                <div class="min-w-0 flex-1">
-                  <div class="truncate text-[13px] font-semibold">{mod.name}</div>
-                  <div class="truncate text-[11px] text-muted-foreground">{$_('appBar.modPath', { values: { name: mod.name } })}</div>
-                </div>
-                {#if activeMod?.path === mod.path}
-                  <Check size={14} class="shrink-0 text-[hsl(var(--gradient-from))]" />
-                {/if}
-              </button>
-            {/each}
-          </div>
-        </div>
-      {/if}
-    </div>
-
-    <div class="flex-1"></div>
-
-    <div class="no-drag flex items-center gap-1.5">
-      <span class="inline-flex items-center gap-1 px-2 h-[22px] rounded-full border border-border bg-muted text-[11px] font-medium text-muted-foreground tracking-[.02em]">
-        <FolderTree size={11} />
-        {$_('appBar.seriesCount', { values: { value: activeMod ? (stats?.seriesCount ?? '—') : '0' } })}
-      </span>
-      <span class="inline-flex items-center gap-1 px-2 h-[22px] rounded-full border border-border bg-muted text-[11px] font-medium text-muted-foreground tracking-[.02em]">
-        {$_('appBar.tracksCount', { values: { value: activeMod ? (stats?.trackCount ?? '—') : '0' } })}
-      </span>
-    </div>
-
+  <div bind:this={pickerEl} class="relative no-drag min-w-[260px] shrink-0">
     <button
-      onclick={() => themeStore.toggle()}
-      class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
-      title={themeStore.current === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      onclick={togglePicker}
+      class="flex h-7 w-full items-center gap-0.5 rounded border border-border bg-rail px-[9px] text-[12px] transition-colors duration-100 hover:border-dim disabled:cursor-not-allowed disabled:opacity-45"
+      disabled={loading || mods.length === 0}
     >
-      {#if themeStore.current === 'dark'}
-        <Sun size={15} class="text-muted-foreground" />
-      {:else}
-        <Moon size={15} class="text-muted-foreground" />
-      {/if}
+      <span class="text-dim">{$_('appBar.modsRoot')}</span>
+      <span class="min-w-0 truncate font-medium">
+        {loading
+          ? $_('appBar.loadingMods')
+          : activeMod?.name ?? $_('appBar.noModSelected')}
+      </span>
+      <span class="flex-1"></span>
+      <ChevronDown size={13} class="shrink-0 text-dim" />
     </button>
 
-    <button
-      onclick={() => { settingsOpen = true }}
-      class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
-      title={$_('appBar.settings')}
-    >
-      <Settings size={15} class="text-muted-foreground" />
-    </button>
+    {#if pickerOpen}
+      <div class="shadow-overlay absolute left-0 right-0 top-[calc(100%+6px)] z-40 overflow-hidden rounded border border-border bg-popover">
+        <div class="border-b border-line2 px-3 py-2 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('appBar.selectMod')}</div>
 
-    {#if platform !== 'darwin'}
-      <div class="no-drag flex items-center ml-2">
-        <button
-          onclick={() => onWindowControlAttempt('minimize')}
-          class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
-          aria-label={$_('appBar.minimize')}
-        >
-          <Minus size={14} class="text-muted-foreground" />
-        </button>
-        <button
-          onclick={() => onWindowControlAttempt('fullscreen')}
-          class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-accent transition-colors"
-          aria-label={$_('appBar.fullscreen')}
-        >
-          <Square size={12} class="text-muted-foreground" />
-        </button>
-        <button
-          onclick={() => onWindowControlAttempt('close')}
-          class="no-drag w-8 h-8 flex items-center justify-center rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
-          aria-label={$_('appBar.close')}
-        >
-          <X size={14} class="text-muted-foreground" />
-        </button>
+        <div class="max-h-[320px] overflow-y-auto p-1">
+          {#each mods as mod}
+            {@const isActive = activeMod?.path === mod.path}
+            <button
+              onclick={() => selectMod(mod)}
+              class="flex w-full items-center gap-2 rounded px-2.5 py-1.5 text-left transition-colors duration-100 {isActive ? 'bg-accbg text-accink' : 'hover:bg-accent'}"
+            >
+              <div class="min-w-0 flex-1">
+                <div class="truncate text-[13px] font-medium">{mod.name}</div>
+                <div class="truncate text-[11px] {isActive ? 'text-accink/70' : 'text-dim'}">{$_('appBar.modPath', { values: { name: mod.name } })}</div>
+              </div>
+              {#if isActive}
+                <Check size={14} class="shrink-0 text-primary" />
+              {/if}
+            </button>
+          {/each}
+        </div>
       </div>
     {/if}
   </div>
+
+  <div class="flex-1"></div>
+
+  <div class="no-drag flex items-center gap-[5px]">
+    <span class="chip-sec">{$_('appBar.seriesCount', { values: { value: activeMod ? (stats?.seriesCount ?? '—') : '0' } })}</span>
+    <span class="chip">{$_('appBar.tracksCount', { values: { value: activeMod ? (stats?.trackCount ?? '—') : '0' } })}</span>
+  </div>
+
+  <div class="no-drag flex items-center">
+    <button
+      onclick={() => themeStore.toggle()}
+      class={iconButton}
+      title={themeStore.current === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+    >
+      {#if themeStore.current === 'dark'}
+        <Sun size={14} strokeWidth={1.8} />
+      {:else}
+        <Moon size={14} strokeWidth={1.8} />
+      {/if}
+    </button>
+
+    <button onclick={() => { settingsOpen = true }} class={iconButton} title={$_('appBar.settings')}>
+      <Settings size={14} strokeWidth={1.8} />
+    </button>
+  </div>
+
+  {#if platform !== 'darwin'}
+    <div class="no-drag ml-1 flex items-center">
+      <button onclick={() => onWindowControlAttempt('minimize')} class={iconButton} aria-label={$_('appBar.minimize')}>
+        <Minus size={14} strokeWidth={1.8} />
+      </button>
+      <button onclick={() => onWindowControlAttempt('fullscreen')} class={iconButton} aria-label={$_('appBar.fullscreen')}>
+        <Square size={12} strokeWidth={1.8} />
+      </button>
+      <button onclick={() => onWindowControlAttempt('close')} class={iconButton} aria-label={$_('appBar.close')}>
+        <X size={14} strokeWidth={1.8} />
+      </button>
+    </div>
+  {/if}
 </div>
 
 <SettingsModal open={settingsOpen} onClose={() => { settingsOpen = false }} />

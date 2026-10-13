@@ -13,7 +13,7 @@
   import { _ } from 'svelte-i18n'
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
-  import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
+  import ActionHeader from '$lib/components/ui/action-header.svelte'
   import { trackUnsaved } from '$lib/stores/unsaved.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import IconButton from '$lib/components/ui/icon-button.svelte'
@@ -300,23 +300,23 @@
   })
 
   const inputClass =
-    'w-full rounded-md border border-input bg-background px-2 py-1.5 text-[13px] outline-none focus:border-ring focus:ring-1 focus:ring-ring'
+    'field w-full'
 
   // Read-only values are plain text so they can't be clicked into like an input.
-  const readonlyClass = 'block truncate px-2 py-1.5 text-[13px] text-muted-foreground'
+  const readonlyClass = 'block truncate px-2 py-1 text-[12.5px] text-muted-foreground'
 
   const cardClass = (item: SeriesOrderItem): string =>
-    `w-[128px] h-[148px] flex flex-col items-center rounded-xl border bg-background/75 p-2 transition-shadow hover:shadow-md cursor-pointer ${item.id === selectedItemId ? 'border-transparent ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border'}`
+    `w-[128px] h-[148px] flex flex-col items-center rounded-xl border p-2 transition-colors hover:border-dim cursor-pointer ${item.id === selectedItemId ? 'border-primary bg-accbg/40' : 'border-line2'}`
 
   trackUnsaved(() => isDirty, handleSave)
 </script>
 
 {#snippet seriesCard(item: SeriesOrderItem)}
-  <div class="w-[80px] h-[80px] rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden shrink-0">
+  <div class="w-[80px] h-[80px] rounded-lg border border-line2 flex items-center justify-center overflow-hidden shrink-0">
     {#if item.iconDataUrl}
       <img src={item.iconDataUrl} alt={item.fields.name} class="w-full h-full object-contain invert dark:invert-0" draggable="false" />
     {:else}
-      <Image size={28} class="text-muted-foreground/40" />
+      <Image size={28} class="text-dim" />
     {/if}
   </div>
 
@@ -325,56 +325,40 @@
   </div>
 {/snippet}
 
-<div class="flex-1 overflow-hidden">
+<ActionHeader
+  title={$_('orderSeries.title')}
+  subtitle={orderData ? $_('orderSeries.dragHint') : activeMod ? $_('orderSeries.noCustomSeries') : $_('orderSeries.chooseMod')}
+>
+  <IconButton onclick={handleReload} title={$_('orderSeries.reload')}>
+    <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
+  </IconButton>
+
+  <button
+    onclick={openNewSeries}
+    disabled={!activeMod}
+    class="btn shrink-0"
+  >
+    <Plus size={14} />
+    {$_('orderSeries.newSeries')}
+  </button>
+
+  <SaveButton
+    {saveState}
+    onclick={handleSave}
+    disabled={!orderData || !isDirty || saveState === 'saving'}
+    save={$_('orderSeries.save')}
+    saving={$_('orderSeries.saving')}
+    saved={$_('orderSeries.saved')}
+  />
+</ActionHeader>
+
+<div class="surface-grain min-h-0 flex-1 overflow-hidden bg-card">
   <div class="flex h-full min-h-0">
-    <!-- Five series cards wide (5 x 128px + gaps, padding, border, scrollbar); settings fill the rest. -->
-    <section class="flex h-full min-h-0 w-[730px] shrink-0 flex-col border border-border bg-card overflow-hidden">
-      <div class="gradient-strip h-[3px] shrink-0"></div>
-      <div class="shrink-0 border-b border-border px-4 py-3 flex items-center justify-between gap-4">
-        <div class="flex min-w-0 items-center gap-3">
-          <GradientIcon>
-            <ListOrdered size={18} />
-          </GradientIcon>
-          <div class="min-w-0">
-            <h2 class="truncate text-sm font-semibold">{$_('orderSeries.title')}</h2>
-            <p class="truncate text-[12.5px] text-muted-foreground">
-              {orderData
-                ? $_('orderSeries.dragHint')
-                : activeMod
-                  ? $_('orderSeries.noCustomSeries')
-                  : $_('orderSeries.chooseMod')}
-            </p>
-          </div>
-        </div>
-
-        <div class="flex shrink-0 items-center gap-2">
-          <IconButton onclick={handleReload} title={$_('orderSeries.reload')}>
-            <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
-          </IconButton>
-
-          <button
-            onclick={openNewSeries}
-            disabled={!activeMod}
-            class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Plus size={14} />
-            {$_('orderSeries.newSeries')}
-          </button>
-
-          <SaveButton
-            {saveState}
-            onclick={handleSave}
-            disabled={!orderData || !isDirty || saveState === 'saving'}
-            save={$_('orderSeries.save')}
-            saving={$_('orderSeries.saving')}
-            saved={$_('orderSeries.saved')}
-          />
-        </div>
-      </div>
-
+    <!-- Five series cards wide (5 x 128px + gaps, padding, scrollbar); settings fill the rest. -->
+    <section class="flex h-full min-h-0 w-[730px] shrink-0 flex-col overflow-hidden">
       <div class="min-h-0 flex-1 overflow-auto p-4">
         {#if loading}
-          <div class="grid h-full min-h-[320px] place-items-center rounded-2xl border border-dashed border-border bg-background/60 text-[13px] text-muted-foreground">
+          <div class="grid h-full min-h-[320px] place-items-center rounded-xl border border-dashed border-border text-[13px] text-muted-foreground">
             {$_('orderSeries.loading')}
           </div>
         {:else if orderData && (orderData.items.length > 0 || orderData.vanillaItems.length > 0)}
@@ -395,7 +379,7 @@
                   aria-label={$_('orderSeries.dragAria')}
                   class="w-full flex justify-center cursor-grab active:cursor-grabbing mb-1"
                 >
-                  <GripVertical size={14} class="text-muted-foreground opacity-60" />
+                  <GripVertical size={14} class="text-dim" />
                 </div>
                 {@render seriesCard(item)}
               </div>
@@ -403,14 +387,14 @@
           </div>
 
           {#if vanillaItems.length > 0}
-            <div class="mt-6 border-t border-border pt-3 pb-3">
+            <div class="mt-6 border-t border-line2 pt-3 pb-3">
               <h3 class="text-[12.5px] font-semibold">{$_('orderSeries.vanillaHeading')}</h3>
               <p class="pt-0.5 text-[11.5px] text-muted-foreground">{$_('orderSeries.vanillaHint')}</p>
             </div>
             <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, 128px);" aria-label={$_('orderSeries.vanillaHeading')}>
               {#each vanillaItems as item (item.id)}
                 <div class={cardClass(item)} role="listitem" onpointerdown={() => (selectedItemId = item.id)}>
-                  <span class="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">{$_('orderSeries.vanillaTag')}</span>
+                  <span class="mb-1 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('orderSeries.vanillaTag')}</span>
                   {@render seriesCard(item)}
                 </div>
               {/each}
@@ -428,30 +412,24 @@
       </div>
     </section>
 
-    <aside class="flex h-full min-h-0 min-w-[340px] flex-1 flex-col border border-l-0 border-border bg-card overflow-hidden">
-      <div class="gradient-strip h-[3px] shrink-0"></div>
-      <div class="shrink-0 border-b border-border px-4 py-3 flex items-center gap-3">
-        <GradientIcon>
-          <Settings2 size={18} />
-        </GradientIcon>
-        <div class="min-w-0">
-          <h2 class="truncate text-sm font-semibold">{$_('orderSeries.settingsHeading')}</h2>
-          <p class="truncate text-[12.5px] text-muted-foreground">{selectedItem?.fields.name ?? $_('orderSeries.settingsHint')}</p>
-        </div>
+    <aside class="flex h-full min-h-0 min-w-[340px] flex-1 flex-col overflow-hidden border-l border-border">
+      <div class="shrink-0 border-b border-line2 px-4 py-3">
+        <h2 class="truncate text-[13.5px] font-semibold tracking-[-.01em]">{$_('orderSeries.settingsHeading')}</h2>
+        <p class="mt-[3px] truncate text-[12.5px] text-muted-foreground">{selectedItem?.fields.name ?? $_('orderSeries.settingsHint')}</p>
       </div>
 
       {#if selectedItem}
-        <div class="shrink-0 flex items-center gap-1 border-b border-border px-2 py-1.5">
+        <div class="shrink-0 flex items-center gap-1 border-b border-line2 px-2 py-1.5">
           <button
             onclick={() => (panelTab = 'settings')}
-            class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors {panelTab === 'settings' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60'}"
+            class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors {panelTab === 'settings' ? 'bg-accbg text-accink' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}"
           >
             <Settings2 size={13} />
             {$_('orderSeries.tabSettings')}
           </button>
           <button
             onclick={() => (panelTab = 'games')}
-            class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors {panelTab === 'games' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60'}"
+            class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors {panelTab === 'games' ? 'bg-accbg text-accink' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}"
           >
             <Gamepad2 size={13} />
             {$_('orderSeries.tabGames')}
@@ -463,9 +441,7 @@
         {#if !selectedItem}
           <div class="grid h-full min-h-[200px] place-items-center text-center">
             <div class="flex flex-col items-center gap-3 px-4">
-              <GradientIcon size="lg">
-                <Settings2 size={20} />
-              </GradientIcon>
+              <Settings2 size={20} class="text-dim" />
               <p class="text-[13px] text-muted-foreground">{$_('orderSeries.settingsHint')}</p>
             </div>
           </div>
@@ -473,22 +449,22 @@
           {@const f = selectedItem.fields}
           <div class="flex flex-col gap-4">
             <div class="flex items-center gap-3">
-              <div class="flex h-[64px] w-[64px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30">
+              <div class="flex h-[64px] w-[64px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line2">
                 {#if selectedItem.iconDataUrl}
                   <img src={selectedItem.iconDataUrl} alt={f.name} class="h-full w-full object-contain invert dark:invert-0" draggable="false" />
                 {:else}
-                  <Image size={26} class="text-muted-foreground/40" />
+                  <Image size={26} class="text-dim" />
                 {/if}
               </div>
               <div class="flex flex-col gap-1">
                 <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldIcon')}</span>
-                <label class="inline-flex cursor-pointer items-center gap-2 self-start rounded-lg border border-input bg-background px-3 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-muted {panelIconBusy ? 'pointer-events-none opacity-60' : ''}">
+                <label class="btn cursor-pointer self-start {panelIconBusy ? 'pointer-events-none opacity-45' : ''}">
                   <Upload size={13} />
                   {$_('orderSeries.changeIcon')}
                   <input type="file" accept="image/png" class="hidden" onchange={panelPickIcon} />
                 </label>
                 {#if panelError}
-                  <span class="text-[11px] text-red-500">{panelError}</span>
+                  <span class="text-[11px] text-destructive">{panelError}</span>
                 {:else}
                   <span class="text-[11px] text-muted-foreground">{$_('orderSeries.iconHint')}</span>
                 {/if}
@@ -513,7 +489,7 @@
               <span class="text-[12px] font-medium text-muted-foreground" title={$_('orderSeries.fldSeriesPlaylistHint')}>{$_('orderSeries.fldSeriesPlaylist')}</span>
               <input type="text" class={inputClass} bind:value={f.seriesPlaylist} placeholder="bgm…" />
               {#if selectedItem.isVanilla && f.seriesPlaylist !== selectedItem.vanillaPlaylist}
-                <span class="text-[11.5px] text-amber-500">{$_('orderSeries.customPlaylistWarning')}</span>
+                <span class="text-[11.5px] text-warn">{$_('orderSeries.customPlaylistWarning')}</span>
               {/if}
             </label>
 
@@ -529,14 +505,14 @@
                 title={$_('orderSeries.volumeHint')}
                 class="{inputClass} flex cursor-pointer items-center justify-between text-left text-muted-foreground opacity-60 transition-opacity hover:opacity-100"
               >
-                <span class="font-mono">{formatDb(selectedItem.volumeDb)}</span>
+                <span class="tabular-nums">{formatDb(selectedItem.volumeDb)}</span>
                 <span class="inline-flex items-center gap-1 text-[11.5px]"><Volume2 size={12} />{$_('orderSeries.volumeEdit')}</span>
               </button>
             </div>
 
             <button
               onclick={() => openIn(selectedItem, 'order-tracks')}
-              class="inline-flex items-center justify-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted"
+              class="btn"
             >
               <ArrowUpDown size={14} />
               {$_('orderSeries.editSongs')}
@@ -547,7 +523,7 @@
           <div class="flex flex-col gap-3">
             <button
               onclick={openAddGame}
-              class="inline-flex items-center justify-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted"
+              class="btn"
             >
               <Plus size={14} />
               {$_('orderSeries.addGame')}
@@ -557,7 +533,7 @@
               <p class="px-1 text-[13px] text-muted-foreground">{$_('orderSeries.noGames')}</p>
             {:else}
               {#each f.games as game (game.id)}
-                <div class="flex flex-col gap-1 rounded-md border border-border bg-background/60 p-2">
+                <div class="flex flex-col gap-1 rounded-xl border border-line2 p-2">
                   <div class="flex items-center gap-2">
                     <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground" title={game.id}>{game.id}</span>
                     {#if !selectedItem.lockedGameIds.includes(game.id)}
@@ -565,7 +541,7 @@
                         onclick={() => removeGame(selectedItem, game.id)}
                         aria-label={$_('orderSeries.removeGame')}
                         title={$_('orderSeries.removeGame')}
-                        class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-dim transition-colors duration-100 hover:bg-accent hover:text-destructive"
                       >
                         <X size={13} />
                       </button>
@@ -578,7 +554,7 @@
                   {/if}
                 </div>
                 {#if lastGameErrorId === game.id}
-                  <span class="-mt-2 px-1 text-[11.5px] text-red-500">{$_('orderSeries.lastGameError')}</span>
+                  <span class="-mt-2 px-1 text-[11.5px] text-destructive">{$_('orderSeries.lastGameError')}</span>
                 {/if}
               {/each}
             {/if}
@@ -592,7 +568,7 @@
 {#if showAddGame}
   <Modal>
       <div class="flex flex-col gap-3 px-5 py-4">
-        <h3 class="text-sm font-semibold">{$_('orderSeries.addGameTitle')}</h3>
+        <h3 class="text-[13.5px] font-semibold">{$_('orderSeries.addGameTitle')}</h3>
         <label class="flex flex-col gap-1">
           <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldGameId')}</span>
           <input type="text" class={inputClass} bind:value={newGameId} placeholder="mario_kart_8" />
@@ -605,14 +581,14 @@
       <div class="flex justify-end gap-2 border-t border-border px-5 py-4">
         <button
           onclick={() => (showAddGame = false)}
-          class="inline-flex items-center justify-center rounded-lg px-3 py-2 text-[12.5px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+          class="btn border-transparent text-muted-foreground"
         >
           {$_('orderSeries.cancel')}
         </button>
         <button
           onclick={confirmAddGame}
           disabled={!newGameValid}
-          class="inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          class="btn-primary"
         >
           {$_('orderSeries.add')}
         </button>
@@ -623,16 +599,16 @@
 {#if showNewSeries}
   <Modal maxWidth="460px" maxHeight="88vh">
       <div class="min-h-0 flex-1 overflow-auto px-5 py-4">
-        <h3 class="text-sm font-semibold">{$_('orderSeries.newSeriesTitle')}</h3>
+        <h3 class="text-[13.5px] font-semibold">{$_('orderSeries.newSeriesTitle')}</h3>
 
         <div class="mt-3 flex flex-col gap-3">
           <label class="flex flex-col gap-1">
             <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.newSeriesIdLabel')}</span>
             <input type="text" class={inputClass} bind:value={nsId} placeholder="my_series" />
             {#if nsTrimmedId && !nsIdValid}
-              <span class="text-[11.5px] text-red-500">{$_('orderSeries.newSeriesIdInvalid')}</span>
+              <span class="text-[11.5px] text-destructive">{$_('orderSeries.newSeriesIdInvalid')}</span>
             {:else if nsIdTaken}
-              <span class="text-[11.5px] text-red-500">{$_('orderSeries.newSeriesIdTaken')}</span>
+              <span class="text-[11.5px] text-destructive">{$_('orderSeries.newSeriesIdTaken')}</span>
             {:else}
               <span class="text-[11.5px] text-muted-foreground">{$_('orderSeries.newSeriesIdHint')}</span>
             {/if}
@@ -655,16 +631,16 @@
           </label>
 
           <div class="flex items-center gap-3">
-            <div class="flex h-[56px] w-[56px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30">
+            <div class="flex h-[56px] w-[56px] shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line2">
               {#if nsIconDataUrl}
                 <img src={nsIconDataUrl} alt="" class="h-full w-full object-contain invert dark:invert-0" />
               {:else}
-                <Image size={22} class="text-muted-foreground/40" />
+                <Image size={22} class="text-dim" />
               {/if}
             </div>
             <div class="flex flex-col gap-1">
               <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldIcon')}</span>
-              <label class="inline-flex cursor-pointer items-center gap-2 self-start rounded-lg border border-input bg-background px-3 py-1.5 text-[12.5px] font-medium transition-colors hover:bg-muted">
+              <label class="btn cursor-pointer self-start">
                 <Upload size={13} />
                 {$_('orderSeries.uploadIcon')}
                 <input type="file" accept="image/png" class="hidden" onchange={nsPickIcon} />
@@ -673,7 +649,7 @@
             </div>
           </div>
 
-          <div class="mt-1 border-t border-border pt-3">
+          <div class="mt-1 border-t border-line2 pt-3">
             <h4 class="text-[12.5px] font-semibold">{$_('orderSeries.tabGames')}</h4>
             <p class="pt-0.5 text-[11.5px] text-muted-foreground">{$_('orderSeries.newSeriesGamesHint')}</p>
           </div>
@@ -683,7 +659,7 @@
           {:else}
             <div class="flex flex-col gap-2">
               {#each nsGames as game (game.id)}
-                <div class="flex items-center gap-2 rounded-md border border-border bg-background/60 p-2">
+                <div class="flex items-center gap-2 rounded-xl border border-line2 p-2">
                   <div class="min-w-0 flex-1">
                     <span class="block truncate text-[11px] font-medium text-muted-foreground" title={game.id}>{game.id}</span>
                     <span class="block truncate text-[13px]">{game.name}</span>
@@ -692,7 +668,7 @@
                     onclick={() => nsRemoveGame(game.id)}
                     aria-label={$_('orderSeries.removeGame')}
                     title={$_('orderSeries.removeGame')}
-                    class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-dim transition-colors duration-100 hover:bg-accent hover:text-destructive"
                   >
                     <X size={14} />
                   </button>
@@ -715,14 +691,14 @@
               disabled={!nsGameValid}
               aria-label={$_('orderSeries.addGame')}
               title={$_('orderSeries.addGame')}
-              class="inline-flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border border-input bg-background transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              class="btn w-[27px] px-0 shrink-0"
             >
               <Plus size={14} />
             </button>
           </div>
 
           {#if nsError}
-            <p class="text-[12px] text-red-500">{nsError}</p>
+            <p class="text-[12px] text-destructive">{nsError}</p>
           {/if}
         </div>
       </div>
@@ -730,14 +706,14 @@
       <div class="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-4">
         <button
           onclick={() => (showNewSeries = false)}
-          class="inline-flex items-center justify-center rounded-lg px-3 py-2 text-[12.5px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+          class="btn border-transparent text-muted-foreground"
         >
           {$_('orderSeries.cancel')}
         </button>
         <button
           onclick={confirmNewSeries}
           disabled={!nsCanCreate}
-          class="inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          class="btn-primary"
         >
           {nsCreating ? $_('orderSeries.creating') : $_('orderSeries.create')}
         </button>

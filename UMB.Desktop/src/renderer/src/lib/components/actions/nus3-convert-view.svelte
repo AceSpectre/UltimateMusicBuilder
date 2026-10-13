@@ -11,6 +11,7 @@
   import { modsStore } from '$lib/stores/mods.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
   import { createSeriesLoader } from '$lib/series-loader'
+  import ActionHeader from '$lib/components/ui/action-header.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import IconButton from '$lib/components/ui/icon-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
@@ -326,7 +327,6 @@
     selectedRank = rank
   }
 
-
   async function convertCurrent(mode: 'loop' | 'end-to-end', candidate?: LoopCandidate) {
     if (!currentTrack || !seriesPath || converting) return
     if (mode === 'loop' && !candidate) return
@@ -372,7 +372,6 @@
     selectedRank = 1
     stopPreview()
   }
-
 
   async function rejectFromReview(track: Nus3SourceTrack) {
     if (!seriesPath) return
@@ -526,8 +525,8 @@
       {/snippet}
     </SeriesPicker>
 
-    <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
-      <div class="gradient-strip h-[3px] shrink-0"></div>
+    <section class="surface-grain flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-card">
+      <ActionHeader title={$_('nav.items.nus3-convert')} subtitle={selectedSeries?.name ?? ''} />
 
       {#if !selectedSeries || sourcesTracks.length === 0}
         <EmptyState
@@ -541,23 +540,23 @@
           {#snippet icon()}<AudioWaveform size={20} />{/snippet}
         </EmptyState>
       {:else}
-        <div class="shrink-0 flex items-center gap-1 border-b border-border bg-card px-4 pt-1">
+        <div class="shrink-0 flex items-center gap-1 border-b border-line2 px-[22px]">
           <button
             onclick={() => (tab = 'convert')}
-            class="relative px-3 py-2 text-[13px] font-medium transition-colors {tab === 'convert' ? 'gradient-text' : 'text-muted-foreground hover:text-foreground'}"
+            class="relative px-3 py-2.5 text-[13px] font-medium transition-colors duration-100 {tab === 'convert' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}"
           >
             {$_('nus3Convert.tabConvert')}
             {#if tab === 'convert'}
-              <span class="gradient-strip absolute -bottom-px left-0 right-0 h-[2px] rounded-full"></span>
+              <span class="absolute inset-x-2 -bottom-px h-0.5 bg-primary"></span>
             {/if}
           </button>
           <button
             onclick={() => (tab = 'review')}
-            class="relative px-3 py-2 text-[13px] font-medium transition-colors {tab === 'review' ? 'gradient-text' : 'text-muted-foreground hover:text-foreground'}"
+            class="relative px-3 py-2.5 text-[13px] font-medium transition-colors duration-100 {tab === 'review' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}"
           >
             {$_('nus3Convert.tabReview')}
             {#if tab === 'review'}
-              <span class="gradient-strip absolute -bottom-px left-0 right-0 h-[2px] rounded-full"></span>
+              <span class="absolute inset-x-2 -bottom-px h-0.5 bg-primary"></span>
             {/if}
           </button>
         </div>
@@ -570,33 +569,32 @@
             {#snippet icon()}<CheckCircle size={20} />{/snippet}
             <button
               onclick={() => (tab = 'review')}
-              class="inline-flex h-8 items-center gap-1.5 rounded-md border-0 px-3 text-[12.5px] font-medium text-white transition-colors"
-              style="background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 4px 14px -2px hsl(var(--gradient-from) / .35);"
+              class="btn-primary"
             >
               {$_('nus3Convert.tabReview')}
             </button>
           </EmptyState>
         {:else}
-        <div class="shrink-0 border-b border-border bg-card px-5 py-3">
+        <div class="shrink-0 border-b border-line2 px-[22px] py-3">
           <div class="flex flex-col gap-2">
-            <span class="gradient-text text-[11px] font-semibold uppercase tracking-wide">
+            <span class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">
               {$_('nus3Convert.kicker1')}
             </span>
             <div class="flex items-center gap-4">
-              <h1 class="min-w-0 flex-1 text-lg font-semibold tracking-tight">
+              <h2 class="min-w-0 flex-1 text-[15px] font-semibold tracking-[-.01em]">
                 {currentTrack?.name ?? ''}
                 {#if currentTrackAnalyzing}
                   <span class="ml-2 text-[12px] font-normal text-muted-foreground">{$_('nus3Convert.loading')}</span>
                 {:else if converting}
                   <span class="ml-2 text-[12px] font-normal text-muted-foreground">{$_('nus3Convert.convertingTrack', { values: { name: currentTrack?.name ?? '' } })}</span>
                 {/if}
-              </h1>
+              </h2>
               <div class="flex shrink-0 items-center gap-2">
               <button
                 onclick={reanalyzeCurrent}
                 disabled={reanalyzing || converting}
                 title={$_('nus3Convert.reanalyzeHint')}
-                class="inline-flex h-8 items-center gap-1.5 rounded-md border border-input bg-background px-3 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:opacity-60"
+                class="btn"
               >
                 <RefreshCw size={14} class={reanalyzing ? 'animate-spin' : ''} />
                 {reanalyzing ? $_('nus3Convert.reanalyzing') : $_('nus3Convert.reanalyze')}
@@ -604,16 +602,14 @@
               <button
                 onclick={rejectCurrent}
                 disabled={converting}
-                class="inline-flex h-8 items-center gap-1.5 rounded-md border-0 px-3 text-[12.5px] font-medium text-white transition-colors disabled:opacity-60"
-                style="background: hsl(271 76% 53%);"
+                class="btn-danger"
               >
                 {$_('nus3Convert.rejectAll')}
               </button>
               <button
                 onclick={acceptCurrent}
                 disabled={!selectedCandidate || converting}
-                class="inline-flex h-8 items-center gap-1.5 rounded-md border-0 px-3 text-[12.5px] font-medium text-white transition-colors disabled:opacity-60"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 4px 14px -2px hsl(var(--gradient-from) / .35);"
+                class="btn-primary"
               >
                 {#if converting}
                   <RefreshCw size={14} class="animate-spin" />
@@ -627,18 +623,18 @@
           </div>
         </div>
 
-        <div class="min-h-0 flex-1 overflow-auto bg-background px-5 py-2.5" style="display: flex; flex-direction: column; gap: 10px;">
+        <div class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto px-[22px] py-3.5">
           <!-- Progress strip + track pills (single row) -->
           <div class="flex items-center gap-2">
-            <span class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span class="shrink-0 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">
               {$_('nus3Convert.seriesQueue', { values: { series: selectedSeries?.name ?? '' } })}
             </span>
-            <span class="shrink-0 inline-flex h-[20px] items-center rounded-full border border-border bg-muted px-1.5 text-[10px] font-medium text-muted-foreground">
+            <span class="chip shrink-0 tabular-nums">
               {doneCount}/{totalCount}
             </span>
-            <div class="h-1 w-[100px] shrink-0 overflow-hidden rounded-full bg-muted">
+            <div class="h-1 w-[100px] shrink-0 overflow-hidden rounded-sm bg-muted">
               <div
-                class="gradient-strip h-full rounded-full transition-all"
+                class="h-full bg-primary transition-all"
                 style="width: {totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%"
               ></div>
             </div>
@@ -648,12 +644,9 @@
                 {@const trackNo = sourcesTracks.findIndex((t) => t.id === track.id) + 1}
                 <button
                   onclick={() => goToPending(i)}
-                  class="flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium whitespace-nowrap transition-colors"
-                  style={isCurrent
-                    ? 'background: linear-gradient(135deg, hsl(var(--gradient-from) / .14), hsl(var(--gradient-to) / .14)); border-color: hsl(var(--gradient-from) / .4); font-weight: 700;'
-                    : 'background: transparent; border-color: hsl(var(--border)); color: hsl(var(--muted-foreground));'}
+                  class="chip shrink-0 whitespace-nowrap transition-colors duration-100 {isCurrent ? 'border-transparent bg-accbg font-medium text-accink' : 'bg-transparent hover:text-foreground'}"
                 >
-                  <span class="font-mono text-[10px]">{String(trackNo).padStart(2, '0')}</span>
+                  <span class="tabular-nums text-[10px]">{String(trackNo).padStart(2, '0')}</span>
                   <span class="max-w-[110px] overflow-hidden text-ellipsis">{track.name}</span>
                 </button>
               {/each}
@@ -661,11 +654,11 @@
           </div>
 
           {#if currentTrackAnalyzing}
-            <div class="grid min-h-[260px] flex-1 place-items-center rounded-xl border border-border bg-card p-6">
+            <div class="grid min-h-[260px] flex-1 place-items-center rounded-xl border border-line2 p-6">
               <div class="flex flex-col items-center gap-4 text-center">
-                <RefreshCw size={36} class="animate-spin" style="color: hsl(var(--gradient-from));" />
+                <RefreshCw size={28} class="animate-spin text-primary" />
                 <div class="flex flex-col gap-1">
-                  <p class="text-sm font-semibold">{$_('nus3Convert.calculatingLoops')}</p>
+                  <p class="text-[13.5px] font-semibold">{$_('nus3Convert.calculatingLoops')}</p>
                   <p class="text-[13px] text-muted-foreground">{$_('nus3Convert.calculatingLoopsHint')}</p>
                 </div>
               </div>
@@ -675,19 +668,16 @@
             {@const dur = currentTrack?.durationSeconds || 228}
             {@const peaks = currentPeaks.length > 0 ? currentPeaks : generatePeaks(140)}
             {@const bars = peaks.length > 0 ? peaks.length : 140}
-            <div class="rounded-xl border border-border bg-card p-3">
+            <div class="rounded-xl border border-line2 p-3">
               <div class="mb-2 flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
-                  <span class="text-base font-semibold">
+                  <span class="text-[13.5px] font-semibold">
                     {$_('nus3Convert.candidateTitle', { values: { rank: c.rank } })}
                   </span>
-                  <span
-                    class="inline-flex h-[22px] items-center rounded-full px-2 text-[11px] font-medium"
-                    style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .15), hsl(var(--gradient-to) / .15)); color: hsl(var(--gradient-from)); border: 1px solid hsl(var(--gradient-from) / .3);"
-                  >
+                  <span class="chip border-transparent bg-accbg text-accink">
                     {$_('nus3Convert.score', { values: { score: c.score.toFixed(1) } })}
                   </span>
-                  <span class="font-mono text-xs text-muted-foreground">
+                  <span class="tabular-nums text-xs text-muted-foreground">
                     {c.loopStartStr} &rarr; {c.loopEndStr} &middot; loop {c.loopLengthStr}
                   </span>
                 </div>
@@ -702,24 +692,13 @@
                   preserveAspectRatio="none"
                   class="block"
                 >
-                  <defs>
-                    <linearGradient id="wf-grad" x1="0" y1="0" x2="1" y2="0">
-                      <stop offset="0%" stop-color="hsl(var(--gradient-from))" />
-                      <stop offset="100%" stop-color="hsl(var(--gradient-to))" />
-                    </linearGradient>
-                    <linearGradient id="wf-grad-soft" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stop-color="hsl(var(--gradient-from) / .25)" />
-                      <stop offset="100%" stop-color="hsl(var(--gradient-to) / .04)" />
-                    </linearGradient>
-                  </defs>
-
                   <!-- Loop region shading -->
                   <rect
                     x={((c.loopStart) / dur) * bars * 3}
                     y="0"
                     width={((c.loopEnd - c.loopStart) / dur) * bars * 3}
                     height="120"
-                    fill="url(#wf-grad-soft)"
+                    fill="rgb(var(--acc) / .12)"
                   />
 
                   <!-- Peak bars -->
@@ -735,7 +714,7 @@
                       width="1.6"
                       height={h}
                       rx="0.8"
-                      fill={insideLoop ? 'url(#wf-grad)' : 'hsl(var(--muted-foreground))'}
+                      fill={insideLoop ? 'rgb(var(--acc))' : 'rgb(var(--mut))'}
                       opacity={insideLoop ? 1 : 0.35}
                     />
                   {/each}
@@ -748,12 +727,12 @@
                     <g opacity={active ? 1 : 0.32}>
                       <line
                         x1={xS} x2={xS} y1="4" y2="116"
-                        stroke={active ? 'hsl(var(--gradient-from))' : 'hsl(var(--foreground))'}
+                        stroke={active ? 'rgb(var(--acc))' : 'rgb(var(--ink))'}
                         stroke-width={active ? 2 : 1}
                       />
                       <line
                         x1={xE} x2={xE} y1="4" y2="116"
-                        stroke={active ? 'hsl(var(--gradient-to))' : 'hsl(var(--foreground))'}
+                        stroke={active ? 'rgb(var(--acc))' : 'rgb(var(--ink))'}
                         stroke-width={active ? 2 : 1}
                         stroke-dasharray="3 2"
                       />
@@ -761,29 +740,28 @@
                   {/each}
 
                   <!-- Selected marker dots -->
-                  <circle cx={(c.loopStart / dur) * bars * 3} cy="10" r="5" fill="hsl(var(--gradient-from))" />
-                  <circle cx={(c.loopEnd / dur) * bars * 3} cy="10" r="5" fill="hsl(var(--gradient-to))" />
+                  <circle cx={(c.loopStart / dur) * bars * 3} cy="10" r="5" fill="rgb(var(--acc))" />
+                  <circle cx={(c.loopEnd / dur) * bars * 3} cy="10" r="5" fill="rgb(var(--acc))" />
                 </svg>
 
                 <!-- Time labels -->
                 <div class="absolute bottom-0 left-0 right-0 flex justify-between pointer-events-none">
-                  <span class="font-mono text-[10px] text-muted-foreground">0:00</span>
+                  <span class="tabular-nums text-[10px] text-muted-foreground">0:00</span>
                   {#each Array.from({ length: Math.floor(dur / 60) }, (_, i) => i + 1) as min}
-                    <span class="font-mono text-[10px] text-muted-foreground">{min}:00</span>
+                    <span class="tabular-nums text-[10px] text-muted-foreground">{min}:00</span>
                   {/each}
-                  <span class="font-mono text-[10px] text-muted-foreground">
+                  <span class="tabular-nums text-[10px] text-muted-foreground">
                     {Math.floor(dur / 60)}:{String(Math.floor(dur % 60)).padStart(2, '0')}
                   </span>
                 </div>
               </div>
 
               <!-- Transport bar -->
-              <div class="flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5">
+              <div class="flex items-center gap-2 rounded-lg border border-line2 px-2.5 py-1.5">
                 <button
                   onclick={() => previewPlaying ? stopPreview() : playLoopPreview()}
                   disabled={previewLoading}
-                  class="inline-flex h-[30px] min-w-[110px] items-center justify-center gap-1.5 rounded-sm border-0 px-2.5 text-[12.5px] font-medium text-white disabled:opacity-60"
-                  style="background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 1px 0 hsl(var(--background)) inset, 0 4px 14px -2px hsl(var(--gradient-from) / .35);"
+                  class="btn-primary min-w-[110px]"
                 >
                   {#if previewLoading}
                     <RefreshCw size={13} class="animate-spin" />
@@ -793,27 +771,22 @@
                   {previewPlaying ? 'Stop' : previewLoading ? 'Loading...' : $_('nus3Convert.loopPreview')}
                 </button>
                 <div class="flex-1"></div>
-                <span class="font-mono text-xs text-muted-foreground">{c.loopLengthStr}</span>
+                <span class="tabular-nums text-xs text-muted-foreground">{c.loopLengthStr}</span>
               </div>
             </div>
           {:else}
             <!-- No loop points found: only end-to-end is available -->
-            <div class="grid min-h-[260px] flex-1 place-items-center rounded-xl border border-border bg-card p-6">
+            <div class="grid min-h-[260px] flex-1 place-items-center rounded-xl border border-line2 p-6">
               <div class="flex max-w-[620px] flex-col items-center gap-4 text-center">
-                <div
-                  class="flex h-12 w-12 items-center justify-center rounded-2xl border border-border"
-                  style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-                >
-                  <AudioWaveform size={20} />
-                </div>
+                <AudioWaveform size={20} class="text-dim" />
                 <div class="flex flex-col gap-1">
-                  <p class="text-sm font-semibold">{$_('nus3Convert.noLoopTitle')}</p>
+                  <p class="text-[13.5px] font-semibold">{$_('nus3Convert.noLoopTitle')}</p>
                   <p class="text-[13px] text-muted-foreground">{$_('nus3Convert.noLoopHint')}</p>
                 </div>
                 <div class="flex flex-wrap items-center justify-center gap-2.5 pt-1">
                   <button
                     onclick={openSettings}
-                    class="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-input bg-background px-4 text-[13px] font-medium transition-colors hover:bg-muted"
+                    class="btn whitespace-nowrap"
                   >
                     <Settings size={15} />
                     {$_('nus3Convert.settingsTitle')}
@@ -821,7 +794,7 @@
                   <button
                     onclick={reanalyzeCurrent}
                     disabled={reanalyzing || converting}
-                    class="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-input bg-background px-4 text-[13px] font-medium transition-colors hover:bg-muted disabled:opacity-60"
+                    class="btn whitespace-nowrap"
                   >
                     <RefreshCw size={15} class={reanalyzing ? 'animate-spin' : ''} />
                     {reanalyzing ? $_('nus3Convert.reanalyzing') : $_('nus3Convert.reanalyze')}
@@ -829,8 +802,7 @@
                   <button
                     onclick={rejectCurrent}
                     disabled={converting}
-                    class="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border-0 px-4 text-[13px] font-medium text-white transition-colors disabled:opacity-60"
-                    style="background: hsl(271 76% 53%);"
+                    class="btn-danger whitespace-nowrap"
                   >
                     {$_('nus3Convert.rejectAll')}
                   </button>
@@ -840,25 +812,25 @@
           {/if}
 
           {#if !currentTrackAnalyzing && currentCandidates.length > 0}
-            <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card">
-              <div class="flex shrink-0 items-center justify-between border-b border-border px-3 py-1.5">
+            <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border">
+              <div class="flex shrink-0 items-center justify-between border-b border-line2 px-3 py-1.5">
                 <div class="flex items-center gap-2">
                   <span class="text-[13px] font-semibold">
                     {$_('nus3Convert.candidateCount', { values: { count: currentCandidates.length } })}
                   </span>
-                  <span class="inline-flex h-[20px] items-center rounded-full border border-border bg-transparent px-1.5 text-[10px] font-medium text-muted-foreground">
+                  <span class="chip">
                     {$_('nus3Convert.clickToPreview')}
                   </span>
                 </div>
-                <span class="font-mono text-[11px] text-muted-foreground">{$_('nus3Convert.sortedBy')}</span>
+                <span class="tabular-nums text-[11px] text-muted-foreground">{$_('nus3Convert.sortedBy')}</span>
               </div>
 
               <div class="min-h-0 flex-1 overflow-auto">
                 <table class="w-full border-collapse text-[12px]">
                   <thead class="sticky top-0">
-                    <tr style="background: hsl(var(--muted) / .5);">
+                    <tr class="bg-card">
                       {#each [$_('nus3Convert.colRank'), $_('nus3Convert.colScore'), $_('nus3Convert.colLoopStart'), $_('nus3Convert.colLoopEnd'), $_('nus3Convert.colLength'), $_('nus3Convert.colNoteDist'), $_('nus3Convert.colRms'), $_('nus3Convert.colSpec')] as header}
-                        <th class="px-2 py-1 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        <th class="px-2 py-1.5 text-left text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">
                           {header}
                         </th>
                       {/each}
@@ -870,34 +842,30 @@
                       {@const belowThreshold = cand.score < minScoreThreshold}
                       <tr
                         onclick={() => selectCandidate(cand.rank)}
-                        class="cursor-pointer border-t border-border transition-colors hover:bg-muted/50"
-                        style="{isSel ? 'background: linear-gradient(90deg, hsl(var(--gradient-from) / .10), transparent);' : ''}{belowThreshold ? ' opacity: 0.45;' : ''}"
+                        class="cursor-pointer border-t border-line2 transition-colors duration-100 {isSel ? 'bg-accbg text-accink' : 'hover:bg-accent'} {belowThreshold ? 'opacity-45' : ''}"
                       >
                         <td class="relative px-2 py-1">
                           {#if isSel}
-                            <span
-                              class="absolute left-0 top-0.5 bottom-0.5 w-[3px] rounded-r"
-                              style="background: linear-gradient(180deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));"
-                            ></span>
+                            <span class="absolute bottom-0 left-0 top-0 w-0.5 bg-primary"></span>
                           {/if}
-                          <span class="font-mono text-[11px] {isSel ? 'font-bold' : 'font-medium'}">
+                          <span class="tabular-nums text-[11px] {isSel ? 'font-semibold' : 'font-medium'}">
                             {String(cand.rank).padStart(2, '0')}
                           </span>
                         </td>
                         <td class="px-2 py-1">
                           <div class="flex items-center gap-1.5">
-                            <div class="h-1 w-[50px] overflow-hidden rounded-full bg-muted">
-                              <div class="gradient-strip h-full rounded-full" style="width: {cand.score}%;"></div>
+                            <div class="h-1 w-[50px] overflow-hidden rounded-sm bg-muted">
+                              <div class="h-full bg-primary" style="width: {cand.score}%;"></div>
                             </div>
-                            <span class="font-mono text-[11px] {isSel ? 'font-bold' : 'font-medium'}">{cand.score.toFixed(1)}</span>
+                            <span class="tabular-nums text-[11px] {isSel ? 'font-semibold' : 'font-medium'}">{cand.score.toFixed(1)}</span>
                           </div>
                         </td>
-                        <td class="px-2 py-1 font-mono text-[11px]">{cand.loopStartStr}</td>
-                        <td class="px-2 py-1 font-mono text-[11px]">{cand.loopEndStr}</td>
-                        <td class="px-2 py-1 font-mono text-[11px]">{cand.loopLengthStr}</td>
-                        <td class="px-2 py-1 font-mono text-[11px]">{(cand.noteDistance ?? 0).toFixed(4)}</td>
-                        <td class="px-2 py-1 font-mono text-[11px]">{cand.rmsDelta.toFixed(1)}</td>
-                        <td class="px-2 py-1 font-mono text-[11px]">{(cand.spectralSim * 100).toFixed(0)}%</td>
+                        <td class="px-2 py-1 tabular-nums text-[11px]">{cand.loopStartStr}</td>
+                        <td class="px-2 py-1 tabular-nums text-[11px]">{cand.loopEndStr}</td>
+                        <td class="px-2 py-1 tabular-nums text-[11px]">{cand.loopLengthStr}</td>
+                        <td class="px-2 py-1 tabular-nums text-[11px]">{(cand.noteDistance ?? 0).toFixed(4)}</td>
+                        <td class="px-2 py-1 tabular-nums text-[11px]">{cand.rmsDelta.toFixed(1)}</td>
+                        <td class="px-2 py-1 tabular-nums text-[11px]">{(cand.spectralSim * 100).toFixed(0)}%</td>
                       </tr>
                     {/each}
                   </tbody>
@@ -910,15 +878,15 @@
 
         {:else}
         <!-- ── Review & Save tab ── -->
-        <div class="shrink-0 border-b border-border bg-card px-5 py-3">
+        <div class="shrink-0 border-b border-line2 px-[22px] py-3">
           <div class="flex items-center gap-4">
             <div class="flex min-w-0 flex-1 flex-col gap-1">
-              <span class="gradient-text text-[11px] font-semibold uppercase tracking-wide">
+              <span class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">
                 {$_('nus3Convert.kicker2')}
               </span>
-              <h1 class="text-lg font-semibold tracking-tight">
+              <h2 class="text-[15px] font-semibold tracking-[-.01em]">
                 {$_('nus3Convert.reviewTitle', { values: { count: convertedTracks.length } })}
-              </h1>
+              </h2>
               <p class="max-w-[720px] text-[12.5px] text-muted-foreground">
                 {$_('nus3Convert.reviewSubtitle')}
               </p>
@@ -927,8 +895,7 @@
               <button
                 onclick={openAcceptModal}
                 disabled={writing || convertedTracks.length === 0}
-                class="inline-flex h-8 items-center gap-1.5 rounded-md border-0 px-3 text-[12.5px] font-medium text-white transition-colors disabled:opacity-60"
-                style="background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 4px 14px -2px hsl(var(--gradient-from) / .35);"
+                class="btn-primary"
               >
                 <CheckCircle size={14} />
                 {writing ? $_('nus3Convert.writing') : $_('nus3Convert.acceptWrite')}
@@ -937,20 +904,17 @@
           </div>
         </div>
 
-        <div class="min-h-0 flex-1 overflow-auto bg-background px-5 py-2.5" style="display: flex; flex-direction: column; gap: 8px;">
+        <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-auto px-[22px] py-3.5">
           {#if convertedTracks.length === 0}
             <div class="grid min-h-[240px] place-items-center">
               <p class="max-w-[360px] text-center text-[13px] text-muted-foreground">{$_('nus3Convert.reviewEmpty')}</p>
             </div>
           {:else}
           <div class="flex items-center gap-2.5">
-            <span class="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">
               {$_('nus3Convert.reviewQueue')}
             </span>
-            <span
-              class="inline-flex h-[22px] items-center rounded-full px-2 text-[11px] font-medium"
-              style="background: hsl(160 84% 39% / .12); color: hsl(160 84% 30%); border: 1px solid hsl(160 84% 39% / .3);"
-            >
+            <span class="chip border-transparent bg-accbg text-accink">
               {$_('nus3Convert.keeping', { values: { count: convertedTracks.length } })}
             </span>
           </div>
@@ -960,13 +924,12 @@
             {@const cand = meta?.candidate}
             {@const realPeaks = waveformPeaks.get(track.id) ?? []}
             {@const miniPeaks = realPeaks.length > 0 ? downsamplePeaks(realPeaks, 60) : generatePeaks(60, track.id.charCodeAt(0))}
-            <div class="rounded-xl border border-border bg-card p-3">
+            <div class="rounded-xl border border-line2 p-3">
               <div class="flex items-center gap-3.5">
                 <button
                   onclick={() => playReviewPreview(track)}
                   disabled={reviewLoadingId === track.id}
-                  class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-0 text-white disabled:opacity-60"
-                  style="background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 1px 0 hsl(var(--background)) inset, 0 4px 14px -2px hsl(var(--gradient-from) / .35);"
+                  class="btn w-[27px] px-0 shrink-0"
                 >
                   {#if reviewLoadingId === track.id}
                     <RefreshCw size={13} class="animate-spin" />
@@ -981,20 +944,17 @@
                   <div class="flex items-center gap-2">
                     <span class="text-[13.5px] font-semibold">{track.name}</span>
                     {#if cand}
-                      <span
-                        class="inline-flex h-[18px] items-center rounded-full px-2 text-[10px] font-medium"
-                        style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .15), hsl(var(--gradient-to) / .15)); color: hsl(var(--gradient-from)); border: 1px solid hsl(var(--gradient-from) / .3);"
-                      >
+                      <span class="chip h-[18px] border-transparent bg-accbg text-accink">
                         #{cand.rank} &middot; {cand.score.toFixed(1)}
                       </span>
                     {/if}
                   </div>
                   {#if cand}
-                    <span class="font-mono text-xs text-muted-foreground">
+                    <span class="tabular-nums text-xs text-muted-foreground">
                       {cand.loopStartStr} &rarr; {cand.loopEndStr} &middot; loop {cand.loopLengthStr}
                     </span>
                   {:else}
-                    <span class="font-mono text-xs text-muted-foreground">{$_('nus3Convert.endToEndLoop')}</span>
+                    <span class="tabular-nums text-xs text-muted-foreground">{$_('nus3Convert.endToEndLoop')}</span>
                   {/if}
                 </div>
 
@@ -1007,7 +967,7 @@
                         x={sFrac * 120} y="0"
                         width={(eFrac - sFrac) * 120}
                         height="36"
-                        fill="hsl(var(--gradient-from) / .12)"
+                        fill="rgb(var(--acc) / .12)"
                       />
                       {#each miniPeaks as p, i}
                         {@const h = 3 + p * 28}
@@ -1016,17 +976,17 @@
                         {@const inside = x / 120 >= sFrac && x / 120 <= eFrac}
                         <rect
                           x={x} y={y} width="1.2" height={h} rx="0.6"
-                          fill={inside ? 'hsl(var(--gradient-from))' : 'hsl(var(--muted-foreground))'}
+                          fill={inside ? 'rgb(var(--acc))' : 'rgb(var(--mut))'}
                           opacity={inside ? 0.9 : 0.35}
                         />
                       {/each}
                       <line
                         x1={sFrac * 120} x2={sFrac * 120} y1="2" y2="34"
-                        stroke="hsl(var(--gradient-from))" stroke-width="1.4"
+                        stroke="rgb(var(--acc))" stroke-width="1.4"
                       />
                       <line
                         x1={eFrac * 120} x2={eFrac * 120} y1="2" y2="34"
-                        stroke="hsl(var(--gradient-to))" stroke-width="1.4" stroke-dasharray="2 2"
+                        stroke="rgb(var(--acc))" stroke-width="1.4" stroke-dasharray="2 2"
                       />
                     </svg>
                   </div>
@@ -1036,10 +996,9 @@
                 <button
                   onclick={() => rejectFromReview(track)}
                   title={$_('nus3Convert.removeConverted')}
-                  class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-0 bg-transparent transition-colors hover:bg-destructive/10"
-                  style="color: hsl(var(--destructive));"
+                  class="btn-danger w-[27px] shrink-0 px-0"
                 >
-                  <Trash2 size={18} />
+                  <Trash2 size={13} />
                 </button>
               </div>
             </div>

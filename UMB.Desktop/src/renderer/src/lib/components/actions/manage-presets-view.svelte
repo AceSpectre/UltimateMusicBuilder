@@ -7,14 +7,14 @@
   import { guardLeave, trackUnsaved } from '$lib/stores/unsaved.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
   import { createSeriesSelection } from '$lib/series-selection.svelte'
-  import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
+  import ActionHeader from '$lib/components/ui/action-header.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import GameSelect from '$lib/components/ui/game-select.svelte'
   import IconButton from '$lib/components/ui/icon-button.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import { RECORD_OPTIONS, emptyPreset, resolvePreset, type PresetValues } from '$lib/presets'
-  import { inputClass, textareaClass, toolbarButtonClass } from '$lib/ui-classes'
+  import { inputClass, textareaClass } from '$lib/ui-classes'
   import type { ModInfo, SongPreset, TrackOrderData } from '$lib/types/electron'
 
   type Kind = 'series' | 'game' | 'preset'
@@ -109,7 +109,7 @@
 
 {#snippet row(kind: Kind, preset: SongPreset, onDelete?: () => void)}
   {@const parent = inherited(kind, preset)}
-  <div class="grid items-center gap-1 rounded border border-border bg-background/75 px-1 py-0.5" style={GRID_COLUMNS} role="listitem">
+  <div class="grid items-center gap-1 rounded border border-line2 px-1 py-0.5" style={GRID_COLUMNS} role="listitem">
     {#if kind === 'preset'}
       <input
         type="text"
@@ -125,7 +125,7 @@
     {/if}
 
     {#if kind === 'game'}
-      <span class="truncate px-1.5 font-mono text-[11px] text-muted-foreground">{preset.game}</span>
+      <span class="truncate px-1.5 tabular-nums text-[11px] text-muted-foreground">{preset.game}</span>
     {:else}
       <GameSelect
         bind:value={preset.game}
@@ -182,18 +182,9 @@
       }}
     />
 
-    <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
-      <div class="gradient-strip h-[3px] shrink-0"></div>
-      <div class="shrink-0 border-b border-border px-4 py-3 flex items-center justify-between gap-4">
-        <div class="flex min-w-0 items-center gap-3">
-          <GradientIcon>
-            <SlidersHorizontal size={18} />
-          </GradientIcon>
-          <h2 class="min-w-0 truncate text-sm font-semibold">{data?.seriesName ?? selection.selected?.name ?? $_('managePresets.title')}</h2>
-        </div>
-
-        <div class="flex shrink-0 items-center gap-2">
-          <button onclick={() => presets.push(emptyPreset())} class={toolbarButtonClass} disabled={!data}>
+    <section class="surface-grain flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-card">
+      <ActionHeader title={$_('managePresets.title')} subtitle={data?.seriesName ?? selection.selected?.name ?? ''}>
+          <button onclick={() => presets.push(emptyPreset())} class="btn" disabled={!data}>
             <Plus size={14} />
             {$_('managePresets.add')}
           </button>
@@ -206,18 +197,17 @@
             saving={$_('managePresets.saving')}
             saved={$_('managePresets.saved')}
           />
-        </div>
-      </div>
+      </ActionHeader>
 
-      <div class="min-h-0 flex-1 overflow-auto p-1">
+      <div class="min-h-0 flex-1 overflow-auto px-[22px] py-3.5">
         {#if dataLoading}
-          <div class="grid h-full min-h-[320px] place-items-center rounded-2xl border border-dashed border-border bg-background/60 text-[13px] text-muted-foreground">
+          <div class="grid h-full min-h-[320px] place-items-center rounded-xl border border-dashed border-border text-[13px] text-muted-foreground">
             {$_('managePresets.loading')}
           </div>
         {:else if data}
           <div class="min-w-[800px]">
             <div
-              class="sticky top-0 z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+              class="sticky top-0 z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim"
               style={GRID_COLUMNS}
             >
               {#each COLUMNS as column}

@@ -1,117 +1,141 @@
-@import '@fontsource/inter/300.css';
-@import '@fontsource/inter/400.css';
-@import '@fontsource/inter/500.css';
-@import '@fontsource/inter/600.css';
-@import '@fontsource/inter/700.css';
-@import '@fontsource/jetbrains-mono/400.css';
-@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/geist-sans/400.css';
+@import '@fontsource/geist-sans/500.css';
+@import '@fontsource/geist-sans/600.css';
+@import '@fontsource/geist-mono/400.css';
+@import '@fontsource/geist-mono/500.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens as RGB channels so Tailwind opacity modifiers work (see tailwind.config.ts). */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 4%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 4%;
-    --primary: 240 6% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 5% 96%;
-    --secondary-foreground: 240 6% 10%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-    --accent: 240 5% 96%;
-    --accent-foreground: 240 6% 10%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
-    --ring: 240 5% 65%;
-    --gradient-from: 262 83% 58%;
-    --gradient-to: 199 89% 48%;
+    --bg: 244 244 246;
+    --surf: 255 255 255;
+    --rail: 249 249 251;
+    --line: 226 226 232;
+    --line2: 237 237 241;
+    --ink: 23 23 28;
+    --mut: 108 107 122;
+    --dim: 157 156 171;
+    --hov: 239 239 243;
+    --chip: 241 241 244;
+    --acc: 15 139 141;
+    --accbg: 232 245 245;
+    --accink: 11 100 102;
+    --btnink: 255 255 255;
+    --sec: 124 58 237;
+    --secbg: 241 236 253;
+    --secink: 91 33 182;
+    --sb: 23 23 28;
+    --sbink: 201 200 214;
+    --sbacc: 167 139 250;
+    --warn: 180 83 9;
+    --err: 220 38 38;
+    --overlay-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.18);
+    --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.02'/%3E%3C/svg%3E");
   }
 
   .dark {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 8% 7%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 8% 7%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 6% 10%;
-    --secondary: 240 4% 16%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 240 4% 16%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 63% 50%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 4% 16%;
-    --input: 240 4% 18%;
-    --ring: 240 5% 65%;
-    --gradient-from: 262 83% 65%;
-    --gradient-to: 199 89% 55%;
+    --bg: 18 18 22;
+    --surf: 23 23 28;
+    --rail: 20 20 24;
+    --line: 41 41 49;
+    --line2: 32 32 39;
+    --ink: 232 231 238;
+    --mut: 148 147 163;
+    --dim: 98 97 111;
+    --hov: 30 30 37;
+    --chip: 30 30 37;
+    --acc: 60 200 194;
+    --accbg: 20 41 42;
+    --accink: 127 224 219;
+    --btnink: 10 23 22;
+    --sec: 167 139 250;
+    --secbg: 33 29 51;
+    --secink: 196 181 253;
+    --sb: 167 139 250;
+    --sbink: 20 17 31;
+    --sbacc: 20 17 31;
+    --warn: 229 180 90;
+    --err: 248 113 113;
+    --overlay-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.5);
   }
 
   * {
-    border-color: hsl(var(--border));
+    border-color: rgb(var(--line));
   }
 
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    background-color: rgb(var(--bg));
+    color: rgb(var(--ink));
+    font: 400 13px/1.5 'Geist Sans', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--acc));
+    outline-offset: 2px;
+  }
+
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: none;
   }
 }
 
 @layer components {
+  /* Faint noise on background surfaces only, never on controls. */
+  .surface-grain {
+    background-image: var(--noise);
+  }
+
+  .btn {
+    @apply inline-flex h-[27px] items-center justify-center gap-1.5 whitespace-nowrap rounded px-3 text-[12px] font-medium transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-45;
+    @apply border border-border bg-card text-foreground enabled:hover:border-dim;
+  }
+
+  .btn-primary {
+    @apply btn border-transparent bg-primary font-[550] text-primary-foreground enabled:hover:border-transparent enabled:hover:bg-primary/90;
+  }
+
   .btn-danger {
-    @apply inline-flex items-center gap-2 rounded-lg border-0 px-4 py-2 text-[12.5px] font-medium text-white transition-colors bg-destructive hover:bg-destructive/90 disabled:opacity-60;
+    @apply btn text-destructive;
+  }
+
+  /* 28px form input. */
+  .field {
+    @apply h-7 rounded border border-input bg-card px-2 text-[12.5px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
+  /* Scrolling body under an action header. */
+  .action-pane {
+    @apply surface-grain min-h-0 flex-1 overflow-auto bg-card px-[22px] py-3.5;
+  }
+
+  .chip {
+    @apply inline-flex h-[21px] items-center gap-1 rounded-sm border border-border bg-muted px-[7px] text-[11px] text-muted-foreground;
+  }
+
+  .chip-sec {
+    @apply chip border-transparent bg-secondary text-secondary-foreground;
   }
 }
 
 @layer utilities {
-  .gradient-strip {
-    background: linear-gradient(90deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
-  }
-
-  .gradient-bg {
-    background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
-  }
-
-  .gradient-text {
-    background: linear-gradient(90deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
   .drag-region {
     -webkit-app-region: drag;
-  }
-
-  /* Pulses a save button while there are unsaved changes. */
-  .save-glow {
-    border-color: hsl(var(--gradient-from));
-    animation: save-glow 1.6s ease-in-out infinite;
   }
 
   .no-drag {
     -webkit-app-region: no-drag;
   }
-}
 
-@keyframes save-glow {
-  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--gradient-from) / 0); }
-  50% { box-shadow: 0 0 14px 2px hsl(var(--gradient-from) / 0.55); }
+  .shadow-overlay {
+    box-shadow: var(--overlay-shadow);
+  }
 }
 
 ::-webkit-scrollbar {
@@ -120,7 +144,7 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
+  background: rgb(var(--line));
   border-radius: 999px;
 }
 
