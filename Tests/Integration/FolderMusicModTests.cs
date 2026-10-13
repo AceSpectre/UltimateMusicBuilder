@@ -220,6 +220,27 @@ namespace Tests.Integration
             Assert.Equal(6, seriesPlaylist.Tracks.Count);
         }
 
+        [Fact]
+        public void ExistingSeries_VanillaRowsBecomeOverridesNotNewSongs()
+        {
+            var modDir = _env.CreateConfiguredMod();
+            var marioDir = Path.Combine(modDir, "mario");
+            File.AppendAllText(Path.Combine(marioDir, "tracks.csv"),
+                "ui_bgm_a01_smb_chijyou,somewhat_good_lofi,Overworld,Kondo,Nintendo,arrange,sf_situationlink,2.5,flowerhead - Somewhat Good- Lofi - 01 summer.flac,False\n");
+            File.WriteAllBytes(Path.Combine(marioDir, "icon.png"), new byte[] { 1 });
+
+            var entries = CreateMod(modDir).GetMusicModEntries();
+
+            var edit = Assert.Single(entries.VanillaBgmOverrides);
+            Assert.Equal(("ui_bgm_a01_smb_chijyou", "ui_gametitle_somewhat_good_lofi", "Overworld", "Kondo", "Nintendo", "record_arrange"),
+                (edit.UiBgmId, edit.UiGameTitleId, edit.Title, edit.Author, edit.Copyright, edit.RecordType));
+            Assert.Equal(("sf_situationlink", "info_" + FolderMusicMod.DeriveToneId("flowerhead - Somewhat Good- Lofi - 01 summer.flac"), false, 2.5f),
+                (edit.SpecialCategory, edit.Info1, edit.InSoundtest, edit.VolumeDb));
+            Assert.DoesNotContain(entries.BgmDbRootEntries, e => e.UiBgmId == "ui_bgm_a01_smb_chijyou");
+            Assert.Equal(6, entries.PlaylistEntries.Single(p => p.Id == "bgmmario").Tracks.Count);
+            Assert.Equal(Path.Combine(marioDir, "icon.png"), entries.VanillaSeriesIcons["ui_series_mario"]);
+        }
+
         // ── Combined totals ────────────────────────────────────────────────
 
         [Fact]

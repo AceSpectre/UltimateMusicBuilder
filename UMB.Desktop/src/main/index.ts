@@ -37,7 +37,7 @@ function createWindow(): void {
   const isMac = process.platform === 'darwin'
 
   mainWindow = new BrowserWindow({
-    width: 1320,
+    width: 1716,
     height: 820,
     minWidth: 900,
     minHeight: 600,
@@ -140,6 +140,9 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.SET_SERIES_ICON, (_event, modPath: string, seriesId: string, iconDataUrl: string) =>
     api('series-set-icon', { modPath, seriesId, iconDataUrl }))
+
+  ipcMain.handle(IPC.ENSURE_VANILLA_SERIES, (_event, modPath: string, seriesId: string) =>
+    api('series-ensure-vanilla', { modPath, seriesId }))
 
   ipcMain.handle(IPC.LIST_NUS3_SOURCES, (_event, seriesPath: string) => api('nus3-list-sources', { seriesPath }))
 

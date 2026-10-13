@@ -62,7 +62,7 @@ namespace Sma5h.Mods.Music.Services
             _bgmPropertyEntries = new Dictionary<string, BgmPropertyEntry>();
             _playlistsEntries = new Dictionary<string, PlaylistEntry>();
             _stageEntries = new Dictionary<string, StageEntry>();
-            _coreVolumes = GetCoreNus3BankVolumes();
+            _coreVolumes = ReadCoreNus3BankVolumes(_config.CurrentValue.ResourcesPath);
             _seriesSongOrderings = new Dictionary<string, List<string>>();
         }
 
@@ -822,15 +822,15 @@ namespace Sma5h.Mods.Music.Services
             return output;
         }
 
-        private Dictionary<string, float> GetCoreNus3BankVolumes()
+        /// <summary>Vanilla nus3bank volumes (dB) by tone id; empty when the resource file is missing.</summary>
+        public static Dictionary<string, float> ReadCoreNus3BankVolumes(string resourcesPath)
         {
             var output = new Dictionary<string, float>();
 
-            var nusBankResourceFile = Path.Combine(_config.CurrentValue.ResourcesPath, MusicConstants.Resources.NUS3BANK_IDS_FILE);
+            var nusBankResourceFile = Path.Combine(resourcesPath, MusicConstants.Resources.NUS3BANK_IDS_FILE);
             if (!File.Exists(nusBankResourceFile))
                 return output;
 
-            _logger.LogDebug("Retrieving NusBank Volumes from CSV {CSVResource}", nusBankResourceFile);
             using (var reader = new StreamReader(nusBankResourceFile))
             {
                 var csvConfiguration = new CsvConfiguration(CultureInfo.InvariantCulture)
@@ -851,12 +851,12 @@ namespace Sma5h.Mods.Music.Services
             return output;
         }
 
-        private string ConvertFromGameTextTag(string input)
+        public static string ConvertFromGameTextTag(string input)
         {
             return input.Replace("\u000e\u0000\u0002\u0002P", "{{").Replace("\u000e\u0000\u0002\u0002d", "}}");
         }
 
-        private string ConvertToGameTextTag(string input)
+        public static string ConvertToGameTextTag(string input)
         {
             return input.Replace("{{", "\u000e\u0000\u0002\u0002P").Replace("}}", "\u000e\u0000\u0002\u0002d");
         }

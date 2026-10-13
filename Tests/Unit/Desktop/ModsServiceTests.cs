@@ -87,5 +87,13 @@ namespace Tests.Unit.Desktop
 
             Assert.Equal(new UMB.CLI.Desktop.ModStats(2, 3), _service.GetModStats(Path.Combine(_ws.ModsRoot, "persona")));
         }
+
+        [Fact]
+        public void GetModStats_LeavesOutVanillaSongEdits()
+        {
+            _ws.WriteSeries("persona", "a", "filename\nx.flac\nui_bgm_vanilla\n");
+
+            Assert.Equal(new UMB.CLI.Desktop.ModStats(1, 1), _service.GetModStats(Path.Combine(_ws.ModsRoot, "persona")));
+        }
     }
 }

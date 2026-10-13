@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
+using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -128,7 +129,7 @@ namespace UMB.CLI.Services
                 if (header.Id == null) continue;
 
                 var tracks = TracksCsv.ReadLenient(csvPath)
-                    .Where(r => r.Get("filename").Length > 0)
+                    .Where(r => r.Get("filename").Length > 0 && !FolderMusicMod.IsVanillaBgmId(r.Get("filename")))
                     .Select(r => new Track(r.Get("filename"),
                         r.Get("title").Length > 0 ? r.Get("title") : Path.GetFileNameWithoutExtension(r.Get("filename"))))
                     .ToList();

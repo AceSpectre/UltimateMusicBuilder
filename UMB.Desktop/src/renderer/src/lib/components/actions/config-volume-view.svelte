@@ -8,7 +8,9 @@
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
+  import { guardLeave, trackUnsaved } from '$lib/stores/unsaved.svelte'
   import { modsStore } from '$lib/stores/mods.svelte'
+  import { settingsStore } from '$lib/stores/settings.svelte'
   import { createSeriesLoader } from '$lib/series-loader'
   import { DB_INPUT, dbToGain, formatBankDb, formatDb, parseDb } from '$lib/volume'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
@@ -50,7 +52,7 @@
   const isDirty = $derived(seriesDbDirty || rows.some((r) => Math.abs((baseline.get(r.originalIndex) ?? r.trackDb) - r.trackDb) > 0.0001))
   // Highlighted when no LUFS cache exists yet.
   const canAnalyze = $derived(!!data && !!selectedPath && data.ffmpegAvailable && !analyzing && !loadingConfig)
-  const needsAnalysis = $derived(!!data && !data.lufsCacheExists)
+  const needsAnalysis = $derived(!!data && !data.lufsCacheExists && rows.some((r) => !r.isVanilla))
 
   // Total boost the build applies: global + series + auto-gain + track.
   function effectiveDb(row: VolumeRowItem): number {
@@ -106,8 +108,10 @@
 
   function selectSeries(path: string) {
     if (path === selectedPath) return
-    selectedPath = path
-    void loadConfig(path)
+    guardLeave(() => {
+      selectedPath = path
+      void loadConfig(path)
+    })
   }
 
   function handleAnalyze() {
@@ -243,6 +247,21 @@
     })
   })
 
+  // Settings changed (global boost, vanilla rows): reload the open series, keeping unsaved edits.
+  $effect(() => {
+    if (!settingsStore.version) return
+    untrack(async () => {
+      const path = selectedPath
+      if (!path || analyzing) return
+      const edits = new Map(rows.map((r) => [r.originalIndex, r.trackDb]))
+      const editedSeriesDb = seriesDb
+      await loadConfig(path)
+      if (path !== selectedPath) return
+      rows = rows.map((r) => ({ ...r, trackDb: edits.get(r.originalIndex) ?? r.trackDb }))
+      seriesDb = editedSeriesDb
+    })
+  })
+
   $effect(() => {
     const unsub = window.electron.umb.subscribeVolumeProgress((p: VolumeProgress) => {
       analyzeProgress = p
@@ -257,6 +276,8 @@
       audioCtx = null
     }
   })
+
+  trackUnsaved(() => isDirty, handleSave)
 </script>
 
 {#snippet boost(db: number, caption: string, hint: string)}
@@ -418,7 +439,7 @@
                     <td class="w-full max-w-0 px-3 py-2">
                       <div class="flex min-w-0 flex-col">
                         <span class="truncate font-semibold">{row.title}</span>
-                        <span class="truncate text-[11px] text-muted-foreground">{row.filename}</span>
+                        <span class="truncate text-[11px] text-muted-foreground">{row.isVanilla ? `${$_('orderTracks.vanillaTag')} · ` : ''}{row.filename}</span>
                       </div>
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px]">
@@ -435,7 +456,7 @@
                       </div>
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px]">
-                      {row.hasMeasurement ? formatBankDb((data?.bankBaseDb ?? 0) + row.autoGainDb) : '—'}
+                      {row.hasMeasurement || row.isVanilla ? formatBankDb(row.bankBaseDb + row.autoGainDb) : '—'}
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-right">
                       <div class="flex items-center justify-end gap-2 font-mono text-[12px]">
@@ -453,7 +474,7 @@
                         />
                       </div>
                     </td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px] font-semibold">{formatBankDb((data?.bankBaseDb ?? 0) + effectiveDb(row))}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px] font-semibold">{formatBankDb(row.bankBaseDb + effectiveDb(row))}</td>
                     <td class="whitespace-nowrap px-3 py-2 text-right">
                       <button
                         onclick={() => togglePreview(row)}

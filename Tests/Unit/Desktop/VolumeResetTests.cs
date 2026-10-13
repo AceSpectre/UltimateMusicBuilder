@@ -14,7 +14,7 @@ namespace Tests.Unit.Desktop
         public VolumeResetTests()
         {
             _service = new VolumeConfigService(_ws.MusicOptions(), new Mock<ILufsAnalysisService>().Object,
-                new Mock<IAudioDecodeService>().Object, TestEnvironment.CreateLogger<VolumeConfigService>());
+                new Mock<IAudioDecodeService>().Object, TestCatalog.Service(), TestEnvironment.CreateLogger<VolumeConfigService>());
         }
 
         public void Dispose() => _ws.Dispose();

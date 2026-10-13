@@ -42,6 +42,8 @@ export interface TrackOrderItem {
   isLocked: boolean
   originalIndex: number | null
   fields: TrackFields | null
+  /** A vanilla song: a tracks.csv row named by its ui_bgm id, or a locked song_order.toml entry. */
+  isVanilla: boolean
 }
 
 export interface SeriesGame {
@@ -106,6 +108,11 @@ export interface SeriesOrderItem {
   iconDataUrl: string | null
   originalIndex: number
   fields: SeriesFields
+  isVanilla: boolean
+  /** Vanilla games of a vanilla series; the build keeps their names. */
+  lockedGameIds: string[]
+  /** A vanilla series' playlist in the game ('' for a custom series). */
+  vanillaPlaylist: string
 }
 
 export interface SaveSeriesItem {
@@ -126,7 +133,10 @@ export interface SeriesOrderData {
   modName: string
   modPath: string
   hasSeriesOrder: boolean
+  /** Custom series, in display order. */
   items: SeriesOrderItem[]
+  /** Every vanilla series; seriesPath is '' until it has a folder in the mod. */
+  vanillaItems: SeriesOrderItem[]
 }
 
 export interface LoopCandidate {
@@ -199,6 +209,10 @@ export interface VolumeRowItem {
   autoGainDb: number
   wasClamped: boolean
   trackDb: number
+  /** nus3bank volume (dB) of the track with no boosts. */
+  bankBaseDb: number
+  /** A vanilla song: no auto-gain. Only listed with applyVolumeToVanilla. */
+  isVanilla: boolean
 }
 
 export interface VolumeConfigData {
@@ -208,8 +222,6 @@ export interface VolumeConfigData {
   seriesDb: number
   targetLufs: number
   maxGainDb: number
-  /** nus3bank volume (dB) of a track with no boosts. */
-  bankBaseDb: number
   ffmpegAvailable: boolean
   lufsCacheExists: boolean
   items: VolumeRowItem[]

@@ -3,9 +3,8 @@
   import ArrowUp from '@lucide/svelte/icons/arrow-up'
   import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down'
   import GripVertical from '@lucide/svelte/icons/grip-vertical'
-  import Eye from '@lucide/svelte/icons/eye'
-  import EyeOff from '@lucide/svelte/icons/eye-off'
   import Lock from '@lucide/svelte/icons/lock'
+  import LockOpen from '@lucide/svelte/icons/lock-open'
   import Music4 from '@lucide/svelte/icons/music-4'
   import ListChecks from '@lucide/svelte/icons/list-checks'
   import Palette from '@lucide/svelte/icons/palette'
@@ -15,13 +14,13 @@
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
   import { modsStore } from '$lib/stores/mods.svelte'
+  import { guardLeave, trackUnsaved } from '$lib/stores/unsaved.svelte'
   import { createSeriesSelection } from '$lib/series-selection.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import GameSelect from '$lib/components/ui/game-select.svelte'
-  import Modal from '$lib/components/ui/modal.svelte'
   import { inSoundtest, overlayLegend, overlayStyle, seriesGameIds } from '$lib/song-overlay'
   import { nextSort, sortBy, type SortKey, type SortState } from '$lib/table-sort'
   import { RECORD_OPTIONS, applyChoice, missingDefaults, presetChoices, type PresetChoice } from '$lib/presets'
@@ -53,11 +52,12 @@
   let dndItems = $state<TrackOrderItem[]>([])
   let orderLoading = $state(false)
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
-  let pendingSeriesPath = $state<string | null>(null)
   let baselineSnapshot = $state('')
   let selectedItemId = $state<string | null>(null)
   let overlayOn = $state(false)
-  let hideVanilla = $state(false)
+  // Locked vanilla songs are read-only and keep their place, as before they were editable.
+  let vanillaLocked = $state(true)
+  const isReadOnly = (item: TrackOrderItem): boolean => item.isLocked || (item.isVanilla && vanillaLocked)
   let sort = $state<SortState<SortColumn>>({ column: 'index', desc: false })
 
   function snapshot(items: TrackOrderItem[]): string {
@@ -79,7 +79,7 @@
   // songs store their base-game info id (info_*). Both share one searchable dropdown.
   const modPinchOptions = $derived(
     dndItems
-      .filter((item) => item.fields !== null && item.filename)
+      .filter((item) => item.fields !== null && item.filename && !item.isVanilla)
       .map((item) => ({ value: item.filename, title: item.fields?.title || item.filename }))
   )
   const vanillaPinchOptions = $derived(
@@ -106,13 +106,12 @@
     soundtest: (item) => Boolean(item.fields && inSoundtest(item.fields))
   }
 
-  // Sorting and hiding are display-only; dragging needs the full list in real track order.
-  const canDrag = $derived(sort.column === 'index' && !sort.desc && !hideVanilla)
-  const hasVanilla = $derived(dndItems.some((item) => !item.fields))
+  // Sorting is display-only; dragging needs the list in real track order.
+  const canDrag = $derived(sort.column === 'index' && !sort.desc)
+  const hasVanilla = $derived(dndItems.some((item) => item.isVanilla))
   const displayItems = $derived.by(() => {
     if (canDrag) return dndItems
-    const visible = hideVanilla ? dndItems.filter((item) => item.fields) : dndItems
-    return sortBy(visible, sort.desc, sortKeys[sort.column])
+    return sortBy(dndItems, sort.desc, sortKeys[sort.column])
   })
 
 
@@ -225,38 +224,7 @@
   }
 
   function requestSelectSeries(path: string) {
-    if (path === modsStore.activeSeriesPath) {
-      return
-    }
-
-    if (isDirty) {
-      pendingSeriesPath = path
-      return
-    }
-
-    modsStore.activeSeriesPath = path
-  }
-
-  async function confirmSaveAndSwitch() {
-    const target = pendingSeriesPath
-    pendingSeriesPath = null
-    await handleSave()
-    if (target) {
-      modsStore.activeSeriesPath = target
-    }
-  }
-
-  function discardAndSwitch() {
-    const target = pendingSeriesPath
-    pendingSeriesPath = null
-    baselineSnapshot = snapshot(dndItems)
-    if (target) {
-      modsStore.activeSeriesPath = target
-    }
-  }
-
-  function cancelSwitch() {
-    pendingSeriesPath = null
+    if (path !== modsStore.activeSeriesPath) guardLeave(() => (modsStore.activeSeriesPath = path))
   }
 
   function handleReload() {
@@ -290,6 +258,8 @@
   })
 
   const recordLabel = (value: string): string => $_(`orderTracks.record.${value}`, { default: value })
+
+  trackUnsaved(() => isDirty, handleSave)
 </script>
 
 <div class="flex-1 overflow-hidden">
@@ -326,13 +296,13 @@
           </button>
 
           <button
-            onclick={() => (hideVanilla = !hideVanilla)}
-            class="{toolbarButtonClass} w-[130px] justify-center"
+            onclick={() => (vanillaLocked = !vanillaLocked)}
+            class="{toolbarButtonClass} w-[140px] justify-center"
             disabled={!hasVanilla}
-            aria-pressed={hideVanilla}
+            aria-pressed={!vanillaLocked}
           >
-            {#if hideVanilla}<Eye size={14} />{:else}<EyeOff size={14} />{/if}
-            {$_(hideVanilla ? 'orderTracks.showVanilla' : 'orderTracks.hideVanilla')}
+            {#if vanillaLocked}<LockOpen size={14} />{:else}<Lock size={14} />{/if}
+            {$_(vanillaLocked ? 'orderTracks.unlockVanilla' : 'orderTracks.lockVanilla')}
           </button>
 
           <button
@@ -424,18 +394,19 @@
               onfinalize={handleFinalize}
             >
               {#each displayItems as item (item.id)}
-                {@const isSelected = !item.isLocked && item.id === selectedItemId}
+                {@const readOnly = isReadOnly(item)}
+                {@const isSelected = !readOnly && item.id === selectedItemId}
                 <div
                   animate:flip={{ duration: FLIP_MS }}
-                  class="grid items-center gap-1 rounded border px-1 py-0.5 {item.isLocked ? 'border-border bg-background/75 opacity-80' : isSelected ? 'border-transparent bg-background ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border bg-background/75'}"
+                  class="grid items-center gap-1 rounded border px-1 py-0.5 {readOnly ? 'border-border bg-background/75 opacity-80' : isSelected ? 'border-transparent bg-background ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border bg-background/75'}"
                   style="{GRID_COLUMNS} {overlayOn ? overlayStyle(item, gameIds) : ''}"
                   role="listitem"
-                  onfocusincapture={() => { if (!item.isLocked) selectedItemId = item.id }}
-                  onpointerdown={() => { if (!item.isLocked) selectedItemId = item.id }}
+                  onfocusincapture={() => { if (!readOnly) selectedItemId = item.id }}
+                  onpointerdown={() => { if (!readOnly) selectedItemId = item.id }}
                 >
                   <div class="flex items-center gap-1">
                     <span class="w-6 text-right text-[11px] tabular-nums text-muted-foreground">{dndItems.indexOf(item) + 1}</span>
-                    {#if item.isLocked}
+                    {#if readOnly}
                       <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted/70 text-muted-foreground" title={$_('orderTracks.locked')}>
                         <Lock size={13} />
                       </div>
@@ -451,11 +422,12 @@
                     {/if}
                   </div>
 
-                  {#if item.fields}
+                  {#if item.fields && !readOnly}
                     {@const f = item.fields}
                     <textarea
-                      class={textareaClass}
+                      class="{textareaClass} {item.isVanilla ? 'italic' : ''}"
                       bind:value={f.title}
+                      title={item.isVanilla ? $_('orderTracks.vanillaHint') : ''}
                       aria-label={$_('orderTracks.colTitle')}
                     ></textarea>
 
@@ -508,7 +480,7 @@
                     </div>
                   {:else}
                     <!-- Locked vanilla row: read-only, same grid layout/height as editable rows -->
-                    <div class="truncate rounded border border-transparent px-1.5 py-0.5 text-[12.5px] font-medium" title={item.title}>{item.title}</div>
+                    <div class="truncate rounded border border-transparent px-1.5 py-0.5 text-[12.5px] font-medium" title={item.fields?.title ?? item.title}>{item.fields?.title ?? item.title}</div>
                     <span class="truncate self-center px-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">{$_('orderTracks.vanillaTag')}</span>
                     <span></span>
                     <span></span>
@@ -529,35 +501,3 @@
     </section>
   </div>
 </div>
-
-{#if pendingSeriesPath}
-  <Modal>
-      <div class="px-5 py-4">
-        <h3 class="text-sm font-semibold">{$_('orderTracks.unsavedTitle')}</h3>
-        <p class="pt-1.5 text-[13px] text-muted-foreground">
-          {$_('orderTracks.unsavedBodyBefore')}
-          <span class="font-medium text-foreground">{orderData?.seriesName ?? selection.selected?.name}</span>{$_('orderTracks.unsavedBodyAfter')}
-        </p>
-      </div>
-      <div class="flex flex-col gap-2 border-t border-border px-5 py-4">
-        <button
-          onclick={confirmSaveAndSwitch}
-          class="inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted"
-        >
-          {$_('orderTracks.saveAndSwitch')}
-        </button>
-        <button
-          onclick={discardAndSwitch}
-          class="inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted"
-        >
-          {$_('orderTracks.discard')}
-        </button>
-        <button
-          onclick={cancelSwitch}
-          class="inline-flex items-center justify-center rounded-lg px-3 py-2 text-[12.5px] font-medium text-muted-foreground transition-colors hover:bg-muted"
-        >
-          {$_('orderTracks.continue')}
-        </button>
-      </div>
-  </Modal>
-{/if}

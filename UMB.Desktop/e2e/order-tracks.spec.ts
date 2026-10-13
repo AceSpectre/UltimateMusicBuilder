@@ -118,3 +118,19 @@ test('UI: Apply Preset enables only after selecting a custom song', async () => 
   await page.getByLabel('Title').first().click()
   await expect(applyPreset).toBeEnabled()
 })
+
+test('UI: switching series with unsaved changes asks first', async () => {
+  const page = await firstWindow(app)
+  await page.getByText('Manage Songs').first().click()
+  await page.getByRole('button', { name: 'dev' }).first().click()
+  await page.getByLabel('Title').first().fill('Unsaved Title')
+
+  await page.getByRole('button', { name: 'mario' }).first().click()
+  await page.getByRole('button', { name: 'Continue making changes' }).click()
+  await expect(page.getByLabel('Title').first()).toHaveValue('Unsaved Title')
+
+  await page.getByRole('button', { name: 'mario' }).first().click()
+  await page.getByRole('button', { name: 'No, discard changes' }).click()
+  await expect(page.getByRole('heading', { name: 'Unsaved changes' })).toBeHidden()
+  expect(readFileSync(join(devPath(), 'tracks.csv'), 'utf8')).not.toContain('Unsaved Title')
+})

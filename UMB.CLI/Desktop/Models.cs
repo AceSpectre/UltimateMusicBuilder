@@ -19,9 +19,15 @@ namespace UMB.CLI.Desktop
         public List<SeriesGame> Games { get; set; } = new();
     }
 
-    /// <summary>VolumeDb is the read-only series dB boost; Config Volume edits it via SeriesPath.</summary>
-    public record SeriesOrderItem(string Id, string Name, string SeriesId, string SeriesPath, double VolumeDb, string IconDataUrl, int OriginalIndex, SeriesFields Fields);
-    public record SeriesOrderData(string ModName, string ModPath, bool HasSeriesOrder, List<SeriesOrderItem> Items);
+    /// <summary>
+    /// VolumeDb is the read-only series dB boost; Config Volume edits it via SeriesPath.
+    /// LockedGameIds are the vanilla games of a vanilla series, whose names the build cannot change;
+    /// VanillaPlaylist is its playlist in the game ("" for a custom series).
+    /// </summary>
+    public record SeriesOrderItem(string Id, string Name, string SeriesId, string SeriesPath, double VolumeDb, string IconDataUrl, int OriginalIndex,
+        SeriesFields Fields, bool IsVanilla, List<string> LockedGameIds, string VanillaPlaylist);
+    /// <summary>Items are the custom series (ordered); VanillaItems every vanilla series, whose SeriesPath is "" until it has a folder.</summary>
+    public record SeriesOrderData(string ModName, string ModPath, bool HasSeriesOrder, List<SeriesOrderItem> Items, List<SeriesOrderItem> VanillaItems);
     public record SaveSeriesItem(string Id, SeriesFields Fields);
 
     public class CreateSeriesInput
@@ -47,7 +53,7 @@ namespace UMB.CLI.Desktop
     }
 
     public record TrackOrderItem(string Id, string Title, string Subtitle, string BgmId, string Filename,
-        bool IsLocked, int? OriginalIndex, TrackFields Fields, bool IsPinchTarget);
+        bool IsLocked, int? OriginalIndex, TrackFields Fields, bool IsPinchTarget, bool IsVanilla);
 
     public record VanillaSongOption(string InfoId, string Name);
 

@@ -28,12 +28,14 @@ namespace Tests.Integration
 
         private VolumeConfigService CreateService(
             Mock<ILufsAnalysisService> lufs = null,
-            Mock<IAudioDecodeService> decode = null)
+            Mock<IAudioDecodeService> decode = null,
+            VanillaCatalogService.Catalog catalog = null)
         {
             return new VolumeConfigService(
                 _env.CreateMusicOptions(),
                 (lufs ?? new Mock<ILufsAnalysisService>()).Object,
                 (decode ?? new Mock<IAudioDecodeService>()).Object,
+                TestCatalog.Service(catalog),
                 TestEnvironment.CreateLogger<VolumeConfigService>());
         }
 
@@ -186,6 +188,26 @@ namespace Tests.Integration
         // ── RunAnalyzeBatch ─────────────────────────────────────────────────
 
         [Fact]
+        public void RunAnalyzeBatch_ListsVanillaSongsWithTheirBankVolumeAndNoAutoGain()
+        {
+            var seriesDir = SetupSeries("mario", ("a.nus3audio", "0"));
+            File.WriteAllText(Path.Combine(seriesDir, "series.toml"),
+                "[series]\nid = \"mario\"\nexisting-series = true\n\n[[games]]\nid = \"smb\"\nname = \"Super Mario Bros.\"\n");
+            var outputPath = Path.Combine(_env.TempDir, "analyze-vanilla.json");
+            var lufs = ValidLufsMock(lufs: -18.0f, gain: 2.5f, available: true);
+
+            CreateService(lufs, catalog: TestCatalog.Mario()).RunAnalyzeBatch(WriteJson(new { seriesPath = seriesDir, outputPath, analyze = true }));
+
+            var result = ReadResult(outputPath);
+            Assert.Equal(new[] { "a.nus3audio", "ui_bgm_a01_smb_chijyou", "ui_bgm_a05_smb3_hikousen" }, result.Items.Select(i => i.Filename));
+            var ground = result.Items[1];
+            Assert.True(ground.IsVanilla);
+            Assert.False(ground.HasMeasurement);
+            Assert.Equal(2.1f, ground.BankBaseDb);
+            lufs.Verify(m => m.Measure(It.IsAny<string>()), Times.Once);
+        }
+
+        [Fact]
         public void RunAnalyzeBatch_Analyze_WritesMeasuredResult()
         {
             var seriesDir = SetupSeries("dev", ("a.nus3audio", "0"), ("b.nus3audio", "0"));
@@ -198,10 +220,11 @@ namespace Tests.Integration
             var result = ReadResult(outputPath);
             Assert.Equal("dev", result.SeriesName);
             Assert.True(result.FfmpegAvailable);
-            Assert.Equal(MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB, result.BankBaseDb);
             Assert.Equal(2, result.Items.Count);
             Assert.All(result.Items, item =>
             {
+                Assert.Equal(MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB, item.BankBaseDb);
+                Assert.False(item.IsVanilla);
                 Assert.True(item.HasMeasurement);
                 Assert.Equal(-18.0f, item.MeasuredLufs);
                 Assert.Equal(VolumeHelper.MultiplierToDb(2.5f), item.AutoGainDb, precision: 4);

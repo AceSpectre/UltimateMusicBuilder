@@ -5,6 +5,8 @@ using UMB.CLI.Views;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
 using Sma5h.Mods.Music.Interfaces;
+using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
+using Sma5h.Mods.Music.Services;
 using Spectre.Console;
 using System;
 using System.Collections.Generic;
@@ -60,17 +62,18 @@ namespace UMB.CLI.Services
         public float AutoGainDb { get; set; }
         public bool WasClamped { get; set; }
         public float TrackDb { get; set; }
+        /// <summary>nus3bank volume (dB) of the track with no boosts; the boosts are added to it.</summary>
+        public float BankBaseDb { get; set; } = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB;
+        /// <summary>A vanilla song: no auto-gain, and the desktop app lists it only with ApplyVolumeToVanilla.</summary>
+        public bool IsVanilla { get; set; }
     }
 
     public class VolumeAnalyzeResultDto
     {
         public string SeriesName { get; set; }
-        public float GlobalDb { get; set; }
         public double SeriesDb { get; set; }
         public float TargetLufs { get; set; }
         public float MaxGainDb { get; set; }
-        /// <summary>nus3bank volume (dB) of a track with no boosts; the boosts are added to it.</summary>
-        public float BankBaseDb { get; set; } = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB;
         public bool FfmpegAvailable { get; set; }
         /// <summary>True if a LUFS cache file already exists for the series directory.</summary>
         public bool LufsCacheExists { get; set; }
@@ -83,17 +86,33 @@ namespace UMB.CLI.Services
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
         private readonly ILufsAnalysisService _lufsService;
         private readonly IAudioDecodeService _decodeService;
+        private readonly VanillaCatalogService _catalog;
+        private readonly Lazy<Dictionary<string, float>> _vanillaBankDb;
 
         public VolumeConfigService(
             IOptionsMonitor<Sma5hMusicOptions> musicConfig,
             ILufsAnalysisService lufsService,
             IAudioDecodeService decodeService,
+            VanillaCatalogService catalog,
             ILogger<VolumeConfigService> logger)
         {
             _musicConfig = musicConfig;
             _lufsService = lufsService;
             _decodeService = decodeService;
+            _catalog = catalog;
             _logger = logger;
+            _vanillaBankDb = new(() => AudioStateService.ReadCoreNus3BankVolumes(musicConfig.CurrentValue.ResourcesPath));
+        }
+
+        private string VanillaToneId(string bgmId) => _catalog.Get()?.Songs.FirstOrDefault(s => s.BgmId == bgmId)?.ToneId;
+
+        /// <summary>A row's audio file: in the series folder, or the game's own for a vanilla song ("" when unknown).</summary>
+        private string SourcePath(string seriesDir, string filename)
+        {
+            if (!FolderMusicMod.IsVanillaBgmId(filename)) return Path.Combine(seriesDir, filename);
+            return VanillaToneId(filename) is { } toneId
+                ? Path.Combine(_musicConfig.CurrentValue.GameResourcesPath, "stream", "sound", "bgm", string.Format(MusicConstants.GameResources.NUS3AUDIO_FILE, toneId))
+                : "";
         }
 
         public void Run()
@@ -212,7 +231,7 @@ namespace UMB.CLI.Services
         {
             var filename = row.GetValueOrDefault("filename", "");
             var title = row.GetValueOrDefault("title", filename);
-            var sourcePath = string.IsNullOrEmpty(filename) ? "" : Path.Combine(seriesDir, filename);
+            var sourcePath = string.IsNullOrEmpty(filename) ? "" : SourcePath(seriesDir, filename);
 
             var dto = new VolumeRowDto
             {
@@ -222,7 +241,14 @@ namespace UMB.CLI.Services
                 TrackDb = ParseDb(row.GetValueOrDefault(TracksCsv.VolumeDbColumn, "")),
             };
 
-            if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
+            // Vanilla songs are boosted by hand only, from their own bank volume.
+            if (FolderMusicMod.IsVanillaBgmId(filename))
+            {
+                dto.IsVanilla = true;
+                if (VanillaToneId(filename) is { } toneId && _vanillaBankDb.Value.TryGetValue(toneId, out var bankDb))
+                    dto.BankBaseDb = bankDb;
+            }
+            else if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
             {
                 var measurement = useCacheOnly ? _lufsService.MeasureCached(sourcePath) : _lufsService.Measure(sourcePath);
                 if (measurement.IsValid)
@@ -266,6 +292,7 @@ namespace UMB.CLI.Services
                 return;
             }
 
+            VanillaTracks.Backfill(seriesDir, _catalog.Get());
             var (rows, _) = ReadCsvRows(csvPath);
 
             var lufsOpts = _musicConfig.CurrentValue.Sma5hMusic.LufsNormalization ?? new();
@@ -301,7 +328,6 @@ namespace UMB.CLI.Services
             WriteAnalyzeResult(input.OutputPath, new VolumeAnalyzeResultDto
             {
                 SeriesName = Path.GetFileName(seriesDir),
-                GlobalDb = _musicConfig.CurrentValue.Sma5hMusic.GlobalVolumeDb,
                 SeriesDb = SeriesToml.ReadVolumeDb(seriesDir),
                 TargetLufs = target,
                 MaxGainDb = maxGainDb,
@@ -366,7 +392,7 @@ namespace UMB.CLI.Services
                 return;
             }
 
-            var sourcePath = Path.Combine(input.SeriesPath, input.Filename);
+            var sourcePath = SourcePath(input.SeriesPath, input.Filename);
             if (!File.Exists(sourcePath))
             {
                 _logger.LogError("Source file not found: {Path}", sourcePath);

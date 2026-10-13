@@ -58,6 +58,15 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
+        public void Load_LeavesOutVanillaSongEdits()
+        {
+            var modPath = SeedMod();
+            File.AppendAllText(Path.Combine(modPath, "mario", "tracks.csv"), "ui_bgm_vanilla,g,Vanilla\n");
+
+            Assert.DoesNotContain(_service.Load(modPath).Songs, s => s.Filename == "ui_bgm_vanilla");
+        }
+
+        [Fact]
         public void Load_ReadsAPlaylistBlockAsPerSongAssignments()
         {
             var menu = Playlist(_service.Load(SeedMod()), "bgmsmashmenu");

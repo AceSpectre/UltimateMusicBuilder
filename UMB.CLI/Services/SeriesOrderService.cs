@@ -10,6 +10,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace UMB.CLI.Services
@@ -25,16 +27,19 @@ namespace UMB.CLI.Services
             "# Listed series appear after official series, before \"Other\"\n" +
             "# Unlisted custom series will be placed after these\n";
 
+        private const string VanillaItemPrefix = "vanilla:";
         private static readonly Regex SeriesIdPattern = new("^[a-z0-9_]+$");
         private static readonly Regex PngDataUrl = new("^data:image/png;base64,([A-Za-z0-9+/=]+)$");
 
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
+        private readonly VanillaCatalogService _catalog;
 
-        public SeriesOrderService(IOptionsMonitor<Sma5hMusicOptions> musicConfig,
+        public SeriesOrderService(IOptionsMonitor<Sma5hMusicOptions> musicConfig, VanillaCatalogService catalog,
             ILogger<SeriesOrderService> logger)
         {
             _musicConfig = musicConfig;
+            _catalog = catalog;
             _logger = logger;
         }
 
@@ -112,15 +117,61 @@ namespace UMB.CLI.Services
 
         public SeriesOrderData Load(string modPath) => Load(ModPaths.ResolveUnderMods(_musicConfig, modPath), out _);
 
-        /// <param name="series">The scanned series, indexed like the returned items.</param>
-        private SeriesOrderData Load(string resolvedModPath, out List<CustomSeries> series)
+        /// <param name="series">The scanned custom series, indexed like the returned items.</param>
+        private SeriesOrderData Load(string resolvedModPath, out List<SeriesFolder> series)
         {
-            series = SortedCustomSeries(resolvedModPath);
+            var folders = ScanSeries(resolvedModPath);
+            series = SortedCustomSeries(resolvedModPath, folders);
             var items = series
-                .Select((s, index) => new SeriesOrderItem($"series:{index}", s.Name, s.Id, s.Dir, s.VolumeDb, s.IconDataUrl, index, s.Fields))
+                .Select((s, index) => new SeriesOrderItem($"series:{index}", s.Name, s.Id, s.Dir, s.VolumeDb, s.IconDataUrl, index, s.Fields, false, new List<string>(), ""))
                 .ToList();
             var hasSeriesOrder = SeriesToml.ReadIdList(SeriesOrderPath(resolvedModPath)).Count > 0;
-            return new SeriesOrderData(Path.GetFileName(resolvedModPath), resolvedModPath, hasSeriesOrder, items);
+            return new SeriesOrderData(Path.GetFileName(resolvedModPath), resolvedModPath, hasSeriesOrder, items, VanillaItems(folders));
+        }
+
+        /// <summary>
+        /// Every vanilla series, in sound test order. One without a folder in the mod yet has an
+        /// empty SeriesPath and the vanilla fields; the folder is created on its first edit.
+        /// </summary>
+        private List<SeriesOrderItem> VanillaItems(List<SeriesFolder> folders)
+        {
+            if (_catalog.Get() is not { } catalog) return new List<SeriesOrderItem>();
+            var existing = folders.Where(f => f.ExistingSeries).GroupBy(f => f.Id).ToDictionary(g => g.Key, g => g.First());
+            return catalog.Series.Select(s =>
+                {
+                    var gameIds = VanillaTracks.Games(catalog, s.Id).Select(g => g.Id).ToList();
+                    return existing.TryGetValue(s.Id, out var folder)
+                        ? new SeriesOrderItem(VanillaItemPrefix + s.Id, s.Name, s.Id, folder.Dir, folder.VolumeDb, folder.IconDataUrl, -1, folder.Fields, true, gameIds, s.Playlist)
+                        : new SeriesOrderItem(VanillaItemPrefix + s.Id, s.Name, s.Id, "", 0, null, -1, VanillaFields(catalog, s), true, gameIds, s.Playlist);
+                })
+                .ToList();
+        }
+
+        private static SeriesFields VanillaFields(VanillaCatalogService.Catalog catalog, VanillaCatalogService.Series series)
+        {
+            var games = VanillaTracks.Games(catalog, series.Id);
+            return new SeriesFields { Name = series.Name, SeriesPlaylist = series.Playlist, Games = games };
+        }
+
+        /// <summary>The folder of a vanilla series in the mod, creating it with every vanilla song as a row.</summary>
+        public string EnsureVanillaSeries(string modPath, string seriesId) =>
+            EnsureVanillaFolder(ModPaths.ResolveUnderMods(_musicConfig, modPath), seriesId);
+
+        private string EnsureVanillaFolder(string resolvedModPath, string seriesId)
+        {
+            if (ScanSeries(resolvedModPath).FirstOrDefault(s => s.ExistingSeries && s.Id == seriesId) is { } folder)
+                return folder.Dir;
+
+            var catalog = _catalog.Get();
+            var series = catalog?.Series.FirstOrDefault(s => s.Id == seriesId) ?? throw new DesktopApiException("Series not found.");
+            var dir = Path.Combine(resolvedModPath, seriesId);
+            if (Directory.Exists(dir))
+                throw new DesktopApiException($"A folder named \"{seriesId}\" already exists in this mod.");
+
+            WriteNewSeries(dir, seriesId, VanillaFields(catalog, series), existingSeries: true);
+            VanillaTracks.Backfill(dir, catalog);
+            _logger.LogInformation("Added vanilla series {SeriesId} to {ModPath}.", seriesId, resolvedModPath);
+            return dir;
         }
 
         /// <summary>
@@ -142,6 +193,15 @@ namespace UMB.CLI.Services
             {
                 if (fieldsById.TryGetValue(item.Id, out var fields))
                     WriteSeriesTomlFields(Path.Combine(series[item.OriginalIndex].Dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
+            }
+
+            // A vanilla series only gets a folder once its fields differ from the vanilla ones.
+            foreach (var item in data.VanillaItems)
+            {
+                if (!fieldsById.TryGetValue(item.Id, out var fields)
+                    || (item.SeriesPath == "" && JsonSerializer.Serialize(fields) == JsonSerializer.Serialize(item.Fields))) continue;
+                var dir = item.SeriesPath == "" ? EnsureVanillaFolder(resolvedModPath, item.SeriesId) : item.SeriesPath;
+                WriteSeriesTomlFields(Path.Combine(dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
             }
 
             WriteSeriesOrder(resolvedModPath, finalItems.Select(i => i.SeriesId));
@@ -174,72 +234,75 @@ namespace UMB.CLI.Services
                 throw new DesktopApiException("At least one game is required.");
 
             var seriesDir = Path.Combine(resolvedModPath, seriesId);
-            if (Directory.Exists(seriesDir) || ScanCustomSeries(resolvedModPath).Any(s => s.Id == seriesId))
+            if (Directory.Exists(seriesDir) || ScanSeries(resolvedModPath).Any(s => s.Id == seriesId)
+                || _catalog.Get()?.Series.Any(s => s.Id == seriesId) == true)
                 throw new DesktopApiException("A series with that ID already exists.");
 
-            Directory.CreateDirectory(seriesDir);
-
-            var lines = new List<string> { "[series]", $"id = \"{SeriesToml.Escape(seriesId)}\"", $"name = \"{SeriesToml.Escape(name)}\"", "playlist-incidence = 100" };
-            var playlist = (input.SeriesPlaylist ?? "").Trim();
-            if (playlist.Length > 0)
-                lines.Add($"series-playlist = \"{SeriesToml.Escape(playlist)}\"");
-            lines.Add("");
-            foreach (var game in games)
-                lines.AddRange(new[] { "[[games]]", $"id = \"{SeriesToml.Escape(game.Id)}\"", $"name = \"{SeriesToml.Escape(game.Name)}\"", "" });
-            lines.AddRange(new[] { "[default-track-data]", $"game = \"{SeriesToml.Escape(games[0].Id)}\"", "author = \"\"", "copyright = \"\"", "record-type = \"original\"", SeriesToml.VolumeDbLine(0), "" });
-
-            SeriesToml.WriteLines(Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), lines);
-            File.WriteAllText(Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE), TracksCsv.Header);
+            WriteNewSeries(seriesDir, seriesId, new SeriesFields
+            {
+                Name = name, SeriesPlaylist = (input.SeriesPlaylist ?? "").Trim(), Games = games
+            }, existingSeries: false);
             if (!string.IsNullOrEmpty(input.IconDataUrl))
                 WriteSeriesIcon(seriesDir, input.IconDataUrl);
 
             return Load(resolvedModPath);
         }
 
-        /// <summary>Writes (or replaces) a custom series' icon.png and returns it as a data URL.</summary>
+        /// <summary>Creates a series folder: series.toml and a header-only tracks.csv.</summary>
+        private static void WriteNewSeries(string seriesDir, string seriesId, SeriesFields fields, bool existingSeries)
+        {
+            var toml = new StringBuilder();
+            CliUtil.AppendSeriesHeader(toml, seriesId, fields.Name, existingSeries, fields.PlaylistIncidence, fields.SeriesPlaylist);
+            foreach (var game in fields.Games)
+                CliUtil.AppendGameBlock(toml, game.Id, game.Name);
+            CliUtil.AppendDefaultTrackData(toml, fields.Games.FirstOrDefault()?.Id ?? "");
+
+            Directory.CreateDirectory(seriesDir);
+            File.WriteAllText(Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), toml.ToString().ReplaceLineEndings("\n"));
+            File.WriteAllText(Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE), TracksCsv.Header);
+        }
+
+        /// <summary>Writes (or replaces) a series' icon.png and returns it as a data URL; a vanilla series gets its folder first.</summary>
         public string SetIcon(string modPath, string seriesId, string iconDataUrl)
         {
             var resolvedModPath = ModPaths.ResolveUnderMods(_musicConfig, modPath);
-            var series = ScanCustomSeries(resolvedModPath).FirstOrDefault(s => s.Id == seriesId)
-                ?? throw new DesktopApiException("Series not found.");
-            WriteSeriesIcon(series.Dir, iconDataUrl);
-            return PngDataUrlOf(Path.Combine(series.Dir, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE));
+            var dir = ScanSeries(resolvedModPath).FirstOrDefault(s => s.Id == seriesId)?.Dir ?? EnsureVanillaFolder(resolvedModPath, seriesId);
+            WriteSeriesIcon(dir, iconDataUrl);
+            return PngDataUrlOf(Path.Combine(dir, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE));
         }
 
-        private record CustomSeries(string Dir, string Id, string Name, string IconPath, SeriesFields Fields, double VolumeDb)
+        private record SeriesFolder(string Dir, string Id, string Name, bool ExistingSeries, string IconPath, SeriesFields Fields, double VolumeDb)
         {
             public string IconDataUrl => IconPath == null ? null : PngDataUrlOf(IconPath);
         }
 
         /// <summary>Custom (non-existing, non-"etc") series, in saved order then by name.</summary>
-        private List<CustomSeries> SortedCustomSeries(string modPath)
+        private static List<SeriesFolder> SortedCustomSeries(string modPath, List<SeriesFolder> folders = null)
         {
             var order = SeriesToml.ReadIdList(SeriesOrderPath(modPath));
             int OrderIndex(string id) => order.Contains(id) ? order.IndexOf(id) : int.MaxValue;
-            return ScanCustomSeries(modPath)
+            return (folders ?? ScanSeries(modPath))
+                .Where(s => !s.ExistingSeries && !string.Equals(s.Id, "etc", StringComparison.OrdinalIgnoreCase))
                 .OrderBy(s => OrderIndex(s.Id))
                 .ThenBy(s => s.Name, StringComparer.InvariantCulture)
                 .ToList();
         }
 
-        private static List<CustomSeries> ScanCustomSeries(string modPath)
+        /// <summary>Every series folder with a series.toml id, custom and existing.</summary>
+        private static List<SeriesFolder> ScanSeries(string modPath)
         {
-            var results = new List<CustomSeries>();
-            if (!Directory.Exists(modPath)) return results;
-
-            foreach (var seriesDir in Directory.GetDirectories(modPath))
+            var results = new List<SeriesFolder>();
+            foreach (var seriesDir in ModPaths.VisibleDirs(modPath))
             {
-                if (Path.GetFileName(seriesDir).StartsWith(".")) continue;
                 var tomlPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
                 if (!File.Exists(tomlPath)) continue;
 
                 var text = File.ReadAllText(tomlPath);
                 var header = SeriesToml.ReadHeader(text);
-                if (header.Id == null || header.ExistingSeries) continue;
-                if (string.Equals(header.Id, "etc", StringComparison.OrdinalIgnoreCase)) continue;
+                if (header.Id == null) continue;
 
                 var iconPath = Path.Combine(seriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_ICON_PNG_FILE);
-                results.Add(new CustomSeries(seriesDir, header.Id, header.Name ?? header.Id,
+                results.Add(new SeriesFolder(seriesDir, header.Id, header.Name ?? header.Id, header.ExistingSeries,
                     File.Exists(iconPath) ? iconPath : null, ReadFields(text, header), SeriesToml.VolumeDb(text)));
             }
             return results;

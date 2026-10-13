@@ -8,6 +8,7 @@
   import { _ } from 'svelte-i18n'
   import Modal from '$lib/components/ui/modal.svelte'
   import { DB_INPUT, clampDb } from '$lib/volume'
+  import { settingsStore } from '$lib/stores/settings.svelte'
 
   let { open, onClose }: { open: boolean; onClose: () => void } = $props()
 
@@ -43,6 +44,7 @@
     saveState = 'saving'
     try {
       await window.electron.umb.saveAppSettings({ globalVolumeDb: clampDb(globalVolumeDb), applyVolumeToVanilla })
+      settingsStore.version++
       saveState = 'saved'
       setTimeout(() => onClose(), 600)
     } catch {
@@ -57,6 +59,7 @@
       await window.electron.umb.saveAppSettings({ globalVolumeDb: 0, applyVolumeToVanilla })
       globalVolumeDb = 0
       await window.electron.umb.resetAllVolumes()
+      settingsStore.version++
       resetConfirmOpen = false
     } catch {
       resetFailed = true

@@ -4,6 +4,7 @@
   import Trash2 from '@lucide/svelte/icons/trash-2'
   import { _ } from 'svelte-i18n'
   import { modsStore } from '$lib/stores/mods.svelte'
+  import { guardLeave, trackUnsaved } from '$lib/stores/unsaved.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
   import { createSeriesSelection } from '$lib/series-selection.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
@@ -102,6 +103,8 @@
   $effect(() => {
     void loadData(modsStore.activeSeriesPath)
   })
+
+  trackUnsaved(() => isDirty, handleSave)
 </script>
 
 {#snippet row(kind: Kind, preset: SongPreset, onDelete?: () => void)}
@@ -172,7 +175,7 @@
       series={selection.series}
       loading={selection.loading}
       activePath={modsStore.activeSeriesPath}
-      onSelect={(path) => (modsStore.activeSeriesPath = path)}
+      onSelect={(path) => { if (path !== modsStore.activeSeriesPath) guardLeave(() => (modsStore.activeSeriesPath = path)) }}
       onReload={() => {
         void selection.reload()
         void loadData(modsStore.activeSeriesPath)

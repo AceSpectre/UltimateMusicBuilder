@@ -24,7 +24,7 @@ namespace Tests.Unit.Desktop
 
         public SeriesOrderServiceTests()
         {
-            _service = new SeriesOrderService(_ws.MusicOptions(), TestEnvironment.CreateLogger<SeriesOrderService>());
+            _service = new SeriesOrderService(_ws.MusicOptions(), TestCatalog.Service(), TestEnvironment.CreateLogger<SeriesOrderService>());
             _modPath = _ws.ModDir("mymod");
         }
 
@@ -373,6 +373,112 @@ namespace Tests.Unit.Desktop
             var toml = SeriesToml("da");
             Assert.Contains("author = \"Nobuo\"", toml);
             Assert.Contains("volume-db = -2.5", toml);
+        }
+
+        // ── Vanilla series ───────────────────────────────────────────────────
+
+        private SeriesOrderService VanillaService() =>
+            new(_ws.MusicOptions(), TestCatalog.Service(TestCatalog.Mario()), TestEnvironment.CreateLogger<SeriesOrderService>());
+
+        private void SaveVanillaEdited(SeriesOrderService service, Action<SeriesFields> edit)
+        {
+            var mario = service.Load(_modPath).VanillaItems.Single();
+            edit(mario.Fields);
+            service.Save(_modPath, new List<SaveSeriesItem> { new(mario.Id, mario.Fields) });
+        }
+
+        [Fact]
+        public void Load_ListsVanillaSeriesWithoutAFolderUsingTheVanillaFields()
+        {
+            var data = VanillaService().Load(_modPath);
+
+            Assert.Empty(data.Items);
+            var mario = Assert.Single(data.VanillaItems);
+            Assert.Equal(("vanilla:mario", "mario", "", true), (mario.Id, mario.SeriesId, mario.SeriesPath, mario.IsVanilla));
+            Assert.Equal(("Super Mario Bros.", "bgmmario"), (mario.Fields.Name, mario.Fields.SeriesPlaylist));
+            Assert.Equal(new[] { "smb", "smb3" }, mario.Fields.Games.Select(g => g.Id));
+            Assert.Equal(new[] { "smb", "smb3" }, mario.LockedGameIds);
+            Assert.Equal("bgmmario", mario.VanillaPlaylist);
+        }
+
+        [Fact]
+        public void Load_UsesTheFolderOfAVanillaSeriesInTheMod()
+        {
+            var dir = WriteCustomSeries("mario", "[series]\nid = \"mario\"\nname = \"Mario\"\nexisting-series = true\nseries-playlist = \"bgmcustom\"\n");
+
+            var data = VanillaService().Load(_modPath);
+
+            Assert.Empty(data.Items);
+            var mario = Assert.Single(data.VanillaItems);
+            Assert.Equal((dir, "bgmcustom"), (mario.SeriesPath, mario.Fields.SeriesPlaylist));
+        }
+
+        [Fact]
+        public void Save_LeavesAnUneditedVanillaSeriesWithoutAFolder()
+        {
+            SaveVanillaEdited(VanillaService(), _ => { });
+
+            Assert.False(Directory.Exists(Path.Combine(_modPath, "mario")));
+        }
+
+        [Fact]
+        public void Save_CreatesTheFolderOfAnEditedVanillaSeries()
+        {
+            var service = VanillaService();
+            SaveVanillaEdited(service, f =>
+            {
+                f.PlaylistIncidence = 42;
+                f.Games.Add(new SeriesGame("smb_wonder", "Super Mario Bros. Wonder"));
+            });
+
+            var toml = SeriesToml("mario");
+            Assert.Contains("existing-series = true", toml);
+            Assert.Contains("playlist-incidence = 42", toml);
+            Assert.Contains("game = \"smb\"", toml);
+            Assert.Contains("id = \"smb_wonder\"", toml);
+            Assert.Equal(Path.Combine(_modPath, "mario"), service.Load(_modPath).VanillaItems.Single().SeriesPath);
+        }
+
+        [Fact]
+        public void EnsureVanillaSeries_CreatesAFolderWithEveryVanillaSongOnce()
+        {
+            var service = VanillaService();
+
+            var dir = service.EnsureVanillaSeries(_modPath, "mario");
+            Assert.Equal(dir, service.EnsureVanillaSeries(_modPath, "mario"));
+
+            var rows = TracksCsv.ReadLenient(Path.Combine(dir, "tracks.csv"));
+            Assert.Equal(new[] { "ui_bgm_a01_smb_chijyou", "ui_bgm_a05_smb3_hikousen" }, rows.Select(r => r.Get("filename")));
+            Assert.Equal(("smb", "Ground Theme", "Koji Kondo", "Nintendo"),
+                (rows[0].Get("game"), rows[0].Get("title"), rows[0].Get("author"), rows[0].Get("copyright")));
+            Assert.Equal(("arrange", "sf_situationlink", "info_a01_smb_chijyou"),
+                (rows[1].Get("record_type"), rows[1].Get("special_category"), rows[1].Get("info1")));
+        }
+
+        [Fact]
+        public void EnsureVanillaSeries_RejectsUnknownSeriesAndTakenFolders()
+        {
+            var service = VanillaService();
+            Assert.Throws<DesktopApiException>(() => service.EnsureVanillaSeries(_modPath, "zelda"));
+
+            _ws.ModDir("mymod", "mario");
+            Assert.Contains("already exists", Assert.Throws<DesktopApiException>(() => service.EnsureVanillaSeries(_modPath, "mario")).Message);
+        }
+
+        [Fact]
+        public void SetIcon_AddsAVanillaSeriesToTheMod()
+        {
+            VanillaService().SetIcon(_modPath, "mario", PngDataUrl);
+
+            Assert.True(File.Exists(Path.Combine(_modPath, "mario", "icon.png")));
+            Assert.Contains("existing-series = true", SeriesToml("mario"));
+        }
+
+        [Fact]
+        public void Create_RejectsAVanillaSeriesId()
+        {
+            var error = Assert.Throws<DesktopApiException>(() => VanillaService().Create(_modPath, OneGame(i => i.SeriesId = "mario")));
+            Assert.Contains("already exists", error.Message);
         }
     }
 }
