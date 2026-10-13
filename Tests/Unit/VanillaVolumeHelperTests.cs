@@ -70,12 +70,12 @@ namespace Tests.Unit
         }
 
         [Fact]
-        public void BoostsByToneId_AppliesOnlyTrackBoostsWhenGlobalAndSeriesAreOff()
+        public void BoostsByToneId_ChangesNoVanillaSongWhenDisabled()
         {
             var boosts = VanillaVolumeHelper.BoostsByToneId(State(), 1f, new Dictionary<string, float> { ["ui_series_mario"] = -3f },
-                new Dictionary<string, float> { ["ui_bgm_b"] = 4f, ["ui_bgm_m"] = 5f }, false);
+                new Dictionary<string, float> { ["ui_bgm_a"] = 4f, ["ui_bgm_b"] = 4f }, false);
 
-            Assert.Equal(new Dictionary<string, float> { ["b"] = 4f }, boosts);
+            Assert.Empty(boosts);
         }
 
         [Fact]

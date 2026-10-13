@@ -149,8 +149,8 @@ namespace UMB.CLI.Services
                             csvFilenames.Add(filename);
 
                             var trackDb = hasVolumeColumn ? VolumeConfigService.ParseDb(csv.GetField(TracksCsv.VolumeDbColumn)) : 0f;
-                            // Vanilla songs only get the global and series boosts with the experimental setting.
-                            var effectiveDb = (FolderMusicMod.IsVanillaBgmId(filename) && !applyToVanilla ? 0f : globalDb + seriesDb) + trackDb;
+                            // Vanilla songs are only boosted with the experimental setting.
+                            var effectiveDb = FolderMusicMod.IsVanillaBgmId(filename) && !applyToVanilla ? 0f : globalDb + seriesDb + trackDb;
                             if (effectiveDb >= SuspiciousDb)
                             {
                                 volumes.Add(new SuspiciousVolumeTrack(modName, seriesName, filename, title, effectiveDb));

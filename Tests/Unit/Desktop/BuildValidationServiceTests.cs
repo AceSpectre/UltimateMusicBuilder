@@ -36,11 +36,11 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void Validate_GivesVanillaSongsOnlyTheirTrackBoost_UnlessApplyVolumeToVanilla()
+        public void Validate_GivesVanillaSongsNoBoost_UnlessApplyVolumeToVanilla()
         {
             _ws.Options.Sma5hMusic.GlobalVolumeDb = 6f;
             _ws.WriteSeries("persona", "persona", "filename,title,game,volume_db\nui_bgm_quiet,Quiet,game,0\nui_bgm_loud,Loud,game,9\n");
-            Assert.Equal(new[] { "ui_bgm_loud" }, _service.Validate("persona").SuspiciousVolumes.Select(t => t.Filename));
+            Assert.Empty(_service.Validate("persona").SuspiciousVolumes);
 
             _ws.Options.Sma5hMusic.ApplyVolumeToVanilla = true;
             Assert.Equal(2, _service.Validate("persona").SuspiciousVolumes.Count);

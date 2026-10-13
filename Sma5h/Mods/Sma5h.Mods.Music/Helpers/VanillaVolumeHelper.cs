@@ -10,13 +10,16 @@ namespace Sma5h.Mods.Music.Helpers
     public static class VanillaVolumeHelper
     {
         /// <summary>
-        /// Each vanilla song's track boost (by UiBgmId), plus the global and series boosts when
-        /// <paramref name="applyGlobalAndSeries"/> (experimental), keyed by tone id. Songs with no
-        /// boost are left out so their vanilla nus3bank is kept.
+        /// Each vanilla song's global + series + track boost (track by UiBgmId), keyed by tone id.
+        /// Songs with no boost are left out so their vanilla nus3bank is kept. Empty unless
+        /// <paramref name="enabled"/> (experimental ApplyVolumeToVanilla).
         /// </summary>
         public static Dictionary<string, float> BoostsByToneId(IAudioStateService state, float globalDb, IReadOnlyDictionary<string, float> seriesDb,
-            IReadOnlyDictionary<string, float> trackDb, bool applyGlobalAndSeries)
+            IReadOnlyDictionary<string, float> trackDb, bool enabled)
         {
+            if (!enabled)
+                return new Dictionary<string, float>();
+
             var seriesByGameTitle = FirstBy(state.GetGameTitleEntries(), g => g.UiGameTitleId, g => g.UiSeriesId);
             var gameTitleByBgm = FirstBy(state.GetBgmDbRootEntries(), d => d.UiBgmId, d => d.UiGameTitleId);
             var bgmBySet = FirstBy(state.GetBgmDbRootEntries(), d => d.StreamSetId, d => d.UiBgmId);
@@ -33,7 +36,7 @@ namespace Sma5h.Mods.Music.Helpers
                 && seriesByGameTitle.TryGetValue(title, out var series) && series != null && seriesDb.TryGetValue(series, out var db) ? db : 0f;
 
             float Boost(string bgmId) =>
-                (applyGlobalAndSeries ? globalDb + SeriesDb(bgmId) : 0f) + (bgmId != null ? trackDb.GetValueOrDefault(bgmId) : 0f);
+                globalDb + SeriesDb(bgmId) + (bgmId != null ? trackDb.GetValueOrDefault(bgmId) : 0f);
 
             return state.GetBgmPropertyEntries()
                 .Where(p => p.Source != EntrySource.Mod)

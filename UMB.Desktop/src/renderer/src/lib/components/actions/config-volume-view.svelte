@@ -48,12 +48,9 @@
   const canAnalyze = $derived(!!data && !!selectedPath && data.ffmpegAvailable && !analyzing && !loadingConfig)
   const needsAnalysis = $derived(!!data && !data.lufsCacheExists && rows.some((r) => !r.isVanilla))
 
-  // Vanilla songs only get the global and series boosts with the experimental setting.
-  const sharedBoosts = (row: VolumeRowItem): boolean => !row.isVanilla || Boolean(data?.applyVolumeToVanilla)
-
   // Total boost the build applies: global + series + auto-gain + track.
   function effectiveDb(row: VolumeRowItem): number {
-    return (sharedBoosts(row) ? (data?.globalDb ?? 0) + seriesDb : 0) + row.autoGainDb + row.trackDb
+    return (data?.globalDb ?? 0) + seriesDb + row.autoGainDb + row.trackDb
   }
 
   async function loadSeries(modPath: string | null) {
@@ -440,12 +437,10 @@
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-right">
                       <div class="flex items-center justify-end gap-2 font-mono text-[12px]">
-                        {#if sharedBoosts(row)}
-                          {@render boost(data?.globalDb ?? 0, $_('configVolume.globalCaption'), $_('configVolume.globalHint'))}
-                          <span class="text-muted-foreground">+</span>
-                          {@render boost(seriesDb, $_('configVolume.seriesCaption'), $_('configVolume.seriesDbHint'))}
-                          <span class="text-muted-foreground">+</span>
-                        {/if}
+                        {@render boost(data?.globalDb ?? 0, $_('configVolume.globalCaption'), $_('configVolume.globalHint'))}
+                        <span class="text-muted-foreground">+</span>
+                        {@render boost(seriesDb, $_('configVolume.seriesCaption'), $_('configVolume.seriesDbHint'))}
+                        <span class="text-muted-foreground">+</span>
                         <input
                           type="number"
                           {...DB_INPUT}

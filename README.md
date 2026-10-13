@@ -143,7 +143,7 @@ Fields:
 * `[default-track-data]` - defaults applied to rows `Scaffold` adds to `tracks.csv`, plus `volume-db`: the series dB boost (+ or -) added to every track in the series. Edit it in Config Volume.
 * `[[game-defaults]]` / `[[presets]]` - song presets, edited in the desktop app's Manage Presets view and applied from Manage Songs. A game default fills songs from that `game`; named presets can be picked per song. Keys left out (`author`, `copyright`, `record-type`, `in-soundtest`) fall back to the game default, then `[default-track-data]`.
 
-Volumes are dB boosts (0 = unchanged): the build adds the global boost (`GlobalVolumeDb` in settings), the series `volume-db`, LUFS auto-gain and the track's `volume_db` column in `tracks.csv`. Older mods that stored linear `volume` multipliers are converted automatically the next time the CLI starts. Vanilla songs never get LUFS auto-gain: they get their `volume_db` row boost (see below), plus the global and series boosts only when the experimental `ApplyVolumeToVanilla` setting is on.
+Volumes are dB boosts (0 = unchanged): the build adds the global boost (`GlobalVolumeDb` in settings), the series `volume-db`, LUFS auto-gain and the track's `volume_db` column in `tracks.csv`. Older mods that stored linear `volume` multipliers are converted automatically the next time the CLI starts. Vanilla songs never get LUFS auto-gain, and their volume is left untouched unless the experimental `ApplyVolumeToVanilla` setting is on: then they get the global, series and `volume_db` row boosts (see below), and Config Volume lists them.
 
 ## series.toml - existing in-game series
 
@@ -179,7 +179,7 @@ A `tracks.csv` row whose `filename` is a vanilla song's id (e.g. `ui_bgm_a01_smb
 
 * `title`, `author`, `copyright` - a changed value replaces the text in every language; an unchanged one keeps the game's translations.
 * `game`, `record_type`, `in_soundtest`, and `special_category` / `info1` (pinch song).
-* `volume_db` - the song's dB boost; its nus3bank is regenerated with it.
+* `volume_db` - the song's dB boost; with `ApplyVolumeToVanilla` on, its nus3bank is regenerated with it.
 
 ---
 

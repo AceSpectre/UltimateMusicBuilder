@@ -230,7 +230,7 @@ namespace Sma5h.Mods.Music
                     _logger.LogError("Error! The song with ToneId {NameId}, File {Filename} could not be processed.", bgmPropertyEntry.NameId, bgmPropertyEntry.Filename);
             }
 
-            // Vanilla audio is kept; only its nus3bank is regenerated with the boosted volume.
+            // Vanilla audio is kept; only its nus3bank is regenerated with the boosted volume (experimental opt-in).
             var vanillaBoosts = VanillaVolumeHelper.BoostsByToneId(_audioStateService, globalDb, _seriesVolumeDb, _vanillaTrackDb,
                 _config.CurrentValue.Sma5hMusic.ApplyVolumeToVanilla);
             if (vanillaBoosts.Count > 0)

@@ -211,7 +211,7 @@ export interface VolumeRowItem {
   trackDb: number
   /** nus3bank volume (dB) of the track with no boosts. */
   bankBaseDb: number
-  /** A vanilla song: no auto-gain, and the global and series boosts only apply with applyVolumeToVanilla. */
+  /** A vanilla song: no auto-gain. Only listed with applyVolumeToVanilla. */
   isVanilla: boolean
 }
 
@@ -222,7 +222,6 @@ export interface VolumeConfigData {
   seriesDb: number
   targetLufs: number
   maxGainDb: number
-  applyVolumeToVanilla: boolean
   ffmpegAvailable: boolean
   lufsCacheExists: boolean
   items: VolumeRowItem[]

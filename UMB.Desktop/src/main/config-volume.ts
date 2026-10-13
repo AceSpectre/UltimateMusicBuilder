@@ -13,7 +13,6 @@ interface VolumeAnalyzeResult {
   seriesDb: number
   targetLufs: number
   maxGainDb: number
-  applyVolumeToVanilla: boolean
   ffmpegAvailable: boolean
   lufsCacheExists: boolean
   items: VolumeRowItem[]
@@ -44,7 +43,6 @@ export async function loadVolumeConfig(
         seriesDb: 0,
         targetLufs: -14,
         maxGainDb: 12,
-        applyVolumeToVanilla: false,
         ffmpegAvailable: false,
         lufsCacheExists: false,
         items: []
@@ -59,7 +57,6 @@ export async function loadVolumeConfig(
       seriesDb: result.seriesDb,
       targetLufs: result.targetLufs,
       maxGainDb: result.maxGainDb,
-      applyVolumeToVanilla: result.applyVolumeToVanilla,
       ffmpegAvailable: result.ffmpegAvailable,
       lufsCacheExists: result.lufsCacheExists ?? false,
       items: result.items ?? []
