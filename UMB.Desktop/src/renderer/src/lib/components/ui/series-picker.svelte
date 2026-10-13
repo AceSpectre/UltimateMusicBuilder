@@ -76,7 +76,7 @@
     {:else}
       <div class="min-h-0 flex-1 overflow-auto p-2">
         <div class="rounded-xl border border-dashed border-border px-3 py-8 text-center text-[12.5px] text-muted-foreground">
-          {$_(!activeMod ? 'seriesPicker.chooseMod' : loading ? 'seriesPicker.loading' : 'seriesPicker.noSeries')}
+          {$_(!activeMod ? 'common.chooseMod' : loading ? 'seriesPicker.loading' : 'seriesPicker.noSeries')}
         </div>
       </div>
     {/if}

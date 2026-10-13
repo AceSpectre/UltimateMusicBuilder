@@ -81,7 +81,7 @@
       <div class="min-h-0 flex-1 overflow-auto px-[22px] py-3.5">
         {#if mods.length === 0}
           <div class="rounded-xl border border-dashed border-border px-3 py-8 text-center text-[13px] text-muted-foreground">
-            {$_('extractIcons.chooseMod')}
+            {$_('common.chooseMod')}
           </div>
         {:else}
           <div class="flex flex-col gap-5">

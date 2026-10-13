@@ -480,7 +480,7 @@
             </div>
           </div>
         {:else}
-          <EmptyState dashed title={$_('orderTracks.emptyTitle')} body={$_('orderTracks.emptyBody')}>
+          <EmptyState dashed title={$_('orderTracks.emptyTitle')} body={$_('common.selectSeries')}>
             {#snippet icon()}<Music4 size={20} />{/snippet}
           </EmptyState>
         {/if}

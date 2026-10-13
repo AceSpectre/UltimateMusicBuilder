@@ -352,7 +352,7 @@
           </div>
         </div>
       {:else if !selectedSeries}
-        <EmptyState body={$_('configVolume.chooseSeries')}>
+        <EmptyState body={$_('common.selectSeries')}>
           {#snippet icon()}<Volume2 size={20} />{/snippet}
         </EmptyState>
       {:else if loadingConfig}

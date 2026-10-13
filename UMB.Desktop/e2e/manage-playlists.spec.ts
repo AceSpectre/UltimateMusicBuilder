@@ -52,7 +52,7 @@ test('UI: add a song to a playlist, set incidence, and Save persists it', async 
   await page.getByText('Manage Playlists').first().click()
   await page.getByRole('button', { name: 'Reload' }).click()
 
-  await page.getByPlaceholder('Search playlists...').fill('Smash Menu')
+  await page.getByPlaceholder('Search playlists…').fill('Smash Menu')
   await page.getByText('Smash Menu').first().click()
 
   await page.getByRole('button', { name: 'Add song' }).click()

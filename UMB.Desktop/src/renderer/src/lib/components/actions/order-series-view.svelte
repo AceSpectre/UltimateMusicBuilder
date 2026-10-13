@@ -405,7 +405,7 @@
             {#snippet icon()}<ListOrdered size={20} />{/snippet}
           </EmptyState>
         {:else}
-          <EmptyState dashed title={$_('orderSeries.chooseMod')} body={$_('orderSeries.chooseModBody')}>
+          <EmptyState dashed title={$_('orderSeries.chooseMod')} body={$_('common.chooseMod')}>
             {#snippet icon()}<ListOrdered size={20} />{/snippet}
           </EmptyState>
         {/if}

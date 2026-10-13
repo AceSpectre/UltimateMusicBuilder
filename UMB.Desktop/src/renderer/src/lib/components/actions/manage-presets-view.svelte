@@ -233,7 +233,7 @@
             </div>
           </div>
         {:else}
-          <EmptyState dashed title={$_('managePresets.emptyTitle')} body={$_('managePresets.emptyBody')}>
+          <EmptyState dashed title={$_('managePresets.emptyTitle')} body={$_('common.selectSeries')}>
             {#snippet icon()}<SlidersHorizontal size={20} />{/snippet}
           </EmptyState>
         {/if}

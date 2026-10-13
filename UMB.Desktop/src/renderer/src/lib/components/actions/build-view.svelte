@@ -193,7 +193,6 @@
   <Modal maxWidth="480px">
     <div class="border-b border-border px-5 py-4">
       <h2 class="text-[13.5px] font-semibold">{$_('build.importModal.title')}</h2>
-      <p class="mt-[3px] text-[12.5px] text-muted-foreground">{$_('build.importModal.subtitle')}</p>
     </div>
 
     <div class="flex flex-col gap-4 px-5 py-5">

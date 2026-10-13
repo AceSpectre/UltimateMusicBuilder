@@ -46,13 +46,13 @@ async function clickNav(page: Page, label: string): Promise<void> {
 function paletteOf(page: Page): Locator {
   return page
     .locator('div.fixed.inset-0.z-50')
-    .filter({ has: page.getByPlaceholder('Search actions...') })
+    .filter({ has: page.getByPlaceholder('Search actions…') })
 }
 
 /** Opens the palette and returns [overlay, search input] with focus already inside. */
 async function openPalette(page: Page): Promise<[Locator, Locator]> {
   await page.keyboard.press('Control+k')
-  const search = page.getByPlaceholder('Search actions...')
+  const search = page.getByPlaceholder('Search actions…')
   await expect(search).toBeVisible()
   // wait for the 50ms autofocus so Escape reaches the palette
   await expect(search).toBeFocused()

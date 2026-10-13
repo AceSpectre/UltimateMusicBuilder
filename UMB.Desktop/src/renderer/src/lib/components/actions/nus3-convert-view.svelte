@@ -534,7 +534,7 @@
             ? $_('nus3Convert.loading')
             : selectedSeries
               ? $_('nus3Convert.noConvertableTitle')
-              : $_('nus3Convert.chooseSeries')}
+              : $_('common.selectSeries')}
           body={analyzing ? $_('nus3Convert.loading') : selectedSeries ? $_('nus3Convert.noConvertableHint') : ''}
         >
           {#snippet icon()}<AudioWaveform size={20} />{/snippet}
@@ -657,10 +657,7 @@
             <div class="grid min-h-[260px] flex-1 place-items-center rounded-xl border border-line2 p-6">
               <div class="flex flex-col items-center gap-4 text-center">
                 <RefreshCw size={28} class="animate-spin text-primary" />
-                <div class="flex flex-col gap-1">
-                  <p class="text-[13.5px] font-semibold">{$_('nus3Convert.calculatingLoops')}</p>
-                  <p class="text-[13px] text-muted-foreground">{$_('nus3Convert.calculatingLoopsHint')}</p>
-                </div>
+                <p class="text-[13.5px] font-semibold">{$_('nus3Convert.calculatingLoops')}</p>
               </div>
             </div>
           {:else if selectedCandidate}
