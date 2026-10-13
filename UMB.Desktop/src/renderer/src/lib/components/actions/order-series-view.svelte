@@ -4,6 +4,7 @@
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
+  import { trackUnsaved } from '$lib/stores/unsaved.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import IconButton from '$lib/components/ui/icon-button.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
@@ -278,8 +279,13 @@
   const inputClass =
     'w-full rounded-md border border-input bg-background px-2 py-1.5 text-[13px] outline-none focus:border-ring focus:ring-1 focus:ring-ring'
 
+  // Read-only values are plain text so they can't be clicked into like an input.
+  const readonlyClass = 'block truncate px-2 py-1.5 text-[13px] text-muted-foreground'
+
   const cardClass = (item: SeriesOrderItem): string =>
     `w-[128px] h-[148px] flex flex-col items-center rounded-xl border bg-background/75 p-2 transition-shadow hover:shadow-md cursor-pointer ${item.id === selectedItemId ? 'border-transparent ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border'}`
+
+  trackUnsaved(() => isDirty, handleSave)
 </script>
 
 {#snippet seriesCard(item: SeriesOrderItem)}
@@ -465,15 +471,15 @@
               </div>
             </div>
 
-            <label class="flex flex-col gap-1">
+            <div class="flex flex-col gap-1">
               <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldId')}</span>
-              <input type="text" class="{inputClass} opacity-60" value={selectedItem.seriesId} readonly title={$_('orderSeries.fldIdHint')} />
-            </label>
+              <span class={readonlyClass} title={$_('orderSeries.fldIdHint')}>{selectedItem.seriesId}</span>
+            </div>
 
             <label class="flex flex-col gap-1">
               <span class="text-[12px] font-medium text-muted-foreground">{$_('orderSeries.fldName')}</span>
               {#if selectedItem.isVanilla}
-                <input type="text" class="{inputClass} opacity-60" value={f.name} readonly title={$_('orderSeries.vanillaNameHint')} />
+                <span class={readonlyClass} title={$_('orderSeries.vanillaNameHint')}>{f.name}</span>
               {:else}
                 <input type="text" class={inputClass} bind:value={f.name} />
               {/if}
@@ -525,9 +531,21 @@
             {:else}
               {#each f.games as game (game.id)}
                 <div class="flex flex-col gap-1 rounded-md border border-border bg-background/60 p-2">
-                  <span class="truncate text-[11px] font-medium text-muted-foreground" title={game.id}>{game.id}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground" title={game.id}>{game.id}</span>
+                    {#if !selectedItem.lockedGameIds.includes(game.id)}
+                      <button
+                        onclick={() => (f.games = f.games.filter((g) => g.id !== game.id))}
+                        aria-label={$_('orderSeries.removeGame')}
+                        title={$_('orderSeries.removeGame')}
+                        class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <X size={13} />
+                      </button>
+                    {/if}
+                  </div>
                   {#if selectedItem.lockedGameIds.includes(game.id)}
-                    <input type="text" class="{inputClass} opacity-60" value={game.name} readonly title={$_('orderSeries.vanillaGameHint')} aria-label={$_('orderSeries.fldGameName')} />
+                    <span class={readonlyClass} title={$_('orderSeries.vanillaGameHint')}>{game.name}</span>
                   {:else}
                     <input type="text" class={inputClass} bind:value={game.name} aria-label={$_('orderSeries.fldGameName')} />
                   {/if}

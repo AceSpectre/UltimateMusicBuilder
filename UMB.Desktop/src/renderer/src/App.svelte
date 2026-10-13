@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, tick } from 'svelte'
+  import { _ } from 'svelte-i18n'
+  import Modal from '$lib/components/ui/modal.svelte'
+  import { unsavedStore } from '$lib/stores/unsaved.svelte'
   import AppBar from '$lib/components/app-bar.svelte'
   import Sidebar from '$lib/components/sidebar.svelte'
   import BottomPanel from '$lib/components/bottom-panel.svelte'
@@ -62,16 +65,49 @@
     }
   }
 
+  // Leaving the open view or mod with unsaved changes asks first.
+  let pendingLeave = $state<(() => void) | null>(null)
+  let leaveSaving = $state(false)
+
+  function guardLeave(leave: () => void) {
+    if (unsavedStore.dirty) pendingLeave = leave
+    else leave()
+  }
+
+  function leaveNow() {
+    const leave = pendingLeave
+    pendingLeave = null
+    leave?.()
+  }
+
+  async function saveAndLeave() {
+    leaveSaving = true
+    await unsavedStore.save?.()
+    await tick()
+    leaveSaving = false
+    // A failed save stays dirty: keep the user on the view.
+    if (unsavedStore.dirty) pendingLeave = null
+    else leaveNow()
+  }
+
   function selectMod(mod: ModInfo) {
-    activeMod = mod
-    diagnostics.modSelections += 1
-    diagnostics.lastMod = mod.name
+    const select = () => {
+      activeMod = mod
+      diagnostics.modSelections += 1
+      diagnostics.lastMod = mod.name
+    }
+    if (mod.path === activeMod?.path) select()
+    else guardLeave(select)
   }
 
   function selectAction(id: string) {
-    activeTab = id
-    diagnostics.actionClicks += 1
-    diagnostics.lastAction = id
+    const select = () => {
+      activeTab = id
+      diagnostics.actionClicks += 1
+      diagnostics.lastAction = id
+    }
+    if (id === activeTab) select()
+    else guardLeave(select)
   }
 
   async function handleWindowControl(action: 'minimize' | 'fullscreen' | 'close') {
@@ -164,6 +200,38 @@
 
   <BottomPanel diagnostics={diagnostics} onPingBridge={runBridgePing} />
 </div>
+
+{#if pendingLeave}
+  <Modal>
+    <div class="px-5 py-4">
+      <h3 class="text-sm font-semibold">{$_('unsaved.title')}</h3>
+      <p class="pt-1.5 text-[13px] text-muted-foreground">{$_('unsaved.body')}</p>
+    </div>
+    <div class="flex flex-col gap-2 border-t border-border px-5 py-4">
+      <button
+        onclick={saveAndLeave}
+        disabled={leaveSaving}
+        class="inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:opacity-60"
+      >
+        {$_('unsaved.save')}
+      </button>
+      <button
+        onclick={leaveNow}
+        disabled={leaveSaving}
+        class="inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:opacity-60"
+      >
+        {$_('unsaved.discard')}
+      </button>
+      <button
+        onclick={() => (pendingLeave = null)}
+        disabled={leaveSaving}
+        class="inline-flex items-center justify-center rounded-lg px-3 py-2 text-[12.5px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+      >
+        {$_('unsaved.stay')}
+      </button>
+    </div>
+  </Modal>
+{/if}
 
 <CommandPalette
   bind:open={commandPaletteOpen}

@@ -134,6 +134,13 @@ export default {
       lastError: 'last error:'
     }
   },
+  unsaved: {
+    title: 'Unsaved changes',
+    body: 'You have unsaved changes. Save them before leaving?',
+    save: 'Yes, save changes',
+    discard: 'No, discard changes',
+    stay: 'Continue making changes'
+  },
   orderSeries: {
     title: 'Manage Series',
     dragHint: 'Drag to reorder. Click a series to edit its series.toml settings on the right.',

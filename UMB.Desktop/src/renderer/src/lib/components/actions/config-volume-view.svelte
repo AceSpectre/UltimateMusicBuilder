@@ -2,7 +2,8 @@
   import { Volume2, RefreshCw, Play, Square, AlertTriangle, Activity } from '@lucide/svelte'
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
-  import { logStore } from '$lib/stores/logs.svelte'
+  import { logStore } from '$lib/stores/logs.svelte'
+  import { trackUnsaved } from '$lib/stores/unsaved.svelte'
   import { modsStore } from '$lib/stores/mods.svelte'
   import { createSeriesLoader } from '$lib/series-loader'
   import { DB_INPUT, dbToGain, formatBankDb, formatDb, parseDb } from '$lib/volume'
@@ -255,6 +256,8 @@
       audioCtx = null
     }
   })
+
+  trackUnsaved(() => isDirty, handleSave)
 </script>
 
 {#snippet boost(db: number, caption: string, hint: string)}

@@ -15,7 +15,7 @@ namespace Tests.Helpers
             return service.Object;
         }
 
-        /// <summary>The "mario" series: games smb and smb3, two sound test songs and a hidden one.</summary>
+        /// <summary>The "mario" series: games smb and smb3 (plus one no song uses), two sound test songs and a hidden one.</summary>
         public static VanillaCatalogService.Catalog Mario() => new()
         {
             BgmTitles = new() { ["ui_bgm_a01_smb_chijyou"] = "Ground Theme", ["ui_bgm_a05_smb3_hikousen"] = "Airship", ["ui_bgm_hidden"] = "Hidden" },
@@ -23,6 +23,7 @@ namespace Tests.Helpers
             {
                 new("smb", "Super Mario Bros.", "ui_series_mario"),
                 new("smb3", "Super Mario Bros. 3", "ui_series_mario"),
+                new("mario_for_doc", "mario_for_doc", "ui_series_mario"),
                 new("loz", "The Legend of Zelda", "ui_series_zelda")
             },
             Series = new() { new("mario", "Super Mario Bros.", "bgmmario") },

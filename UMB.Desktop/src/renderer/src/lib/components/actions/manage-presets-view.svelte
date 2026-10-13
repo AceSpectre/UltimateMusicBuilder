@@ -1,7 +1,8 @@
 <script lang="ts">
   import { Plus, SlidersHorizontal, Trash2 } from '@lucide/svelte'
   import { _ } from 'svelte-i18n'
-  import { modsStore } from '$lib/stores/mods.svelte'
+  import { modsStore } from '$lib/stores/mods.svelte'
+  import { trackUnsaved } from '$lib/stores/unsaved.svelte'
   import { logStore } from '$lib/stores/logs.svelte'
   import { createSeriesSelection } from '$lib/series-selection.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
@@ -100,6 +101,8 @@
   $effect(() => {
     void loadData(modsStore.activeSeriesPath)
   })
+
+  trackUnsaved(() => isDirty, handleSave)
 </script>
 
 {#snippet row(kind: Kind, preset: SongPreset, onDelete?: () => void)}

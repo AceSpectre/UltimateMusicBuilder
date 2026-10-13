@@ -201,7 +201,7 @@ namespace UMB.CLI.Services
             var songOrder = SeriesToml.ReadIdList(files.SongOrder);
             var uiSeriesId = series.Id != null ? MusicConstants.InternalIds.SERIES_ID_PREFIX + series.Id : null;
 
-            var vanillaGames = catalog?.GameTitles.Where(g => g.SeriesId == uiSeriesId).Select(g => new SeriesGame(g.Id, g.Name)).ToList()
+            var vanillaGames = (catalog != null && series.Id != null ? VanillaTracks.Games(catalog, series.Id) : null)
                 ?? new List<SeriesGame>();
             var vanillaSongs = catalog?.Songs.Where(s => s.SeriesId == uiSeriesId).Select(s => new VanillaSongOption(s.InfoId, s.Name)).ToList()
                 ?? new List<VanillaSongOption>();

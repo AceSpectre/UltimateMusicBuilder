@@ -16,12 +16,15 @@ namespace UMB.CLI.Services
         public static List<VanillaCatalogService.Song> Songs(VanillaCatalogService.Catalog catalog, string seriesId) =>
             catalog.Songs.Where(s => s.TestDispOrder >= 0 && s.SeriesId == MusicConstants.InternalIds.SERIES_ID_PREFIX + seriesId).ToList();
 
-        /// <summary>The vanilla games of a series, by id.</summary>
-        public static List<SeriesGame> Games(VanillaCatalogService.Catalog catalog, string seriesId) =>
-            catalog.GameTitles.Where(g => g.SeriesId == MusicConstants.InternalIds.SERIES_ID_PREFIX + seriesId)
+        /// <summary>The vanilla games of a series that have songs, by id.</summary>
+        public static List<SeriesGame> Games(VanillaCatalogService.Catalog catalog, string seriesId)
+        {
+            var used = catalog.Songs.Select(s => s.GameId).ToHashSet();
+            return catalog.GameTitles.Where(g => g.SeriesId == MusicConstants.InternalIds.SERIES_ID_PREFIX + seriesId && used.Contains(g.Id))
                 .OrderBy(g => g.Id, System.StringComparer.OrdinalIgnoreCase)
                 .Select(g => new SeriesGame(g.Id, g.Name))
                 .ToList();
+        }
 
         /// <summary>
         /// Appends a row for every vanilla song of an existing series that has none, in sound test

@@ -98,9 +98,20 @@
     -webkit-app-region: drag;
   }
 
+  /* Pulses a save button while there are unsaved changes. */
+  .save-glow {
+    border-color: hsl(var(--gradient-from));
+    animation: save-glow 1.6s ease-in-out infinite;
+  }
+
   .no-drag {
     -webkit-app-region: no-drag;
   }
+}
+
+@keyframes save-glow {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--gradient-from) / 0); }
+  50% { box-shadow: 0 0 14px 2px hsl(var(--gradient-from) / 0.55); }
 }
 
 ::-webkit-scrollbar {
