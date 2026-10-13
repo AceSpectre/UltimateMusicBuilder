@@ -123,7 +123,7 @@ namespace UMB.CLI.Services
             var folders = ScanSeries(resolvedModPath);
             series = SortedCustomSeries(resolvedModPath, folders);
             var items = series
-                .Select((s, index) => new SeriesOrderItem($"series:{index}", s.Name, s.Id, s.Dir, s.VolumeDb, s.IconDataUrl, index, s.Fields, false, new List<string>()))
+                .Select((s, index) => new SeriesOrderItem($"series:{index}", s.Name, s.Id, s.Dir, s.VolumeDb, s.IconDataUrl, index, s.Fields, false, new List<string>(), ""))
                 .ToList();
             var hasSeriesOrder = SeriesToml.ReadIdList(SeriesOrderPath(resolvedModPath)).Count > 0;
             return new SeriesOrderData(Path.GetFileName(resolvedModPath), resolvedModPath, hasSeriesOrder, items, VanillaItems(folders));
@@ -141,8 +141,8 @@ namespace UMB.CLI.Services
                 {
                     var gameIds = VanillaTracks.Games(catalog, s.Id).Select(g => g.Id).ToList();
                     return existing.TryGetValue(s.Id, out var folder)
-                        ? new SeriesOrderItem(VanillaItemPrefix + s.Id, s.Name, s.Id, folder.Dir, folder.VolumeDb, folder.IconDataUrl, -1, folder.Fields, true, gameIds)
-                        : new SeriesOrderItem(VanillaItemPrefix + s.Id, s.Name, s.Id, "", 0, null, -1, VanillaFields(catalog, s), true, gameIds);
+                        ? new SeriesOrderItem(VanillaItemPrefix + s.Id, s.Name, s.Id, folder.Dir, folder.VolumeDb, folder.IconDataUrl, -1, folder.Fields, true, gameIds, s.Playlist)
+                        : new SeriesOrderItem(VanillaItemPrefix + s.Id, s.Name, s.Id, "", 0, null, -1, VanillaFields(catalog, s), true, gameIds, s.Playlist);
                 })
                 .ToList();
         }

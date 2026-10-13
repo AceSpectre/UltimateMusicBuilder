@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Eye, EyeOff, Lock, Music4, ListChecks, Palette, Wand2 } from '@lucide/svelte'
+  import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical, Lock, LockOpen, Music4, ListChecks, Palette, Wand2 } from '@lucide/svelte'
   import { DropdownMenu } from 'bits-ui'
   import { _ } from 'svelte-i18n'
   import { flip } from 'svelte/animate'
@@ -48,7 +48,9 @@
   let baselineSnapshot = $state('')
   let selectedItemId = $state<string | null>(null)
   let overlayOn = $state(false)
-  let hideVanilla = $state(false)
+  // Locked vanilla songs are read-only and keep their place, as before they were editable.
+  let vanillaLocked = $state(true)
+  const isReadOnly = (item: TrackOrderItem): boolean => item.isLocked || (item.isVanilla && vanillaLocked)
   let sort = $state<SortState<SortColumn>>({ column: 'index', desc: false })
 
   function snapshot(items: TrackOrderItem[]): string {
@@ -97,13 +99,12 @@
     soundtest: (item) => Boolean(item.fields && inSoundtest(item.fields))
   }
 
-  // Sorting and hiding are display-only; dragging needs the full list in real track order.
-  const canDrag = $derived(sort.column === 'index' && !sort.desc && !hideVanilla)
+  // Sorting is display-only; dragging needs the list in real track order.
+  const canDrag = $derived(sort.column === 'index' && !sort.desc)
   const hasVanilla = $derived(dndItems.some((item) => item.isVanilla))
   const displayItems = $derived.by(() => {
     if (canDrag) return dndItems
-    const visible = hideVanilla ? dndItems.filter((item) => !item.isVanilla) : dndItems
-    return sortBy(visible, sort.desc, sortKeys[sort.column])
+    return sortBy(dndItems, sort.desc, sortKeys[sort.column])
   })
 
 
@@ -319,13 +320,13 @@
           </button>
 
           <button
-            onclick={() => (hideVanilla = !hideVanilla)}
-            class="{toolbarButtonClass} w-[130px] justify-center"
+            onclick={() => (vanillaLocked = !vanillaLocked)}
+            class="{toolbarButtonClass} w-[140px] justify-center"
             disabled={!hasVanilla}
-            aria-pressed={hideVanilla}
+            aria-pressed={!vanillaLocked}
           >
-            {#if hideVanilla}<Eye size={14} />{:else}<EyeOff size={14} />{/if}
-            {$_(hideVanilla ? 'orderTracks.showVanilla' : 'orderTracks.hideVanilla')}
+            {#if vanillaLocked}<LockOpen size={14} />{:else}<Lock size={14} />{/if}
+            {$_(vanillaLocked ? 'orderTracks.unlockVanilla' : 'orderTracks.lockVanilla')}
           </button>
 
           <button
@@ -417,18 +418,19 @@
               onfinalize={handleFinalize}
             >
               {#each displayItems as item (item.id)}
-                {@const isSelected = !item.isLocked && item.id === selectedItemId}
+                {@const readOnly = isReadOnly(item)}
+                {@const isSelected = !readOnly && item.id === selectedItemId}
                 <div
                   animate:flip={{ duration: FLIP_MS }}
-                  class="grid items-center gap-1 rounded border px-1 py-0.5 {item.isLocked ? 'border-border bg-background/75 opacity-80' : isSelected ? 'border-transparent bg-background ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border bg-background/75'}"
+                  class="grid items-center gap-1 rounded border px-1 py-0.5 {readOnly ? 'border-border bg-background/75 opacity-80' : isSelected ? 'border-transparent bg-background ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border bg-background/75'}"
                   style="{GRID_COLUMNS} {overlayOn ? overlayStyle(item, gameIds) : ''}"
                   role="listitem"
-                  onfocusincapture={() => { if (!item.isLocked) selectedItemId = item.id }}
-                  onpointerdown={() => { if (!item.isLocked) selectedItemId = item.id }}
+                  onfocusincapture={() => { if (!readOnly) selectedItemId = item.id }}
+                  onpointerdown={() => { if (!readOnly) selectedItemId = item.id }}
                 >
                   <div class="flex items-center gap-1">
                     <span class="w-6 text-right text-[11px] tabular-nums text-muted-foreground">{dndItems.indexOf(item) + 1}</span>
-                    {#if item.isLocked}
+                    {#if readOnly}
                       <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted/70 text-muted-foreground" title={$_('orderTracks.locked')}>
                         <Lock size={13} />
                       </div>
@@ -444,7 +446,7 @@
                     {/if}
                   </div>
 
-                  {#if item.fields}
+                  {#if item.fields && !readOnly}
                     {@const f = item.fields}
                     <textarea
                       class="{textareaClass} {item.isVanilla ? 'italic' : ''}"
@@ -502,7 +504,7 @@
                     </div>
                   {:else}
                     <!-- Locked vanilla row: read-only, same grid layout/height as editable rows -->
-                    <div class="truncate rounded border border-transparent px-1.5 py-0.5 text-[12.5px] font-medium" title={item.title}>{item.title}</div>
+                    <div class="truncate rounded border border-transparent px-1.5 py-0.5 text-[12.5px] font-medium" title={item.fields?.title ?? item.title}>{item.fields?.title ?? item.title}</div>
                     <span class="truncate self-center px-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">{$_('orderTracks.vanillaTag')}</span>
                     <span></span>
                     <span></span>

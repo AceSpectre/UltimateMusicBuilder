@@ -72,7 +72,19 @@
   function confirmAddGame() {
     if (!selectedItem || !newGameValid) return
     selectedItem.fields.games = [...selectedItem.fields.games, { id: trimmedNewGameId, name: newGameName.trim() }]
+    lastGameErrorId = null
     showAddGame = false
+  }
+
+  // A custom series keeps at least one game; removing the last one shows an error on it instead.
+  let lastGameErrorId = $state<string | null>(null)
+
+  function removeGame(item: SeriesOrderItem, gameId: string) {
+    if (!item.isVanilla && item.fields.games.length === 1) {
+      lastGameErrorId = gameId
+      return
+    }
+    item.fields.games = item.fields.games.filter((g) => g.id !== gameId)
   }
 
   const SERIES_ID_RE = /^[a-z0-9_]+$/
@@ -218,6 +230,7 @@
   $effect(() => {
     void selectedItemId
     panelError = null
+    lastGameErrorId = null
   })
 
   function handleConsider(event: CustomEvent<DndEvent<SeriesOrderItem>>) {
@@ -304,7 +317,8 @@
 
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
-    <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
+    <!-- Five series cards wide (5 x 128px + gaps, padding, border, scrollbar); settings fill the rest. -->
+    <section class="flex h-full min-h-0 w-[730px] shrink-0 flex-col border border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
       <div class="shrink-0 border-b border-border px-4 py-3 flex items-center justify-between gap-4">
         <div class="flex min-w-0 items-center gap-3">
@@ -323,7 +337,7 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex shrink-0 items-center gap-2">
           <IconButton onclick={handleReload} title={$_('orderSeries.reload')}>
             <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
           </IconButton>
@@ -404,7 +418,7 @@
       </div>
     </section>
 
-    <aside class="flex h-full min-h-0 w-[340px] shrink-0 flex-col border border-l-0 border-border bg-card overflow-hidden">
+    <aside class="flex h-full min-h-0 min-w-[340px] flex-1 flex-col border border-l-0 border-border bg-card overflow-hidden">
       <div class="gradient-strip h-[3px] shrink-0"></div>
       <div class="shrink-0 border-b border-border px-4 py-3 flex items-center gap-3">
         <GradientIcon>
@@ -488,6 +502,9 @@
             <label class="flex flex-col gap-1">
               <span class="text-[12px] font-medium text-muted-foreground" title={$_('orderSeries.fldSeriesPlaylistHint')}>{$_('orderSeries.fldSeriesPlaylist')}</span>
               <input type="text" class={inputClass} bind:value={f.seriesPlaylist} placeholder="bgm…" />
+              {#if selectedItem.isVanilla && f.seriesPlaylist !== selectedItem.vanillaPlaylist}
+                <span class="text-[11.5px] text-amber-500">{$_('orderSeries.customPlaylistWarning')}</span>
+              {/if}
             </label>
 
             <label class="flex flex-col gap-1">
@@ -535,7 +552,7 @@
                     <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-muted-foreground" title={game.id}>{game.id}</span>
                     {#if !selectedItem.lockedGameIds.includes(game.id)}
                       <button
-                        onclick={() => (f.games = f.games.filter((g) => g.id !== game.id))}
+                        onclick={() => removeGame(selectedItem, game.id)}
                         aria-label={$_('orderSeries.removeGame')}
                         title={$_('orderSeries.removeGame')}
                         class="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -550,6 +567,9 @@
                     <input type="text" class={inputClass} bind:value={game.name} aria-label={$_('orderSeries.fldGameName')} />
                   {/if}
                 </div>
+                {#if lastGameErrorId === game.id}
+                  <span class="-mt-2 px-1 text-[11.5px] text-red-500">{$_('orderSeries.lastGameError')}</span>
+                {/if}
               {/each}
             {/if}
           </div>

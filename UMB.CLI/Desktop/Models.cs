@@ -21,10 +21,11 @@ namespace UMB.CLI.Desktop
 
     /// <summary>
     /// VolumeDb is the read-only series dB boost; Config Volume edits it via SeriesPath.
-    /// LockedGameIds are the vanilla games of a vanilla series, whose names the build cannot change.
+    /// LockedGameIds are the vanilla games of a vanilla series, whose names the build cannot change;
+    /// VanillaPlaylist is its playlist in the game ("" for a custom series).
     /// </summary>
     public record SeriesOrderItem(string Id, string Name, string SeriesId, string SeriesPath, double VolumeDb, string IconDataUrl, int OriginalIndex,
-        SeriesFields Fields, bool IsVanilla, List<string> LockedGameIds);
+        SeriesFields Fields, bool IsVanilla, List<string> LockedGameIds, string VanillaPlaylist);
     /// <summary>Items are the custom series (ordered); VanillaItems every vanilla series, whose SeriesPath is "" until it has a folder.</summary>
     public record SeriesOrderData(string ModName, string ModPath, bool HasSeriesOrder, List<SeriesOrderItem> Items, List<SeriesOrderItem> VanillaItems);
     public record SaveSeriesItem(string Id, SeriesFields Fields);

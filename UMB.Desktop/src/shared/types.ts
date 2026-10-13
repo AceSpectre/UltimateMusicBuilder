@@ -111,6 +111,8 @@ export interface SeriesOrderItem {
   isVanilla: boolean
   /** Vanilla games of a vanilla series; the build keeps their names. */
   lockedGameIds: string[]
+  /** A vanilla series' playlist in the game ('' for a custom series). */
+  vanillaPlaylist: string
 }
 
 export interface SaveSeriesItem {

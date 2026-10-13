@@ -199,14 +199,19 @@ test('UI: Change icon in the settings panel writes the chosen PNG', async () => 
   await expect.poll(() => (existsSync(iconPath) ? readFileSync(iconPath).toString('base64') : null)).toBe(PNG_B64)
 })
 
-test('UI: leaving with unsaved changes asks first; deleting a game discards cleanly', async () => {
+test('UI: the last game of a custom series cannot be removed; leaving unsaved changes asks first', async () => {
   const page = await firstWindow(app)
   await page.getByText('Manage Series').first().click()
   await page.getByRole('button', { name: 'Reload series' }).click()
   await page.getByText('Gamma').first().click()
   await page.getByRole('button', { name: 'Games', exact: true }).click()
-  await page.getByRole('button', { name: 'Remove game' }).first().click()
+  await expect(page.getByRole('button', { name: 'Remove game' })).toHaveCount(1)
+  await page.getByRole('button', { name: 'Remove game' }).click()
+  await expect(page.getByText('Custom series must have at least one game')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Save Changes' })).toBeDisabled()
 
+  await page.locator('aside').getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByLabel('Name', { exact: true }).fill('Gamma Renamed')
   await page.getByText('Manage Songs').first().click()
   await expect(page.getByRole('heading', { name: 'Unsaved changes' })).toBeVisible()
   await page.getByRole('button', { name: 'Continue making changes' }).click()
@@ -215,5 +220,5 @@ test('UI: leaving with unsaved changes asks first; deleting a game discards clea
   await page.getByText('Manage Songs').first().click()
   await page.getByRole('button', { name: 'No, discard changes' }).click()
   await expect(page.getByRole('heading', { name: 'Unsaved changes' })).toBeHidden()
-  expect(readFileSync(join(modDir, 'gamma', 'series.toml'), 'utf8')).toContain('[[games]]')
+  expect(readFileSync(join(modDir, 'gamma', 'series.toml'), 'utf8')).not.toContain('Gamma Renamed')
 })
