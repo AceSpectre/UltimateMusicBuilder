@@ -2,7 +2,7 @@
   import { onMount, tick } from 'svelte'
   import { _ } from 'svelte-i18n'
   import Modal from '$lib/components/ui/modal.svelte'
-  import { unsavedStore } from '$lib/stores/unsaved.svelte'
+  import { guardLeave, unsavedStore } from '$lib/stores/unsaved.svelte'
   import AppBar from '$lib/components/app-bar.svelte'
   import Sidebar from '$lib/components/sidebar.svelte'
   import BottomPanel from '$lib/components/bottom-panel.svelte'
@@ -65,18 +65,12 @@
     }
   }
 
-  // Leaving the open view or mod with unsaved changes asks first.
-  let pendingLeave = $state<(() => void) | null>(null)
+  // Leaving the open view, mod or series with unsaved changes asks first.
   let leaveSaving = $state(false)
 
-  function guardLeave(leave: () => void) {
-    if (unsavedStore.dirty) pendingLeave = leave
-    else leave()
-  }
-
   function leaveNow() {
-    const leave = pendingLeave
-    pendingLeave = null
+    const leave = unsavedStore.pendingLeave
+    unsavedStore.pendingLeave = null
     leave?.()
   }
 
@@ -86,7 +80,7 @@
     await tick()
     leaveSaving = false
     // A failed save stays dirty: keep the user on the view.
-    if (unsavedStore.dirty) pendingLeave = null
+    if (unsavedStore.dirty) unsavedStore.pendingLeave = null
     else leaveNow()
   }
 
@@ -114,7 +108,7 @@
     diagnostics.windowClicks += 1
     diagnostics.lastWindowRequest = action
     if (action === 'close' && unsavedStore.dirty) {
-      pendingLeave = () => void window.electron.umb.windowClose()
+      unsavedStore.pendingLeave = () => void window.electron.umb.windowClose()
       return
     }
     try {
@@ -205,7 +199,7 @@
   <BottomPanel diagnostics={diagnostics} onPingBridge={runBridgePing} />
 </div>
 
-{#if pendingLeave}
+{#if unsavedStore.pendingLeave}
   <Modal>
     <div class="px-5 py-4">
       <h3 class="text-sm font-semibold">{$_('unsaved.title')}</h3>
@@ -227,7 +221,7 @@
         {$_('unsaved.discard')}
       </button>
       <button
-        onclick={() => (pendingLeave = null)}
+        onclick={() => (unsavedStore.pendingLeave = null)}
         disabled={leaveSaving}
         class="inline-flex items-center justify-center rounded-lg px-3 py-2 text-[12.5px] font-medium text-muted-foreground transition-colors hover:bg-muted"
       >

@@ -3,7 +3,7 @@
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
-  import { trackUnsaved } from '$lib/stores/unsaved.svelte'
+  import { guardLeave, trackUnsaved } from '$lib/stores/unsaved.svelte'
   import { modsStore } from '$lib/stores/mods.svelte'
   import { settingsStore } from '$lib/stores/settings.svelte'
   import { createSeriesLoader } from '$lib/series-loader'
@@ -103,8 +103,10 @@
 
   function selectSeries(path: string) {
     if (path === selectedPath) return
-    selectedPath = path
-    void loadConfig(path)
+    guardLeave(() => {
+      selectedPath = path
+      void loadConfig(path)
+    })
   }
 
   function handleAnalyze() {

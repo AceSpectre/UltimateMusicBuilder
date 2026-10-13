@@ -1,8 +1,16 @@
-// The open view's unsaved changes, so leaving it (another view or mod) can ask first.
+// The open view's unsaved changes, so leaving it (another view, mod or series) can ask first.
 export const unsavedStore = $state({
   dirty: false,
-  save: null as (() => Promise<void>) | null
+  save: null as (() => Promise<void>) | null,
+  // The leave waiting on the user's answer; App shows the prompt while it is set.
+  pendingLeave: null as (() => void) | null
 })
+
+/** Runs leave now, or once the user saves or discards the open view's unsaved changes. */
+export function guardLeave(leave: () => void): void {
+  if (unsavedStore.dirty) unsavedStore.pendingLeave = leave
+  else leave()
+}
 
 /** Registers a view's dirty state and save action for the leave guard; call during component init. */
 export function trackUnsaved(isDirty: () => boolean, save: () => Promise<void>): void {

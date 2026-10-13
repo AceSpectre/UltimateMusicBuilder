@@ -464,12 +464,6 @@ export default {
     emptyTitle: 'Pick a series',
     emptyBody:
       'This panel will show the selected series’ songs as an editable table once a series is selected.',
-    unsavedTitle: 'Unsaved changes',
-    unsavedBodyBefore: 'You have unsaved song changes for ',
-    unsavedBodyAfter: '. Save them before switching series?',
-    saveAndSwitch: 'Yes, save changes',
-    discard: 'No, discard changes',
-    continue: 'Continue making changes',
     colIndex: '#',
     colTitle: 'Title',
     colGame: 'Game',

@@ -5,14 +5,13 @@
   import { flip } from 'svelte/animate'
   import { dragHandleZone, dragHandle, type DndEvent } from 'svelte-dnd-action'
   import { modsStore } from '$lib/stores/mods.svelte'
-  import { trackUnsaved } from '$lib/stores/unsaved.svelte'
+  import { guardLeave, trackUnsaved } from '$lib/stores/unsaved.svelte'
   import { createSeriesSelection } from '$lib/series-selection.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import GameSelect from '$lib/components/ui/game-select.svelte'
-  import Modal from '$lib/components/ui/modal.svelte'
   import { inSoundtest, overlayLegend, overlayStyle, seriesGameIds } from '$lib/song-overlay'
   import { nextSort, sortBy, type SortKey, type SortState } from '$lib/table-sort'
   import { RECORD_OPTIONS, applyChoice, missingDefaults, presetChoices, type PresetChoice } from '$lib/presets'
@@ -44,7 +43,6 @@
   let dndItems = $state<TrackOrderItem[]>([])
   let orderLoading = $state(false)
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
-  let pendingSeriesPath = $state<string | null>(null)
   let baselineSnapshot = $state('')
   let selectedItemId = $state<string | null>(null)
   let overlayOn = $state(false)
@@ -217,38 +215,7 @@
   }
 
   function requestSelectSeries(path: string) {
-    if (path === modsStore.activeSeriesPath) {
-      return
-    }
-
-    if (isDirty) {
-      pendingSeriesPath = path
-      return
-    }
-
-    modsStore.activeSeriesPath = path
-  }
-
-  async function confirmSaveAndSwitch() {
-    const target = pendingSeriesPath
-    pendingSeriesPath = null
-    await handleSave()
-    if (target) {
-      modsStore.activeSeriesPath = target
-    }
-  }
-
-  function discardAndSwitch() {
-    const target = pendingSeriesPath
-    pendingSeriesPath = null
-    baselineSnapshot = snapshot(dndItems)
-    if (target) {
-      modsStore.activeSeriesPath = target
-    }
-  }
-
-  function cancelSwitch() {
-    pendingSeriesPath = null
+    if (path !== modsStore.activeSeriesPath) guardLeave(() => (modsStore.activeSeriesPath = path))
   }
 
   function handleReload() {
@@ -525,35 +492,3 @@
     </section>
   </div>
 </div>
-
-{#if pendingSeriesPath}
-  <Modal>
-      <div class="px-5 py-4">
-        <h3 class="text-sm font-semibold">{$_('orderTracks.unsavedTitle')}</h3>
-        <p class="pt-1.5 text-[13px] text-muted-foreground">
-          {$_('orderTracks.unsavedBodyBefore')}
-          <span class="font-medium text-foreground">{orderData?.seriesName ?? selection.selected?.name}</span>{$_('orderTracks.unsavedBodyAfter')}
-        </p>
-      </div>
-      <div class="flex flex-col gap-2 border-t border-border px-5 py-4">
-        <button
-          onclick={confirmSaveAndSwitch}
-          class="inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted"
-        >
-          {$_('orderTracks.saveAndSwitch')}
-        </button>
-        <button
-          onclick={discardAndSwitch}
-          class="inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted"
-        >
-          {$_('orderTracks.discard')}
-        </button>
-        <button
-          onclick={cancelSwitch}
-          class="inline-flex items-center justify-center rounded-lg px-3 py-2 text-[12.5px] font-medium text-muted-foreground transition-colors hover:bg-muted"
-        >
-          {$_('orderTracks.continue')}
-        </button>
-      </div>
-  </Modal>
-{/if}
