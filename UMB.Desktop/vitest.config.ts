@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [svelte({ hot: false })],
   test: {
     environment: 'node',
-    include: ['src/main/**/*.test.ts', 'src/renderer/**/*.test.ts'],
+    include: ['src/main/**/*.test.ts', 'src/renderer/**/*.test.ts', 'e2e/**/*.test.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/main/**/*.ts', 'src/renderer/src/lib/stores/**/*.ts'],

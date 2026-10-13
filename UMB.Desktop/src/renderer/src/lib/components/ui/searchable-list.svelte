@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Search } from '@lucide/svelte'
+  import Search from '@lucide/svelte/icons/search'
 
   // Search box, count line and selectable rows, shared by Manage Playlists and the series sidebars.
   // Callers filter `items` themselves (see matchesSearch) so they can react to the filtered list.

@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { Image, FolderOpen, RefreshCw, Download, Check, AlertTriangle } from '@lucide/svelte'
+  import Image from '@lucide/svelte/icons/image'
+  import FolderOpen from '@lucide/svelte/icons/folder-open'
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw'
+  import Download from '@lucide/svelte/icons/download'
+  import Check from '@lucide/svelte/icons/check'
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
   import GradientIcon from '$lib/components/ui/gradient-icon.svelte'

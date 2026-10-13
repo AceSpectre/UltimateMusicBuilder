@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { Volume2, RefreshCw, Play, Square, AlertTriangle, Activity } from '@lucide/svelte'
+  import Volume2 from '@lucide/svelte/icons/volume-2'
+  import RefreshCw from '@lucide/svelte/icons/refresh-cw'
+  import Play from '@lucide/svelte/icons/play'
+  import Square from '@lucide/svelte/icons/square'
+  import AlertTriangle from '@lucide/svelte/icons/alert-triangle'
+  import Activity from '@lucide/svelte/icons/activity'
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'

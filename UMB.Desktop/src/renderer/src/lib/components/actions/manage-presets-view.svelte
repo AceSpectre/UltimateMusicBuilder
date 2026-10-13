@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { Plus, SlidersHorizontal, Trash2 } from '@lucide/svelte'
+  import Plus from '@lucide/svelte/icons/plus'
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal'
+  import Trash2 from '@lucide/svelte/icons/trash-2'
   import { _ } from 'svelte-i18n'
   import { modsStore } from '$lib/stores/mods.svelte'
   import { guardLeave, trackUnsaved } from '$lib/stores/unsaved.svelte'

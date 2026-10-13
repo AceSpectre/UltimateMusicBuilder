@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Save } from '@lucide/svelte'
+  import Save from '@lucide/svelte/icons/save'
 
   let {
     saveState,
