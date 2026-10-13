@@ -12,8 +12,8 @@
     countText,
     emptyText
   }: {
-    /** badge: optional count shown as a pill when above zero. */
-    items: { id: string; label: string; badge?: number }[]
+    /** badge: optional count shown as a pill when above zero; hint: optional muted tag. */
+    items: { id: string; label: string; badge?: number; hint?: string }[]
     activeId: string | null
     onSelect: (id: string) => void
     search?: string
@@ -43,6 +43,9 @@
           style={isActive ? 'background: linear-gradient(135deg, hsl(var(--gradient-from) / .14), hsl(var(--gradient-to) / .14));' : ''}
         >
           <span class="min-w-0 flex-1 truncate">{item.label}</span>
+          {#if item.hint}
+            <span class="shrink-0 text-[10.5px] font-normal text-muted-foreground">{item.hint}</span>
+          {/if}
           {#if item.badge}
             <span class="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">{item.badge}</span>
           {/if}

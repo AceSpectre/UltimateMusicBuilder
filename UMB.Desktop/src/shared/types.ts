@@ -321,43 +321,57 @@ export interface PlaylistInfoData {
   stages: StageInfo[]
 }
 
-// One mod song assigned to a playlist, with its per-song incidence (random-roll weight).
-export interface PlaylistSongAssignment {
-  seriesId: string
-  seriesName: string
-  filename: string
+// A song that can go in a playlist (vanilla or from the mod).
+export interface PlaylistSong {
+  bgmId: string
   title: string
-  incidence: number
+  seriesName: string
+  isMod: boolean
 }
 
-export interface PlaylistTarget {
+// A playlist song's order and incidence per stage order slot (0-15); order -1 leaves it out of that slot.
+// autoAdded: a mod song the build always adds to this playlist, so it can only be left out of orders.
+export interface PlaylistTrack {
+  bgmId: string
+  orders: number[]
+  incidences: number[]
+  autoAdded?: boolean
+}
+
+export type PlaylistKind = 'vanilla' | 'series' | 'custom'
+
+// persisted: playlists.toml (or a series.toml [[playlists]] block) sets this playlist.
+export interface ManagedPlaylist {
   id: string
   name: string
-  assignedCount: number
-  assignments: PlaylistSongAssignment[]
+  kind: PlaylistKind
+  persisted: boolean
+  tracks: PlaylistTrack[]
 }
 
-// A mod track available to assign (the pool shown in the "add song" picker).
-export interface ModSong {
-  seriesId: string
+export interface ManagedStage {
+  id: string
+  name: string
+  hidden: boolean
   seriesName: string
-  filename: string
-  title: string
+  vanillaPlaylistId: string
+  vanillaOrder: number
+  playlistId: string
+  order: number
 }
 
 export interface ManagePlaylistsData {
   modName: string
   modPath: string
-  playlists: PlaylistTarget[]
-  songs: ModSong[]
+  playlists: ManagedPlaylist[]
+  stages: ManagedStage[]
+  songs: PlaylistSong[]
 }
 
-// Flat assignment record sent from the renderer on save.
-export interface PlaylistAssignmentInput {
+export interface StageAssignmentInput {
+  id: string
   playlistId: string
-  seriesId: string
-  filename: string
-  incidence: number
+  order: number
 }
 
 // Track flagged by the pre-build volume check.

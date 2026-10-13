@@ -12,6 +12,7 @@ import type {
   LogLine,
   LoopAnalysisOptions,
   ManagePlaylistsData,
+  ManagedPlaylist,
   MergeAnalysis,
   MergeResult,
   ModInfo,
@@ -21,12 +22,12 @@ import type {
   Nus3ConversionMeta,
   Nus3SourceTrack,
   Nus3TrackDecision,
-  PlaylistAssignmentInput,
   PlaylistInfoData,
   SaveSeriesItem,
   SaveTrackItem,
   SeriesOrderData,
   SongPresets,
+  StageAssignmentInput,
   SuspiciousVolumeTrack,
   TrackOrderData,
   VolumeConfigData,
@@ -72,7 +73,7 @@ export interface UmbApi {
   executeMerge(modPaths: string[], outputName: string, priorityModPath: string | null): Promise<MergeResult>
   getPlaylistInfo(): Promise<PlaylistInfoData>
   loadManagePlaylists(modPath: string): Promise<ManagePlaylistsData>
-  saveManagePlaylists(modPath: string, assignments: PlaylistAssignmentInput[]): Promise<ManagePlaylistsData>
+  saveManagePlaylists(modPath: string, playlists: ManagedPlaylist[], stages: StageAssignmentInput[]): Promise<ManagePlaylistsData>
   getWorkspace(): Promise<string>
   checkArcOutput(): Promise<boolean>
   getAppSettings(): Promise<AppSettings>

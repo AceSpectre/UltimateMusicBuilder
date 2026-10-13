@@ -1,5 +1,5 @@
 import { _electron as electron, type ElectronApplication, type Page } from '@playwright/test'
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync, existsSync } from 'fs'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync, existsSync, symlinkSync, unlinkSync, readdirSync } from 'fs'
 import { spawnSync } from 'child_process'
 import { tmpdir } from 'os'
 import { join, resolve, dirname } from 'path'
@@ -121,6 +121,24 @@ export function hasGameResources(): boolean {
 }
 
 /** True when `cmd` resolves on PATH. Gates specs that shell out to ffmpeg/pymusiclooper/dotnet. */
+/**
+ * Gives a workspace the repo's Resources, for actions that read vanilla data: the game files are
+ * linked (cleanup removes only the link) and the small files beside them copied.
+ */
+export function linkResources(ws: E2EWorkspace): void {
+  const source = join(repoRoot(), 'Resources')
+  const link = join(ws.root, 'Resources', 'Game')
+  for (const name of readdirSync(source).filter((name) => name !== 'Game')) {
+    cpSync(join(source, name), join(ws.root, 'Resources', name), { recursive: true })
+  }
+  symlinkSync(join(source, 'Game'), link, 'junction')
+  const cleanup = ws.cleanup
+  ws.cleanup = () => {
+    unlinkSync(link)
+    cleanup()
+  }
+}
+
 export function hasTool(cmd: string): boolean {
   const probe =
     process.platform === 'win32'

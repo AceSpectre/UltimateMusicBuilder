@@ -136,7 +136,7 @@ Fields:
 * `playlist-incidence` - default random-roll weight for the auto-generated `bgm_gametitle_<id>` playlist. Per-`[[playlists]]` blocks can override with their own `incidence`.
 * `series-playlist` - optional extra playlist that receives every song. Scaffold sets `bgm_<id>` for new series. `bgm_gametitle_<id>` is created regardless.
 * `[[games]]` - one block per "game". Custom series need at least one. `id` is referenced by `tracks.csv`'s `game` column.
-* `[[playlists]]` - extra playlists for this series' songs.
+* `[[playlists]]` - extra playlists for this series' songs. Saving in Manage Playlists moves these into [playlists.toml](#playliststoml---playlists-and-stage-playlists).
   * `id` - playlist identifier (existing stage playlist, or a new one UMB will create).
   * `incidence` - random-roll weight for this block's songs.
   * `songs` - `"*"` for all, or a TOML array of filenames. Stem-tolerant: `"Destroyer"` matches `Destroyer.nus3audio`. Pre-build validation warns on no-match entries; `Cleanup` prunes them.
@@ -180,6 +180,29 @@ A `tracks.csv` row whose `filename` is a vanilla song's id (e.g. `ui_bgm_a01_smb
 * `title`, `author`, `copyright` - a changed value replaces the text in every language; an unchanged one keeps the game's translations.
 * `game`, `record_type`, `in_soundtest`, and `special_category` / `info1` (pinch song).
 * `volume_db` - the song's dB boost; with `ApplyVolumeToVanilla` on, its nus3bank is regenerated with it.
+
+## playlists.toml - playlists and stage playlists
+
+An optional `playlists.toml` at the mod root holds the playlists and stage assignments edited in the desktop app's Manage Playlists view. Saving there also moves every series' `[[playlists]]` blocks into this file.
+
+```toml
+[[playlists]]
+id = "bgmmymix"                     # a new playlist, or a game/series playlist to replace
+name = "My Mix"                     # only for new playlists
+tracks = [
+    { song = "ui_bgm_a01_smb_chijyou", order = 0, incidence = 100 },
+    { song = "ui_bgm_destroyer", order = [1, 1, 1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], incidence = 50 },
+]
+
+[[stages]]
+id = "ui_stage_battle_field"
+playlist = "bgmmymix"
+order = 0
+```
+
+* A playlist here replaces the whole playlist of that id. The build then still adds every mod song missing from `bgmsmashbtl` and its series' stage playlists, so new songs join saved playlists too; to keep one off a stage, leave it out of that order instead. Songs are ui_bgm ids; a mod song's id is `ui_bgm_` plus its filename in lowercase with other characters as `_`.
+* Every stage plays one order (0-15) of its playlist. `order` and `incidence` are one value for all 16 orders, or an array with one per order; order `-1` leaves the song out of that order.
+* `[[stages]]` sets the playlist and order a stage plays.
 
 ---
 
