@@ -191,8 +191,9 @@ namespace UMB.CLI.Services
             var fieldsById = items.Where(i => i.Fields != null).ToDictionary(i => i.Id, i => i.Fields);
             foreach (var item in finalItems)
             {
-                if (fieldsById.TryGetValue(item.Id, out var fields))
-                    WriteSeriesTomlFields(Path.Combine(series[item.OriginalIndex].Dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
+                if (!fieldsById.TryGetValue(item.Id, out var fields)) continue;
+                WriteSeriesTomlFields(Path.Combine(series[item.OriginalIndex].Dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
+                RenameSeriesPlaylist(resolvedModPath, item.Fields.SeriesPlaylist, fields.SeriesPlaylist);
             }
 
             // A vanilla series only gets a folder once its fields differ from the vanilla ones.
@@ -202,6 +203,7 @@ namespace UMB.CLI.Services
                     || (item.SeriesPath == "" && JsonSerializer.Serialize(fields) == JsonSerializer.Serialize(item.Fields))) continue;
                 var dir = item.SeriesPath == "" ? EnsureVanillaFolder(resolvedModPath, item.SeriesId) : item.SeriesPath;
                 WriteSeriesTomlFields(Path.Combine(dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
+                RenameSeriesPlaylist(resolvedModPath, item.Fields.SeriesPlaylist, fields.SeriesPlaylist);
             }
 
             WriteSeriesOrder(resolvedModPath, finalItems.Select(i => i.SeriesId));
@@ -338,6 +340,17 @@ namespace UMB.CLI.Services
             lines = SeriesToml.RewriteGames(lines, fields.Games ?? new List<SeriesGame>());
 
             SeriesToml.WriteLines(seriesTomlPath, lines);
+        }
+
+        /// <summary>
+        /// A renamed series playlist keeps its playlists.toml entry and stages. Game playlists are never renamed:
+        /// pointing a series at one, or away from one, leaves playlists.toml as it is.
+        /// </summary>
+        private void RenameSeriesPlaylist(string modPath, string oldId, string newId)
+        {
+            var gamePlaylists = _catalog.Get()?.Playlists.Select(p => p.Id).ToHashSet() ?? new HashSet<string>();
+            if (string.IsNullOrEmpty(oldId) || string.IsNullOrEmpty(newId) || oldId == newId || gamePlaylists.Contains(oldId) || gamePlaylists.Contains(newId)) return;
+            PlaylistsToml.RenamePlaylist(modPath, oldId, newId);
         }
 
         private static string SeriesOrderPath(string modPath) =>

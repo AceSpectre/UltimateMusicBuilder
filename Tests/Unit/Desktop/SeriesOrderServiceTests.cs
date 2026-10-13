@@ -480,5 +480,36 @@ namespace Tests.Unit.Desktop
             var error = Assert.Throws<DesktopApiException>(() => VanillaService().Create(_modPath, OneGame(i => i.SeriesId = "mario")));
             Assert.Contains("already exists", error.Message);
         }
+    
+        private const string PlaylistsToml =
+            "[[playlists]]\nid = \"bgm_a\"\ntracks = []\n\n[[stages]]\nid = \"ui_stage_x\"\nplaylist = \"bgm_a\"\norder = 0\n";
+
+        [Fact]
+        public void Save_RenamingASeriesPlaylist_RenamesItInPlaylistsToml()
+        {
+            WriteCustomSeries("a", RichToml.Replace("bgmmario", "bgm_a"));
+            File.WriteAllText(Path.Combine(_modPath, "playlists.toml"), PlaylistsToml);
+
+            SaveEdited(f => f.SeriesPlaylist = "bgm_b");
+
+            Assert.Equal(PlaylistsToml.Replace("bgm_a", "bgm_b"), File.ReadAllText(Path.Combine(_modPath, "playlists.toml")));
+        }
+
+        [Fact]
+        public void Save_PointingASeriesAtAGamePlaylist_LeavesPlaylistsTomlAlone()
+        {
+            var service = new SeriesOrderService(_ws.MusicOptions(), TestCatalog.Service(TestCatalog.Mario()), TestEnvironment.CreateLogger<SeriesOrderService>());
+            WriteCustomSeries("a", RichToml.Replace("bgmmario", "bgm_a"));
+            File.WriteAllText(Path.Combine(_modPath, "playlists.toml"), PlaylistsToml);
+            var items = service.Load(_modPath).Items.Select(i =>
+            {
+                i.Fields.SeriesPlaylist = "bgmmario";
+                return new SaveSeriesItem(i.Id, i.Fields);
+            }).ToList();
+
+            service.Save(_modPath, items);
+
+            Assert.Equal(PlaylistsToml, File.ReadAllText(Path.Combine(_modPath, "playlists.toml")));
+        }
     }
 }

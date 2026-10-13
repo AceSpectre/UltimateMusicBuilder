@@ -1,6 +1,5 @@
 using Sma5h.Mods.Music.Models;
 using Sma5h.Mods.Music.Models.PlaylistEntryModels;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -52,49 +51,47 @@ namespace Sma5h.Mods.Music.Helpers
             return added.Count;
         }
 
-        /// <summary>The playlists the build adds a mod song of a series to: bgmsmashbtl and the playlists of the series' stages.</summary>
-        public static Func<string, ISet<string>> ModSongPlaylists(IEnumerable<StageEntry> stages)
+        /// <summary>
+        /// The songs the build always keeps in a playlist: a mod series' own playlists hold every song of the series,
+        /// and bgmsmashbtl plus the playlists of the series' stages hold its sound test songs.
+        /// </summary>
+        public static List<RequiredSong> RequiredSongs(IEnumerable<StageEntry> stages, IEnumerable<PlaylistEntry> seriesPlaylists,
+            IEnumerable<(string UiBgmId, string UiSeriesId)> soundTestSongs)
         {
             var stagePlaylists = stages
                 .Where(s => !string.IsNullOrEmpty(s.UiSeriesId) && !string.IsNullOrEmpty(s.BgmSetId))
                 .ToLookup(s => s.UiSeriesId, s => s.BgmSetId);
-            return uiSeriesId => stagePlaylists[uiSeriesId ?? ""].Prepend(SmashBattlePlaylist).ToHashSet();
+            return seriesPlaylists
+                .SelectMany(p => p.Tracks.Select(t => new RequiredSong(p.Id, t.UiBgmId, t.Incidence0)))
+                .Concat(soundTestSongs.SelectMany(song => stagePlaylists[song.UiSeriesId ?? ""].Prepend(SmashBattlePlaylist).Distinct()
+                    .Select(id => new RequiredSong(id, song.UiBgmId, 100))))
+                .ToList();
         }
 
-        /// <summary>Adds each mod song missing from its <see cref="ModSongPlaylists"/> at their end. Returns the insertions.</summary>
-        public static int AddModSongs(IDictionary<string, PlaylistEntry> playlists, IEnumerable<StageEntry> stages,
-            IEnumerable<(string UiBgmId, string UiSeriesId)> songs)
-        {
-            var targets = ModSongPlaylists(stages);
-            var added = 0;
-            foreach (var (uiBgmId, uiSeriesId) in songs)
-            {
-                foreach (var id in targets(uiSeriesId))
-                {
-                    if (!playlists.TryGetValue(id, out var playlist) || playlist.Tracks.Any(t => t.UiBgmId == uiBgmId)) continue;
-                    var order = playlist.Tracks.Count > 0 ? (short)(playlist.Tracks.Max(t => t.Order0) + 1) : (short)0;
-                    playlist.Tracks.Add(Track(uiBgmId, order, 100));
-                    added++;
-                }
-            }
-            return added;
-        }
-
-        /// <summary>playlists.toml playlists replace the ones with the same id. Applied before <see cref="AddModSongs"/>, so new mod songs still join.</summary>
-        public static void ApplyPlaylists(IDictionary<string, PlaylistEntry> playlists, IEnumerable<PlaylistEntry> overrides)
+        /// <summary>
+        /// After the mods' playlists are merged in: playlists.toml playlists replace theirs, the required songs any playlist
+        /// lacks join at its end, then playlists.toml stages get their playlists. Returns the songs added.
+        /// </summary>
+        public static int ApplyModPlaylists(IDictionary<string, PlaylistEntry> playlists, IEnumerable<StageEntry> stages,
+            IEnumerable<RequiredSong> required, IEnumerable<PlaylistEntry> overrides, IEnumerable<StagePlaylistAssignment> assignments)
         {
             foreach (var playlist in overrides)
             {
                 if (!playlists.TryGetValue(playlist.Id, out var existing))
                     playlists[playlist.Id] = existing = new PlaylistEntry(playlist.Id);
-                existing.Title = playlist.Title;
+                existing.Title = playlist.Title ?? existing.Title;
                 existing.Tracks = playlist.Tracks.ToList();
             }
-        }
 
-        /// <summary>playlists.toml stages get new playlists. Applied after <see cref="AddModSongs"/>, which follows the game's stage playlists.</summary>
-        public static void ApplyStages(IEnumerable<StageEntry> stages, IEnumerable<StagePlaylistAssignment> assignments)
-        {
+            var added = 0;
+            foreach (var song in required)
+            {
+                if (!playlists.TryGetValue(song.PlaylistId, out var playlist) || playlist.Tracks.Any(t => t.UiBgmId == song.UiBgmId)) continue;
+                var order = playlist.Tracks.Count > 0 ? (short)(playlist.Tracks.Max(t => t.Order0) + 1) : (short)0;
+                playlist.Tracks.Add(Track(song.UiBgmId, order, song.Incidence));
+                added++;
+            }
+
             var byStage = assignments.GroupBy(a => a.UiStageId).ToDictionary(g => g.Key, g => g.Last());
             foreach (var stage in stages)
             {
@@ -102,6 +99,7 @@ namespace Sma5h.Mods.Music.Helpers
                 stage.BgmSetId = assignment.BgmSetId;
                 stage.BgmSettingNo = assignment.BgmSettingNo;
             }
+            return added;
         }
 
         private static PropertyInfo[] Properties(string prefix) =>

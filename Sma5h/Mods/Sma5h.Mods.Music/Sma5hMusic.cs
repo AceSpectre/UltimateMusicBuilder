@@ -37,6 +37,7 @@ namespace Sma5h.Mods.Music
 
         private readonly Dictionary<string, float> _seriesVolumeDb = new();
         private readonly Dictionary<string, float> _vanillaTrackDb = new();
+        private readonly List<PlaylistEntry> _seriesPlaylists = new();
         private readonly List<PlaylistEntry> _playlistOverrides = new();
         private readonly List<StagePlaylistAssignment> _stageAssignments = new();
 
@@ -99,6 +100,7 @@ namespace Sma5h.Mods.Music
                 vanillaOverrides.AddRange(musicModEntries.VanillaBgmOverrides);
                 foreach (var icon in musicModEntries.VanillaSeriesIcons)
                     vanillaSeriesIcons[icon.Key] = icon.Value;
+                _seriesPlaylists.AddRange(musicModEntries.SeriesPlaylists);
                 _playlistOverrides.AddRange(musicModEntries.PlaylistOverrides);
                 _stageAssignments.AddRange(musicModEntries.StageAssignments);
             }
@@ -459,10 +461,9 @@ namespace Sma5h.Mods.Music
             var playlists = _audioStateService.GetPlaylists().ToDictionary(p => p.Id);
             var registered = playlists.Keys.ToHashSet();
 
-            PlaylistHelper.ApplyPlaylists(playlists, _playlistOverrides);
-            var added = PlaylistHelper.AddModSongs(playlists, stages, modSongs);
+            var required = PlaylistHelper.RequiredSongs(stages, _seriesPlaylists, modSongs);
+            var added = PlaylistHelper.ApplyModPlaylists(playlists, stages, required, _playlistOverrides, _stageAssignments);
             _logger.LogInformation("Added {ModSongCount} mod song(s) to stage playlists ({TotalAdded} total insertions).", modSongs.Count, added);
-            PlaylistHelper.ApplyStages(stages, _stageAssignments);
 
             foreach (var playlist in playlists.Values.Where(p => !registered.Contains(p.Id)))
                 _audioStateService.AddPlaylistEntry(playlist);

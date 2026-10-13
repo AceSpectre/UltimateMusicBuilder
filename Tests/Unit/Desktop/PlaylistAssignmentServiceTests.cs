@@ -44,13 +44,16 @@ namespace Tests.Unit.Desktop
         private static ManagedPlaylist Playlist(ManagePlaylistsData data, string id) => data.Playlists.Single(p => p.Id == id);
         private static string[] Songs(ManagedPlaylist playlist) => playlist.Tracks.Select(t => t.BgmId).ToArray();
 
+        private static ManagedPlaylist Saved(string id, string kind, params string[] songs) =>
+            new(id, id, kind, new(), songs.Select(s => new PlaylistTrack(s, Order0, Incidence100)).ToList(), null);
+
         [Fact]
         public void Load_ShowsGamePlaylistsWithTheModSongsTheBuildAdds()
         {
             var data = _service.Load(SeedMod());
 
             var mario = Playlist(data, "bgmmario");
-            Assert.Equal(("Mario", "vanilla", false), (mario.Name, mario.Kind, mario.Persisted));
+            Assert.Equal(("Mario", "vanilla", null), (mario.Name, mario.Kind, mario.DefaultTracks));
             Assert.Equal(new[] { "ui_bgm_a01_smb_chijyou", "ui_bgm_a05_smb3_hikousen", "ui_bgm_a", "ui_bgm_b" }, Songs(mario));
             Assert.Equal(new[] { "ui_bgm_a01_smb_chijyou", "ui_bgm_c", "ui_bgm_a", "ui_bgm_b" }, Songs(Playlist(data, "bgmsmashbtl")));
         }
@@ -65,12 +68,26 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void Load_ShowsSeriesPlaylistBlocksAsSavedCustomPlaylists()
+        public void Load_ReportsLegacyBlocks_ShowingThemAsTheyBuild()
         {
-            var menu = Playlist(_service.Load(SeedMod()), "bgmsmashmenu");
+            var data = _service.Load(SeedMod());
 
-            Assert.Equal(("custom", true), (menu.Kind, menu.Persisted));
+            Assert.True(data.LegacyBlocks);
+            var menu = Playlist(data, "bgmsmashmenu");
+            Assert.Equal(("custom", 0), (menu.Kind, menu.Series.Count));
             Assert.Equal(new PlaylistTrack("ui_bgm_a", Order0, Enumerable.Repeat((ushort)10, 16).ToArray()), menu.Tracks.Single(), new TrackComparer());
+        }
+
+        [Fact]
+        public void Load_ShowsAWildcardLegacyBlockAsASeriesFlag()
+        {
+            var modPath = SeedMod();
+            File.AppendAllText(Path.Combine(modPath, "cuphead", "series.toml"), "\n[[playlists]]\nid = \"bgm_cuphead_mix\"\nincidence = 100\n");
+
+            var mix = Playlist(_service.Load(modPath), "bgm_cuphead_mix");
+
+            Assert.Equal("series", mix.Kind);
+            Assert.Equal(new[] { new SeriesRef("cuphead", "Cuphead") }, mix.Series);
         }
 
         [Fact]
@@ -91,37 +108,6 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void Save_RoundTripsPlaylistsAndOrderSlots()
-        {
-            var modPath = SeedMod();
-            var orders = Enumerable.Range(0, 16).Select(i => (short)(i == 3 ? -1 : 0)).ToArray();
-            var playlist = new ManagedPlaylist("bgmmine", "Mine", "custom", false, new()
-            {
-                new("ui_bgm_c", orders, Incidence100),
-                new("ui_bgm_a01_smb_chijyou", Order0, Incidence100)
-            });
-
-            var mine = Playlist(_service.Save(modPath, new() { playlist }, new()), "bgmmine");
-
-            Assert.Equal(("Mine", "custom", true), (mine.Name, mine.Kind, mine.Persisted));
-            Assert.Equal(playlist.Tracks, mine.Tracks, new TrackComparer());
-            var toml = File.ReadAllText(Path.Combine(modPath, "playlists.toml"));
-            Assert.Contains("{ song = \"ui_bgm_a01_smb_chijyou\", order = 0, incidence = 100 },", toml);
-            Assert.Contains("order = [0, 0, 0, -1, 0,", toml);
-        }
-
-        [Fact]
-        public void Save_ReplacesAGamePlaylist()
-        {
-            var modPath = SeedMod();
-
-            var result = _service.Save(modPath, new() { new("bgmmario", "Mario", "vanilla", true, new() { new("ui_bgm_b", Order0, Incidence100) }) }, new());
-
-            Assert.Equal(new[] { "ui_bgm_b", "ui_bgm_a" }, Songs(Playlist(result, "bgmmario")));
-            Assert.DoesNotContain("name =", File.ReadAllText(Path.Combine(modPath, "playlists.toml")));
-        }
-
-        [Fact]
         public void Load_FlagsTheModSongsTheBuildAlwaysAdds()
         {
             var battle = Playlist(_service.Load(SeedMod()), "bgmsmashbtl");
@@ -130,26 +116,84 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
+        public void Save_RoundTripsPlaylistsAndOrderSlots()
+        {
+            var modPath = SeedMod();
+            var orders = Enumerable.Range(0, 16).Select(i => (short)(i == 3 ? -1 : 0)).ToArray();
+            var playlist = new ManagedPlaylist("bgmmine", "Mine", "custom", new(), new()
+            {
+                new("ui_bgm_c", orders, Incidence100),
+                new("ui_bgm_a01_smb_chijyou", Order0, Incidence100)
+            }, null);
+
+            var mine = Playlist(_service.Save(modPath, new() { playlist }, new()), "bgmmine");
+
+            Assert.Equal(("Mine", "custom"), (mine.Name, mine.Kind));
+            Assert.Equal(playlist.Tracks, mine.Tracks, new TrackComparer());
+            var toml = File.ReadAllText(Path.Combine(modPath, "playlists.toml"));
+            Assert.Contains("{ song = \"ui_bgm_a01_smb_chijyou\", order = 0, incidence = 100 },", toml);
+            Assert.Contains("order = [0, 0, 0, -1, 0,", toml);
+        }
+
+        [Fact]
+        public void Save_ReplacesAGamePlaylist_GivingItsDefaultForAReset()
+        {
+            var modPath = SeedMod();
+
+            var mario = Playlist(_service.Save(modPath, new() { Saved("bgmmario", "vanilla", "ui_bgm_b") }, new()), "bgmmario");
+
+            Assert.Equal(new[] { "ui_bgm_b", "ui_bgm_a" }, Songs(mario));
+            Assert.Equal(new[] { "ui_bgm_a01_smb_chijyou", "ui_bgm_a05_smb3_hikousen", "ui_bgm_a", "ui_bgm_b" }, mario.DefaultTracks.Select(t => t.BgmId));
+            Assert.DoesNotContain("name =", File.ReadAllText(Path.Combine(modPath, "playlists.toml")));
+        }
+
+        [Fact]
         public void Save_ASavedPlaylistStillGetsModSongs_RemovedOrNew()
         {
             var modPath = SeedMod();
-            _service.Save(modPath, new() { new("bgmsmashbtl", "Smash Battle", "vanilla", false, new() { new("ui_bgm_a01_smb_chijyou", Order0, Incidence100) }) }, new());
+            _service.Save(modPath, new() { Saved("bgmsmashbtl", "vanilla", "ui_bgm_a01_smb_chijyou") }, new());
 
             Assert.Equal(new[] { "ui_bgm_a01_smb_chijyou", "ui_bgm_c", "ui_bgm_a", "ui_bgm_b" }, Songs(Playlist(_service.Load(modPath), "bgmsmashbtl")));
         }
 
         [Fact]
-        public void Save_MovesSeriesPlaylistBlocksOut_KeepingTheOtherTables()
+        public void Save_ASeriesPlaylistAlwaysHoldsEverySongOfTheSeries()
         {
             var modPath = SeedMod();
+            _service.Save(modPath, new() { Saved("bgm_gametitle_cuphead", "series", "ui_bgm_a01_smb_chijyou") }, new());
 
-            _service.Save(modPath, new(), new());
+            var cuphead = Playlist(_service.Load(modPath), "bgm_gametitle_cuphead");
+            Assert.Equal(new[] { "ui_bgm_a01_smb_chijyou", "ui_bgm_c" }, Songs(cuphead));
+            Assert.Equal(new[] { false, true }, cuphead.Tracks.Select(t => t.AutoAdded));
+        }
 
+        [Fact]
+        public void Save_ASeriesFlagKeepsEverySongOfThatSeries()
+        {
+            var modPath = SeedMod();
+            var mix = new ManagedPlaylist("bgm_mix", "Mix", "series", new() { new("cuphead", "Cuphead") }, new(), null);
+
+            var saved = Playlist(_service.Save(modPath, new() { mix }, new()), "bgm_mix");
+
+            Assert.Equal("series", saved.Kind);
+            Assert.Equal(new[] { "ui_bgm_c" }, Songs(saved));
+            Assert.Contains("series = [\"cuphead\"]", File.ReadAllText(Path.Combine(modPath, "playlists.toml")));
+        }
+
+        [Fact]
+        public void Save_MigratesLegacyBlocks_KeepingTheOtherTables()
+        {
+            var modPath = SeedMod();
+            var data = _service.Load(modPath);
+
+            var result = _service.Save(modPath, data.Playlists.Where(p => p.Kind == "custom").ToList(), new());
+
+            Assert.False(result.LegacyBlocks);
             var toml = File.ReadAllText(Path.Combine(modPath, "mario", "series.toml"));
             Assert.DoesNotContain("[[playlists]]", toml);
             foreach (var expected in new[] { "id = \"mario\"", "[[games]]", "[default-track-data]" })
                 Assert.Contains(expected, toml);
-            Assert.DoesNotContain(_service.Load(modPath).Playlists, p => p.Id == "bgmsmashmenu");
+            Assert.Equal(new[] { "ui_bgm_a" }, Songs(Playlist(result, "bgmsmashmenu")));
         }
 
         [Fact]

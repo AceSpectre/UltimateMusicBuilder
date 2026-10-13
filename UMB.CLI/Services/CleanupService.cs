@@ -1,9 +1,11 @@
 ﻿using CsvHelper;
 using CsvHelper.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
+using Sma5h.Mods.Music.Interfaces;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using System;
 using System.Collections.Generic;
@@ -19,11 +21,12 @@ namespace UMB.CLI.Services
     {
         private readonly ILogger _logger;
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
+        private readonly VanillaCatalogService _catalog;
 
-
-        public CleanupService(IOptionsMonitor<Sma5hMusicOptions> musicConfig, ILogger<CleanupService> logger)
+        public CleanupService(IOptionsMonitor<Sma5hMusicOptions> musicConfig, VanillaCatalogService catalog, ILogger<CleanupService> logger)
         {
             _musicConfig = musicConfig;
+            _catalog = catalog;
             _logger = logger;
         }
 
@@ -47,6 +50,7 @@ namespace UMB.CLI.Services
             int totalRemoved = 0;
             int totalFiles = 0;
             int totalDeadSongs = 0;
+            int totalStaleSongs = 0;
 
             foreach (var modDir in modDirs)
             {
@@ -109,12 +113,36 @@ namespace UMB.CLI.Services
                         totalDeadSongs += deadInSeries;
                     }
                 }
+
+                totalStaleSongs += PruneStalePlaylistSongs(modDir);
             }
 
             _logger.LogInformation("--------------------");
             _logger.LogInformation("Cleanup complete: removed {Removed} entries from {Files} tracks.csv file(s).", totalRemoved, totalFiles);
             if (totalDeadSongs > 0)
                 _logger.LogInformation("Pruned {Count} dead song reference(s) from series.toml playlist arrays.", totalDeadSongs);
+            if (totalStaleSongs > 0)
+                _logger.LogInformation("Pruned {Count} stale song(s) from playlists.toml.", totalStaleSongs);
+        }
+
+        /// <summary>Drops playlists.toml songs that are neither vanilla nor in the mod. Returns the songs dropped.</summary>
+        private int PruneStalePlaylistSongs(string modDir)
+        {
+            var relativeToml = Path.Combine(Path.GetFileName(modDir), MusicConstants.MusicModFiles.FOLDER_MOD_PLAYLISTS_TOML_FILE);
+            if (!File.Exists(PlaylistsToml.PathIn(modDir))) return 0;
+            var catalog = _catalog.Get();
+            if (catalog == null)
+            {
+                _logger.LogWarning("Skipping {TomlPath}: game resources are needed to tell vanilla songs from stale ones.", relativeToml);
+                return 0;
+            }
+
+            var modSongs = new FolderMusicMod(NullLogger<IMusicMod>.Instance, null, modDir, readAudioMetadata: false).GetMusicModEntries().BgmDbRootEntries;
+            var known = catalog.BgmTitles.Keys.Concat(modSongs.Select(b => b.UiBgmId)).ToHashSet();
+            var dropped = PlaylistsToml.RemoveSongs(modDir, known.Contains);
+            foreach (var song in dropped)
+                _logger.LogInformation("Removing stale song '{Song}' from {TomlPath}", song, relativeToml);
+            return dropped.Count;
         }
 
         /// <summary>

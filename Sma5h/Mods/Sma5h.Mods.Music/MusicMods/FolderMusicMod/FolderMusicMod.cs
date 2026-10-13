@@ -55,19 +55,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         {
             var output = new MusicModEntries();
             var seenToneIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            var playlistsPath = Path.Combine(_modPath, MusicConstants.MusicModFiles.FOLDER_MOD_PLAYLISTS_TOML_FILE);
-            if (File.Exists(playlistsPath))
-            {
-                try
-                {
-                    ReadPlaylistsFile(playlistsPath, output);
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e, "Failed to parse {Path}.", playlistsPath);
-                }
-            }
+            var tracksBySeries = new Dictionary<string, List<(string uiBgmId, int incidence)>>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var subfolder in Directory.GetDirectories(_modPath).OrderBy(Path.GetFileName, StringComparer.OrdinalIgnoreCase))
             {
@@ -201,6 +189,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 var seriesDb = seriesFile.DefaultTrackData?.VolumeDb ?? 0f;
                 output.SeriesVolumeDb[uiSeriesId] = seriesDb;
                 var playlistTracks = new List<(string uiBgmId, int incidence)>();
+                tracksBySeries[seriesFile.Series.Id] = playlistTracks;
                 var filenameByUiBgmId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var filenameToInfoId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var deferredInfo1 = new List<(string id, Action<string> setInfo1, string info1Filename)>();
@@ -369,7 +358,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 {
                     // Invariant: bgm_gametitle_{series_id} is always populated with every song.
                     var gametitlePlaylistId = PlaylistHelper.GameTitlePlaylistPrefix + seriesFile.Series.Id;
-                    output.PlaylistEntries.Add(BuildPlaylistEntry(gametitlePlaylistId, playlistTracks));
+                    AddSeriesPlaylist(output, BuildPlaylistEntry(gametitlePlaylistId, playlistTracks, seriesFile.Series.Name));
                     _logger.LogInformation("Created playlist {PlaylistId} with {TrackCount} track(s).", gametitlePlaylistId, playlistTracks.Count);
 
                     // Optional additional catch-all (e.g. bgmzelda) — set via `series-playlist`.
@@ -377,7 +366,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     if (!string.IsNullOrEmpty(seriesPlaylistId)
                         && !string.Equals(seriesPlaylistId, gametitlePlaylistId, StringComparison.OrdinalIgnoreCase))
                     {
-                        output.PlaylistEntries.Add(BuildPlaylistEntry(seriesPlaylistId, playlistTracks));
+                        AddSeriesPlaylist(output, BuildPlaylistEntry(seriesPlaylistId, playlistTracks, seriesFile.Series.Name));
                         _logger.LogInformation("Created series playlist {PlaylistId} with {TrackCount} track(s).", seriesPlaylistId, playlistTracks.Count);
                     }
 
@@ -423,6 +412,19 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                         output.PlaylistEntries.Add(BuildPlaylistEntry(playlistOverride.Id, overrideTracks));
                         _logger.LogInformation("Created playlist {PlaylistId} with {TrackCount} track(s) (from [[playlists]] override).", playlistOverride.Id, overrideTracks.Count);
                     }
+                }
+            }
+
+            var playlistsPath = Path.Combine(_modPath, MusicConstants.MusicModFiles.FOLDER_MOD_PLAYLISTS_TOML_FILE);
+            if (File.Exists(playlistsPath))
+            {
+                try
+                {
+                    ReadPlaylistsFile(playlistsPath, output, tracksBySeries);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e, "Failed to parse {Path}.", playlistsPath);
                 }
             }
 
@@ -528,14 +530,21 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             return MusicConstants.VALID_RECORD_TYPES.Contains(prefixed) ? prefixed : "record_original";
         }
 
-        private static PlaylistEntry BuildPlaylistEntry(string playlistId, List<(string uiBgmId, int incidence)> tracks)
+        private static PlaylistEntry BuildPlaylistEntry(string playlistId, List<(string uiBgmId, int incidence)> tracks, string title = null)
         {
-            var entry = new PlaylistEntry(playlistId);
+            var entry = new PlaylistEntry(playlistId, title);
             entry.Tracks.AddRange(tracks.Select((t, i) => PlaylistHelper.Track(t.uiBgmId, (short)i, (ushort)Math.Clamp(t.incidence, 0, ushort.MaxValue))));
             return entry;
         }
 
-        private static void ReadPlaylistsFile(string tomlPath, MusicModEntries output)
+        private static void AddSeriesPlaylist(MusicModEntries output, PlaylistEntry playlist)
+        {
+            output.PlaylistEntries.Add(playlist);
+            output.SeriesPlaylists.Add(playlist);
+        }
+
+        /// <summary>Reads playlists.toml; a playlist flagged with `series` always holds every song of those series.</summary>
+        private static void ReadPlaylistsFile(string tomlPath, MusicModEntries output, Dictionary<string, List<(string uiBgmId, int incidence)>> tracksBySeries)
         {
             var file = Toml.ToModel<FolderPlaylistsFileConfig>(File.ReadAllText(tomlPath), options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
             foreach (var playlist in file.Playlists.Where(p => !string.IsNullOrWhiteSpace(p.Id)))
@@ -544,6 +553,9 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                 entry.Tracks.AddRange(playlist.Tracks.Where(t => !string.IsNullOrWhiteSpace(t.Song))
                     .Select(t => PlaylistHelper.Track(t.Song, Slots<short>(t.Order, 0), Slots<ushort>(t.Incidence, 100))));
                 output.PlaylistOverrides.Add(entry);
+                output.PlaylistSeriesFlags[playlist.Id] = playlist.Series;
+                foreach (var seriesId in playlist.Series.Where(tracksBySeries.ContainsKey))
+                    output.SeriesPlaylists.Add(BuildPlaylistEntry(playlist.Id, tracksBySeries[seriesId], playlist.Name));
             }
             foreach (var stage in file.Stages.Where(s => !string.IsNullOrWhiteSpace(s.Id) && !string.IsNullOrWhiteSpace(s.Playlist)))
                 output.StageAssignments.Add(new StagePlaylistAssignment(stage.Id, stage.Playlist, (byte)Math.Clamp(stage.Order, 0, PlaylistHelper.OrderCount - 1)));

@@ -81,6 +81,8 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
     {
         public string Id { get; set; }
         public string Name { get; set; }
+        /// <summary>Series ids whose every song this playlist always holds (a dedicated series playlist).</summary>
+        public List<string> Series { get; set; } = new();
         public List<FolderPlaylistTrackConfig> Tracks { get; set; } = new();
     }
 

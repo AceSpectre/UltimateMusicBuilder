@@ -145,11 +145,17 @@ namespace UMB.CLI.Desktop
     /// AutoAdded: a mod song the build always adds to this playlist, so removing it does not last.
     /// </summary>
     public record PlaylistTrack(string BgmId, short[] Orders, ushort[] Incidences, bool AutoAdded = false);
-    /// <summary>Kind is "vanilla", "series" (made by a mod series) or "custom"; Persisted when playlists.toml or a series.toml block sets it.</summary>
-    public record ManagedPlaylist(string Id, string Name, string Kind, bool Persisted, List<PlaylistTrack> Tracks);
+    public record SeriesRef(string Id, string Name);
+    /// <summary>
+    /// Kind is "vanilla", "series" (filled by a mod series) or "custom". Series: the series playlists.toml flags it
+    /// with, whose every song it always holds. DefaultTracks: a changed game or series playlist's default, else null.
+    /// </summary>
+    public record ManagedPlaylist(string Id, string Name, string Kind, List<SeriesRef> Series, List<PlaylistTrack> Tracks, List<PlaylistTrack> DefaultTracks);
     public record ManagedStage(string Id, string Name, bool Hidden, string SeriesName,
         string VanillaPlaylistId, int VanillaOrder, string PlaylistId, int Order);
-    public record ManagePlaylistsData(string ModName, string ModPath, List<ManagedPlaylist> Playlists, List<ManagedStage> Stages, List<PlaylistSong> Songs);
+    /// <summary>LegacyBlocks: series.toml still has [[playlists]] blocks, which saving moves into playlists.toml.</summary>
+    public record ManagePlaylistsData(string ModName, string ModPath, List<ManagedPlaylist> Playlists, List<ManagedStage> Stages,
+        List<PlaylistSong> Songs, bool LegacyBlocks);
     public record StageAssignmentInput(string Id, string PlaylistId, int Order);
 
     // ── Build pre-checks ───────────────────────────────────────────────────
