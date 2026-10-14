@@ -8,7 +8,7 @@ let app: ElectronApplication
 
 // nav order — src/renderer/src/lib/actions.ts
 const NAV_ITEMS: Array<{ id: string; label: string }> = [
-  { id: 'build', label: 'Build' },
+  { id: 'build', label: 'Build & Setup' },
   { id: 'nus3-convert', label: 'Nus3 Convert' },
   { id: 'config-volume', label: 'Config Volume' },
   { id: 'order-series', label: 'Manage Series' },
@@ -90,7 +90,7 @@ test('sidebar counts each action click', async () => {
     .then((t) => parseInt(t!.replace('action clicks:', '').trim(), 10))
 
   await clickNav(page, 'Merge')
-  await clickNav(page, 'Build')
+  await clickNav(page, 'Build & Setup')
 
   await expect(page.getByText(`action clicks: ${clicksBefore + 2}`)).toBeVisible()
 })
@@ -120,7 +120,7 @@ test('command palette filters actions by the typed query', async () => {
   await expect(palette.getByRole('button', { name: 'Manage Series' })).toBeVisible()
   await expect(palette.getByRole('button', { name: 'Manage Songs' })).toBeVisible()
   await expect(palette.getByRole('button', { name: 'Manage Playlists' })).toBeVisible()
-  await expect(palette.getByRole('button', { name: 'Build', exact: true })).toHaveCount(0)
+  await expect(palette.getByRole('button', { name: 'Build & Setup', exact: true })).toHaveCount(0)
   await expect(palette.getByText('Mods', { exact: true })).toHaveCount(0)
 
   await search.press('Escape')
@@ -141,7 +141,7 @@ test('command palette shows the empty state for a query that matches nothing', a
 test('command palette selecting an action switches the view and closes', async () => {
   const page = await firstWindow(app)
   await openBottomPanel(page)
-  await clickNav(page, 'Build')
+  await clickNav(page, 'Build & Setup')
 
   const [palette, search] = await openPalette(page)
   await search.fill('extract')

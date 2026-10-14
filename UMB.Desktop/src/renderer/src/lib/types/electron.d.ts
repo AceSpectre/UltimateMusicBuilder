@@ -27,6 +27,7 @@ import type {
   SaveTrackItem,
   SeriesOrderData,
   SongPresets,
+  SetupStatus,
   SuspiciousVolumeTrack,
   TrackOrderData,
   VolumeConfigData,
@@ -43,6 +44,7 @@ export interface UmbApi {
   listModSeries(modPath: string): Promise<ModSeriesInfo[]>
   getModStats(modPath: string): Promise<ModStats>
   checkBuildVolumes(modName: string | null): Promise<SuspiciousVolumeTrack[]>
+  checkSetup(): Promise<SetupStatus>
   resetAllVolumes(): Promise<void>
   loadTrackOrder(seriesPath: string): Promise<TrackOrderData>
   saveTrackOrder(seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData>

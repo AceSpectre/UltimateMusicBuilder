@@ -2,6 +2,9 @@
   import Folder from '@lucide/svelte/icons/folder'
   import AlertTriangle from '@lucide/svelte/icons/alert-triangle'
   import LoaderCircle from '@lucide/svelte/icons/loader-circle'
+  import CircleCheck from '@lucide/svelte/icons/circle-check'
+  import CircleX from '@lucide/svelte/icons/circle-x'
+  import RotateCw from '@lucide/svelte/icons/rotate-cw'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
   import ActionHeader from '$lib/components/ui/action-header.svelte'
@@ -9,7 +12,7 @@
   import Modal from '$lib/components/ui/modal.svelte'
   import { settingsStore } from '$lib/stores/settings.svelte'
   import { formatDb } from '$lib/volume'
-  import type { ModInfo, SuspiciousVolumeTrack } from '$lib/types/electron'
+  import type { ModInfo, SetupStatus, SuspiciousVolumeTrack } from '$lib/types/electron'
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
 
@@ -35,6 +38,22 @@
     if (anyRunning) return
     void window.electron.umb.checkArcOutput().then((v) => { hasOutput = v })
     void window.electron.umb.getAppSettings().then((s) => { globalVolumeDb = s.globalVolumeDb })
+  })
+
+  let setup = $state<SetupStatus | null>(null)
+  let setupRunning = $state(false)
+
+  async function checkSetup() {
+    setupRunning = true
+    try {
+      setup = await window.electron.umb.checkSetup()
+    } finally {
+      setupRunning = false
+    }
+  }
+
+  $effect(() => {
+    void checkSetup()
   })
 
   async function handleBuildClick() {
@@ -143,50 +162,97 @@
   }
 </script>
 
+{#snippet sectionLabel(text: string)}
+  <div class="mb-2 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{text}</div>
+{/snippet}
+
+{#snippet status(ok: boolean | undefined)}
+  {#if setupRunning || ok === undefined}
+    <span class="flex items-center gap-1.5 text-[12px] text-dim"><LoaderCircle size={13} class="animate-spin" />{$_('build.setup.checking')}</span>
+  {:else if ok}
+    <span class="flex items-center gap-1.5 text-[12px] text-primary"><CircleCheck size={13} />{$_('build.setup.ready')}</span>
+  {:else}
+    <span class="flex items-center gap-1.5 text-[12px] text-destructive"><CircleX size={13} />{$_('build.setup.missing')}</span>
+  {/if}
+{/snippet}
+
 <ActionHeader title={$_('build.title')} subtitle={$_('build.subtitle')} />
 
 <div class="action-pane">
-  <CommandRow
-    name={$_('build.buildButton')}
-    description={$_('build.buildDescription')}
-    note={hasOutput ? $_('build.outputNotEmpty') : ''}
-    tone="warn"
-  >
-    <button onclick={handleBuildClick} disabled={anyRunning && !buildRunning} class="btn-primary">
-      {buildRunning ? $_('build.stopBuild') : $_('build.buildButton')}
-    </button>
-  </CommandRow>
+  <section>
+    {@render sectionLabel($_('build.sections.build'))}
+    <CommandRow
+      name={$_('build.buildButton')}
+      description={$_('build.buildDescription')}
+      note={hasOutput ? $_('build.outputNotEmpty') : ''}
+      tone="warn"
+    >
+      <button onclick={handleBuildClick} disabled={anyRunning && !buildRunning} class="btn-primary">
+        {buildRunning ? $_('build.stopBuild') : $_('build.buildButton')}
+      </button>
+    </CommandRow>
 
-  <CommandRow name={$_('build.scaffoldButton')} description={$_('build.scaffoldDescription')}>
-    <button onclick={handleScaffold} disabled={anyRunning} class="btn">
-      {#if scaffoldRunning}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.scaffoldButton')}{/if}
-    </button>
-  </CommandRow>
+    <CommandRow name={$_('build.scaffoldButton')} description={$_('build.scaffoldDescription')}>
+      <button onclick={handleScaffold} disabled={anyRunning} class="btn">
+        {#if scaffoldRunning}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.scaffoldButton')}{/if}
+      </button>
+    </CommandRow>
 
-  <CommandRow name={$_('build.cleanupButton')} description={$_('build.cleanupDescription')} note={$_('build.destructive')} tone="err">
-    <button onclick={handleCleanup} disabled={anyRunning} class="btn-danger">
-      {#if cleanupRunning}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.cleanupButton')}{/if}
-    </button>
-  </CommandRow>
+    <CommandRow name={$_('build.cleanupButton')} description={$_('build.cleanupDescription')} note={$_('build.destructive')} tone="err">
+      <button onclick={handleCleanup} disabled={anyRunning} class="btn-danger">
+        {#if cleanupRunning}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.cleanupButton')}{/if}
+      </button>
+    </CommandRow>
 
-  <CommandRow name={$_('build.importButton')} description={$_('build.importDescription')} note={$_('build.importNote')}>
-    <button onclick={openImportModal} disabled={anyRunning} class="btn">
-      {#if importRunning}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.importButton')}…{/if}
-    </button>
-  </CommandRow>
+    <CommandRow name={$_('build.importButton')} description={$_('build.importDescription')} note={$_('build.importNote')}>
+      <button onclick={openImportModal} disabled={anyRunning} class="btn">
+        {#if importRunning}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.importButton')}…{/if}
+      </button>
+    </CommandRow>
 
-  <div class="mt-4 grid grid-cols-[repeat(3,minmax(0,180px))] gap-[18px] border-t border-line2 pt-3">
-    <div>
-      <div class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('build.facts.target')}</div>
-      <div class="mt-[5px] text-[13.5px] font-medium">ArcOutput/</div>
-    </div>
-    {#if globalVolumeDb !== null}
+    <div class="mt-3 grid grid-cols-[repeat(3,minmax(0,180px))] gap-[18px]">
       <div>
-        <div class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('build.facts.globalVolume')}</div>
-        <div class="mt-[5px] text-[13.5px] font-medium">{formatDb(globalVolumeDb)}</div>
+        <div class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('build.facts.target')}</div>
+        <div class="mt-[5px] text-[13.5px] font-medium">ArcOutput/</div>
       </div>
-    {/if}
-  </div>
+      {#if globalVolumeDb !== null}
+        <div>
+          <div class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('build.facts.globalVolume')}</div>
+          <div class="mt-[5px] text-[13.5px] font-medium">{formatDb(globalVolumeDb)}</div>
+        </div>
+      {/if}
+    </div>
+  </section>
+
+  <section class="mt-4 border-t border-line2 pt-3">
+    <div class="flex items-start justify-between">
+      {@render sectionLabel($_('build.sections.setup'))}
+      <button onclick={checkSetup} disabled={setupRunning} class="btn h-6">
+        <RotateCw size={12} />
+        {$_('build.setup.recheck')}
+      </button>
+    </div>
+
+    {#each ['pymusiclooper', 'ffmpeg'] as const as tool (tool)}
+      <CommandRow
+        name={tool}
+        description={$_(`build.setup.${tool}Description`)}
+        note={setup?.[tool].version ?? (setup ? $_('build.setup.toolNotFound') : '')}
+        tone={setup && !setup[tool].ok ? 'err' : 'dim'}
+      >
+        {@render status(setup?.[tool].ok)}
+      </CommandRow>
+    {/each}
+
+    <CommandRow
+      name={$_('build.setup.resourcesName')}
+      description={setup ? $_('build.setup.resourcesDescription', { values: { path: setup.resources.path } }) : ''}
+      note={setup && !setup.resources.ok ? $_('build.setup.resourcesMissing', { values: { count: setup.resources.missing.length } }) : ''}
+      tone="err"
+    >
+      {@render status(setup?.resources.ok)}
+    </CommandRow>
+  </section>
 </div>
 
 {#if importModalOpen}

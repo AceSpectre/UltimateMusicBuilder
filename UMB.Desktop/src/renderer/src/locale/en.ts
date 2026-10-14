@@ -4,8 +4,24 @@ export default {
     selectSeries: 'Select a series.'
   },
   build: {
-    title: 'Build',
-    subtitle: 'Build mod output for the Switch.',
+    title: 'Build & Setup',
+    subtitle: 'Build mod output for the Switch and check the tools it needs.',
+    sections: {
+      build: 'Build',
+      setup: 'Setup'
+    },
+    setup: {
+      recheck: 'Recheck',
+      checking: 'Checking',
+      ready: 'Ready',
+      missing: 'Missing',
+      toolNotFound: 'Not found on PATH. Run the setup script.',
+      pymusiclooperDescription: 'Finds loop points for Nus3 Convert.',
+      ffmpegDescription: 'Decodes audio for conversion, previews and loudness.',
+      resourcesName: 'Game resources',
+      resourcesDescription: 'Extracted game files in {path}.',
+      resourcesMissing: '{count, plural, one {# required file} other {# required files}} missing, see README.txt there'
+    },
     buildButton: 'Build',
     buildDescription: 'Compile all mods into ArcOutput for the Switch.',
     scaffoldButton: 'Scaffold',
@@ -97,7 +113,7 @@ export default {
       inspect: 'INSPECT'
     },
     items: {
-      build: 'Build',
+      build: 'Build & Setup',
       'nus3-convert': 'Nus3 Convert',
       'config-volume': 'Config Volume',
       'order-series': 'Manage Series',

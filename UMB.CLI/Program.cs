@@ -312,6 +312,7 @@ namespace UMB.CLI
             services.AddScoped<Services.VanillaCatalogService>();
             services.AddScoped<Services.PlaylistAssignmentService>();
             services.AddScoped<Services.Nus3WorkflowService>();
+            services.AddScoped<Services.SetupCheckService>();
             services.AddScoped<Desktop.DesktopApi>();
             services.AddScoped<Script>();
         }

@@ -120,6 +120,8 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.CHECK_BUILD_VOLUMES, (_event, modName: string | null) => api('build-volume-check', { modName }))
 
+  ipcMain.handle(IPC.CHECK_SETUP, () => api('setup-check'))
+
   ipcMain.handle(IPC.RESET_ALL_VOLUMES, () => api('volume-reset-all'))
 
   ipcMain.handle(IPC.LOAD_TRACK_ORDER, (_event, seriesPath: string) => api('track-order-load', { seriesPath }))

@@ -24,6 +24,7 @@ import type {
   SaveTrackItem,
   SeriesOrderData,
   SongPresets,
+  SetupStatus,
   SuspiciousVolumeTrack,
   TrackOrderData,
   VolumeConfigData,
@@ -49,6 +50,7 @@ const api = {
   getModStats: (modPath: string): Promise<ModStats> => ipcRenderer.invoke(IPC.GET_MOD_STATS, modPath),
   checkBuildVolumes: (modName: string | null): Promise<SuspiciousVolumeTrack[]> =>
     ipcRenderer.invoke(IPC.CHECK_BUILD_VOLUMES, modName),
+  checkSetup: (): Promise<SetupStatus> => ipcRenderer.invoke(IPC.CHECK_SETUP),
   resetAllVolumes: (): Promise<void> => ipcRenderer.invoke(IPC.RESET_ALL_VOLUMES),
   loadTrackOrder: (seriesPath: string): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.LOAD_TRACK_ORDER, seriesPath),
   saveTrackOrder: (seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.SAVE_TRACK_ORDER, seriesPath, items),

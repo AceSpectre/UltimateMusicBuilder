@@ -7,11 +7,12 @@ import type { LogLine } from './cli'
 
 const mocks = vi.hoisted(() => ({
   app: { isPackaged: false },
-  spawn: vi.fn()
+  spawn: vi.fn(),
+  spawnSync: vi.fn()
 }))
 
 vi.mock('electron', () => ({ app: mocks.app }))
-vi.mock('child_process', () => ({ spawn: mocks.spawn }))
+vi.mock('child_process', () => ({ spawn: mocks.spawn, spawnSync: mocks.spawnSync }))
 
 /** Minimal stand-in for the ChildProcess surface cli.ts actually touches. */
 class FakeProc extends EventEmitter {
@@ -19,6 +20,7 @@ class FakeProc extends EventEmitter {
   stderr = new EventEmitter()
   stdin = { write: vi.fn() }
   kill = vi.fn()
+  pid = 4242
 
   out(chunk: string): void {
     this.stdout.emit('data', Buffer.from(chunk))
@@ -70,6 +72,7 @@ function messages(): string[] {
 beforeEach(async () => {
   vi.resetModules()
   mocks.spawn.mockReset()
+  mocks.spawnSync.mockReset()
   mocks.app.isPackaged = false
   procs = []
   lines = []
@@ -568,6 +571,26 @@ describe('shutdownDaemon', () => {
     const last = JSON.parse(daemon.stdin.write.mock.calls.at(-1)![0])
     expect(last).toEqual({ id: 0, action: '__shutdown__', args: [] })
     expect(daemon.kill).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['win32', 1],
+    ['linux', 0]
+  ] as const)('kills the process tree on %s only', async (platform, taskkills) => {
+    const done = cli.spawnCliAction(WS, 'config-volume-save', ['a'], onLine)
+    await flush()
+    lastProc().out('__DONE__\t1\t0\n')
+    await done
+    const original = process.platform
+    Object.defineProperty(process, 'platform', { value: platform })
+    try {
+      cli.shutdownDaemon()
+    } finally {
+      Object.defineProperty(process, 'platform', { value: original })
+    }
+
+    expect(mocks.spawnSync).toHaveBeenCalledTimes(taskkills)
+    if (taskkills) expect(mocks.spawnSync).toHaveBeenCalledWith('taskkill', ['/pid', '4242', '/T', '/F'])
   })
 
   it('is a no-op when no daemon was started', () => {

@@ -369,6 +369,18 @@ export interface SuspiciousVolumeTrack {
   effectiveDb: number
 }
 
+/** Setup check: a tool's first --version line (null when it can't run) and the game files still missing. */
+export interface ToolStatus {
+  ok: boolean
+  version: string | null
+}
+
+export interface SetupStatus {
+  pymusiclooper: ToolStatus
+  ffmpeg: ToolStatus
+  resources: { ok: boolean; path: string; missing: string[] }
+}
+
 export interface DebugPingResult {
   ok: boolean
   workspace: string
