@@ -16,8 +16,7 @@ const NAV_ITEMS: Array<{ id: string; label: string }> = [
   { id: 'manage-presets', label: 'Manage Presets' },
   { id: 'manage-playlists', label: 'Manage Playlists' },
   { id: 'merge', label: 'Merge' },
-  { id: 'extract-icons', label: 'Extract Icons' },
-  { id: 'playlist-info', label: 'Playlist Info' }
+  { id: 'extract-icons', label: 'Extract Icons' }
 ]
 
 test.beforeAll(async () => {

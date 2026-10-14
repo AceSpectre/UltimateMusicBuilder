@@ -208,8 +208,6 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.EXECUTE_MERGE, (_event, modPaths: string[], outputName: string, priorityModPath: string | null) =>
     api('merge-execute', { modPaths, outputName, priorityModPath }))
 
-  ipcMain.handle(IPC.GET_PLAYLIST_INFO, () => api('playlist-info'))
-
   ipcMain.handle(IPC.LOAD_MANAGE_PLAYLISTS, (_event, modPath: string) => api('playlists-load', { modPath }))
 
   ipcMain.handle(IPC.SAVE_MANAGE_PLAYLISTS, (_event, modPath: string, playlists: SavedPlaylist[], stages: StageAssignmentInput[]) =>

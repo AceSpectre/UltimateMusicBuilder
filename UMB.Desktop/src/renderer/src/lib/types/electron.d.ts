@@ -21,7 +21,6 @@ import type {
   Nus3ConversionMeta,
   Nus3SourceTrack,
   Nus3TrackDecision,
-  PlaylistInfoData,
   SavedPlaylist,
   SaveSeriesItem,
   SaveTrackItem,
@@ -71,7 +70,6 @@ export interface UmbApi {
   analyzeMerge(modPaths: string[]): Promise<MergeAnalysis>
   validateMergeName(name: string): Promise<string | null>
   executeMerge(modPaths: string[], outputName: string, priorityModPath: string | null): Promise<MergeResult>
-  getPlaylistInfo(): Promise<PlaylistInfoData>
   loadManagePlaylists(modPath: string): Promise<ManagePlaylistsData>
   saveManagePlaylists(modPath: string, playlists: SavedPlaylist[], stages: StageAssignmentInput[]): Promise<ManagePlaylistsData>
   getWorkspace(): Promise<string>

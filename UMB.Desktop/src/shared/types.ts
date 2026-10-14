@@ -296,36 +296,6 @@ export interface MergeResult {
   conflictsResolved: number
 }
 
-export interface PlaylistInfo {
-  id: string
-  name: string
-  series: string[]
-  songCount: number
-}
-
-export interface StageSong {
-  order: number
-  bgmId: string
-  name: string
-}
-
-export interface StageInfo {
-  uiStageId: string
-  name: string
-  hidden: boolean
-  seriesId: string
-  seriesName: string
-  playlistId: string
-  playlistName: string
-  order: number
-  songs: StageSong[]
-}
-
-export interface PlaylistInfoData {
-  playlists: PlaylistInfo[]
-  stages: StageInfo[]
-}
-
 // A song that can go in a playlist (vanilla or from the mod).
 export interface PlaylistSong {
   bgmId: string

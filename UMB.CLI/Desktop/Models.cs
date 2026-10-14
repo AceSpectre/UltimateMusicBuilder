@@ -131,13 +131,6 @@ namespace UMB.CLI.Desktop
         public bool? Force { get; set; }
     }
 
-    // ── Playlist info ──────────────────────────────────────────────────────
-    public record PlaylistInfo(string Id, string Name, List<string> Series, int SongCount);
-    public record StageSong(int Order, string BgmId, string Name);
-    public record StageInfo(string UiStageId, string Name, bool Hidden, string SeriesId, string SeriesName,
-        string PlaylistId, string PlaylistName, int Order, List<StageSong> Songs);
-    public record PlaylistInfoData(List<PlaylistInfo> Playlists, List<StageInfo> Stages);
-
     // ── Manage playlists ───────────────────────────────────────────────────
     public record PlaylistSong(string BgmId, string Title, string SeriesName, bool IsMod);
     /// <summary>

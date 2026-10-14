@@ -42,13 +42,6 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void GetPlaylistInfo_ReportsMissingGameFiles()
-        {
-            var service = new VanillaCatalogService(_ws.CoreOptions(), new Mock<IServiceProvider>().Object);
-            Assert.Contains("Game resources not found", Assert.Throws<DesktopApiException>(service.GetPlaylistInfo).Message);
-        }
-
-        [Fact]
         public void Catalog_ResolvesSongTitles()
         {
             if (RepoCatalog()?.Get() is not { } catalog) return;
@@ -108,16 +101,12 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void PlaylistInfo_ListsPlaylistsAndStages()
+        public void Catalog_LoadsPlaylistsAndStages()
         {
-            if (RepoCatalog()?.GetPlaylistInfo() is not { } info) return;
+            if (RepoCatalog()?.Get() is not { } catalog) return;
 
-            Assert.Contains(info.Playlists, p => p.Id == "bgmmario" && p.Name == "Mario" && p.SongCount > 0);
-            var battlefield = Assert.Single(info.Stages, s => s.UiStageId == "ui_stage_battle_field");
-            Assert.Equal("Battlefield", battlefield.Name);
-            Assert.NotEmpty(battlefield.Songs);
-            Assert.Equal(battlefield.Songs.OrderBy(s => s.Order).Select(s => s.BgmId), battlefield.Songs.Select(s => s.BgmId));
-            Assert.Equal(info.Stages.OrderBy(s => s.Hidden).Select(s => s.UiStageId), info.Stages.Select(s => s.UiStageId));
+            Assert.Contains(catalog.Playlists, p => p.Id == "bgmmario" && p.Tracks.Count > 0);
+            Assert.Equal("bgmsmashbtl", Assert.Single(catalog.Stages, s => s.UiStageId == "ui_stage_battle_field").BgmSetId);
         }
     }
 }
