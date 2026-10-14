@@ -5,7 +5,6 @@ import ListOrdered from '@lucide/svelte/icons/list-ordered'
 import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down'
 import GitMerge from '@lucide/svelte/icons/git-merge'
 import Image from '@lucide/svelte/icons/image'
-import ListMusic from '@lucide/svelte/icons/list-music'
 import ListPlus from '@lucide/svelte/icons/list-plus'
 import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal'
 import type { Component } from 'svelte'
@@ -48,12 +47,6 @@ export const navGroups: NavGroup[] = [
     items: [
       { id: 'merge', icon: GitMerge },
       { id: 'extract-icons', icon: Image }
-    ]
-  },
-  {
-    id: 'inspect',
-    items: [
-      { id: 'playlist-info', icon: ListMusic }
     ]
   }
 ]

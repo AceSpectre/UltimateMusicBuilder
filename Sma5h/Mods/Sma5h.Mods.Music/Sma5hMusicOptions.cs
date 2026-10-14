@@ -20,6 +20,11 @@ namespace Sma5h.Mods.Music
             public float GlobalVolumeDb { get; set; }
             /// <summary>Experimental: also apply the global and series dB boosts to vanilla songs.</summary>
             public bool ApplyVolumeToVanilla { get; set; }
+            /// <summary>Every mod sound test song joins bgmsmashbtl (the Smash Battle playlist), at <see cref="SmashBattleIncidence"/>.</summary>
+            public bool AddModSongsToSmashBattle { get; set; } = true;
+            public ushort SmashBattleIncidence { get; set; }
+            /// <summary>Turns on album selection (My Music) on every stage.</summary>
+            public bool EnableAlbumSelectionOnAllStages { get; set; } = true;
             public LufsNormalizationOptions LufsNormalization { get; set; } = new();
         }
 

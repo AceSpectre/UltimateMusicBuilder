@@ -131,19 +131,25 @@ namespace UMB.CLI.Desktop
         public bool? Force { get; set; }
     }
 
-    // ── Playlist info ──────────────────────────────────────────────────────
-    public record PlaylistInfo(string Id, string Name, List<string> Series, int SongCount);
-    public record StageSong(int Order, string BgmId, string Name);
-    public record StageInfo(string UiStageId, string Name, bool Hidden, string SeriesId, string SeriesName,
-        string PlaylistId, string PlaylistName, int Order, List<StageSong> Songs);
-    public record PlaylistInfoData(List<PlaylistInfo> Playlists, List<StageInfo> Stages);
-
     // ── Manage playlists ───────────────────────────────────────────────────
-    public record PlaylistSongAssignment(string SeriesId, string SeriesName, string Filename, string Title, int Incidence);
-    public record PlaylistTarget(string Id, string Name, int AssignedCount, List<PlaylistSongAssignment> Assignments);
-    public record ModSong(string SeriesId, string SeriesName, string Filename, string Title);
-    public record ManagePlaylistsData(string ModName, string ModPath, List<PlaylistTarget> Playlists, List<ModSong> Songs);
-    public record PlaylistAssignmentInput(string PlaylistId, string SeriesId, string Filename, double Incidence);
+    public record PlaylistSong(string BgmId, string Title, string SeriesName, bool IsMod);
+    /// <summary>
+    /// A playlist song's order and incidence per stage order slot (0-15); order -1 leaves it out of that slot.
+    /// AutoAdded: a mod song the build always adds to this playlist, so removing it does not last.
+    /// </summary>
+    public record PlaylistTrack(string BgmId, short[] Orders, ushort[] Incidences, bool AutoAdded = false);
+    public record SeriesRef(string Id, string Name);
+    /// <summary>
+    /// Kind is "vanilla", "series" (filled by a mod series) or "custom". Series: the series playlists.toml flags it
+    /// with, whose every song it always holds. DefaultTracks: a changed game or series playlist's default, else null.
+    /// </summary>
+    public record ManagedPlaylist(string Id, string Name, string Kind, List<SeriesRef> Series, List<PlaylistTrack> Tracks, List<PlaylistTrack> DefaultTracks);
+    public record ManagedStage(string Id, string Name, bool Hidden, string SeriesName,
+        string VanillaPlaylistId, int VanillaOrder, string PlaylistId, int Order);
+    /// <summary>LegacyBlocks: series.toml still sets playlists (series-playlist, [[playlists]] blocks), which saving moves into playlists.toml.</summary>
+    public record ManagePlaylistsData(string ModName, string ModPath, List<ManagedPlaylist> Playlists, List<ManagedStage> Stages,
+        List<PlaylistSong> Songs, bool LegacyBlocks);
+    public record StageAssignmentInput(string Id, string PlaylistId, int Order);
 
     // ── Build pre-checks ───────────────────────────────────────────────────
     public record SuspiciousVolumeTrack(string ModName, string SeriesName, string Filename, string Title, float EffectiveDb);

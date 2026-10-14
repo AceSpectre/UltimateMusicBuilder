@@ -37,6 +37,9 @@ namespace Sma5h.Mods.Music
 
         private readonly Dictionary<string, float> _seriesVolumeDb = new();
         private readonly Dictionary<string, float> _vanillaTrackDb = new();
+        private readonly List<PlaylistEntry> _seriesPlaylists = new();
+        private readonly List<PlaylistEntry> _playlistOverrides = new();
+        private readonly List<StagePlaylistAssignment> _stageAssignments = new();
 
         public Sma5hMusic(IOptionsMonitor<Sma5hMusicOptions> config, IMusicModManagerService musicModManagerService, IAudioStateService audioStateService,
             INus3AudioService nus3AudioService, IProcessService processService, ILufsAnalysisService lufsService, IStateManager state, ILogger<Sma5hMusic> logger)
@@ -68,6 +71,9 @@ namespace Sma5h.Mods.Music
             _logger.LogInformation("Loading Sma5hMusic Mods");
             var musicMods = _musicModManagerService.RefreshMusicMods();
 
+            _seriesPlaylists.Clear();
+            _playlistOverrides.Clear();
+            _stageAssignments.Clear();
             var vanillaOverrides = new List<VanillaBgmOverride>();
             var vanillaSeriesIcons = new Dictionary<string, string>();
             foreach (var musicMod in musicMods)
@@ -97,6 +103,9 @@ namespace Sma5h.Mods.Music
                 vanillaOverrides.AddRange(musicModEntries.VanillaBgmOverrides);
                 foreach (var icon in musicModEntries.VanillaSeriesIcons)
                     vanillaSeriesIcons[icon.Key] = icon.Value;
+                _seriesPlaylists.AddRange(musicModEntries.SeriesPlaylists);
+                _playlistOverrides.AddRange(musicModEntries.PlaylistOverrides);
+                _stageAssignments.AddRange(musicModEntries.StageAssignments);
             }
 
             VanillaOverrideHelper.Apply(_audioStateService, vanillaOverrides, _config.CurrentValue.Sma5hMusic.DefaultLocale, _logger);
@@ -128,11 +137,12 @@ namespace Sma5h.Mods.Music
             //AutoAddToBgmSelector - TODO Optimize :-)
             ProcessPlaylistAutoMapping();
 
-            //Add mod songs to all existing playlists so they appear on every stage
-            AddModSongsToAllPlaylists();
+            //Add mod songs to their stage playlists, then apply playlists.toml on top
+            ApplyModPlaylists();
 
             //Enable album selection (My Music) on all stages
-            EnableBgmSelectorOnAllStages();
+            if (_config.CurrentValue.Sma5hMusic.EnableAlbumSelectionOnAllStages)
+                EnableBgmSelectorOnAllStages();
 
             //Sort Series by Sound Test - TODO Allow for manual ordering
             ProcessSeriesOrderAutoMapping();
@@ -444,82 +454,22 @@ namespace Sma5h.Mods.Music
             return true;
         }
 
-        private void AddModSongsToAllPlaylists()
+        private void ApplyModPlaylists()
         {
-            var modSongs = _audioStateService.GetBgmDbRootEntries()
-                .Where(p => p.TestDispOrder >= 0 && p.MusicMod != null)
-                .ToList();
+            var gameToSeries = _audioStateService.GetGameTitleEntries().ToDictionary(p => p.UiGameTitleId, p => p.UiSeriesId);
+            var modSongs = PlaylistHelper.SoundTestSongs(_audioStateService.GetBgmDbRootEntries().Where(p => p.MusicMod != null), gameToSeries);
+            var stages = _audioStateService.GetStagesEntries().ToList();
+            var playlists = _audioStateService.GetPlaylists().ToDictionary(p => p.Id);
+            var registered = playlists.Keys.ToHashSet();
 
-            if (modSongs.Count == 0)
-                return;
+            var required = PlaylistHelper.RequiredSongs(stages, _seriesPlaylists, modSongs, PlaylistHelper.SmashBattleIncidence(_config.CurrentValue.Sma5hMusic));
+            var added = PlaylistHelper.ApplyModPlaylists(playlists, stages, required, _playlistOverrides, _stageAssignments);
+            _logger.LogInformation("Added {TotalAdded} song(s) the build keeps to their playlists.", added);
 
-            // Build lookup: game title -> series
-            var gameToSeries = _audioStateService.GetGameTitleEntries()
-                .ToDictionary(p => p.UiGameTitleId, p => p.UiSeriesId);
-
-            // Build lookup: series -> set of stage playlist IDs (BgmSetId)
-            var seriesToPlaylists = new Dictionary<string, HashSet<string>>();
-            foreach (var stage in _audioStateService.GetStagesEntries())
-            {
-                if (string.IsNullOrEmpty(stage.UiSeriesId) || string.IsNullOrEmpty(stage.BgmSetId))
-                    continue;
-                if (!seriesToPlaylists.TryGetValue(stage.UiSeriesId, out var playlistIds))
-                {
-                    playlistIds = new HashSet<string>();
-                    seriesToPlaylists[stage.UiSeriesId] = playlistIds;
-                }
-                playlistIds.Add(stage.BgmSetId);
-            }
-
-            var allPlaylists = _audioStateService.GetPlaylists().ToDictionary(p => p.Id, p => p);
-            int totalAdded = 0;
-
-            foreach (var song in modSongs)
-            {
-                // Determine which playlists this song should be added to
-                var targetPlaylistIds = new HashSet<string> { "bgmsmashbtl" };
-
-                // Add to series-specific stage playlists based on song's game title -> series -> stages
-                if (!string.IsNullOrEmpty(song.UiGameTitleId) &&
-                    gameToSeries.TryGetValue(song.UiGameTitleId, out var seriesId) &&
-                    seriesToPlaylists.TryGetValue(seriesId, out var seriesPlaylistIds))
-                {
-                    foreach (var id in seriesPlaylistIds)
-                        targetPlaylistIds.Add(id);
-                }
-
-                foreach (var playlistId in targetPlaylistIds)
-                {
-                    if (!allPlaylists.TryGetValue(playlistId, out var playlist))
-                        continue;
-
-                    var existingIds = playlist.Tracks.Select(t => t.UiBgmId).ToHashSet();
-                    if (existingIds.Contains(song.UiBgmId))
-                        continue;
-
-                    var order = playlist.Tracks.Count > 0
-                        ? (short)(playlist.Tracks.Max(t => t.Order0) + 1)
-                        : (short)0;
-
-                    playlist.Tracks.Add(new PlaylistValueEntry
-                    {
-                        UiBgmId = song.UiBgmId,
-                        Incidence0 = 100, Incidence1 = 100, Incidence2 = 100, Incidence3 = 100,
-                        Incidence4 = 100, Incidence5 = 100, Incidence6 = 100, Incidence7 = 100,
-                        Incidence8 = 100, Incidence9 = 100, Incidence10 = 100, Incidence11 = 100,
-                        Incidence12 = 100, Incidence13 = 100, Incidence14 = 100, Incidence15 = 100,
-                        Order0 = order, Order1 = order, Order2 = order, Order3 = order,
-                        Order4 = order, Order5 = order, Order6 = order, Order7 = order,
-                        Order8 = order, Order9 = order, Order10 = order, Order11 = order,
-                        Order12 = order, Order13 = order, Order14 = order, Order15 = order
-                    });
-                    totalAdded++;
-                    _logger.LogDebug("Added {UiBgmId} to playlist {PlaylistId}.", song.UiBgmId, playlistId);
-                }
-            }
-
-            _logger.LogInformation("Added {ModSongCount} mod song(s) to stage playlists ({TotalAdded} total insertions).",
-                modSongs.Count, totalAdded);
+            foreach (var playlist in playlists.Values.Where(p => !registered.Contains(p.Id)))
+                _audioStateService.AddPlaylistEntry(playlist);
+            if (_playlistOverrides.Count + _stageAssignments.Count > 0)
+                _logger.LogInformation("Applied playlists.toml: {PlaylistCount} playlist(s), {StageCount} stage(s).", _playlistOverrides.Count, _stageAssignments.Count);
         }
 
         private void EnableBgmSelectorOnAllStages()

@@ -156,15 +156,15 @@ namespace Tests.Integration
         }
 
         [Fact]
-        public void Scaffold_CreatesSeriesPlaylistField()
+        public void Scaffold_GivesEachSeriesItsPlaylistInPlaylistsToml()
         {
             _env.CreateUnconfiguredMod();
             var service = CreateService();
             service.Run();
 
-            var tomlPath = Path.Combine(_env.ModPath, "scaffold-mod", "dev", "series.toml");
-            var content = File.ReadAllText(tomlPath);
-            Assert.Contains("series-playlist =", content);
+            var modDir = Path.Combine(_env.ModPath, "scaffold-mod");
+            Assert.DoesNotContain("series-playlist", File.ReadAllText(Path.Combine(modDir, "dev", "series.toml")));
+            Assert.Contains("id = \"bgm_dev\"\nname = \"dev\"\nseries = [\"dev\"]", File.ReadAllText(Path.Combine(modDir, "playlists.toml")));
         }
 
         // ── Existing series scaffold ───────────────────────────────────────

@@ -159,6 +159,27 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
+        public void Execute_MergesPlaylistsToml_PriorityModWinningSharedIds()
+        {
+            var a = _ws.ModDir("modA");
+            var b = _ws.ModDir("modB");
+            Series("modA", "persona", MinimalToml("persona", "Persona"), "filename\na.flac\n");
+            Series("modB", "mario", MinimalToml("mario", "Mario"), "filename\nb.flac\n");
+            DesktopWorkspace.WriteFile(a, "playlists.toml",
+                "[[playlists]]\nid = \"bgmmine\"\ntracks = []\n\n[[stages]]\nid = \"ui_stage_x\"\nplaylist = \"bgmmine\"\norder = 0\n");
+            DesktopWorkspace.WriteFile(b, "playlists.toml",
+                "[[playlists]]\nid = \"bgmmine\"\ntracks = [\n    { song = \"ui_bgm_b\", order = 0, incidence = 100 },\n]\n\n" +
+                "[[playlists]]\nid = \"bgmtheirs\"\ntracks = []\n\n[[stages]]\nid = \"ui_stage_x\"\nplaylist = \"bgmtheirs\"\norder = 1\n");
+
+            var result = _service.Execute(new() { a, b }, "merged", a);
+
+            var toml = File.ReadAllText(Path.Combine(result.OutputPath, "playlists.toml"));
+            Assert.Equal(new[] { "bgmmine", "bgmtheirs", "ui_stage_x" }, Regex.Matches(toml, @"^id = ""([^""]+)""", RegexOptions.Multiline).Select(m => m.Groups[1].Value));
+            Assert.DoesNotContain("ui_bgm_b", toml);
+            Assert.Contains("playlist = \"bgmmine\"", toml);
+        }
+
+        [Fact]
         public void Execute_RejectsAnInvalidOutputName()
         {
             var a = _ws.ModDir("modA");

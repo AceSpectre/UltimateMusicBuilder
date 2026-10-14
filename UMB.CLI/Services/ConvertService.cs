@@ -349,11 +349,8 @@ namespace UMB.CLI.Services
             bool isExisting, List<(string id, string name)> games)
         {
             var sb = new StringBuilder();
-            // For existing series the scaffold maintenance pass will fill in `series-playlist`
-            // from vanilla data after conversion finishes.
-            CliUtil.AppendSeriesHeader(sb, seriesId, seriesName,
-                existingSeries: isExisting,
-                seriesPlaylist: isExisting ? null : $"bgm_{seriesId}");
+            // The scaffold pass after conversion gives each series its playlist in playlists.toml.
+            CliUtil.AppendSeriesHeader(sb, seriesId, seriesName, existingSeries: isExisting);
 
             foreach (var (id, name) in games)
                 CliUtil.AppendGameBlock(sb, id, name);

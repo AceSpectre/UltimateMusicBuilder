@@ -185,6 +185,9 @@ namespace Tests.Helpers
             return mock.Object;
         }
 
+        /// <summary>More configuration keys (e.g. "Sma5hMusic:AddModSongsToSmashBattle") for the full DI container.</summary>
+        public Dictionary<string, string> ExtraSettings { get; } = new();
+
         /// <summary>
         /// Builds an IConfiguration suitable for the full DI container,
         /// pointing at real game resources and the test mod.
@@ -211,6 +214,8 @@ namespace Tests.Helpers
                 ["Sma5hMusic:LufsNormalization:Enabled"] = "false",
                 ["Sma5hMusic:PlaylistMapping:GenerationMode"] = "Manual"
             };
+            foreach (var (key, value) in ExtraSettings)
+                settings[key] = value;
 
             return new ConfigurationBuilder()
                 .AddInMemoryCollection(settings)

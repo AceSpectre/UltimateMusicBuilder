@@ -65,9 +65,8 @@ namespace UMB.CLI.Desktop
                 ["nus3-reject"] = In<Nus3TrackInput>(i => { Get<Nus3WorkflowService>().RejectTrack(i.SeriesPath, i.TrackId); return true; }),
                 ["nus3-accept"] = In<Nus3AcceptInput>(i => { Get<AcceptNus3Service>().Accept(i.SeriesPath, i.DeleteSources); return true; }),
 
-                ["playlist-info"] = _ => Get<VanillaCatalogService>().GetPlaylistInfo(),
                 ["playlists-load"] = In<ModPathInput>(i => Get<PlaylistAssignmentService>().Load(i.ModPath)),
-                ["playlists-save"] = In<SavePlaylistsInput>(i => Get<PlaylistAssignmentService>().Save(i.ModPath, i.Assignments)),
+                ["playlists-save"] = In<SavePlaylistsInput>(i => Get<PlaylistAssignmentService>().Save(i.ModPath, i.Playlists, i.Stages)),
             };
         }
 
@@ -121,6 +120,6 @@ namespace UMB.CLI.Desktop
         private record Nus3TrackInput(string SeriesPath, string TrackId);
         private record Nus3AcceptInput(string SeriesPath, bool DeleteSources);
         private record Nus3ConvertTrackInput(string SeriesPath, string TrackId, string Mode, LoopCandidate Candidate);
-        private record SavePlaylistsInput(string ModPath, List<PlaylistAssignmentInput> Assignments);
+        private record SavePlaylistsInput(string ModPath, List<ManagedPlaylist> Playlists, List<StageAssignmentInput> Stages);
     }
 }

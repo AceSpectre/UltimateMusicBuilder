@@ -58,6 +58,7 @@
   // Locked vanilla songs are read-only and keep their place, as before they were editable.
   let vanillaLocked = $state(true)
   const isReadOnly = (item: TrackOrderItem): boolean => item.isLocked || (item.isVanilla && vanillaLocked)
+  const lockedCellClass = 'self-center whitespace-pre-line break-words px-1.5 py-0.5 text-[12.5px] text-muted-foreground'
   let sort = $state<SortState<SortColumn>>({ column: 'index', desc: false })
 
   function snapshot(items: TrackOrderItem[]): string {
@@ -479,14 +480,17 @@
                       />
                     </div>
                   {:else}
-                    <!-- Locked vanilla row: read-only, same grid layout/height as editable rows -->
-                    <div class="truncate rounded border border-transparent px-1.5 py-0.5 text-[12.5px] font-medium" title={item.fields?.title ?? item.title}>{item.fields?.title ?? item.title}</div>
-                    <span class="truncate self-center px-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">{$_('orderTracks.vanillaTag')}</span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                    <span class="justify-self-center self-center rounded-full border border-border bg-background/80 px-2 py-0.5 text-[10.5px] text-muted-foreground">{$_('orderTracks.locked')}</span>
+                    <!-- Locked row: its current values, read-only, in the same grid as editable rows -->
+                    {@const f = item.fields}
+                    <span class="{lockedCellClass} font-medium {item.isVanilla ? 'italic' : ''}">{f?.title ?? item.title}</span>
+                    <span class={lockedCellClass}>{f ? gameName(f.game) : ''}</span>
+                    <span class={lockedCellClass}>{f?.author ?? ''}</span>
+                    <span class={lockedCellClass}>{f?.copyright ?? ''}</span>
+                    <span class={lockedCellClass}>{f ? recordLabel(f.record_type) : ''}</span>
+                    <span class={lockedCellClass}>{f ? pinchTitle(f.info1) : ''}</span>
+                    <div class="flex items-center justify-center">
+                      <input type="checkbox" class="h-4 w-4" checked={f ? inSoundtest(f) : false} disabled aria-label={$_('orderTracks.colInSoundtest')} />
+                    </div>
                   {/if}
                 </div>
               {/each}
