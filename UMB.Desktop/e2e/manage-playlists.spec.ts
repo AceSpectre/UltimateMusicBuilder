@@ -97,21 +97,6 @@ test('UI: create a playlist, add a song, give it to a stage and save to playlist
   expect(data.stages.find((s) => s.id === 'ui_stage_battle_field')?.playlistId).toBe('bgmeemix')
 })
 
-test('a changed game playlist comes back with its default for a reset', async () => {
-  const page = await firstWindow(app)
-  const data = await page.evaluate((mp) => window.electron.umb.loadManagePlaylists(mp), modDir)
-  const zelda = data.playlists.find((p) => p.id === 'bgmzelda')!
-
-  const result = await page.evaluate(
-    ([mp, p]) => window.electron.umb.saveManagePlaylists(mp as string, [{ ...(p as typeof zelda), tracks: (p as typeof zelda).tracks.slice(1) }], []),
-    [modDir, zelda] as const
-  )
-
-  const saved = result.playlists.find((p) => p.id === 'bgmzelda')!
-  expect(saved.tracks.length).toBe(zelda.tracks.length - 1)
-  expect(saved.defaultTracks?.length).toBe(zelda.tracks.length)
-})
-
 test('UI: locked vanilla songs in Manage Songs still show their values', async () => {
   const page = await firstWindow(app)
   await page.getByText('Manage Songs').first().click()

@@ -42,6 +42,13 @@ namespace Sma5h.Mods.Music.Helpers
         public static PlaylistValueEntry Track(string uiBgmId, short order, ushort incidence) =>
             Track(uiBgmId, Enumerable.Repeat(order, OrderCount).ToArray(), Enumerable.Repeat(incidence, OrderCount).ToArray());
 
+        public static PlaylistEntry Clone(PlaylistEntry playlist)
+        {
+            var copy = new PlaylistEntry(playlist.Id, playlist.Title);
+            copy.Tracks.AddRange(playlist.Tracks.Select(t => Track(t.UiBgmId, Orders(t), Incidences(t))));
+            return copy;
+        }
+
         /// <summary>Adds the playlist, or merges its new tracks into the one with the same id. Returns the tracks added.</summary>
         public static int Merge(IDictionary<string, PlaylistEntry> playlists, PlaylistEntry playlist)
         {
@@ -78,6 +85,10 @@ namespace Sma5h.Mods.Music.Helpers
                 }))
                 .ToList();
         }
+
+        /// <summary>The sound test songs with their series, for <see cref="RequiredSongs"/>.</summary>
+        public static List<(string UiBgmId, string UiSeriesId)> SoundTestSongs(IEnumerable<BgmDbRootEntry> songs, IReadOnlyDictionary<string, string> seriesByGame) =>
+            songs.Where(b => b.TestDispOrder >= 0).Select(b => (b.UiBgmId, seriesByGame.GetValueOrDefault(b.UiGameTitleId ?? ""))).ToList();
 
         /// <summary>The bgmsmashbtl incidence for <see cref="RequiredSongs"/>: null when mod songs do not join it.</summary>
         public static ushort? SmashBattleIncidence(Sma5hMusicOptions.Sma5hMusicOptionsSection options) =>

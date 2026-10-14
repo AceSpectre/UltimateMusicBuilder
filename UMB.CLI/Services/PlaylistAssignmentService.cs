@@ -21,6 +21,8 @@ namespace UMB.CLI.Services
     public class PlaylistAssignmentService
     {
         private const string PlaylistsTable = "playlists";
+        /// <summary>A legacy series.toml playlist: WholeSeries for series-playlist and blocks without a song list.</summary>
+        private record LegacyPlaylist(string PlaylistId, string SeriesId, bool WholeSeries);
 
         private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
         private readonly VanillaCatalogService _catalog;
@@ -35,29 +37,26 @@ namespace UMB.CLI.Services
         {
             var catalog = _catalog.Get() ?? throw new DesktopApiException("Game resources not found in Resources/Game.");
             var resolvedModPath = ModPaths.ResolveUnderMods(_musicConfig, modPath);
-            var mod = new FolderMusicMod(NullLogger<IMusicMod>.Instance, null, resolvedModPath, readAudioMetadata: false).GetMusicModEntries();
+            var mod = new FolderMusicMod(NullLogger<IMusicMod>.Instance, null, resolvedModPath).GetMusicModEntries();
 
             var seriesByGame = catalog.GameTitles.ToDictionary(g => MusicConstants.InternalIds.GAME_TITLE_ID_PREFIX + g.Id, g => g.SeriesId);
             foreach (var game in mod.GameTitleEntries)
                 seriesByGame.TryAdd(game.UiGameTitleId, game.UiSeriesId);
-            var modSongs = mod.BgmDbRootEntries
-                .Where(b => b.TestDispOrder >= 0)
-                .Select(b => (b.UiBgmId, UiSeriesId: seriesByGame.GetValueOrDefault(b.UiGameTitleId ?? "")))
-                .ToList();
+            var modSongs = PlaylistHelper.SoundTestSongs(mod.BgmDbRootEntries, seriesByGame);
             var stages = catalog.Stages.Select(Copy).ToList();
             var required = PlaylistHelper.RequiredSongs(stages, mod.SeriesPlaylists, modSongs, PlaylistHelper.SmashBattleIncidence(_musicConfig.CurrentValue.Sma5hMusic));
             var autoAdded = required.Select(r => (r.PlaylistId, r.UiBgmId)).ToHashSet();
 
             // Defaults: each game and series playlist without its saved tracks or legacy blocks.
-            var defaults = catalog.Playlists.ToDictionary(p => p.Id, Copy);
+            var defaults = catalog.Playlists.ToDictionary(p => p.Id, PlaylistHelper.Clone);
             foreach (var playlist in mod.SeriesPlaylists)
-                PlaylistHelper.Merge(defaults, Copy(playlist));
+                PlaylistHelper.Merge(defaults, PlaylistHelper.Clone(playlist));
             PlaylistHelper.ApplyModPlaylists(defaults, stages, required, Array.Empty<PlaylistEntry>(), Array.Empty<StagePlaylistAssignment>());
 
             // As the build: game playlists, the mod's series playlists, then playlists.toml and the songs the build keeps.
-            var playlists = catalog.Playlists.ToDictionary(p => p.Id, Copy);
+            var playlists = catalog.Playlists.ToDictionary(p => p.Id, PlaylistHelper.Clone);
             foreach (var playlist in mod.PlaylistEntries)
-                PlaylistHelper.Merge(playlists, Copy(playlist));
+                PlaylistHelper.Merge(playlists, PlaylistHelper.Clone(playlist));
             PlaylistHelper.ApplyModPlaylists(playlists, stages, required, mod.PlaylistOverrides, mod.StageAssignments);
 
             var seriesNames = catalog.Series.ToDictionary(s => MusicConstants.InternalIds.SERIES_ID_PREFIX + s.Id, s => s.Name);
@@ -77,7 +76,7 @@ namespace UMB.CLI.Services
 
             // Legacy series.toml playlists: series-playlist and wildcard blocks become series flags when migrated.
             var legacy = LegacyPlaylists(resolvedModPath);
-            var seriesFlags = mod.PlaylistSeriesFlags.SelectMany(f => f.Value.Select(series => (PlaylistId: f.Key, SeriesId: series)))
+            var seriesFlags = PlaylistsToml.Read(resolvedModPath).Playlists.SelectMany(p => p.Series.Select(series => (PlaylistId: p.Id, SeriesId: series)))
                 .Concat(legacy.Where(l => l.WholeSeries).Select(l => (l.PlaylistId, l.SeriesId)))
                 .Distinct()
                 .ToLookup(f => f.PlaylistId, f => new SeriesRef(f.SeriesId, SeriesName(MusicConstants.InternalIds.SERIES_ID_PREFIX + f.SeriesId)));
@@ -116,24 +115,32 @@ namespace UMB.CLI.Services
 
         /// <summary>
         /// Writes the given playlists and stage playlists to playlists.toml and drops the legacy series.toml playlists
-        /// (series-playlist and [[playlists]] blocks), which the saved playlists now hold. Load reports them so the app asks first.
+        /// (series-playlist and [[playlists]] blocks), which the saved playlists now hold.
         /// </summary>
         public ManagePlaylistsData Save(string modPath, List<ManagedPlaylist> playlists, List<StageAssignmentInput> stages)
         {
             var resolvedModPath = ModPaths.ResolveUnderMods(_musicConfig, modPath);
-            PlaylistsToml.Write(resolvedModPath, playlists ?? new(), stages ?? new());
+            PlaylistsToml.Write(resolvedModPath, new FolderPlaylistsFileConfig
+            {
+                Playlists = (playlists ?? new()).Select(ToConfig).ToList(),
+                Stages = (stages ?? new()).Select(s => new FolderStageConfig { Id = s.Id, Playlist = s.PlaylistId, Order = s.Order }).ToList()
+            });
             foreach (var path in SeriesTomlPaths(resolvedModPath))
             {
                 var lines = SeriesToml.RewriteArrayTables(SeriesToml.ReadLines(path), PlaylistsTable, new List<List<string>>());
-                SeriesToml.WriteLines(path, SeriesToml.UpsertTable(lines, "series", new[] { new SeriesToml.Entry(SeriesPlaylistKey, null) }, createIfMissing: false));
+                SeriesToml.WriteLines(path, SeriesToml.UpsertTable(lines, "series", new[] { new SeriesToml.Entry(PlaylistsToml.LegacySeriesPlaylistKey, null) }, createIfMissing: false));
             }
             return Load(resolvedModPath);
         }
 
-        private const string SeriesPlaylistKey = "series-playlist";
-
-        /// <summary>A legacy series.toml playlist: WholeSeries for series-playlist and blocks without a song list.</summary>
-        private record LegacyPlaylist(string PlaylistId, string SeriesId, bool WholeSeries);
+        /// <summary>Game playlists keep their game name, so only other playlists save one.</summary>
+        private static FolderPlaylistConfig ToConfig(ManagedPlaylist playlist) => new()
+        {
+            Id = playlist.Id,
+            Name = playlist.Kind == "vanilla" ? null : playlist.Name,
+            Series = playlist.Series?.Select(s => s.Id).ToList() ?? new(),
+            Tracks = playlist.Tracks?.Select(t => new FolderPlaylistTrackConfig { Song = t.BgmId, Order = t.Orders, Incidence = t.Incidences }).ToList()
+        };
 
         private static List<LegacyPlaylist> LegacyPlaylists(string modPath) =>
             SeriesTomlPaths(modPath)
@@ -144,7 +151,7 @@ namespace UMB.CLI.Services
                     return SeriesToml.TableArrayBlocks(text, PlaylistsTable)
                         .Select(block => new LegacyPlaylist(SeriesToml.NonEmptyString(block, "id"), seriesId,
                             !Regex.IsMatch(block, @"^\s*songs\s*=\s*\[", RegexOptions.Multiline)))
-                        .Append(new LegacyPlaylist(SeriesToml.NonEmptyString(SeriesToml.TableSection(text, "series") ?? text, SeriesPlaylistKey), seriesId, true));
+                        .Append(new LegacyPlaylist(SeriesToml.NonEmptyString(SeriesToml.TableSection(text, "series") ?? text, PlaylistsToml.LegacySeriesPlaylistKey), seriesId, true));
                 })
                 .Where(l => l.PlaylistId != null && l.SeriesId != null)
                 .ToList();
@@ -159,13 +166,6 @@ namespace UMB.CLI.Services
             ModPaths.VisibleDirs(modPath)
                 .Select(dir => Path.Combine(dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE))
                 .Where(File.Exists);
-
-        private static PlaylistEntry Copy(PlaylistEntry playlist)
-        {
-            var copy = new PlaylistEntry(playlist.Id, playlist.Title);
-            copy.Tracks.AddRange(playlist.Tracks.Select(t => PlaylistHelper.Track(t.UiBgmId, PlaylistHelper.Orders(t), PlaylistHelper.Incidences(t))));
-            return copy;
-        }
 
         private static StageEntry Copy(StageEntry stage) => new()
         {

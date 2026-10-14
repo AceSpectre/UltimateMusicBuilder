@@ -22,7 +22,8 @@
   import { inputClass, toolbarButtonClass } from '$lib/ui-classes'
   import {
     ORDER_SLOTS,
-    addSongs,
+    addSong,
+    clampIncidence,
     excludedTracks,
     isChanged,
     playlistDefaults,
@@ -47,6 +48,8 @@
     series: 'managePlaylists.kindSeries',
     vanilla: 'managePlaylists.kindVanilla'
   }
+  const iconButtonClass =
+    'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground'
 
   let data = $state<ManagePlaylistsData | null>(null)
   let loading = $state(false)
@@ -167,7 +170,7 @@
     saveState = 'saving'
     const plain = $state.snapshot(data)
     for (const track of plain.playlists.flatMap((p) => p.tracks)) {
-      track.incidences = track.incidences.map((i) => Math.max(0, Math.min(65535, Math.trunc(Number(i)) || 0)))
+      track.incidences = track.incidences.map(clampIncidence)
     }
     try {
       showMigrate = false
@@ -181,6 +184,18 @@
 
   trackUnsaved(() => isDirty, handleSave)
 </script>
+
+{#snippet removeButton(playlist: ManagedPlaylist, track: PlaylistTrack)}
+  <button
+    onclick={() => removeTrack(playlist, track.bgmId)}
+    disabled={track.autoAdded}
+    aria-label={$_('managePlaylists.removeSong')}
+    title={$_(track.autoAdded ? 'managePlaylists.autoAdded' : 'managePlaylists.removeSong')}
+    class="{iconButtonClass} disabled:cursor-not-allowed disabled:opacity-40"
+  >
+    <X size={14} />
+  </button>
+{/snippet}
 
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
@@ -315,8 +330,6 @@
                         <p class="pt-1 text-[11.5px] text-muted-foreground">
                           {$_('managePlaylists.seriesFlag', { values: { series: playlist.series.map((s) => s.name).join(', ') } })}
                         </p>
-                      {:else if playlist.kind === 'series'}
-                        <p class="pt-1 text-[11.5px] text-muted-foreground">{$_('managePlaylists.seriesHint')}</p>
                       {/if}
                     </div>
                     <div class="flex shrink-0 items-center gap-2">
@@ -415,19 +428,11 @@
                           onclick={() => setIncluded(playlist, slot, item.track, false)}
                           aria-label={$_('managePlaylists.exclude')}
                           title={$_('managePlaylists.exclude')}
-                          class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          class={iconButtonClass}
                         >
                           <EyeOff size={14} />
                         </button>
-                        <button
-                          onclick={() => removeTrack(playlist, item.id)}
-                          disabled={item.track.autoAdded}
-                          aria-label={$_('managePlaylists.removeSong')}
-                          title={$_(item.track.autoAdded ? 'managePlaylists.autoAdded' : 'managePlaylists.removeSong')}
-                          class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                          <X size={14} />
-                        </button>
+                        {@render removeButton(playlist, item.track)}
                       </div>
                     {/each}
                   </div>
@@ -442,19 +447,11 @@
                             onclick={() => setIncluded(playlist, slot, track, true)}
                             aria-label={$_('managePlaylists.include')}
                             title={$_('managePlaylists.include')}
-                            class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                            class={iconButtonClass}
                           >
                             <Eye size={14} />
                           </button>
-                          <button
-                            onclick={() => removeTrack(playlist, track.bgmId)}
-                            disabled={track.autoAdded}
-                            aria-label={$_('managePlaylists.removeSong')}
-                            title={$_(track.autoAdded ? 'managePlaylists.autoAdded' : 'managePlaylists.removeSong')}
-                            class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            <X size={14} />
-                          </button>
+                          {@render removeButton(playlist, track)}
                         </div>
                       {/each}
                     </div>
@@ -514,7 +511,7 @@
                               onclick={() => { stage.playlistId = stage.vanillaPlaylistId; stage.order = stage.vanillaOrder }}
                               title={$_('managePlaylists.resetStage', { values: { playlist: playlistNames.get(stage.vanillaPlaylistId) ?? stage.vanillaPlaylistId, order: stage.vanillaOrder } })}
                               aria-label={$_('managePlaylists.resetStage', { values: { playlist: stage.vanillaPlaylistId, order: stage.vanillaOrder } })}
-                              class="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                              class={iconButtonClass}
                             >
                               <RotateCcw size={14} />
                             </button>
@@ -550,7 +547,7 @@
         <div class="flex flex-col gap-1">
           {#each addablePool as song (song.bgmId)}
             <button
-              onclick={() => addSongs(playlist, [song.bgmId])}
+              onclick={() => addSong(playlist, song.bgmId)}
               class="flex w-full items-center gap-2 rounded-lg border border-border bg-background/60 px-3 py-2 text-left transition-colors hover:bg-muted"
             >
               <div class="min-w-0 flex-1">

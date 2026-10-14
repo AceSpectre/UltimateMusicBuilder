@@ -137,7 +137,7 @@ namespace UMB.CLI.Services
                 return 0;
             }
 
-            var modSongs = new FolderMusicMod(NullLogger<IMusicMod>.Instance, null, modDir, readAudioMetadata: false).GetMusicModEntries().BgmDbRootEntries;
+            var modSongs = new FolderMusicMod(NullLogger<IMusicMod>.Instance, null, modDir).GetMusicModEntries().BgmDbRootEntries;
             var known = catalog.BgmTitles.Keys.Concat(modSongs.Select(b => b.UiBgmId)).ToHashSet();
             var dropped = PlaylistsToml.RemoveSongs(modDir, known.Contains);
             foreach (var song in dropped)

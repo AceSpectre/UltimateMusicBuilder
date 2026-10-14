@@ -382,7 +382,6 @@ export default {
     kindCustom: 'Custom',
     kindSeries: 'Series',
     kindVanilla: 'Game',
-    seriesHint: 'Made by a series in this mod. It always holds every song of the series; you can add other songs and set orders.',
     seriesFlag: 'Always holds every song of: {series}',
     resetPlaylist: 'Reset to default',
     resetPlaylistHint: 'Back to the game’s playlist plus the songs this mod always adds',

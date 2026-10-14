@@ -27,7 +27,6 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         private readonly IAudioMetadataService _audioMetadataService;
         private readonly string _modPath;
         private readonly FolderMusicModInformation _modInfo;
-        private readonly bool _readAudioMetadata;
 
         public string Id => _modInfo.Id;
         public string Name => _modInfo.Name;
@@ -40,10 +39,9 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
         /// </summary>
         public static Dictionary<string, HashSet<string>> SeriesFilterByMod { get; set; }
 
-        /// <param name="readAudioMetadata">False skips reading each song's length and loop points, for callers that only need the entries.</param>
-        public FolderMusicMod(ILogger<IMusicMod> logger, IAudioMetadataService audioMetadataService, string modPath, bool readAudioMetadata = true)
+        /// <param name="audioMetadataService">Null skips reading each song's length and loop points, for callers that only need the entries.</param>
+        public FolderMusicMod(ILogger<IMusicMod> logger, IAudioMetadataService audioMetadataService, string modPath)
         {
-            _readAudioMetadata = readAudioMetadata;
             _logger = logger;
             _audioMetadataService = audioMetadataService;
             _modPath = modPath;
@@ -303,7 +301,7 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                     {
                         AudioVolume = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB + seriesDb + row.VolumeDb
                     };
-                    if (_readAudioMetadata)
+                    if (_audioMetadataService != null)
                         try
                         {
                             AudioCuePoints cuePoints = null;
@@ -562,7 +560,6 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
                         .Select(t => PlaylistHelper.Track(t.Song, Slots<short>(t.Order, 0), Slots<ushort>(t.Incidence, 100))));
                     output.PlaylistOverrides.Add(entry);
                 }
-                output.PlaylistSeriesFlags[playlist.Id] = playlist.Series;
                 foreach (var seriesId in playlist.Series.Where(tracksBySeries.ContainsKey))
                     AddSeriesPlaylist(output, BuildPlaylistEntry(playlist.Id, tracksBySeries[seriesId], playlist.Name));
             }

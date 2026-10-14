@@ -24,17 +24,19 @@ function renumber(playlist: ManagedPlaylist, slot: number): void {
   setSlotOrder(playlist, slot, slotTracks(playlist, slot))
 }
 
-/** Appends songs to every slot (as Sma5h did), with the default incidence. */
-export function addSongs(playlist: ManagedPlaylist, bgmIds: string[]): void {
-  const known = new Set(playlist.tracks.map((t) => t.bgmId))
-  for (const bgmId of bgmIds.filter((id) => !known.has(id))) {
-    known.add(bgmId)
-    playlist.tracks.push({
-      bgmId,
-      orders: ORDER_SLOTS.map((slot) => slotTracks(playlist, slot).length),
-      incidences: ORDER_SLOTS.map(() => DEFAULT_INCIDENCE)
-    })
-  }
+/** An incidence (random-roll weight) as a whole number in 0-65535. */
+export function clampIncidence(value: unknown): number {
+  return Math.max(0, Math.min(65535, Math.trunc(Number(value)) || 0))
+}
+
+/** Appends a song to every slot (as Sma5h did), with the default incidence. */
+export function addSong(playlist: ManagedPlaylist, bgmId: string): void {
+  if (playlist.tracks.some((t) => t.bgmId === bgmId)) return
+  playlist.tracks.push({
+    bgmId,
+    orders: ORDER_SLOTS.map((slot) => slotTracks(playlist, slot).length),
+    incidences: ORDER_SLOTS.map(() => DEFAULT_INCIDENCE)
+  })
 }
 
 export function removeTrack(playlist: ManagedPlaylist, bgmId: string): void {

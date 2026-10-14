@@ -482,8 +482,8 @@ namespace Tests.Unit.Desktop
             var error = Assert.Throws<DesktopApiException>(() => VanillaService().Create(_modPath, OneGame(i => i.SeriesId = "mario")));
             Assert.Contains("already exists", error.Message);
         }
-    
-        private const string PlaylistsToml =
+
+        private const string SeriesAPlaylistsToml =
             "[[playlists]]\nid = \"bgm_a\"\nname = \"A\"\nseries = [\"a\"]\ntracks = []\n\n[[stages]]\nid = \"ui_stage_x\"\nplaylist = \"bgm_a\"\norder = 0\n";
 
         private string PlaylistsTomlText() => File.ReadAllText(Path.Combine(_modPath, "playlists.toml"));
@@ -492,7 +492,7 @@ namespace Tests.Unit.Desktop
         public void Load_ReadsTheSeriesPlaylistFromPlaylistsToml()
         {
             WriteCustomSeries("a", RichToml);
-            File.WriteAllText(Path.Combine(_modPath, "playlists.toml"), PlaylistsToml);
+            File.WriteAllText(Path.Combine(_modPath, "playlists.toml"), SeriesAPlaylistsToml);
 
             Assert.Equal("bgm_a", _service.Load(_modPath).Items.Single().Fields.SeriesPlaylist);
         }
@@ -501,11 +501,11 @@ namespace Tests.Unit.Desktop
         public void Save_RenamingASeriesPlaylist_RenamesItAndItsStagesInPlaylistsToml()
         {
             WriteCustomSeries("a", RichToml.Replace("series-playlist = \"bgmmario\"\n", ""));
-            File.WriteAllText(Path.Combine(_modPath, "playlists.toml"), PlaylistsToml);
+            File.WriteAllText(Path.Combine(_modPath, "playlists.toml"), SeriesAPlaylistsToml);
 
             SaveEdited(f => f.SeriesPlaylist = "bgm_b");
 
-            Assert.Equal(PlaylistsToml.Replace("bgm_a", "bgm_b"), PlaylistsTomlText());
+            Assert.Equal(SeriesAPlaylistsToml.Replace("bgm_a", "bgm_b"), PlaylistsTomlText());
         }
 
         [Fact]
@@ -513,7 +513,7 @@ namespace Tests.Unit.Desktop
         {
             var service = new SeriesOrderService(_ws.MusicOptions(), TestCatalog.Service(TestCatalog.Mario()), TestEnvironment.CreateLogger<SeriesOrderService>());
             WriteCustomSeries("a", RichToml.Replace("series-playlist = \"bgmmario\"\n", ""));
-            File.WriteAllText(Path.Combine(_modPath, "playlists.toml"), PlaylistsToml);
+            File.WriteAllText(Path.Combine(_modPath, "playlists.toml"), SeriesAPlaylistsToml);
             var items = service.Load(_modPath).Items.Select(i =>
             {
                 i.Fields.SeriesPlaylist = "bgmmario";

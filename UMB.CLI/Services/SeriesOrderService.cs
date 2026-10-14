@@ -339,7 +339,7 @@ namespace UMB.CLI.Services
             var lines = SeriesToml.UpsertTable(SeriesToml.ReadLines(seriesTomlPath), "series", new[]
             {
                 new SeriesToml.Entry("name", $"name = \"{SeriesToml.Escape(fields.Name)}\""),
-                new SeriesToml.Entry("series-playlist", null),
+                new SeriesToml.Entry(PlaylistsToml.LegacySeriesPlaylistKey, null),
                 new SeriesToml.Entry("playlist-incidence", $"playlist-incidence = {fields.PlaylistIncidence}")
             }, createIfMissing: false);
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { ManagedPlaylist, ManagedStage } from '$lib/types/electron'
 import {
-  addSongs,
+  addSong,
+  clampIncidence,
   excludedTracks,
   playlistIdError,
   playlistIdFromName,
@@ -70,11 +71,12 @@ describe('slots', () => {
     expect(ids(slotTracks(p, 0))).toEqual(['a', 'b'])
   })
 
-  it('adds new songs at the end of every slot, skipping ones already there', () => {
+  it('adds a new song at the end of every slot, skipping one already there', () => {
     const p = playlist()
     p.tracks[1].orders[4] = -1
 
-    addSongs(p, ['c', 'a'])
+    addSong(p, 'c')
+    addSong(p, 'a')
 
     expect(ids(p.tracks)).toEqual(['a', 'b', 'c'])
     expect(p.tracks[2].orders[0]).toBe(2)
@@ -177,5 +179,9 @@ describe('saving', () => {
     const stages = [stage(), stage({ id: 'empty', order: 2 }), stage({ id: 'gone', playlistId: 'bgmgone' })]
 
     expect(silentStages(stages, [p]).map((s) => s.id)).toEqual(['empty', 'gone'])
+  })
+
+  it('clamps incidences to whole numbers in 0-65535', () => {
+    expect([clampIncidence('12.7'), clampIncidence(-5), clampIncidence(70000), clampIncidence('')]).toEqual([12, 0, 65535, 0])
   })
 })

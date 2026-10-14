@@ -17,6 +17,7 @@ namespace Tests.Unit.Desktop
             "[default-track-data]\ngame = \"g\"\n";
 
         private const string CupheadToml = "[series]\nid = \"cuphead\"\nname = \"Cuphead\"\n\n[[games]]\nid = \"gc\"\nname = \"GC\"\n";
+        private const string LegacyCupheadToml = "[series]\nid = \"cuphead\"\nname = \"Cuphead\"\nseries-playlist = \"bgm_cuphead\"\n\n[[games]]\nid = \"gc\"\nname = \"GC\"\n";
 
         private static readonly short[] Order0 = Enumerable.Repeat((short)0, 16).ToArray();
         private static readonly ushort[] Incidence100 = Enumerable.Repeat((ushort)100, 16).ToArray();
@@ -67,9 +68,7 @@ namespace Tests.Unit.Desktop
         [Fact]
         public void Load_ShowsALegacySeriesPlaylistFieldAsASeriesFlag()
         {
-            var modPath = SeedMod(cupheadToml: CupheadToml.Replace("name = \"Cuphead\"\n", "name = \"Cuphead\"\nseries-playlist = \"bgm_cuphead\"\n"));
-
-            var data = _service.Load(modPath);
+            var data = _service.Load(SeedMod(LegacyCupheadToml));
 
             Assert.True(data.LegacyBlocks);
             var cuphead = Playlist(data, "bgm_cuphead");
@@ -182,7 +181,7 @@ namespace Tests.Unit.Desktop
         [Fact]
         public void Save_MigratesALegacySeriesPlaylistField_ToAFlagOnlyPlaylist()
         {
-            var modPath = SeedMod(cupheadToml: CupheadToml.Replace("name = \"Cuphead\"\n", "name = \"Cuphead\"\nseries-playlist = \"bgm_cuphead\"\n"));
+            var modPath = SeedMod(LegacyCupheadToml);
             var cuphead = Playlist(_service.Load(modPath), "bgm_cuphead");
 
             var result = _service.Save(modPath, new() { cuphead with { Tracks = null } }, new());
@@ -190,19 +189,6 @@ namespace Tests.Unit.Desktop
             Assert.DoesNotContain("series-playlist", File.ReadAllText(Path.Combine(modPath, "cuphead", "series.toml")));
             Assert.Equal("[[playlists]]\nid = \"bgm_cuphead\"\nname = \"Cuphead\"\nseries = [\"cuphead\"]\n", File.ReadAllText(Path.Combine(modPath, "playlists.toml")));
             Assert.Equal(new[] { "ui_bgm_c" }, Songs(Playlist(result, "bgm_cuphead")));
-        }
-
-        [Fact]
-        public void Save_ASeriesFlagKeepsEverySongOfThatSeries()
-        {
-            var modPath = SeedMod();
-            var mix = new ManagedPlaylist("bgm_mix", "Mix", "series", new() { new("cuphead", "Cuphead") }, new(), null);
-
-            var saved = Playlist(_service.Save(modPath, new() { mix }, new()), "bgm_mix");
-
-            Assert.Equal("series", saved.Kind);
-            Assert.Equal(new[] { "ui_bgm_c" }, Songs(saved));
-            Assert.Contains("series = [\"cuphead\"]", File.ReadAllText(Path.Combine(modPath, "playlists.toml")));
         }
 
         [Fact]

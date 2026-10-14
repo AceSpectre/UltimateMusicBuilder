@@ -71,6 +71,9 @@ namespace Sma5h.Mods.Music
             _logger.LogInformation("Loading Sma5hMusic Mods");
             var musicMods = _musicModManagerService.RefreshMusicMods();
 
+            _seriesPlaylists.Clear();
+            _playlistOverrides.Clear();
+            _stageAssignments.Clear();
             var vanillaOverrides = new List<VanillaBgmOverride>();
             var vanillaSeriesIcons = new Dictionary<string, string>();
             foreach (var musicMod in musicMods)
@@ -454,17 +457,14 @@ namespace Sma5h.Mods.Music
         private void ApplyModPlaylists()
         {
             var gameToSeries = _audioStateService.GetGameTitleEntries().ToDictionary(p => p.UiGameTitleId, p => p.UiSeriesId);
-            var modSongs = _audioStateService.GetBgmDbRootEntries()
-                .Where(p => p.TestDispOrder >= 0 && p.MusicMod != null)
-                .Select(p => (p.UiBgmId, gameToSeries.GetValueOrDefault(p.UiGameTitleId ?? "")))
-                .ToList();
+            var modSongs = PlaylistHelper.SoundTestSongs(_audioStateService.GetBgmDbRootEntries().Where(p => p.MusicMod != null), gameToSeries);
             var stages = _audioStateService.GetStagesEntries().ToList();
             var playlists = _audioStateService.GetPlaylists().ToDictionary(p => p.Id);
             var registered = playlists.Keys.ToHashSet();
 
             var required = PlaylistHelper.RequiredSongs(stages, _seriesPlaylists, modSongs, PlaylistHelper.SmashBattleIncidence(_config.CurrentValue.Sma5hMusic));
             var added = PlaylistHelper.ApplyModPlaylists(playlists, stages, required, _playlistOverrides, _stageAssignments);
-            _logger.LogInformation("Added {ModSongCount} mod song(s) to stage playlists ({TotalAdded} total insertions).", modSongs.Count, added);
+            _logger.LogInformation("Added {TotalAdded} song(s) the build keeps to their playlists.", added);
 
             foreach (var playlist in playlists.Values.Where(p => !registered.Contains(p.Id)))
                 _audioStateService.AddPlaylistEntry(playlist);

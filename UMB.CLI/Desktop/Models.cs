@@ -146,7 +146,7 @@ namespace UMB.CLI.Desktop
     public record ManagedPlaylist(string Id, string Name, string Kind, List<SeriesRef> Series, List<PlaylistTrack> Tracks, List<PlaylistTrack> DefaultTracks);
     public record ManagedStage(string Id, string Name, bool Hidden, string SeriesName,
         string VanillaPlaylistId, int VanillaOrder, string PlaylistId, int Order);
-    /// <summary>LegacyBlocks: series.toml still has [[playlists]] blocks, which saving moves into playlists.toml.</summary>
+    /// <summary>LegacyBlocks: series.toml still sets playlists (series-playlist, [[playlists]] blocks), which saving moves into playlists.toml.</summary>
     public record ManagePlaylistsData(string ModName, string ModPath, List<ManagedPlaylist> Playlists, List<ManagedStage> Stages,
         List<PlaylistSong> Songs, bool LegacyBlocks);
     public record StageAssignmentInput(string Id, string PlaylistId, int Order);

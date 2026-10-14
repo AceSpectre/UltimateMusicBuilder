@@ -120,7 +120,6 @@ export function hasGameResources(): boolean {
   return existsSync(join(repoRoot(), 'Resources', 'Game', 'ui', 'param', 'database', 'ui_bgm_db.prc'))
 }
 
-/** True when `cmd` resolves on PATH. Gates specs that shell out to ffmpeg/pymusiclooper/dotnet. */
 /**
  * Gives a workspace the repo's Resources, for actions that read vanilla data: the game files are
  * linked (cleanup removes only the link) and the small files beside them copied.
@@ -139,6 +138,7 @@ export function linkResources(ws: E2EWorkspace): void {
   }
 }
 
+/** True when `cmd` resolves on PATH. Gates specs that shell out to ffmpeg/pymusiclooper/dotnet. */
 export function hasTool(cmd: string): boolean {
   const probe =
     process.platform === 'win32'

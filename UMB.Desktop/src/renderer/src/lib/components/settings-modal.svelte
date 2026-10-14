@@ -9,6 +9,7 @@
   import Modal from '$lib/components/ui/modal.svelte'
   import { DB_INPUT, clampDb } from '$lib/volume'
   import { settingsStore } from '$lib/stores/settings.svelte'
+  import { clampIncidence } from '$lib/playlists'
   import type { AppSettings } from '$lib/types/electron'
 
   let { open, onClose }: { open: boolean; onClose: () => void } = $props()
@@ -52,7 +53,7 @@
       globalVolumeDb: clampDb(globalVolumeDb),
       applyVolumeToVanilla,
       addModSongsToSmashBattle,
-      smashBattleIncidence: Math.max(0, Math.min(65535, Math.trunc(Number(smashBattleIncidence)) || 0)),
+      smashBattleIncidence: clampIncidence(smashBattleIncidence),
       albumSelectionOnAllStages
     }
   }
@@ -100,20 +101,24 @@
   </button>
 {/snippet}
 
+{#snippet switchRow(id: string, label: string, value: boolean, set: (value: boolean) => void, onClass: string)}
+  <div class="flex items-center justify-between gap-3">
+    <span id="{id}-label" class="text-[12.5px] font-medium">{$_(label)}</span>
+    <button
+      role="switch"
+      aria-checked={value}
+      aria-labelledby="{id}-label"
+      onclick={() => { set(!value); markEdited() }}
+      class="relative h-5 w-9 shrink-0 rounded-full transition-colors {value ? onClass : 'bg-muted-foreground/30'}"
+    >
+      <span class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform {value ? 'translate-x-4' : ''}"></span>
+    </button>
+  </div>
+{/snippet}
+
 {#snippet toggle(id: string, label: string, hint: string, value: boolean, set: (value: boolean) => void)}
   <div class="flex flex-col gap-1">
-    <div class="flex items-center justify-between gap-3">
-      <span id="{id}-label" class="text-[12.5px] font-medium">{$_(label)}</span>
-      <button
-        role="switch"
-        aria-checked={value}
-        aria-labelledby="{id}-label"
-        onclick={() => { set(!value); markEdited() }}
-        class="relative h-5 w-9 shrink-0 rounded-full transition-colors {value ? 'bg-[hsl(var(--gradient-from))]' : 'bg-muted-foreground/30'}"
-      >
-        <span class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform {value ? 'translate-x-4' : ''}"></span>
-      </button>
-    </div>
+    {@render switchRow(id, label, value, set, 'bg-[hsl(var(--gradient-from))]')}
     <p class="text-[11.5px] text-muted-foreground">{$_(hint)}</p>
   </div>
 {/snippet}
@@ -197,18 +202,7 @@
         </div>
       {:else}
         <div class="px-5 py-5 flex flex-col gap-1.5">
-          <div class="flex items-center justify-between gap-3">
-            <span id="apply-vanilla-label" class="text-[12.5px] font-medium">{$_('settings.applyVolumeToVanilla')}</span>
-            <button
-              role="switch"
-              aria-checked={applyVolumeToVanilla}
-              aria-labelledby="apply-vanilla-label"
-              onclick={() => { applyVolumeToVanilla = !applyVolumeToVanilla; markEdited() }}
-              class="relative h-5 w-9 shrink-0 rounded-full transition-colors {applyVolumeToVanilla ? 'bg-destructive' : 'bg-muted-foreground/30'}"
-            >
-              <span class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform {applyVolumeToVanilla ? 'translate-x-4' : ''}"></span>
-            </button>
-          </div>
+          {@render switchRow('apply-vanilla', 'settings.applyVolumeToVanilla', applyVolumeToVanilla, (v) => (applyVolumeToVanilla = v), 'bg-destructive')}
           <p class="flex items-start gap-1.5 text-[11.5px] text-destructive">
             <AlertTriangle size={13} class="mt-0.5 shrink-0" />
             {$_('settings.applyVolumeToVanillaWarning')}

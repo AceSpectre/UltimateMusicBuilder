@@ -15,58 +15,57 @@ namespace UMB.CLI.Services
     /// </summary>
     public static class PlaylistsToml
     {
+        /// <summary>The legacy series.toml key that playlists.toml series flags replace.</summary>
+        public const string LegacySeriesPlaylistKey = "series-playlist";
+
         private static readonly Regex SongLine = new(@"^\s*\{\s*song\s*=\s*""([^""]*)""");
 
         public static string PathIn(string modPath) => Path.Combine(modPath, MusicConstants.MusicModFiles.FOLDER_MOD_PLAYLISTS_TOML_FILE);
 
-        /// <summary>The playlists and stage playlists. A playlist with a name reads as custom (only those get one written).</summary>
-        public static (List<ManagedPlaylist> Playlists, List<StageAssignmentInput> Stages) Read(string modPath)
+        /// <summary>The playlists (those with an id) and stage playlists.</summary>
+        public static FolderPlaylistsFileConfig Read(string modPath)
         {
-            if (!File.Exists(PathIn(modPath))) return (new(), new());
+            if (!File.Exists(PathIn(modPath))) return new();
             var file = FolderMusicMod.ParsePlaylistsFile(PathIn(modPath));
-            var playlists = file.Playlists.Where(p => !string.IsNullOrWhiteSpace(p.Id)).Select(p => new ManagedPlaylist(
-                p.Id, p.Name ?? p.Id, p.Name != null ? "custom" : "vanilla",
-                p.Series.Select(id => new SeriesRef(id, id)).ToList(),
-                p.Tracks?.Select(t => new PlaylistTrack(t.Song, FolderMusicMod.Slots<short>(t.Order, 0), FolderMusicMod.Slots<ushort>(t.Incidence, 100))).ToList(),
-                null)).ToList();
-            var stages = file.Stages.Select(s => new StageAssignmentInput(s.Id, s.Playlist, s.Order)).ToList();
-            return (playlists, stages);
+            file.Playlists.RemoveAll(p => string.IsNullOrWhiteSpace(p.Id));
+            return file;
         }
 
         /// <summary>Writes the playlists and stage playlists, removing the file when both are empty.</summary>
-        public static void Write(string modPath, IReadOnlyList<ManagedPlaylist> playlists, IReadOnlyList<StageAssignmentInput> stages)
+        public static void Write(string modPath, FolderPlaylistsFileConfig file)
         {
-            if (playlists.Count + stages.Count == 0)
+            if (file.Playlists.Count + file.Stages.Count == 0)
             {
                 File.Delete(PathIn(modPath));
                 return;
             }
 
             var lines = new List<string>();
-            foreach (var playlist in playlists)
+            foreach (var playlist in file.Playlists)
             {
                 lines.Add("[[playlists]]");
                 lines.Add($"id = \"{SeriesToml.Escape(playlist.Id)}\"");
-                if (playlist.Kind != "vanilla" && !string.IsNullOrEmpty(playlist.Name) && playlist.Name != playlist.Id)
+                if (!string.IsNullOrEmpty(playlist.Name) && playlist.Name != playlist.Id)
                     lines.Add($"name = \"{SeriesToml.Escape(playlist.Name)}\"");
-                if (playlist.Series?.Count > 0)
-                    lines.Add($"series = [{string.Join(", ", playlist.Series.Select(s => $"\"{SeriesToml.Escape(s.Id)}\""))}]");
+                if (playlist.Series.Count > 0)
+                    lines.Add($"series = [{string.Join(", ", playlist.Series.Select(s => $"\"{SeriesToml.Escape(s)}\""))}]");
                 if (playlist.Tracks?.Count == 0)
                     lines.Add("tracks = []");
                 else if (playlist.Tracks != null)
                 {
                     lines.Add("tracks = [");
                     lines.AddRange(playlist.Tracks.Select(t =>
-                        $"    {{ song = \"{SeriesToml.Escape(t.BgmId)}\", order = {Slots(t.Orders)}, incidence = {Slots(t.Incidences)} }},"));
+                        $"    {{ song = \"{SeriesToml.Escape(t.Song)}\", order = {SlotText(FolderMusicMod.Slots<short>(t.Order, 0))}, " +
+                        $"incidence = {SlotText(FolderMusicMod.Slots<ushort>(t.Incidence, 100))} }},"));
                     lines.Add("]");
                 }
                 lines.Add("");
             }
-            foreach (var stage in stages)
+            foreach (var stage in file.Stages)
             {
                 lines.Add("[[stages]]");
                 lines.Add($"id = \"{SeriesToml.Escape(stage.Id)}\"");
-                lines.Add($"playlist = \"{SeriesToml.Escape(stage.PlaylistId)}\"");
+                lines.Add($"playlist = \"{SeriesToml.Escape(stage.Playlist)}\"");
                 lines.Add($"order = {Math.Clamp(stage.Order, 0, PlaylistHelper.OrderCount - 1)}");
                 lines.Add("");
             }
@@ -76,7 +75,7 @@ namespace UMB.CLI.Services
         /// <summary>The playlist flagged with each series (the first, when several are).</summary>
         public static Dictionary<string, string> SeriesPlaylists(string modPath) =>
             Read(modPath).Playlists
-                .SelectMany(p => p.Series.Select(s => (Series: s.Id, Playlist: p.Id)))
+                .SelectMany(p => p.Series.Select(s => (Series: s, Playlist: p.Id)))
                 .GroupBy(f => f.Series)
                 .ToDictionary(g => g.Key, g => g.First().Playlist);
 
@@ -90,35 +89,35 @@ namespace UMB.CLI.Services
             if (PlaylistHelper.IsGameTitlePlaylist(playlistId))
                 throw new DesktopApiException($"{PlaylistHelper.GameTitlePlaylistPrefix} playlists are reserved for the build.");
 
-            var (playlists, stages) = Read(modPath);
-            bool Flags(ManagedPlaylist p) => p.Series.Any(s => s.Id == seriesId);
-            var current = playlists.Where(Flags).ToList();
+            var file = Read(modPath);
+            var current = file.Playlists.Where(p => p.Series.Contains(seriesId)).ToList();
             if (current.Count == 1 && current[0].Id == playlistId) return;
 
             var old = current.Count == 1 ? current[0] : null;
-            if (old != null && old.Series.Count == 1 && playlistId.Length > 0 && !gamePlaylists.Contains(old.Id)
-                && !gamePlaylists.Contains(playlistId) && playlists.All(p => p.Id != playlistId))
+            var canRename = old != null && old.Series.Count == 1 && playlistId.Length > 0 && !gamePlaylists.Contains(old.Id)
+                && !gamePlaylists.Contains(playlistId) && file.Playlists.All(p => p.Id != playlistId);
+            if (canRename)
             {
-                playlists = playlists.Select(p => p == old ? p with { Id = playlistId, Name = string.IsNullOrEmpty(name) ? p.Name : name } : p).ToList();
-                stages = stages.Select(s => s.PlaylistId == old.Id ? s with { PlaylistId = playlistId } : s).ToList();
+                foreach (var stage in file.Stages.Where(s => s.Playlist == old.Id))
+                    stage.Playlist = playlistId;
+                old.Id = playlistId;
+                if (old.Name != null && !string.IsNullOrEmpty(name))
+                    old.Name = name;
             }
             else
             {
-                playlists = playlists
-                    .Select(p => Flags(p) ? p with { Series = p.Series.Where(s => s.Id != seriesId).ToList() } : p)
-                    .Where(p => p.Tracks != null || p.Series.Count > 0)
-                    .ToList();
-                var target = playlists.FirstOrDefault(p => p.Id == playlistId);
+                current.ForEach(p => p.Series.RemoveAll(s => s == seriesId));
+                file.Playlists.RemoveAll(p => p.Tracks == null && p.Series.Count == 0);
+                var target = file.Playlists.FirstOrDefault(p => p.Id == playlistId);
                 if (target != null)
-                    playlists[playlists.IndexOf(target)] = target with { Series = target.Series.Append(new SeriesRef(seriesId, seriesId)).ToList() };
+                    target.Series.Add(seriesId);
                 else if (playlistId.Length > 0)
-                    playlists.Add(new ManagedPlaylist(playlistId, gamePlaylists.Contains(playlistId) ? playlistId : name, gamePlaylists.Contains(playlistId) ? "vanilla" : "custom",
-                        new() { new SeriesRef(seriesId, seriesId) }, null, null));
+                    file.Playlists.Add(new FolderPlaylistConfig { Id = playlistId, Name = gamePlaylists.Contains(playlistId) ? null : name, Series = new() { seriesId } });
             }
-            Write(modPath, playlists, stages);
+            Write(modPath, file);
         }
 
-        /// <summary>Drops playlist tracks whose song is not kept. Returns the dropped song ids.</summary>
+        /// <summary>Drops playlist tracks whose song is not kept, leaving the rest of the file as written. Returns the dropped song ids.</summary>
         public static List<string> RemoveSongs(string modPath, Func<string, bool> keep)
         {
             var path = PathIn(modPath);
@@ -131,7 +130,7 @@ namespace UMB.CLI.Services
         }
 
         /// <summary>One value when every order slot shares it, else the 16 values.</summary>
-        private static string Slots<T>(IReadOnlyList<T> values) =>
+        private static string SlotText<T>(IReadOnlyList<T> values) =>
             values.Distinct().Count() == 1 ? $"{values[0]}" : $"[{string.Join(", ", values)}]";
     }
 }

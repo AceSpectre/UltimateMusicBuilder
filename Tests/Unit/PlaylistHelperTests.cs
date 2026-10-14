@@ -52,19 +52,23 @@ namespace Tests.Unit
             }, required);
         }
 
-        [Theory]
-        [InlineData(true, 40)]
-        [InlineData(false, 40)]
-        public void RequiredSongs_FollowTheSmashBattleSettings(bool addToSmashBattle, ushort incidence)
+        private static List<RequiredSong> RequiredSongsWith(bool addToSmashBattle)
         {
             var stages = new[] { new StageEntry { UiStageId = "s", UiSeriesId = "ui_series_mario", BgmSetId = "bgmmario" } };
-            var options = new Sma5h.Mods.Music.Sma5hMusicOptions.Sma5hMusicOptionsSection { AddModSongsToSmashBattle = addToSmashBattle, SmashBattleIncidence = incidence };
+            var options = new Sma5h.Mods.Music.Sma5hMusicOptions.Sma5hMusicOptionsSection { AddModSongsToSmashBattle = addToSmashBattle, SmashBattleIncidence = 40 };
+            return PlaylistHelper.RequiredSongs(stages, Array.Empty<PlaylistEntry>(), new[] { ("x", "ui_series_mario") }, PlaylistHelper.SmashBattleIncidence(options));
+        }
 
-            var required = PlaylistHelper.RequiredSongs(stages, Array.Empty<PlaylistEntry>(), new[] { ("x", "ui_series_mario") }, PlaylistHelper.SmashBattleIncidence(options));
+        [Fact]
+        public void RequiredSongs_JoinSmashBattleAtTheSetIncidence()
+        {
+            Assert.Equal(new[] { new RequiredSong("bgmsmashbtl", "x", 40), new RequiredSong("bgmmario", "x", 100) }, RequiredSongsWith(true));
+        }
 
-            var expected = new List<RequiredSong> { new("bgmmario", "x", 100) };
-            if (addToSmashBattle) expected.Insert(0, new("bgmsmashbtl", "x", incidence));
-            Assert.Equal(expected, required);
+        [Fact]
+        public void RequiredSongs_LeaveOutSmashBattleWhenTurnedOff()
+        {
+            Assert.Equal(new[] { new RequiredSong("bgmmario", "x", 100) }, RequiredSongsWith(false));
         }
 
         [Fact]
@@ -112,7 +116,7 @@ namespace Tests.Unit
             Assert.Equal(new[] { "x" }, Songs(playlists["bgmmario"]));
             Assert.Empty(playlists["bgmmine"].Tracks);
         }
-    
+
         [Fact]
         public void ApplyModPlaylists_IgnoresGameTitlePlaylistOverridesAndStages()
         {

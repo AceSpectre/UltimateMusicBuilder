@@ -18,16 +18,11 @@ namespace Sma5h.Mods.Music.Models
         public List<VanillaBgmOverride> VanillaBgmOverrides { get; }
         /// <summary>icon.png path by UiSeriesId, for vanilla series.</summary>
         public Dictionary<string, string> VanillaSeriesIcons { get; }
-        /// <summary>
-        /// The playlists each series fills with all its songs: bgm_gametitle_ and series-playlist (also in PlaylistEntries),
-        /// and playlists.toml playlists flagged with the series.
-        /// </summary>
+        /// <summary>The playlists each series fills with all its songs: bgm_gametitle_, series-playlist and playlists.toml series flags.</summary>
         public List<PlaylistEntry> SeriesPlaylists { get; }
         /// <summary>playlists.toml playlists, which replace the playlists with the same id.</summary>
         public List<PlaylistEntry> PlaylistOverrides { get; }
         public List<StagePlaylistAssignment> StageAssignments { get; }
-        /// <summary>The series flags of playlists.toml playlists, by playlist id.</summary>
-        public Dictionary<string, List<string>> PlaylistSeriesFlags { get; }
 
         public MusicModEntries()
         {
@@ -46,7 +41,6 @@ namespace Sma5h.Mods.Music.Models
             SeriesPlaylists = new List<PlaylistEntry>();
             PlaylistOverrides = new List<PlaylistEntry>();
             StageAssignments = new List<StagePlaylistAssignment>();
-            PlaylistSeriesFlags = new Dictionary<string, List<string>>();
         }
     }
 }
