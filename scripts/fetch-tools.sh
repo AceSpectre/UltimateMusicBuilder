@@ -69,7 +69,7 @@ download() {
     local dest=$2
     echo "   ↓ $url"
     if have curl; then
-        curl -fL --retry 3 -o "$dest" "$url"
+        curl -fL --retry 3 --retry-all-errors -o "$dest" "$url"
     elif have wget; then
         wget -q -O "$dest" "$url"
     else

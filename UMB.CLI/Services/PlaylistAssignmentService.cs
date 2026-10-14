@@ -1,10 +1,12 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Sma5h.Mods.Music;
 using Sma5h.Mods.Music.Helpers;
+using Sma5h.Mods.Music.Interfaces;
+using Sma5h.Mods.Music.Models;
 using Sma5h.Mods.Music.MusicMods.FolderMusicMod;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -13,150 +15,164 @@ using UMB.CLI.Desktop;
 namespace UMB.CLI.Services
 {
     /// <summary>
-    /// Assigns a mod's songs to in-game playlists via the [[playlists]] blocks in each
-    /// series.toml (missing or "*" songs = every song in the series).
+    /// Edits a mod's playlists and stage playlists. Load shows them as the build will, with each changed game or
+    /// series playlist's default; Save writes playlists.toml and moves legacy series.toml [[playlists]] blocks into it.
     /// </summary>
     public class PlaylistAssignmentService
     {
-        private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
+        private const string PlaylistsTable = "playlists";
+        /// <summary>A legacy series.toml playlist: WholeSeries for series-playlist and blocks without a song list.</summary>
+        private record LegacyPlaylist(string PlaylistId, string SeriesId, bool WholeSeries);
 
-        public PlaylistAssignmentService(IOptionsMonitor<Sma5hMusicOptions> musicConfig)
+        private readonly IOptionsMonitor<Sma5hMusicOptions> _musicConfig;
+        private readonly VanillaCatalogService _catalog;
+
+        public PlaylistAssignmentService(IOptionsMonitor<Sma5hMusicOptions> musicConfig, VanillaCatalogService catalog)
         {
             _musicConfig = musicConfig;
+            _catalog = catalog;
         }
 
         public ManagePlaylistsData Load(string modPath)
         {
+            var catalog = _catalog.Get() ?? throw new DesktopApiException("Game resources not found in Resources/Game.");
             var resolvedModPath = ModPaths.ResolveUnderMods(_musicConfig, modPath);
-            var series = ScanModSeries(resolvedModPath);
+            var mod = new FolderMusicMod(NullLogger<IMusicMod>.Instance, null, resolvedModPath).GetMusicModEntries();
 
-            var songs = series.SelectMany(s => s.Tracks.Select(t => new ModSong(s.SeriesId, s.SeriesName, t.Filename, t.Title))).ToList();
+            var seriesByGame = catalog.GameTitles.ToDictionary(g => MusicConstants.InternalIds.GAME_TITLE_ID_PREFIX + g.Id, g => g.SeriesId);
+            foreach (var game in mod.GameTitleEntries)
+                seriesByGame.TryAdd(game.UiGameTitleId, game.UiSeriesId);
+            var modSongs = PlaylistHelper.SoundTestSongs(mod.BgmDbRootEntries, seriesByGame);
+            var stages = catalog.Stages.Select(Copy).ToList();
+            var required = PlaylistHelper.RequiredSongs(stages, mod.SeriesPlaylists, modSongs, PlaylistHelper.SmashBattleIncidence(_musicConfig.CurrentValue.Sma5hMusic));
+            var autoAdded = required.Select(r => (r.PlaylistId, r.UiBgmId)).ToHashSet();
 
-            // Resolve [[playlists]] blocks into per-song assignments; the last block wins on a duplicate song + playlist.
-            var assignmentsByPlaylist = new Dictionary<string, Dictionary<(string, string), PlaylistSongAssignment>>();
-            foreach (var s in series)
-            {
-                var trackByStem = s.Tracks.GroupBy(t => Stem(t.Filename)).ToDictionary(g => g.Key, g => g.Last());
-                foreach (var block in s.Blocks)
+            // Defaults: each game and series playlist without its saved tracks or legacy blocks.
+            var defaults = catalog.Playlists.ToDictionary(p => p.Id, PlaylistHelper.Clone);
+            foreach (var playlist in mod.SeriesPlaylists)
+                PlaylistHelper.Merge(defaults, PlaylistHelper.Clone(playlist));
+            PlaylistHelper.ApplyModPlaylists(defaults, stages, required, Array.Empty<PlaylistEntry>(), Array.Empty<StagePlaylistAssignment>());
+
+            // As the build: game playlists, the mod's series playlists, then playlists.toml and the songs the build keeps.
+            var playlists = catalog.Playlists.ToDictionary(p => p.Id, PlaylistHelper.Clone);
+            foreach (var playlist in mod.PlaylistEntries)
+                PlaylistHelper.Merge(playlists, PlaylistHelper.Clone(playlist));
+            PlaylistHelper.ApplyModPlaylists(playlists, stages, required, mod.PlaylistOverrides, mod.StageAssignments);
+
+            var seriesNames = catalog.Series.ToDictionary(s => MusicConstants.InternalIds.SERIES_ID_PREFIX + s.Id, s => s.Name);
+            foreach (var (id, name) in DisplayNames.Series)
+                seriesNames.TryAdd(id, name);
+            foreach (var series in mod.SeriesEntries)
+                seriesNames[series.UiSeriesId] = series.MSBTTitle.GetValueOrDefault("en_us", series.NameId);
+            string SeriesName(string uiSeriesId) => seriesNames.GetValueOrDefault(uiSeriesId ?? "", uiSeriesId ?? "");
+
+            var vanillaTitles = mod.VanillaBgmOverrides.Where(o => !string.IsNullOrEmpty(o.Title)).ToDictionary(o => o.UiBgmId, o => o.Title);
+            var songs = catalog.Songs
+                .Select(s => new PlaylistSong(s.BgmId, vanillaTitles.GetValueOrDefault(s.BgmId, s.Name), SeriesName(s.SeriesId), false))
+                .Concat(mod.BgmDbRootEntries.Select(b => new PlaylistSong(b.UiBgmId, b.Title.GetValueOrDefault("en_us", b.UiBgmId),
+                    SeriesName(seriesByGame.GetValueOrDefault(b.UiGameTitleId ?? "")), true)))
+                .GroupBy(s => s.BgmId).Select(g => g.Last())
+                .ToList();
+
+            // Legacy series.toml playlists: series-playlist and wildcard blocks become series flags when migrated.
+            var legacy = LegacyPlaylists(resolvedModPath);
+            var seriesFlags = PlaylistsToml.Read(resolvedModPath).Playlists.SelectMany(p => p.Series.Select(series => (PlaylistId: p.Id, SeriesId: series)))
+                .Concat(legacy.Where(l => l.WholeSeries).Select(l => (l.PlaylistId, l.SeriesId)))
+                .Distinct()
+                .ToLookup(f => f.PlaylistId, f => new SeriesRef(f.SeriesId, SeriesName(MusicConstants.InternalIds.SERIES_ID_PREFIX + f.SeriesId)));
+
+            var vanillaIds = catalog.Playlists.Select(p => p.Id).ToHashSet();
+            var managed = playlists.Values
+                .Where(p => !PlaylistHelper.IsGameTitlePlaylist(p.Id))
+                .Select(p =>
                 {
-                    var matched = block.Songs == null
-                        ? s.Tracks
-                        : block.Songs.Select(name => trackByStem.GetValueOrDefault(Stem(name))).Where(t => t != null).ToList();
-                    if (!assignmentsByPlaylist.TryGetValue(block.Id, out var perPlaylist))
-                        assignmentsByPlaylist[block.Id] = perPlaylist = new Dictionary<(string, string), PlaylistSongAssignment>();
-                    foreach (var t in matched)
-                        perPlaylist[(s.SeriesId, t.Filename)] = new PlaylistSongAssignment(s.SeriesId, s.SeriesName, t.Filename, t.Title, block.Incidence);
-                }
-            }
+                    var series = seriesFlags[p.Id].ToList();
+                    var kind = vanillaIds.Contains(p.Id) ? "vanilla" : series.Count > 0 ? "series" : "custom";
+                    var name = CliUtil.FirstNonEmpty(DisplayNames.Playlists.GetValueOrDefault(p.Id), p.Title, p.Id);
+                    var defaultTracks = kind != "custom" && defaults.TryGetValue(p.Id, out var d) && TrackKey(d) != TrackKey(p) ? Tracks(d, autoAdded) : null;
+                    return new ManagedPlaylist(p.Id, name, kind, series, Tracks(p, autoAdded), defaultTracks);
+                })
+                .OrderBy(p => p.Kind == "custom" ? 0 : p.Kind == "series" ? 1 : 2)
+                .ThenBy(p => p.Name, StringComparer.InvariantCultureIgnoreCase)
+                .ToList();
 
-            // Targets = existing game playlists, then any other playlist ids the mod references.
-            var playlistIds = DisplayNames.Playlists.Keys.ToList();
-            playlistIds.AddRange(assignmentsByPlaylist.Keys.Where(id => !DisplayNames.Playlists.ContainsKey(id)));
+            var vanillaStages = catalog.Stages.ToDictionary(s => s.UiStageId);
+            var managedStages = stages
+                .Select(s =>
+                {
+                    var name = DisplayNames.Stages.GetValueOrDefault(s.UiStageId, s.UiStageId);
+                    var vanilla = vanillaStages[s.UiStageId];
+                    return new ManagedStage(s.UiStageId, name, name.StartsWith("(H)"), SeriesName(s.UiSeriesId),
+                        vanilla.BgmSetId ?? "", vanilla.BgmSettingNo, s.BgmSetId ?? "", s.BgmSettingNo);
+                })
+                .Where(s => s.VanillaPlaylistId.Length > 0)
+                .OrderBy(s => s.Hidden)
+                .ThenBy(s => s.Name, StringComparer.InvariantCulture)
+                .ToList();
 
-            var playlists = playlistIds.Select(id =>
-            {
-                var assignments = assignmentsByPlaylist.TryGetValue(id, out var byKey) ? byKey.Values.ToList() : new List<PlaylistSongAssignment>();
-                return new PlaylistTarget(id, DisplayNames.Playlists.GetValueOrDefault(id, id), assignments.Count, assignments);
-            }).ToList();
-
-            return new ManagePlaylistsData(Path.GetFileName(resolvedModPath), resolvedModPath, playlists, songs);
+            return new ManagePlaylistsData(Path.GetFileName(resolvedModPath), resolvedModPath, managed, managedStages, songs, legacy.Count > 0);
         }
 
         /// <summary>
-        /// Rewrites every series' [[playlists]] blocks from the assignments (series left without
-        /// any lose theirs). One block per playlist + incidence, so songs can differ in incidence.
+        /// Writes the given playlists and stage playlists to playlists.toml and drops the legacy series.toml playlists
+        /// (series-playlist and [[playlists]] blocks), which the saved playlists now hold.
         /// </summary>
-        public ManagePlaylistsData Save(string modPath, List<PlaylistAssignmentInput> assignments)
+        public ManagePlaylistsData Save(string modPath, List<ManagedPlaylist> playlists, List<StageAssignmentInput> stages)
         {
             var resolvedModPath = ModPaths.ResolveUnderMods(_musicConfig, modPath);
-            var series = ScanModSeries(resolvedModPath);
-            var bySeries = (assignments ?? new List<PlaylistAssignmentInput>())
-                .GroupBy(a => a.SeriesId)
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            foreach (var s in series)
+            PlaylistsToml.Write(resolvedModPath, new FolderPlaylistsFileConfig
             {
-                var blocks = bySeries.GetValueOrDefault(s.SeriesId, new List<PlaylistAssignmentInput>())
-                    .Select(a => (a.PlaylistId, a.Filename, Incidence: (int)Math.Clamp(Math.Truncate(a.Incidence), 0, 65535)))
-                    .GroupBy(a => (a.PlaylistId, a.Incidence))
-                    .OrderBy(g => g.Key.PlaylistId, StringComparer.InvariantCulture)
-                    .ThenBy(g => g.Key.Incidence)
-                    .Select(g => PlaylistBlock(g.Key.PlaylistId, g.Key.Incidence, g.Select(a => a.Filename).Distinct().ToList()))
-                    .ToList();
-
-                var tomlPath = Path.Combine(s.Dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
-                SeriesToml.WriteLines(tomlPath, SeriesToml.RewriteArrayTables(SeriesToml.ReadLines(tomlPath), "playlists", blocks));
+                Playlists = (playlists ?? new()).Select(ToConfig).ToList(),
+                Stages = (stages ?? new()).Select(s => new FolderStageConfig { Id = s.Id, Playlist = s.PlaylistId, Order = s.Order }).ToList()
+            });
+            foreach (var path in SeriesTomlPaths(resolvedModPath))
+            {
+                var lines = SeriesToml.RewriteArrayTables(SeriesToml.ReadLines(path), PlaylistsTable, new List<List<string>>());
+                SeriesToml.WriteLines(path, SeriesToml.UpsertTable(lines, "series", new[] { new SeriesToml.Entry(PlaylistsToml.LegacySeriesPlaylistKey, null) }, createIfMissing: false));
             }
-
             return Load(resolvedModPath);
         }
 
-        private static List<string> PlaylistBlock(string id, int incidence, List<string> filenames)
+        /// <summary>Game playlists keep their game name, so only other playlists save one.</summary>
+        private static FolderPlaylistConfig ToConfig(ManagedPlaylist playlist) => new()
         {
-            var block = new List<string> { "[[playlists]]", $"id = \"{SeriesToml.Escape(id)}\"", $"incidence = {incidence}" };
-            if (filenames.Count == 1)
-            {
-                block.Add($"songs = [\"{SeriesToml.Escape(filenames[0])}\"]");
-            }
-            else
-            {
-                block.Add("songs = [");
-                block.AddRange(filenames.Select(f => $"    \"{SeriesToml.Escape(f)}\","));
-                block.Add("]");
-            }
-            return block;
-        }
+            Id = playlist.Id,
+            Name = playlist.Kind == "vanilla" ? null : playlist.Name,
+            Series = playlist.Series?.Select(s => s.Id).ToList() ?? new(),
+            Tracks = playlist.Tracks?.Select(t => new FolderPlaylistTrackConfig { Song = t.BgmId, Order = t.Orders, Incidence = t.Incidences }).ToList()
+        };
 
-        private record Track(string Filename, string Title);
-        private record PlaylistBlockConfig(string Id, int Incidence, List<string> Songs);
-        private record ModSeries(string Dir, string SeriesId, string SeriesName, List<Track> Tracks, List<PlaylistBlockConfig> Blocks);
+        private static List<LegacyPlaylist> LegacyPlaylists(string modPath) =>
+            SeriesTomlPaths(modPath)
+                .SelectMany(path =>
+                {
+                    var text = File.ReadAllText(path);
+                    var seriesId = SeriesToml.ReadHeader(text).Id;
+                    return SeriesToml.TableArrayBlocks(text, PlaylistsTable)
+                        .Select(block => new LegacyPlaylist(SeriesToml.NonEmptyString(block, "id"), seriesId,
+                            !Regex.IsMatch(block, @"^\s*songs\s*=\s*\[", RegexOptions.Multiline)))
+                        .Append(new LegacyPlaylist(SeriesToml.NonEmptyString(SeriesToml.TableSection(text, "series") ?? text, PlaylistsToml.LegacySeriesPlaylistKey), seriesId, true));
+                })
+                .Where(l => l.PlaylistId != null && l.SeriesId != null)
+                .ToList();
 
-        private static List<ModSeries> ScanModSeries(string modPath)
+        private static List<PlaylistTrack> Tracks(PlaylistEntry playlist, HashSet<(string, string)> autoAdded) =>
+            playlist.Tracks.Select(t => new PlaylistTrack(t.UiBgmId, PlaylistHelper.Orders(t), PlaylistHelper.Incidences(t), autoAdded.Contains((playlist.Id, t.UiBgmId)))).ToList();
+
+        private static string TrackKey(PlaylistEntry playlist) =>
+            string.Join(";", playlist.Tracks.Select(t => $"{t.UiBgmId}:{string.Join(",", PlaylistHelper.Orders(t))}:{string.Join(",", PlaylistHelper.Incidences(t))}"));
+
+        private static IEnumerable<string> SeriesTomlPaths(string modPath) =>
+            ModPaths.VisibleDirs(modPath)
+                .Select(dir => Path.Combine(dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE))
+                .Where(File.Exists);
+
+        private static StageEntry Copy(StageEntry stage) => new()
         {
-            var results = new List<ModSeries>();
-            if (!Directory.Exists(modPath)) return results;
-
-            foreach (var dir in Directory.GetDirectories(modPath))
-            {
-                var name = Path.GetFileName(dir);
-                if (name.StartsWith(".") || name == CliUtil.ValidateFolder) continue;
-                var tomlPath = Path.Combine(dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE);
-                var csvPath = Path.Combine(dir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE);
-                if (!File.Exists(tomlPath) || !File.Exists(csvPath)) continue;
-
-                var text = File.ReadAllText(tomlPath);
-                var header = SeriesToml.ReadHeader(text);
-                if (header.Id == null) continue;
-
-                var tracks = TracksCsv.ReadLenient(csvPath)
-                    .Where(r => r.Get("filename").Length > 0 && !FolderMusicMod.IsVanillaBgmId(r.Get("filename")))
-                    .Select(r => new Track(r.Get("filename"),
-                        r.Get("title").Length > 0 ? r.Get("title") : Path.GetFileNameWithoutExtension(r.Get("filename"))))
-                    .ToList();
-
-                results.Add(new ModSeries(dir, header.Id, header.Name ?? header.Id, tracks, ParsePlaylistBlocks(text)));
-            }
-            return results;
-        }
-
-        private static List<PlaylistBlockConfig> ParsePlaylistBlocks(string text)
-        {
-            var blocks = new List<PlaylistBlockConfig>();
-            foreach (var block in SeriesToml.TableArrayBlocks(text, "playlists"))
-            {
-                var id = SeriesToml.NonEmptyString(block, "id");
-                if (id == null) continue;
-                var incidence = Regex.Match(block, @"^\s*incidence\s*=\s*(\d+)", RegexOptions.Multiline);
-                var songs = Regex.Match(block, @"songs\s*=\s*(""\*""|'\*'|\[[\s\S]*?\])");
-                List<string> songList = null;
-                if (songs.Success && songs.Groups[1].Value.StartsWith("["))
-                    songList = Regex.Matches(songs.Groups[1].Value, @"""([^""]*)""").Select(m => m.Groups[1].Value).ToList();
-                blocks.Add(new PlaylistBlockConfig(id,
-                    incidence.Success ? int.Parse(incidence.Groups[1].Value, CultureInfo.InvariantCulture) : 100, songList));
-            }
-            return blocks;
-        }
-
-        private static string Stem(string filename) => Path.GetFileNameWithoutExtension(filename).ToLowerInvariant();
+            UiStageId = stage.UiStageId,
+            UiSeriesId = stage.UiSeriesId,
+            BgmSetId = stage.BgmSetId,
+            BgmSettingNo = stage.BgmSettingNo
+        };
     }
 }

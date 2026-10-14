@@ -6,6 +6,7 @@ using Sma5h.Data.Ui.Param.Database;
 using Sma5h.Data.Ui.Param.Database.PrcUiBgmDatabaseModels;
 using Sma5h.Interfaces;
 using Sma5h.Mods.Music.Helpers;
+using Sma5h.Mods.Music.Models;
 using Sma5h.Mods.Music.Services;
 using Sma5h.ResourceProviders;
 using Sma5h.ResourceProviders.Constants;
@@ -14,8 +15,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection;
-using UMB.CLI.Desktop;
 
 namespace UMB.CLI.Services
 {
@@ -35,8 +34,6 @@ namespace UMB.CLI.Services
         private const string Locale = "us_en";
 
         private static readonly ConcurrentDictionary<string, Lazy<Catalog>> Cache = new();
-        private static readonly PropertyInfo[] PlaylistOrder = PlaylistProperties("Order");
-        private static readonly PropertyInfo[] PlaylistIncidence = PlaylistProperties("Incidence");
 
         private readonly IOptionsMonitor<Sma5hOptions> _config;
         private readonly IServiceProvider _services;
@@ -55,12 +52,6 @@ namespace UMB.CLI.Services
             return Cache.GetOrAdd(gamePath, path => new Lazy<Catalog>(() => Load(path))).Value;
         }
 
-        public PlaylistInfoData GetPlaylistInfo()
-        {
-            var catalog = Get() ?? throw new DesktopApiException("Game resources not found in Resources/Game.");
-            return catalog.PlaylistInfo;
-        }
-
         public class Catalog
         {
             public Dictionary<string, string> BgmTitles { get; init; }
@@ -69,7 +60,9 @@ namespace UMB.CLI.Services
             public List<Series> Series { get; init; }
             /// <summary>Songs in sound test order, then the hidden ones (TestDispOrder &lt; 0).</summary>
             public List<Song> Songs { get; init; }
-            public PlaylistInfoData PlaylistInfo { get; init; }
+            /// <summary>The game's playlists and stages; copy them before changing them.</summary>
+            public List<PlaylistEntry> Playlists { get; init; }
+            public List<StageEntry> Stages { get; init; }
         }
 
         private Catalog Load(string gamePath)
@@ -148,68 +141,25 @@ namespace UMB.CLI.Services
                     playlistBySeries.GetValueOrDefault(s.UiSeriesId, "")))
                 .ToList();
 
+            var playlists = bgmDb.PlaylistEntries.Select(p =>
+            {
+                var playlist = new PlaylistEntry(p.Id);
+                playlist.Tracks.AddRange(p.Values.Select(MusicMapper.ToEntry));
+                return playlist;
+            }).ToList();
+            var stages = stageDb.DbRootEntries.Values.Select(MusicMapper.ToEntry).ToList();
+
             return new Catalog
             {
                 BgmTitles = bgmTitles,
                 GameTitles = gameTitles,
                 Series = series,
                 Songs = songs,
-                PlaylistInfo = BuildPlaylistInfo(bgmDb, stageDb, bgmTitles)
+                Playlists = playlists,
+                Stages = stages
             };
         }
 
-        private static PlaylistInfoData BuildPlaylistInfo(PrcUiBgmDatabase bgmDb, PrcUiStageDatabase stageDb, Dictionary<string, string> bgmTitles)
-        {
-            var tracksByPlaylist = bgmDb.PlaylistEntries.ToDictionary(p => p.Id, p => p.Values);
-            var stages = stageDb.DbRootEntries.Values.ToList();
-
-            // playlist → series of the stages that use it
-            var seriesByPlaylist = stages
-                .Where(s => !string.IsNullOrEmpty(s.BgmSetId))
-                .GroupBy(s => s.BgmSetId)
-                .ToDictionary(g => g.Key, g => g.Select(s => s.UiSeriesId).Where(id => !string.IsNullOrEmpty(id)).ToHashSet());
-
-            var playlists = tracksByPlaylist
-                .Select(p => new PlaylistInfo(
-                    p.Key,
-                    DisplayNames.Playlists.GetValueOrDefault(p.Key, p.Key),
-                    seriesByPlaylist.GetValueOrDefault(p.Key, new HashSet<string>())
-                        .Select(id => DisplayNames.Series.GetValueOrDefault(id, id))
-                        .Where(name => name.Length > 0 && name != "None")
-                        .OrderBy(name => name, StringComparer.InvariantCulture)
-                        .ToList(),
-                    p.Value.Count))
-                .OrderBy(p => p.Name, StringComparer.InvariantCulture)
-                .ToList();
-
-            var stageInfos = stages
-                .Select(stage =>
-                {
-                    var name = DisplayNames.Stages.GetValueOrDefault(stage.UiStageId, stage.UiStageId);
-                    var playlistId = stage.BgmSetId ?? "";
-                    var order = stage.BgmSettingNo;
-                    var songs = tracksByPlaylist.GetValueOrDefault(playlistId, new List<PrcBgmPlaylistEntry>())
-                        .Where(track => order < PlaylistIncidence.Length && Convert.ToInt32(PlaylistIncidence[order].GetValue(track)) > 0)
-                        .Select(track => new StageSong(
-                            Convert.ToInt32(PlaylistOrder[order].GetValue(track)),
-                            track.UiBgmId,
-                            bgmTitles.GetValueOrDefault(track.UiBgmId, track.UiBgmId)))
-                        .OrderBy(s => s.Order)
-                        .ToList();
-                    return new StageInfo(stage.UiStageId, name, name.StartsWith("(H)"), stage.UiSeriesId ?? "",
-                        DisplayNames.Series.GetValueOrDefault(stage.UiSeriesId ?? "", stage.UiSeriesId ?? ""),
-                        playlistId, DisplayNames.Playlists.GetValueOrDefault(playlistId, playlistId), order, songs);
-                })
-                .OrderBy(s => s.Hidden)
-                .ThenBy(s => s.Name, StringComparer.InvariantCulture)
-                .ToList();
-
-            return new PlaylistInfoData(playlists, stageInfos);
-        }
-
         private static string WithoutPrefix(string id, string prefix) => id.StartsWith(prefix) ? id[prefix.Length..] : id;
-
-        private static PropertyInfo[] PlaylistProperties(string prefix) =>
-            Enumerable.Range(0, 16).Select(i => typeof(PrcBgmPlaylistEntry).GetProperty(prefix + i)).ToArray();
     }
 }

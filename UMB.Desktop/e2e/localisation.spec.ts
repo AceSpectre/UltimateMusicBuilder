@@ -37,8 +37,7 @@ test('sidebar labels match locale strings', async () => {
     'Build & Setup',
     'Nus3 Convert', 'Config Volume',
     'Manage Series', 'Manage Songs',
-    'Merge', 'Extract Icons',
-    'Playlist Info'
+    'Merge', 'Extract Icons'
   ]
 
   const sidebar = page.getByRole('navigation')

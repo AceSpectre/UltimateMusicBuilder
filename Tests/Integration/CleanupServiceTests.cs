@@ -16,11 +16,42 @@ namespace Tests.Integration
 
         public void Dispose() => _env.Dispose();
 
-        private CleanupService CreateService()
+        private CleanupService CreateService(VanillaCatalogService.Catalog catalog = null)
         {
             return new CleanupService(
                 _env.CreateMusicOptions(),
+                TestCatalog.Service(catalog ?? TestCatalog.Mario()),
                 TestEnvironment.CreateLogger<CleanupService>());
+        }
+
+        private const string KartsSong = "ui_bgm_flowerhead___somewhat_good__karts___01_karts";
+
+        private static string TomlWithSongs(params string[] songs) =>
+            "[[playlists]]\nid = \"bgmmine\"\ntracks = [\n" +
+            string.Concat(songs.Select(s => $"    {{ song = \"{s}\", order = 0, incidence = 100 }},\n")) + "]\n";
+
+        [Fact]
+        public void Cleanup_RemovesStalePlaylistsTomlSongs_KeepingVanillaAndModSongs()
+        {
+            var modDir = _env.CreateConfiguredMod();
+            var path = Path.Combine(modDir, "playlists.toml");
+            File.WriteAllText(path, TomlWithSongs("ui_bgm_a01_smb_chijyou", KartsSong, "ui_bgm_gone"));
+
+            CreateService().Run();
+
+            Assert.Equal(TomlWithSongs("ui_bgm_a01_smb_chijyou", KartsSong), File.ReadAllText(path));
+        }
+
+        [Fact]
+        public void Cleanup_LeavesPlaylistsTomlWithoutGameResources()
+        {
+            var modDir = _env.CreateConfiguredMod();
+            var path = Path.Combine(modDir, "playlists.toml");
+            File.WriteAllText(path, TomlWithSongs("ui_bgm_gone"));
+
+            new CleanupService(_env.CreateMusicOptions(), TestCatalog.Service(), TestEnvironment.CreateLogger<CleanupService>()).Run();
+
+            Assert.Contains("ui_bgm_gone", File.ReadAllText(path));
         }
 
         [Fact]

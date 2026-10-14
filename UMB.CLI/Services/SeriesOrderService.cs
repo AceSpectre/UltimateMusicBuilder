@@ -126,7 +126,11 @@ namespace UMB.CLI.Services
                 .Select((s, index) => new SeriesOrderItem($"series:{index}", s.Name, s.Id, s.Dir, s.VolumeDb, s.IconDataUrl, index, s.Fields, false, new List<string>(), ""))
                 .ToList();
             var hasSeriesOrder = SeriesToml.ReadIdList(SeriesOrderPath(resolvedModPath)).Count > 0;
-            return new SeriesOrderData(Path.GetFileName(resolvedModPath), resolvedModPath, hasSeriesOrder, items, VanillaItems(folders));
+            var vanillaItems = VanillaItems(folders);
+            var seriesPlaylists = PlaylistsToml.SeriesPlaylists(resolvedModPath);
+            foreach (var item in items.Concat(vanillaItems))
+                item.Fields.SeriesPlaylist = seriesPlaylists.GetValueOrDefault(item.SeriesId, item.Fields.SeriesPlaylist);
+            return new SeriesOrderData(Path.GetFileName(resolvedModPath), resolvedModPath, hasSeriesOrder, items, vanillaItems);
         }
 
         /// <summary>
@@ -168,7 +172,10 @@ namespace UMB.CLI.Services
             if (Directory.Exists(dir))
                 throw new DesktopApiException($"A folder named \"{seriesId}\" already exists in this mod.");
 
-            WriteNewSeries(dir, seriesId, VanillaFields(catalog, series), existingSeries: true);
+            var fields = VanillaFields(catalog, series);
+            WriteNewSeries(dir, seriesId, fields, existingSeries: true);
+            if (!PlaylistsToml.SeriesPlaylists(resolvedModPath).ContainsKey(seriesId))
+                SetSeriesPlaylist(resolvedModPath, seriesId, fields);
             VanillaTracks.Backfill(dir, catalog);
             _logger.LogInformation("Added vanilla series {SeriesId} to {ModPath}.", seriesId, resolvedModPath);
             return dir;
@@ -191,8 +198,9 @@ namespace UMB.CLI.Services
             var fieldsById = items.Where(i => i.Fields != null).ToDictionary(i => i.Id, i => i.Fields);
             foreach (var item in finalItems)
             {
-                if (fieldsById.TryGetValue(item.Id, out var fields))
-                    WriteSeriesTomlFields(Path.Combine(series[item.OriginalIndex].Dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
+                if (!fieldsById.TryGetValue(item.Id, out var fields)) continue;
+                WriteSeriesTomlFields(Path.Combine(series[item.OriginalIndex].Dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
+                SetSeriesPlaylist(resolvedModPath, item.SeriesId, fields);
             }
 
             // A vanilla series only gets a folder once its fields differ from the vanilla ones.
@@ -202,6 +210,7 @@ namespace UMB.CLI.Services
                     || (item.SeriesPath == "" && JsonSerializer.Serialize(fields) == JsonSerializer.Serialize(item.Fields))) continue;
                 var dir = item.SeriesPath == "" ? EnsureVanillaFolder(resolvedModPath, item.SeriesId) : item.SeriesPath;
                 WriteSeriesTomlFields(Path.Combine(dir, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_TOML_FILE), fields);
+                SetSeriesPlaylist(resolvedModPath, item.SeriesId, fields);
             }
 
             WriteSeriesOrder(resolvedModPath, finalItems.Select(i => i.SeriesId));
@@ -238,10 +247,9 @@ namespace UMB.CLI.Services
                 || _catalog.Get()?.Series.Any(s => s.Id == seriesId) == true)
                 throw new DesktopApiException("A series with that ID already exists.");
 
-            WriteNewSeries(seriesDir, seriesId, new SeriesFields
-            {
-                Name = name, SeriesPlaylist = (input.SeriesPlaylist ?? "").Trim(), Games = games
-            }, existingSeries: false);
+            var fields = new SeriesFields { Name = name, SeriesPlaylist = (input.SeriesPlaylist ?? "").Trim(), Games = games };
+            WriteNewSeries(seriesDir, seriesId, fields, existingSeries: false);
+            SetSeriesPlaylist(resolvedModPath, seriesId, fields);
             if (!string.IsNullOrEmpty(input.IconDataUrl))
                 WriteSeriesIcon(seriesDir, input.IconDataUrl);
 
@@ -252,7 +260,7 @@ namespace UMB.CLI.Services
         private static void WriteNewSeries(string seriesDir, string seriesId, SeriesFields fields, bool existingSeries)
         {
             var toml = new StringBuilder();
-            CliUtil.AppendSeriesHeader(toml, seriesId, fields.Name, existingSeries, fields.PlaylistIncidence, fields.SeriesPlaylist);
+            CliUtil.AppendSeriesHeader(toml, seriesId, fields.Name, existingSeries, fields.PlaylistIncidence);
             foreach (var game in fields.Games)
                 CliUtil.AppendGameBlock(toml, game.Id, game.Name);
             CliUtil.AppendDefaultTrackData(toml, fields.Games.FirstOrDefault()?.Id ?? "");
@@ -331,7 +339,7 @@ namespace UMB.CLI.Services
             var lines = SeriesToml.UpsertTable(SeriesToml.ReadLines(seriesTomlPath), "series", new[]
             {
                 new SeriesToml.Entry("name", $"name = \"{SeriesToml.Escape(fields.Name)}\""),
-                new SeriesToml.Entry("series-playlist", string.IsNullOrEmpty(fields.SeriesPlaylist) ? null : $"series-playlist = \"{SeriesToml.Escape(fields.SeriesPlaylist)}\""),
+                new SeriesToml.Entry(PlaylistsToml.LegacySeriesPlaylistKey, null),
                 new SeriesToml.Entry("playlist-incidence", $"playlist-incidence = {fields.PlaylistIncidence}")
             }, createIfMissing: false);
 
@@ -339,6 +347,11 @@ namespace UMB.CLI.Services
 
             SeriesToml.WriteLines(seriesTomlPath, lines);
         }
+
+        /// <summary>A series' playlist lives in playlists.toml, flagged with the series (see <see cref="PlaylistsToml.SetSeriesPlaylist"/>).</summary>
+        private void SetSeriesPlaylist(string modPath, string seriesId, SeriesFields fields) =>
+            PlaylistsToml.SetSeriesPlaylist(modPath, seriesId, fields.SeriesPlaylist, fields.Name,
+                _catalog.Get()?.Playlists.Select(p => p.Id).ToHashSet() ?? new HashSet<string>());
 
         private static string SeriesOrderPath(string modPath) =>
             Path.Combine(modPath, MusicConstants.MusicModFiles.FOLDER_MOD_SERIES_ORDER_TOML_FILE);

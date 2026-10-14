@@ -137,7 +137,8 @@ namespace Tests.Unit.Desktop
             Assert.Contains("id = \"my_series\"", toml);
             Assert.Contains("name = \"My Series\"", toml);
             Assert.Contains("playlist-incidence = 100", toml);
-            Assert.Contains("series-playlist = \"bgm_my_series\"", toml);
+            Assert.DoesNotContain("series-playlist", toml);
+            Assert.Contains("id = \"bgm_my_series\"\nname = \"My Series\"\nseries = [\"my_series\"]", File.ReadAllText(Path.Combine(_modPath, "playlists.toml")));
             Assert.Contains("[[games]]", toml);
             Assert.Contains("id = \"first_game\"", toml);
             Assert.Equal("filename,game,title,author,copyright,record_type,special_category,volume_db,info1,in_soundtest",
@@ -344,7 +345,8 @@ namespace Tests.Unit.Desktop
 
             var toml = SeriesToml("da");
             Assert.Contains("name = \"Renamed\"", toml);
-            Assert.Contains("series-playlist = \"bgmother\"", toml);
+            Assert.DoesNotContain("series-playlist", toml);
+            Assert.Contains("id = \"bgmother\"", File.ReadAllText(Path.Combine(_modPath, "playlists.toml")));
             Assert.Contains("playlist-incidence = 50", toml);
             Assert.Contains("id = \"a\"", toml);
             Assert.Contains("[[games]]", toml);
@@ -479,6 +481,60 @@ namespace Tests.Unit.Desktop
         {
             var error = Assert.Throws<DesktopApiException>(() => VanillaService().Create(_modPath, OneGame(i => i.SeriesId = "mario")));
             Assert.Contains("already exists", error.Message);
+        }
+
+        private const string SeriesAPlaylistsToml =
+            "[[playlists]]\nid = \"bgm_a\"\nname = \"A\"\nseries = [\"a\"]\ntracks = []\n\n[[stages]]\nid = \"ui_stage_x\"\nplaylist = \"bgm_a\"\norder = 0\n";
+
+        private string PlaylistsTomlText() => File.ReadAllText(Path.Combine(_modPath, "playlists.toml"));
+
+        [Fact]
+        public void Load_ReadsTheSeriesPlaylistFromPlaylistsToml()
+        {
+            WriteCustomSeries("a", RichToml);
+            File.WriteAllText(Path.Combine(_modPath, "playlists.toml"), SeriesAPlaylistsToml);
+
+            Assert.Equal("bgm_a", _service.Load(_modPath).Items.Single().Fields.SeriesPlaylist);
+        }
+
+        [Fact]
+        public void Save_RenamingASeriesPlaylist_RenamesItAndItsStagesInPlaylistsToml()
+        {
+            WriteCustomSeries("a", RichToml.Replace("series-playlist = \"bgmmario\"\n", ""));
+            File.WriteAllText(Path.Combine(_modPath, "playlists.toml"), SeriesAPlaylistsToml);
+
+            SaveEdited(f => f.SeriesPlaylist = "bgm_b");
+
+            Assert.Equal(SeriesAPlaylistsToml.Replace("bgm_a", "bgm_b"), PlaylistsTomlText());
+        }
+
+        [Fact]
+        public void Save_PointingASeriesAtAGamePlaylist_FlagsThatPlaylistInstead()
+        {
+            var service = new SeriesOrderService(_ws.MusicOptions(), TestCatalog.Service(TestCatalog.Mario()), TestEnvironment.CreateLogger<SeriesOrderService>());
+            WriteCustomSeries("a", RichToml.Replace("series-playlist = \"bgmmario\"\n", ""));
+            File.WriteAllText(Path.Combine(_modPath, "playlists.toml"), SeriesAPlaylistsToml);
+            var items = service.Load(_modPath).Items.Select(i =>
+            {
+                i.Fields.SeriesPlaylist = "bgmmario";
+                return new SaveSeriesItem(i.Id, i.Fields);
+            }).ToList();
+
+            service.Save(_modPath, items);
+
+            Assert.Equal(
+                "[[playlists]]\nid = \"bgm_a\"\nname = \"A\"\ntracks = []\n\n[[playlists]]\nid = \"bgmmario\"\nseries = [\"a\"]\n\n" +
+                "[[stages]]\nid = \"ui_stage_x\"\nplaylist = \"bgm_a\"\norder = 0\n", PlaylistsTomlText());
+        }
+
+        [Fact]
+        public void Save_RejectsAGameTitlePlaylist()
+        {
+            WriteCustomSeries("a", RichToml);
+
+            var error = Assert.Throws<DesktopApiException>(() => SaveEdited(f => f.SeriesPlaylist = "bgm_gametitle_a"));
+
+            Assert.Equal("bgm_gametitle_ playlists are reserved for the build.", error.Message);
         }
     }
 }

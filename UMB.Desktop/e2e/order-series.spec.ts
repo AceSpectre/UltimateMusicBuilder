@@ -111,7 +111,8 @@ test('createSeries writes a new series folder (series.toml + header-only tracks.
   const toml = readFileSync(join(modDir, 'ipc_series', 'series.toml'), 'utf8')
   expect(toml).toContain('id = "ipc_series"')
   expect(toml).toContain('name = "IPC Series"')
-  expect(toml).toContain('series-playlist = "bgm_ipc_series"')
+  expect(toml).not.toContain('series-playlist')
+  expect(readFileSync(join(modDir, 'playlists.toml'), 'utf8')).toContain('id = "bgm_ipc_series"')
   expect(toml).toContain('id = "ipc_game"')
   expect(toml).toContain('game = "ipc_game"')
 
@@ -140,7 +141,8 @@ test('UI: New Series modal creates a series (playlist auto-filled, one game requ
   const toml = readFileSync(join(modDir, 'ui_series', 'series.toml'), 'utf8')
   expect(toml).toContain('id = "ui_series"')
   expect(toml).toContain('name = "UI Series"')
-  expect(toml).toContain('series-playlist = "bgm_ui_series"')
+  expect(toml).not.toContain('series-playlist')
+  expect(readFileSync(join(modDir, 'playlists.toml'), 'utf8')).toContain('id = "bgm_ui_series"')
   expect(toml).toContain('id = "ui_game"')
   expect(toml).toContain('game = "ui_game"')
 

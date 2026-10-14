@@ -46,7 +46,7 @@ namespace Tests.Unit
             };
 
             var entry = Reflect.InvokeStatic<PlaylistEntry>(
-                typeof(FolderMusicMod), "BuildPlaylistEntry", "bgm_test", tracks);
+                typeof(FolderMusicMod), "BuildPlaylistEntry", "bgm_test", tracks, null);
 
             Assert.Equal("bgm_test", entry.Id);
             Assert.Equal(3, entry.Tracks.Count);

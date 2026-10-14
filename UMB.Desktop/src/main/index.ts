@@ -7,7 +7,7 @@ import { loadVolumeConfig, saveVolumeConfig, decodeTrackPreview } from './config
 import { getAppSettings, saveAppSettings, checkArcOutput } from './app-settings'
 import { IPC } from '../shared/ipc-channels'
 import type {
-  AppSettings, CreateSeriesInput, LoopAnalysisOptions, Nus3TrackDecision, PlaylistAssignmentInput,
+  AppSettings, CreateSeriesInput, LoopAnalysisOptions, Nus3TrackDecision, SavedPlaylist, StageAssignmentInput,
   SaveSeriesItem, SaveTrackItem, SongPresets, VolumeOverride
 } from '../shared/types'
 
@@ -210,12 +210,10 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC.EXECUTE_MERGE, (_event, modPaths: string[], outputName: string, priorityModPath: string | null) =>
     api('merge-execute', { modPaths, outputName, priorityModPath }))
 
-  ipcMain.handle(IPC.GET_PLAYLIST_INFO, () => api('playlist-info'))
-
   ipcMain.handle(IPC.LOAD_MANAGE_PLAYLISTS, (_event, modPath: string) => api('playlists-load', { modPath }))
 
-  ipcMain.handle(IPC.SAVE_MANAGE_PLAYLISTS, (_event, modPath: string, assignments: PlaylistAssignmentInput[]) =>
-    api('playlists-save', { modPath, assignments }))
+  ipcMain.handle(IPC.SAVE_MANAGE_PLAYLISTS, (_event, modPath: string, playlists: SavedPlaylist[], stages: StageAssignmentInput[]) =>
+    api('playlists-save', { modPath, playlists, stages }))
 
   ipcMain.handle(IPC.CHECK_ARC_OUTPUT, () => checkArcOutput(workspace))
 

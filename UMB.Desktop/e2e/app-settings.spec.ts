@@ -77,3 +77,18 @@ test('settings modal cancel discards the edit', async () => {
   expect(existsSync(settingsPath())).toBe(true)
   expect(readSettings().Sma5hMusic.GlobalVolumeDb).toBe(2.25)
 })
+
+test('settings modal saves the Smash Battle and album selection settings', async () => {
+  const page = await firstWindow(app)
+
+  await page.getByTitle('Settings').click()
+  const incidence = page.locator('#smash-battle-incidence')
+  await expect(incidence).toHaveValue('0')
+  await incidence.fill('40')
+  await page.getByRole('switch', { name: 'Album selection on all stages' }).click()
+  await page.getByRole('button', { name: 'Save' }).click()
+
+  await expect(incidence).toBeHidden({ timeout: 8000 })
+  const music = readSettings().Sma5hMusic
+  expect([music.AddModSongsToSmashBattle, music.SmashBattleIncidence, music.EnableAlbumSelectionOnAllStages]).toEqual([true, 40, false])
+})

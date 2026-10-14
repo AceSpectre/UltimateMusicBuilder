@@ -18,11 +18,12 @@ fi
 
 work="$(mktemp -d -t umb-vgmstream.XXXXXX)"
 trap 'rm -rf "$work"' EXIT
-curl -fL --retry 3 "https://github.com/vgmstream/vgmstream/archive/refs/tags/$tag.tar.gz" -o "$work/vgmstream.tar.gz"
-curl -fL --retry 3 "https://ffmpeg.org/releases/ffmpeg-$ffmpeg_version.tar.xz" -o "$work/ffmpeg.tar.xz"
+curl -fL --retry 3 --retry-all-errors "https://github.com/vgmstream/vgmstream/archive/refs/tags/$tag.tar.gz" -o "$work/vgmstream.tar.gz"
+curl -fL --retry 3 --retry-all-errors "https://github.com/FFmpeg/FFmpeg/archive/refs/tags/n$ffmpeg_version.tar.gz" -o "$work/ffmpeg.tar.gz"
 tar -xf "$work/vgmstream.tar.gz" -C "$work"
-tar -xf "$work/ffmpeg.tar.xz" -C "$work"
+tar -xf "$work/ffmpeg.tar.gz" -C "$work"
 source_dir="$work/vgmstream-$tag"
+ffmpeg_dir="$work/FFmpeg-n$ffmpeg_version"
 
 # Adapt the pinned recipe for Apple's linker and static codec libraries.
 python3 - "$source_dir" <<'PY'
@@ -59,7 +60,7 @@ PY
 cmake -S "$source_dir" -B "$work/build" \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
     -DBUILD_CLI=ON -DBUILD_V123=OFF -DBUILD_AUDACIOUS=OFF \
-    -DVGMSTREAM_VERSION="$tag" -DFFMPEG_PATH="$work/ffmpeg-$ffmpeg_version" \
+    -DVGMSTREAM_VERSION="$tag" -DFFMPEG_PATH="$ffmpeg_dir" \
     -DCMAKE_PREFIX_PATH="$(brew --prefix)" \
     -DMPG123_LIBRARIES="$(brew --prefix mpg123)/lib/libmpg123.a" \
     -DVORBISFILE_LIBRARY="$(brew --prefix libvorbis)/lib/libvorbisfile.a" \
@@ -89,5 +90,5 @@ cp "$binary" "$target"
 chmod +x "$target"
 # Retain redistribution notices alongside the bundled executable.
 cp "$source_dir/COPYING" "$(dirname "$target")/COPYING-vgmstream"
-cp "$work/ffmpeg-$ffmpeg_version/COPYING.GPLv2" "$(dirname "$target")/COPYING-FFmpeg-GPLv2"
+cp "$ffmpeg_dir/COPYING.GPLv2" "$(dirname "$target")/COPYING-FFmpeg-GPLv2"
 echo "Built $target ($tag, FFmpeg $ffmpeg_version; static codecs)."

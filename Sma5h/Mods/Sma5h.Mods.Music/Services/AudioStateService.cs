@@ -335,29 +335,13 @@ namespace Sma5h.Mods.Music.Services
 
         public bool AddPlaylistEntry(PlaylistEntry playlistEntry)
         {
-            if (!_playlistsEntries.ContainsKey(playlistEntry.Id))
-            {
-                _playlistsEntries.Add(playlistEntry.Id, playlistEntry);
-                _logger.LogInformation("Registered playlist {PlaylistId} with {TrackCount} track(s).", playlistEntry.Id, playlistEntry.Tracks.Count);
-            }
+            var isNew = !_playlistsEntries.ContainsKey(playlistEntry.Id);
+            var added = PlaylistHelper.Merge(_playlistsEntries, playlistEntry);
+            if (isNew)
+                _logger.LogInformation("Registered playlist {PlaylistId} with {TrackCount} track(s).", playlistEntry.Id, added);
             else
-            {
-                // Merge new tracks into the existing playlist (for existing series like Final Fantasy, Persona, etc.)
-                var existing = _playlistsEntries[playlistEntry.Id];
-                var existingIds = existing.Tracks.Select(t => t.UiBgmId).ToHashSet();
-                int added = 0;
-                foreach (var track in playlistEntry.Tracks)
-                {
-                    if (!existingIds.Contains(track.UiBgmId))
-                    {
-                        existing.Tracks.Add(track);
-                        added++;
-                    }
-                }
                 _logger.LogInformation("Merged {AddedCount} new track(s) into existing playlist {PlaylistId} ({SkippedCount} duplicate(s) skipped).",
                     added, playlistEntry.Id, playlistEntry.Tracks.Count - added);
-            }
-
             return true;
         }
         #endregion

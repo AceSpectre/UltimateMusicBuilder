@@ -12,8 +12,8 @@
     countText,
     emptyText
   }: {
-    /** badge: optional count shown as a pill when above zero. */
-    items: { id: string; label: string; badge?: number }[]
+    /** badge: optional count shown as a pill when above zero; hint: optional muted tag. */
+    items: { id: string; label: string; badge?: number; hint?: string }[]
     activeId: string | null
     onSelect: (id: string) => void
     search?: string
@@ -39,6 +39,9 @@
           class="mb-px flex h-7 w-full items-center gap-2 rounded px-2.5 text-left text-[13px] transition-colors duration-100 {isActive ? 'bg-accbg font-medium text-accink' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}"
         >
           <span class="min-w-0 flex-1 truncate">{item.label}</span>
+          {#if item.hint}
+            <span class="shrink-0 text-[10.5px] font-normal text-muted-foreground">{item.hint}</span>
+          {/if}
           {#if item.badge}
             <span class="chip h-[18px] shrink-0 px-1.5 text-[10.5px] tabular-nums">{item.badge}</span>
           {/if}

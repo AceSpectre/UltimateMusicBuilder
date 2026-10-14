@@ -7,8 +7,22 @@ export type { AppSettings } from '../shared/types'
 
 const DEFAULTS: AppSettings = {
   globalVolumeDb: 0,
-  applyVolumeToVanilla: false
+  applyVolumeToVanilla: false,
+  addModSongsToSmashBattle: true,
+  smashBattleIncidence: 0,
+  albumSelectionOnAllStages: true
 }
+
+// AppSettings field -> appsettings.json Sma5hMusic key.
+const KEYS: Record<keyof AppSettings, string> = {
+  globalVolumeDb: 'GlobalVolumeDb',
+  applyVolumeToVanilla: 'ApplyVolumeToVanilla',
+  addModSongsToSmashBattle: 'AddModSongsToSmashBattle',
+  smashBattleIncidence: 'SmashBattleIncidence',
+  albumSelectionOnAllStages: 'EnableAlbumSelectionOnAllStages'
+}
+
+const FIELDS = Object.keys(KEYS) as (keyof AppSettings)[]
 
 // The CLI loads appsettings.json from its own directory (AppContext.BaseDirectory):
 // the bundled cli/ folder when packaged, or the dev bin/ when running via `dotnet run`.
@@ -28,11 +42,8 @@ function readJson(path: string): unknown {
 export function getAppSettings(workspace: string): AppSettings {
   try {
     const raw = readJson(settingsPath(workspace)) as Record<string, unknown>
-    const music = raw?.Sma5hMusic as Record<string, unknown> | undefined
-    return {
-      globalVolumeDb: (music?.GlobalVolumeDb as number) ?? DEFAULTS.globalVolumeDb,
-      applyVolumeToVanilla: (music?.ApplyVolumeToVanilla as boolean) ?? DEFAULTS.applyVolumeToVanilla
-    }
+    const music = (raw?.Sma5hMusic ?? {}) as Record<string, unknown>
+    return Object.fromEntries(FIELDS.map((f) => [f, music[KEYS[f]] ?? DEFAULTS[f]])) as unknown as AppSettings
   } catch {
     return { ...DEFAULTS }
   }
@@ -53,7 +64,6 @@ export function saveAppSettings(workspace: string, settings: AppSettings): void 
   const path = settingsPath(workspace)
   const raw = readJson(path) as Record<string, Record<string, unknown>>
   raw.Sma5hMusic ??= {}
-  raw.Sma5hMusic.GlobalVolumeDb = settings.globalVolumeDb
-  raw.Sma5hMusic.ApplyVolumeToVanilla = settings.applyVolumeToVanilla
+  for (const f of FIELDS) raw.Sma5hMusic[KEYS[f]] = settings[f]
   writeFileSync(path, JSON.stringify(raw, null, 2), 'utf-8')
 }

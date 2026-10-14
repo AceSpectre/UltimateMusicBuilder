@@ -190,6 +190,7 @@ namespace UMB.CLI.Services
             }
 
             MergeSeriesOrder(analysis.ModPaths, priority, outputDir);
+            MergePlaylists(analysis.ModPaths, priority, outputDir);
 
             _logger.LogInformation("Merge complete: {SeriesCount} series, {TrackCount} tracks", analysis.TotalSeries, totalTracks);
             return new MergeResult(outputDir, outputName.Trim(), analysis.TotalSeries, totalTracks, conflictsResolved);
@@ -361,6 +362,29 @@ namespace UMB.CLI.Services
 
             SeriesOrderService.WriteSeriesOrder(outputDir, mergedOrder);
             _logger.LogInformation("Merged series-order.toml with {Count} series.", mergedOrder.Count);
+        }
+
+        /// <summary>Combines the mods' playlists.toml playlists and stages by id, priority mod first.</summary>
+        private static void MergePlaylists(List<string> modPaths, string priorityModPath, string outputDir)
+        {
+            var texts = modPaths.OrderByDescending(d => d == priorityModPath)
+                .Select(d => Path.Combine(d, MusicConstants.MusicModFiles.FOLDER_MOD_PLAYLISTS_TOML_FILE))
+                .Where(File.Exists)
+                .Select(File.ReadAllText)
+                .ToList();
+            var lines = new List<string>();
+            foreach (var table in new[] { "playlists", "stages" })
+            {
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var block in texts.SelectMany(text => SeriesToml.TableArrayBlocks(text, table)).Where(b => seen.Add(SeriesToml.String(b, "id"))))
+                {
+                    lines.Add($"[[{table}]]");
+                    lines.AddRange(SeriesToml.SplitLines(block.Trim()));
+                    lines.Add("");
+                }
+            }
+            if (lines.Count > 0)
+                SeriesToml.WriteLines(Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_PLAYLISTS_TOML_FILE), lines);
         }
     }
 }

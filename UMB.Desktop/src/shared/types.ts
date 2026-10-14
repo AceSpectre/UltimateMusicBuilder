@@ -262,6 +262,11 @@ export interface AppSettings {
   globalVolumeDb: number
   /** Experimental: apply the global and series dB boosts to vanilla songs. */
   applyVolumeToVanilla: boolean
+  /** Every mod song joins the Smash Battle playlist (bgmsmashbtl), at smashBattleIncidence. */
+  addModSongsToSmashBattle: boolean
+  smashBattleIncidence: number
+  /** Album selection (My Music) on every stage. */
+  albumSelectionOnAllStages: boolean
 }
 
 export interface MergeSeriesSource {
@@ -291,73 +296,69 @@ export interface MergeResult {
   conflictsResolved: number
 }
 
-export interface PlaylistInfo {
+// A song that can go in a playlist (vanilla or from the mod).
+export interface PlaylistSong {
+  bgmId: string
+  title: string
+  seriesName: string
+  isMod: boolean
+}
+
+// A playlist song's order and incidence per stage order slot (0-15); order -1 leaves it out of that slot.
+// autoAdded: a mod song the build always adds to this playlist, so it can only be left out of orders.
+export interface PlaylistTrack {
+  bgmId: string
+  orders: number[]
+  incidences: number[]
+  autoAdded?: boolean
+}
+
+export type PlaylistKind = 'vanilla' | 'series' | 'custom'
+
+export interface SeriesRef {
   id: string
   name: string
-  series: string[]
-  songCount: number
 }
 
-export interface StageSong {
-  order: number
-  bgmId: string
+// series: the series playlists.toml flags this playlist with; it always holds all their songs.
+// defaultTracks: a changed game or series playlist's tracks without playlists.toml, else null.
+export interface ManagedPlaylist {
+  id: string
   name: string
+  kind: PlaylistKind
+  series: SeriesRef[]
+  tracks: PlaylistTrack[]
+  defaultTracks: PlaylistTrack[] | null
 }
 
-export interface StageInfo {
-  uiStageId: string
+// A playlist to save; null tracks keeps only its name and series flag (the build fills in the rest).
+export type SavedPlaylist = Omit<ManagedPlaylist, 'tracks'> & { tracks: PlaylistTrack[] | null }
+
+export interface ManagedStage {
+  id: string
   name: string
   hidden: boolean
-  seriesId: string
   seriesName: string
+  vanillaPlaylistId: string
+  vanillaOrder: number
   playlistId: string
-  playlistName: string
   order: number
-  songs: StageSong[]
-}
-
-export interface PlaylistInfoData {
-  playlists: PlaylistInfo[]
-  stages: StageInfo[]
-}
-
-// One mod song assigned to a playlist, with its per-song incidence (random-roll weight).
-export interface PlaylistSongAssignment {
-  seriesId: string
-  seriesName: string
-  filename: string
-  title: string
-  incidence: number
-}
-
-export interface PlaylistTarget {
-  id: string
-  name: string
-  assignedCount: number
-  assignments: PlaylistSongAssignment[]
-}
-
-// A mod track available to assign (the pool shown in the "add song" picker).
-export interface ModSong {
-  seriesId: string
-  seriesName: string
-  filename: string
-  title: string
 }
 
 export interface ManagePlaylistsData {
   modName: string
   modPath: string
-  playlists: PlaylistTarget[]
-  songs: ModSong[]
+  playlists: ManagedPlaylist[]
+  stages: ManagedStage[]
+  songs: PlaylistSong[]
+  // series.toml still has legacy playlists (series-playlist, [[playlists]] blocks), which saving moves into playlists.toml.
+  legacyBlocks: boolean
 }
 
-// Flat assignment record sent from the renderer on save.
-export interface PlaylistAssignmentInput {
+export interface StageAssignmentInput {
+  id: string
   playlistId: string
-  seriesId: string
-  filename: string
-  incidence: number
+  order: number
 }
 
 // Track flagged by the pre-build volume check.

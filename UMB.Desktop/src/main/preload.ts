@@ -18,13 +18,13 @@ import type {
   Nus3ConversionMeta,
   Nus3SourceTrack,
   Nus3TrackDecision,
-  PlaylistAssignmentInput,
-  PlaylistInfoData,
+  SavedPlaylist,
   SaveSeriesItem,
   SaveTrackItem,
   SeriesOrderData,
   SongPresets,
   SetupStatus,
+  StageAssignmentInput,
   SuspiciousVolumeTrack,
   TrackOrderData,
   VolumeConfigData,
@@ -82,10 +82,9 @@ const api = {
     ipcRenderer.invoke(IPC.VALIDATE_MERGE_NAME, name),
   executeMerge: (modPaths: string[], outputName: string, priorityModPath: string | null): Promise<MergeResult> =>
     ipcRenderer.invoke(IPC.EXECUTE_MERGE, modPaths, outputName, priorityModPath),
-  getPlaylistInfo: (): Promise<PlaylistInfoData> => ipcRenderer.invoke(IPC.GET_PLAYLIST_INFO),
   loadManagePlaylists: (modPath: string): Promise<ManagePlaylistsData> => ipcRenderer.invoke(IPC.LOAD_MANAGE_PLAYLISTS, modPath),
-  saveManagePlaylists: (modPath: string, assignments: PlaylistAssignmentInput[]): Promise<ManagePlaylistsData> =>
-    ipcRenderer.invoke(IPC.SAVE_MANAGE_PLAYLISTS, modPath, assignments),
+  saveManagePlaylists: (modPath: string, playlists: SavedPlaylist[], stages: StageAssignmentInput[]): Promise<ManagePlaylistsData> =>
+    ipcRenderer.invoke(IPC.SAVE_MANAGE_PLAYLISTS, modPath, playlists, stages),
   runAction: (action: string, args?: string[]) =>
     ipcRenderer.invoke(IPC.RUN_ACTION, action, args) as Promise<void>,
   selectFolder: (): Promise<string | null> => ipcRenderer.invoke(IPC.SELECT_FOLDER),
