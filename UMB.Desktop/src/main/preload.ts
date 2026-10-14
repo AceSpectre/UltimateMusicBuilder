@@ -9,7 +9,6 @@ import type {
   LogLine,
   LoopAnalysisOptions,
   ManagePlaylistsData,
-  ManagedPlaylist,
   MergeAnalysis,
   MergeResult,
   ModInfo,
@@ -20,6 +19,7 @@ import type {
   Nus3SourceTrack,
   Nus3TrackDecision,
   PlaylistInfoData,
+  SavedPlaylist,
   SaveSeriesItem,
   SaveTrackItem,
   SeriesOrderData,
@@ -83,7 +83,7 @@ const api = {
     ipcRenderer.invoke(IPC.EXECUTE_MERGE, modPaths, outputName, priorityModPath),
   getPlaylistInfo: (): Promise<PlaylistInfoData> => ipcRenderer.invoke(IPC.GET_PLAYLIST_INFO),
   loadManagePlaylists: (modPath: string): Promise<ManagePlaylistsData> => ipcRenderer.invoke(IPC.LOAD_MANAGE_PLAYLISTS, modPath),
-  saveManagePlaylists: (modPath: string, playlists: ManagedPlaylist[], stages: StageAssignmentInput[]): Promise<ManagePlaylistsData> =>
+  saveManagePlaylists: (modPath: string, playlists: SavedPlaylist[], stages: StageAssignmentInput[]): Promise<ManagePlaylistsData> =>
     ipcRenderer.invoke(IPC.SAVE_MANAGE_PLAYLISTS, modPath, playlists, stages),
   runAction: (action: string, args?: string[]) =>
     ipcRenderer.invoke(IPC.RUN_ACTION, action, args) as Promise<void>,

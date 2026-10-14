@@ -138,7 +138,8 @@ namespace Sma5h.Mods.Music
             ApplyModPlaylists();
 
             //Enable album selection (My Music) on all stages
-            EnableBgmSelectorOnAllStages();
+            if (_config.CurrentValue.Sma5hMusic.EnableAlbumSelectionOnAllStages)
+                EnableBgmSelectorOnAllStages();
 
             //Sort Series by Sound Test - TODO Allow for manual ordering
             ProcessSeriesOrderAutoMapping();
@@ -461,7 +462,7 @@ namespace Sma5h.Mods.Music
             var playlists = _audioStateService.GetPlaylists().ToDictionary(p => p.Id);
             var registered = playlists.Keys.ToHashSet();
 
-            var required = PlaylistHelper.RequiredSongs(stages, _seriesPlaylists, modSongs);
+            var required = PlaylistHelper.RequiredSongs(stages, _seriesPlaylists, modSongs, PlaylistHelper.SmashBattleIncidence(_config.CurrentValue.Sma5hMusic));
             var added = PlaylistHelper.ApplyModPlaylists(playlists, stages, required, _playlistOverrides, _stageAssignments);
             _logger.LogInformation("Added {ModSongCount} mod song(s) to stage playlists ({TotalAdded} total insertions).", modSongs.Count, added);
 

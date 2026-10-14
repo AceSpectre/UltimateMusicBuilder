@@ -103,7 +103,6 @@ Each series folder contains a `series.toml` and `tracks.csv`. For new modded ser
 id = "the-finals"
 name = "THE FINALS"
 playlist-incidence = 100
-series-playlist = "bgm_the-finals"
 
 [[games]]
 id = "the-finals"
@@ -133,8 +132,9 @@ record-type = "arrange"
 Fields:
 
 * `[series].id` / `name` - internal id and in-game label.
-* `playlist-incidence` - default random-roll weight for the auto-generated `bgm_gametitle_<id>` playlist. Per-`[[playlists]]` blocks can override with their own `incidence`.
-* `series-playlist` - optional extra playlist that receives every song. Scaffold sets `bgm_<id>` for new series. `bgm_gametitle_<id>` is created regardless.
+* `playlist-incidence` - default random-roll weight of the series' songs in its own playlists.
+* The series' playlist is set in [playlists.toml](#playliststoml---playlists-and-stage-playlists) (Scaffold and Manage Series write it there: `bgm_<id>` for new series). A `series-playlist` key here is legacy and is migrated by Manage Playlists.
+* The build also makes a hidden `bgm_gametitle_<id>` playlist of every song in the series, so its songs are always in a playlist. Mods cannot edit it or give it to a stage.
 * `[[games]]` - one block per "game". Custom series need at least one. `id` is referenced by `tracks.csv`'s `game` column.
 * `[[playlists]]` - legacy: extra playlists for this series' songs. Manage Playlists offers to migrate these into [playlists.toml](#playliststoml---playlists-and-stage-playlists).
   * `id` - playlist identifier (existing stage playlist, or a new one UMB will create).
@@ -155,7 +155,6 @@ id = "example_series"               # matches the vanilla series id (without the
 name = "Example Series"             # the english label this series uses in vanilla
 existing-series = true              # tells UMB the series exists already - skip creating a SeriesEntry
 playlist-incidence = 100
-series-playlist = "bgmexample"      # the vanilla stage playlist for this series (scaffold fills this in)
 
 [[games]]
 id = "example_game_one"             # vanilla games for this series, plus any custom sub-games you want
@@ -169,7 +168,7 @@ When `existing-series = true`:
 
 * No `SeriesEntry` is emitted (vanilla one is reused).
 * Game-title entries are still emitted. Vanilla duplicates are deduped; custom sub-games get registered.
-* `series-playlist` points at the vanilla stage playlist, so your songs join the random rotation on every stage using it.
+* Scaffold flags the vanilla stage playlist with the series in playlists.toml, so your songs join the random rotation on every stage using it.
 * Optional `song_order.toml` (written by `Order Tracks`) interleaves your songs with vanilla in Sound Test / My Music.
 * An `icon.png` replaces the vanilla series icon.
 
@@ -201,11 +200,11 @@ playlist = "bgmmymix"
 order = 0
 ```
 
-* A playlist here replaces the whole playlist of that id. The build then still adds the songs it always keeps: every song of a series in its `bgm_gametitle_<id>` and `series-playlist` playlists, and every mod song in `bgmsmashbtl` and its series' stage playlists. New songs therefore join saved playlists too; to keep one off a stage, leave it out of that order instead. Songs are ui_bgm ids; a mod song's id is `ui_bgm_` plus its filename in lowercase with other characters as `_`.
+* A playlist here replaces the whole playlist of that id. The build then still adds the songs it always keeps: every song of a series in the playlists flagged with it, and every mod song in its series' stage playlists and in `bgmsmashbtl` (settings `AddModSongsToSmashBattle` and `SmashBattleIncidence`, default on at incidence 0). The build also turns on album selection (My Music) on every stage unless `EnableAlbumSelectionOnAllStages` is off; all three are in the desktop app's General settings. New songs therefore join saved playlists too; to keep one off a stage, leave it out of that order instead. Songs are ui_bgm ids; a mod song's id is `ui_bgm_` plus its filename in lowercase with other characters as `_`.
 * Every stage plays one order (0-15) of its playlist. `order` and `incidence` are one value for all 16 orders, or an array with one per order; order `-1` leaves the song out of that order.
-* `series` makes a dedicated series playlist: every song of those series is always in it, without listing them.
+* `series` makes a dedicated series playlist: every song of those series is always in it, without listing them. Without `tracks` the playlist is left as it is (or created) plus those songs; Manage Series' "Series Playlist" field edits this flag.
 * `[[stages]]` sets the playlist and order a stage plays.
-* Manage Playlists can reset a changed game or series playlist to its default, which removes it from this file. Renaming a series' `series-playlist` in Manage Series renames it here too.
+* Manage Playlists can reset a changed game or series playlist to its default, which removes it from this file. Changing a series' playlist in Manage Series renames its own playlist here, with the stages playing it, or moves the flag to the playlist chosen.
 
 ---
 

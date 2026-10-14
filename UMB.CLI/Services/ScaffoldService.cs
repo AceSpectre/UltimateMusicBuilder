@@ -95,8 +95,8 @@ namespace UMB.CLI.Services
                         totalDefaultsAdded++;
                     }
 
-                    if (EnsureSeriesPlaylistField(tomlPath))
-                        _logger.LogInformation("Added series-playlist field to {Path}", tomlPath);
+                    if (EnsureSeriesPlaylist(modDir, tomlPath))
+                        _logger.LogInformation("Added the series playlist for {Path} to playlists.toml", tomlPath);
                     var addedSongs = EnsureSongsOnPlaylistBlocks(tomlPath);
                     if (addedSongs > 0)
                         _logger.LogInformation("Added songs = \"*\" to {Count} [[playlists]] block(s) in {Path}", addedSongs, tomlPath);
@@ -381,8 +381,7 @@ namespace UMB.CLI.Services
         private string BuildNewSeriesToml(string folderName)
         {
             var sb = new StringBuilder();
-            CliUtil.AppendSeriesHeader(sb, folderName, folderName,
-                playlistIncidence: 100, seriesPlaylist: $"bgm_{folderName}");
+            CliUtil.AppendSeriesHeader(sb, folderName, folderName, playlistIncidence: 100);
             CliUtil.AppendGameBlock(sb, folderName, folderName);
             CliUtil.AppendDefaultTrackData(sb, folderName);
             return sb.ToString();
@@ -399,17 +398,8 @@ namespace UMB.CLI.Services
 
             _logger.LogInformation("Series '{Folder}' matches existing in-game series {SeriesId} — populating from vanilla data.", folderName, uiSeriesId);
 
-            string seriesPlaylistId = null;
-            if (_vanillaPlaylistBySeriesId != null
-                && _vanillaPlaylistBySeriesId.TryGetValue(uiSeriesId, out var vanillaPlaylistId)
-                && !string.IsNullOrWhiteSpace(vanillaPlaylistId))
-            {
-                seriesPlaylistId = vanillaPlaylistId;
-            }
-
             var sb = new StringBuilder();
-            CliUtil.AppendSeriesHeader(sb, seriesId, seriesName,
-                existingSeries: true, playlistIncidence: 100, seriesPlaylist: seriesPlaylistId);
+            CliUtil.AppendSeriesHeader(sb, seriesId, seriesName, existingSeries: true, playlistIncidence: 100);
 
             if (games.Count == 0)
             {
@@ -468,18 +458,14 @@ namespace UMB.CLI.Services
         }
 
         /// <summary>
-        /// Inserts `series-playlist = "..."` into the [series] block if absent. Returns true if changed.
-        /// Default value: vanilla stage-playlist id for existing series, else `bgm_{series.id}`.
+        /// Gives a series its playlist in playlists.toml (flagged with the series) unless it has one there or a legacy
+        /// series.toml series-playlist. Default: the vanilla stage playlist for existing series, else `bgm_{series.id}`.
+        /// Returns true if changed.
         /// </summary>
-        private bool EnsureSeriesPlaylistField(string tomlPath)
+        private bool EnsureSeriesPlaylist(string modDir, string tomlPath)
         {
             var text = File.ReadAllText(tomlPath);
-
             if (Regex.IsMatch(text, @"^\s*series-playlist\s*=", RegexOptions.Multiline))
-                return false;
-
-            var seriesHeader = Regex.Match(text, @"^\s*\[series\]\s*$", RegexOptions.Multiline);
-            if (!seriesHeader.Success)
                 return false;
 
             FolderSeriesFileConfig parsed;
@@ -493,46 +479,18 @@ namespace UMB.CLI.Services
             }
 
             var seriesId = parsed.Series?.Id;
-            if (string.IsNullOrWhiteSpace(seriesId))
+            if (string.IsNullOrWhiteSpace(seriesId) || PlaylistsToml.SeriesPlaylists(modDir).ContainsKey(seriesId))
                 return false;
 
-            string playlistId = null;
-            if (parsed.Series.ExistingSeries)
-            {
-                EnsureVanillaDataLoaded();
-                var uiSeriesId = MusicConstants.InternalIds.SERIES_ID_PREFIX + seriesId;
-                if (_vanillaPlaylistBySeriesId != null
-                    && _vanillaPlaylistBySeriesId.TryGetValue(uiSeriesId, out var vanillaPlaylistId)
-                    && !string.IsNullOrWhiteSpace(vanillaPlaylistId))
-                {
-                    playlistId = vanillaPlaylistId;
-                }
-            }
-            else
-            {
-                playlistId = "bgm_" + seriesId;
-            }
-
+            EnsureVanillaDataLoaded();
+            var gamePlaylists = _vanillaPlaylistBySeriesId?.Values.ToHashSet() ?? new HashSet<string>();
+            var playlistId = parsed.Series.ExistingSeries
+                ? _vanillaPlaylistBySeriesId?.GetValueOrDefault(MusicConstants.InternalIds.SERIES_ID_PREFIX + seriesId)
+                : "bgm_" + seriesId;
             if (string.IsNullOrWhiteSpace(playlistId))
                 return false;
 
-            // Find the end of the [series] block — either the next [section] header or EOF.
-            int afterHeader = seriesHeader.Index + seriesHeader.Length;
-            var nextSection = Regex.Match(text.Substring(afterHeader), @"^\s*\[", RegexOptions.Multiline);
-            int blockEnd = nextSection.Success ? afterHeader + nextSection.Index : text.Length;
-
-            // Insert the new line just before blockEnd. Trim trailing whitespace so the
-            // inserted line sits on its own line above the gap to the next section.
-            var before = text.Substring(0, blockEnd).TrimEnd('\r', '\n', ' ', '\t');
-            var after = text.Substring(blockEnd);
-            var inserted = before
-                + Environment.NewLine
-                + $"series-playlist = \"{CliUtil.EscapeToml(playlistId)}\""
-                + Environment.NewLine
-                + Environment.NewLine
-                + after.TrimStart('\r', '\n');
-
-            File.WriteAllText(tomlPath, inserted);
+            PlaylistsToml.SetSeriesPlaylist(modDir, seriesId, playlistId, parsed.Series.Name ?? seriesId, gamePlaylists);
             return true;
         }
 

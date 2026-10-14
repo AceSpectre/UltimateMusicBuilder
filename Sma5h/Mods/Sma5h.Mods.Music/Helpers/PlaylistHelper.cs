@@ -14,8 +14,13 @@ namespace Sma5h.Mods.Music.Helpers
     {
         public const int OrderCount = 16;
         public const string SmashBattlePlaylist = "bgmsmashbtl";
-        /// <summary>Every mod series gets a playlist of all its songs, named this prefix plus the series id.</summary>
+        /// <summary>
+        /// Every mod series gets a hidden playlist of all its songs, named this prefix plus the series id, so its songs
+        /// are always in a playlist. Mods cannot replace these or give them to stages.
+        /// </summary>
         public const string GameTitlePlaylistPrefix = "bgm_gametitle_";
+
+        public static bool IsGameTitlePlaylist(string playlistId) => playlistId?.StartsWith(GameTitlePlaylistPrefix) == true;
 
         private static readonly PropertyInfo[] OrderProperties = Properties("Order");
         private static readonly PropertyInfo[] IncidenceProperties = Properties("Incidence");
@@ -53,20 +58,30 @@ namespace Sma5h.Mods.Music.Helpers
 
         /// <summary>
         /// The songs the build always keeps in a playlist: a mod series' own playlists hold every song of the series,
-        /// and bgmsmashbtl plus the playlists of the series' stages hold its sound test songs.
+        /// the playlists of the series' stages hold its sound test songs, and so does bgmsmashbtl when
+        /// <paramref name="smashBattleIncidence"/> is set (the incidence those songs join it with).
         /// </summary>
         public static List<RequiredSong> RequiredSongs(IEnumerable<StageEntry> stages, IEnumerable<PlaylistEntry> seriesPlaylists,
-            IEnumerable<(string UiBgmId, string UiSeriesId)> soundTestSongs)
+            IEnumerable<(string UiBgmId, string UiSeriesId)> soundTestSongs, ushort? smashBattleIncidence)
         {
             var stagePlaylists = stages
                 .Where(s => !string.IsNullOrEmpty(s.UiSeriesId) && !string.IsNullOrEmpty(s.BgmSetId))
                 .ToLookup(s => s.UiSeriesId, s => s.BgmSetId);
             return seriesPlaylists
                 .SelectMany(p => p.Tracks.Select(t => new RequiredSong(p.Id, t.UiBgmId, t.Incidence0)))
-                .Concat(soundTestSongs.SelectMany(song => stagePlaylists[song.UiSeriesId ?? ""].Prepend(SmashBattlePlaylist).Distinct()
-                    .Select(id => new RequiredSong(id, song.UiBgmId, 100))))
+                .Concat(soundTestSongs.SelectMany(song =>
+                {
+                    var stageSongs = stagePlaylists[song.UiSeriesId ?? ""].Distinct().Select(id => new RequiredSong(id, song.UiBgmId, 100));
+                    return smashBattleIncidence is { } incidence
+                        ? stageSongs.Where(s => s.PlaylistId != SmashBattlePlaylist).Prepend(new RequiredSong(SmashBattlePlaylist, song.UiBgmId, incidence))
+                        : stageSongs;
+                }))
                 .ToList();
         }
+
+        /// <summary>The bgmsmashbtl incidence for <see cref="RequiredSongs"/>: null when mod songs do not join it.</summary>
+        public static ushort? SmashBattleIncidence(Sma5hMusicOptions.Sma5hMusicOptionsSection options) =>
+            options.AddModSongsToSmashBattle ? options.SmashBattleIncidence : null;
 
         /// <summary>
         /// After the mods' playlists are merged in: playlists.toml playlists replace theirs, the required songs any playlist
@@ -75,7 +90,7 @@ namespace Sma5h.Mods.Music.Helpers
         public static int ApplyModPlaylists(IDictionary<string, PlaylistEntry> playlists, IEnumerable<StageEntry> stages,
             IEnumerable<RequiredSong> required, IEnumerable<PlaylistEntry> overrides, IEnumerable<StagePlaylistAssignment> assignments)
         {
-            foreach (var playlist in overrides)
+            foreach (var playlist in overrides.Where(p => !IsGameTitlePlaylist(p.Id)))
             {
                 if (!playlists.TryGetValue(playlist.Id, out var existing))
                     playlists[playlist.Id] = existing = new PlaylistEntry(playlist.Id);
@@ -92,7 +107,7 @@ namespace Sma5h.Mods.Music.Helpers
                 added++;
             }
 
-            var byStage = assignments.GroupBy(a => a.UiStageId).ToDictionary(g => g.Key, g => g.Last());
+            var byStage = assignments.Where(a => !IsGameTitlePlaylist(a.BgmSetId)).GroupBy(a => a.UiStageId).ToDictionary(g => g.Key, g => g.Last());
             foreach (var stage in stages)
             {
                 if (!byStage.TryGetValue(stage.UiStageId, out var assignment)) continue;

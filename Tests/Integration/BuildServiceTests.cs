@@ -125,6 +125,40 @@ namespace Tests.Integration
         }
 
         [Fact]
+        public void Run_FollowsTheSmashBattleAndAlbumSelectionSettings()
+        {
+            _env.CreateConfiguredMod("test-mod");
+            _env.ExtraSettings["Sma5hMusic:AddModSongsToSmashBattle"] = "false";
+            _env.ExtraSettings["Sma5hMusic:EnableAlbumSelectionOnAllStages"] = "false";
+            var (build, sp) = CreateBuildService();
+            using (sp)
+            {
+                build.Run("test-mod");
+
+                var audioState = sp.GetRequiredService<IAudioStateService>();
+                var modSongs = audioState.GetModBgmDbRootEntries().Select(b => b.UiBgmId).ToHashSet();
+                Assert.DoesNotContain(audioState.GetPlaylists().Single(p => p.Id == "bgmsmashbtl").Tracks, t => modSongs.Contains(t.UiBgmId));
+                Assert.Contains(audioState.GetStagesEntries(), s => !s.BgmSelector);
+            }
+        }
+
+        [Fact]
+        public void Run_ByDefault_AddsModSongsToSmashBattleAndAlbumSelectionToEveryStage()
+        {
+            _env.CreateConfiguredMod("test-mod");
+            var (build, sp) = CreateBuildService();
+            using (sp)
+            {
+                build.Run("test-mod");
+
+                var audioState = sp.GetRequiredService<IAudioStateService>();
+                var battle = audioState.GetPlaylists().Single(p => p.Id == "bgmsmashbtl").Tracks.Select(t => t.UiBgmId).ToHashSet();
+                Assert.All(audioState.GetModBgmDbRootEntries().Where(b => b.TestDispOrder >= 0), b => Assert.Contains(b.UiBgmId, battle));
+                Assert.All(audioState.GetStagesEntries(), s => Assert.True(s.BgmSelector));
+            }
+        }
+
+        [Fact]
         public void Run_AppliesPlaylistsTomlPlaylistsAndStages()
         {
             var modDir = _env.CreateConfiguredMod("test-mod");

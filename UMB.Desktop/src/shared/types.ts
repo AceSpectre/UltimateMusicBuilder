@@ -262,6 +262,11 @@ export interface AppSettings {
   globalVolumeDb: number
   /** Experimental: apply the global and series dB boosts to vanilla songs. */
   applyVolumeToVanilla: boolean
+  /** Every mod song joins the Smash Battle playlist (bgmsmashbtl), at smashBattleIncidence. */
+  addModSongsToSmashBattle: boolean
+  smashBattleIncidence: number
+  /** Album selection (My Music) on every stage. */
+  albumSelectionOnAllStages: boolean
 }
 
 export interface MergeSeriesSource {
@@ -356,6 +361,9 @@ export interface ManagedPlaylist {
   defaultTracks: PlaylistTrack[] | null
 }
 
+// A playlist to save; null tracks keeps only its name and series flag (the build fills in the rest).
+export type SavedPlaylist = Omit<ManagedPlaylist, 'tracks'> & { tracks: PlaylistTrack[] | null }
+
 export interface ManagedStage {
   id: string
   name: string
@@ -373,7 +381,7 @@ export interface ManagePlaylistsData {
   playlists: ManagedPlaylist[]
   stages: ManagedStage[]
   songs: PlaylistSong[]
-  // series.toml still has legacy [[playlists]] blocks, which saving moves into playlists.toml.
+  // series.toml still has legacy playlists (series-playlist, [[playlists]] blocks), which saving moves into playlists.toml.
   legacyBlocks: boolean
 }
 

@@ -45,13 +45,12 @@ namespace UMB.CLI.Services
                 .Select(b => (b.UiBgmId, UiSeriesId: seriesByGame.GetValueOrDefault(b.UiGameTitleId ?? "")))
                 .ToList();
             var stages = catalog.Stages.Select(Copy).ToList();
-            var required = PlaylistHelper.RequiredSongs(stages, mod.SeriesPlaylists, modSongs);
+            var required = PlaylistHelper.RequiredSongs(stages, mod.SeriesPlaylists, modSongs, PlaylistHelper.SmashBattleIncidence(_musicConfig.CurrentValue.Sma5hMusic));
             var autoAdded = required.Select(r => (r.PlaylistId, r.UiBgmId)).ToHashSet();
 
-            // Defaults: each game and series playlist without playlists.toml or legacy blocks.
-            var implicitSeries = mod.SeriesPlaylists.Where(mod.PlaylistEntries.Contains).ToList();
+            // Defaults: each game and series playlist without its saved tracks or legacy blocks.
             var defaults = catalog.Playlists.ToDictionary(p => p.Id, Copy);
-            foreach (var playlist in implicitSeries)
+            foreach (var playlist in mod.SeriesPlaylists)
                 PlaylistHelper.Merge(defaults, Copy(playlist));
             PlaylistHelper.ApplyModPlaylists(defaults, stages, required, Array.Empty<PlaylistEntry>(), Array.Empty<StagePlaylistAssignment>());
 
@@ -76,20 +75,20 @@ namespace UMB.CLI.Services
                 .GroupBy(s => s.BgmId).Select(g => g.Last())
                 .ToList();
 
-            // Legacy series.toml blocks: a wildcard one (no song list) becomes a series flag when migrated.
-            var legacyBlocks = LegacyBlocks(resolvedModPath);
+            // Legacy series.toml playlists: series-playlist and wildcard blocks become series flags when migrated.
+            var legacy = LegacyPlaylists(resolvedModPath);
             var seriesFlags = mod.PlaylistSeriesFlags.SelectMany(f => f.Value.Select(series => (PlaylistId: f.Key, SeriesId: series)))
-                .Concat(legacyBlocks.Where(b => b.Wildcard).Select(b => (b.PlaylistId, b.SeriesId)))
+                .Concat(legacy.Where(l => l.WholeSeries).Select(l => (l.PlaylistId, l.SeriesId)))
                 .Distinct()
                 .ToLookup(f => f.PlaylistId, f => new SeriesRef(f.SeriesId, SeriesName(MusicConstants.InternalIds.SERIES_ID_PREFIX + f.SeriesId)));
 
             var vanillaIds = catalog.Playlists.Select(p => p.Id).ToHashSet();
-            var implicitSeriesIds = implicitSeries.Select(p => p.Id).ToHashSet();
             var managed = playlists.Values
+                .Where(p => !PlaylistHelper.IsGameTitlePlaylist(p.Id))
                 .Select(p =>
                 {
                     var series = seriesFlags[p.Id].ToList();
-                    var kind = vanillaIds.Contains(p.Id) ? "vanilla" : implicitSeriesIds.Contains(p.Id) || series.Count > 0 ? "series" : "custom";
+                    var kind = vanillaIds.Contains(p.Id) ? "vanilla" : series.Count > 0 ? "series" : "custom";
                     var name = CliUtil.FirstNonEmpty(DisplayNames.Playlists.GetValueOrDefault(p.Id), p.Title, p.Id);
                     var defaultTracks = kind != "custom" && defaults.TryGetValue(p.Id, out var d) && TrackKey(d) != TrackKey(p) ? Tracks(d, autoAdded) : null;
                     return new ManagedPlaylist(p.Id, name, kind, series, Tracks(p, autoAdded), defaultTracks);
@@ -112,34 +111,42 @@ namespace UMB.CLI.Services
                 .ThenBy(s => s.Name, StringComparer.InvariantCulture)
                 .ToList();
 
-            return new ManagePlaylistsData(Path.GetFileName(resolvedModPath), resolvedModPath, managed, managedStages, songs, legacyBlocks.Count > 0);
+            return new ManagePlaylistsData(Path.GetFileName(resolvedModPath), resolvedModPath, managed, managedStages, songs, legacy.Count > 0);
         }
 
         /// <summary>
-        /// Writes the given playlists and stage playlists to playlists.toml and drops the legacy series.toml
-        /// [[playlists]] blocks, which the saved playlists now hold. Load reports legacy blocks so the app asks first.
+        /// Writes the given playlists and stage playlists to playlists.toml and drops the legacy series.toml playlists
+        /// (series-playlist and [[playlists]] blocks), which the saved playlists now hold. Load reports them so the app asks first.
         /// </summary>
         public ManagePlaylistsData Save(string modPath, List<ManagedPlaylist> playlists, List<StageAssignmentInput> stages)
         {
             var resolvedModPath = ModPaths.ResolveUnderMods(_musicConfig, modPath);
             PlaylistsToml.Write(resolvedModPath, playlists ?? new(), stages ?? new());
             foreach (var path in SeriesTomlPaths(resolvedModPath))
-                SeriesToml.WriteLines(path, SeriesToml.RewriteArrayTables(SeriesToml.ReadLines(path), PlaylistsTable, new List<List<string>>()));
+            {
+                var lines = SeriesToml.RewriteArrayTables(SeriesToml.ReadLines(path), PlaylistsTable, new List<List<string>>());
+                SeriesToml.WriteLines(path, SeriesToml.UpsertTable(lines, "series", new[] { new SeriesToml.Entry(SeriesPlaylistKey, null) }, createIfMissing: false));
+            }
             return Load(resolvedModPath);
         }
 
-        private record LegacyBlock(string PlaylistId, string SeriesId, bool Wildcard);
+        private const string SeriesPlaylistKey = "series-playlist";
 
-        private static List<LegacyBlock> LegacyBlocks(string modPath) =>
+        /// <summary>A legacy series.toml playlist: WholeSeries for series-playlist and blocks without a song list.</summary>
+        private record LegacyPlaylist(string PlaylistId, string SeriesId, bool WholeSeries);
+
+        private static List<LegacyPlaylist> LegacyPlaylists(string modPath) =>
             SeriesTomlPaths(modPath)
                 .SelectMany(path =>
                 {
                     var text = File.ReadAllText(path);
                     var seriesId = SeriesToml.ReadHeader(text).Id;
-                    return SeriesToml.TableArrayBlocks(text, PlaylistsTable).Select(block => new LegacyBlock(
-                        SeriesToml.NonEmptyString(block, "id"), seriesId, !Regex.IsMatch(block, @"^\s*songs\s*=\s*\[", RegexOptions.Multiline)));
+                    return SeriesToml.TableArrayBlocks(text, PlaylistsTable)
+                        .Select(block => new LegacyPlaylist(SeriesToml.NonEmptyString(block, "id"), seriesId,
+                            !Regex.IsMatch(block, @"^\s*songs\s*=\s*\[", RegexOptions.Multiline)))
+                        .Append(new LegacyPlaylist(SeriesToml.NonEmptyString(SeriesToml.TableSection(text, "series") ?? text, SeriesPlaylistKey), seriesId, true));
                 })
-                .Where(b => b.PlaylistId != null && b.SeriesId != null)
+                .Where(l => l.PlaylistId != null && l.SeriesId != null)
                 .ToList();
 
         private static List<PlaylistTrack> Tracks(PlaylistEntry playlist, HashSet<(string, string)> autoAdded) =>

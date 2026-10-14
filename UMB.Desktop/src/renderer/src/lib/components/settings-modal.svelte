@@ -9,11 +9,15 @@
   import Modal from '$lib/components/ui/modal.svelte'
   import { DB_INPUT, clampDb } from '$lib/volume'
   import { settingsStore } from '$lib/stores/settings.svelte'
+  import type { AppSettings } from '$lib/types/electron'
 
   let { open, onClose }: { open: boolean; onClose: () => void } = $props()
 
   let globalVolumeDb = $state(0)
   let applyVolumeToVanilla = $state(false)
+  let addModSongsToSmashBattle = $state(true)
+  let smashBattleIncidence = $state(0)
+  let albumSelectionOnAllStages = $state(true)
   let tab = $state<'general' | 'experimental'>('general')
   let saveState = $state<'idle' | 'saving' | 'saved'>('idle')
   let loaded = $state(false)
@@ -26,6 +30,9 @@
       void window.electron.umb.getAppSettings().then((s) => {
         globalVolumeDb = s.globalVolumeDb
         applyVolumeToVanilla = s.applyVolumeToVanilla
+        addModSongsToSmashBattle = s.addModSongsToSmashBattle
+        smashBattleIncidence = s.smashBattleIncidence
+        albumSelectionOnAllStages = s.albumSelectionOnAllStages
         loaded = true
       })
     }
@@ -40,10 +47,20 @@
     if (saveState === 'saved') saveState = 'idle'
   }
 
+  function current(): AppSettings {
+    return {
+      globalVolumeDb: clampDb(globalVolumeDb),
+      applyVolumeToVanilla,
+      addModSongsToSmashBattle,
+      smashBattleIncidence: Math.max(0, Math.min(65535, Math.trunc(Number(smashBattleIncidence)) || 0)),
+      albumSelectionOnAllStages
+    }
+  }
+
   async function handleSave() {
     saveState = 'saving'
     try {
-      await window.electron.umb.saveAppSettings({ globalVolumeDb: clampDb(globalVolumeDb), applyVolumeToVanilla })
+      await window.electron.umb.saveAppSettings(current())
       settingsStore.version++
       saveState = 'saved'
       setTimeout(() => onClose(), 600)
@@ -56,7 +73,7 @@
     resetting = true
     resetFailed = false
     try {
-      await window.electron.umb.saveAppSettings({ globalVolumeDb: 0, applyVolumeToVanilla })
+      await window.electron.umb.saveAppSettings({ ...current(), globalVolumeDb: 0 })
       globalVolumeDb = 0
       await window.electron.umb.resetAllVolumes()
       settingsStore.version++
@@ -81,6 +98,24 @@
     <Icon size={13} />
     {label}
   </button>
+{/snippet}
+
+{#snippet toggle(id: string, label: string, hint: string, value: boolean, set: (value: boolean) => void)}
+  <div class="flex flex-col gap-1">
+    <div class="flex items-center justify-between gap-3">
+      <span id="{id}-label" class="text-[12.5px] font-medium">{$_(label)}</span>
+      <button
+        role="switch"
+        aria-checked={value}
+        aria-labelledby="{id}-label"
+        onclick={() => { set(!value); markEdited() }}
+        class="relative h-5 w-9 shrink-0 rounded-full transition-colors {value ? 'bg-[hsl(var(--gradient-from))]' : 'bg-muted-foreground/30'}"
+      >
+        <span class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform {value ? 'translate-x-4' : ''}"></span>
+      </button>
+    </div>
+    <p class="text-[11.5px] text-muted-foreground">{$_(hint)}</p>
+  </div>
 {/snippet}
 
 {#if open}
@@ -140,6 +175,25 @@
             <RotateCcw size={14} />
             {$_('settings.resetVolumes')}
           </button>
+
+          <div class="flex flex-col gap-3 border-t border-border pt-4">
+            {@render toggle('add-smash-battle', 'settings.addModSongsToSmashBattle', 'settings.addModSongsToSmashBattleHint', addModSongsToSmashBattle, (v) => (addModSongsToSmashBattle = v))}
+            <div class="flex flex-col gap-1.5">
+              <label for="smash-battle-incidence" class="text-[12.5px] font-medium">{$_('settings.smashBattleIncidence')}</label>
+              <input
+                id="smash-battle-incidence"
+                type="number"
+                min="0"
+                max="65535"
+                bind:value={smashBattleIncidence}
+                oninput={markEdited}
+                disabled={!addModSongsToSmashBattle}
+                class="rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-mono outline-none focus:border-ring disabled:opacity-50"
+              />
+              <p class="text-[11.5px] text-muted-foreground">{$_('settings.smashBattleIncidenceHint')}</p>
+            </div>
+            {@render toggle('album-selection', 'settings.albumSelectionOnAllStages', 'settings.albumSelectionOnAllStagesHint', albumSelectionOnAllStages, (v) => (albumSelectionOnAllStages = v))}
+          </div>
         </div>
       {:else}
         <div class="px-5 py-5 flex flex-col gap-1.5">

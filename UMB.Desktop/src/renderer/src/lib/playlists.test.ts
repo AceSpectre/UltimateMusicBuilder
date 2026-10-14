@@ -142,6 +142,18 @@ describe('saving', () => {
     expect(playlistsToSave([saved], defaults)).toEqual([])
   })
 
+  it('saves an unchanged series-flagged playlist as its flag only', () => {
+    const flagged = playlist({ id: 'bgm_mix', kind: 'series', series: [{ id: 'dev', name: 'Dev' }] })
+    const edited = playlist({ id: 'bgm_dev', kind: 'series', series: [{ id: 'dev', name: 'Dev' }] })
+    const defaults = playlistDefaults([flagged, edited])
+    edited.tracks.pop()
+
+    expect(playlistsToSave([flagged, edited], defaults).map((p) => [p.id, p.tracks?.length ?? null])).toEqual([
+      ['bgm_mix', null],
+      ['bgm_dev', 1]
+    ])
+  })
+
   it('never counts a custom playlist as changed', () => {
     const custom = playlist({ kind: 'custom' })
     const defaults = playlistDefaults([custom])

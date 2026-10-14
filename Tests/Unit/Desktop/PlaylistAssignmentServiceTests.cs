@@ -32,10 +32,10 @@ namespace Tests.Unit.Desktop
         public void Dispose() => _ws.Dispose();
 
         /// <summary>A mod editing the vanilla mario series and adding cuphead; returns the mod path.</summary>
-        private string SeedMod()
+        private string SeedMod(string cupheadToml = CupheadToml)
         {
             var mario = _ws.WriteSeries("mymod", "mario", MarioCsv, MarioToml);
-            var cuphead = _ws.WriteSeries("mymod", "cuphead", CupheadCsv, CupheadToml);
+            var cuphead = _ws.WriteSeries("mymod", "cuphead", CupheadCsv, cupheadToml);
             foreach (var audio in new[] { Path.Combine(mario, "a.flac"), Path.Combine(mario, "b.flac"), Path.Combine(cuphead, "c.flac") })
                 File.WriteAllText(audio, "");
             return Path.Combine(_ws.ModsRoot, "mymod");
@@ -59,11 +59,22 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void Load_ListsTheSeriesPlaylists()
+        public void Load_HidesTheGameTitlePlaylists()
         {
-            var cuphead = Playlist(_service.Load(SeedMod()), "bgm_gametitle_cuphead");
+            Assert.DoesNotContain(_service.Load(SeedMod()).Playlists, p => p.Id.StartsWith("bgm_gametitle_"));
+        }
 
+        [Fact]
+        public void Load_ShowsALegacySeriesPlaylistFieldAsASeriesFlag()
+        {
+            var modPath = SeedMod(cupheadToml: CupheadToml.Replace("name = \"Cuphead\"\n", "name = \"Cuphead\"\nseries-playlist = \"bgm_cuphead\"\n"));
+
+            var data = _service.Load(modPath);
+
+            Assert.True(data.LegacyBlocks);
+            var cuphead = Playlist(data, "bgm_cuphead");
             Assert.Equal(("Cuphead", "series"), (cuphead.Name, cuphead.Kind));
+            Assert.Equal(new[] { new SeriesRef("cuphead", "Cuphead") }, cuphead.Series);
             Assert.Equal(new[] { "ui_bgm_c" }, Songs(cuphead));
         }
 
@@ -157,14 +168,28 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
-        public void Save_ASeriesPlaylistAlwaysHoldsEverySongOfTheSeries()
+        public void Save_ASavedSeriesPlaylistStillHoldsEverySongOfTheSeries()
         {
             var modPath = SeedMod();
-            _service.Save(modPath, new() { Saved("bgm_gametitle_cuphead", "series", "ui_bgm_a01_smb_chijyou") }, new());
+            var mix = Saved("bgm_cuphead", "series", "ui_bgm_a01_smb_chijyou") with { Series = new() { new("cuphead", "Cuphead") } };
+            _service.Save(modPath, new() { mix }, new());
 
-            var cuphead = Playlist(_service.Load(modPath), "bgm_gametitle_cuphead");
+            var cuphead = Playlist(_service.Load(modPath), "bgm_cuphead");
             Assert.Equal(new[] { "ui_bgm_a01_smb_chijyou", "ui_bgm_c" }, Songs(cuphead));
             Assert.Equal(new[] { false, true }, cuphead.Tracks.Select(t => t.AutoAdded));
+        }
+
+        [Fact]
+        public void Save_MigratesALegacySeriesPlaylistField_ToAFlagOnlyPlaylist()
+        {
+            var modPath = SeedMod(cupheadToml: CupheadToml.Replace("name = \"Cuphead\"\n", "name = \"Cuphead\"\nseries-playlist = \"bgm_cuphead\"\n"));
+            var cuphead = Playlist(_service.Load(modPath), "bgm_cuphead");
+
+            var result = _service.Save(modPath, new() { cuphead with { Tracks = null } }, new());
+
+            Assert.DoesNotContain("series-playlist", File.ReadAllText(Path.Combine(modPath, "cuphead", "series.toml")));
+            Assert.Equal("[[playlists]]\nid = \"bgm_cuphead\"\nname = \"Cuphead\"\nseries = [\"cuphead\"]\n", File.ReadAllText(Path.Combine(modPath, "playlists.toml")));
+            Assert.Equal(new[] { "ui_bgm_c" }, Songs(Playlist(result, "bgm_cuphead")));
         }
 
         [Fact]
@@ -199,10 +224,18 @@ namespace Tests.Unit.Desktop
         [Fact]
         public void Save_AssignsStagePlaylists()
         {
-            var result = _service.Save(SeedMod(), new(), new() { new("ui_stage_battle_field", "bgm_gametitle_cuphead", 4) });
+            var result = _service.Save(SeedMod(), new() { Saved("bgmmine", "custom", "ui_bgm_c") }, new() { new("ui_stage_battle_field", "bgmmine", 4) });
 
             var stage = result.Stages.Single(s => s.Id == "ui_stage_battle_field");
-            Assert.Equal(("bgm_gametitle_cuphead", 4, "bgmsmashbtl", 0), (stage.PlaylistId, stage.Order, stage.VanillaPlaylistId, stage.VanillaOrder));
+            Assert.Equal(("bgmmine", 4, "bgmsmashbtl", 0), (stage.PlaylistId, stage.Order, stage.VanillaPlaylistId, stage.VanillaOrder));
+        }
+
+        [Fact]
+        public void Save_IgnoresStagesGivenAGameTitlePlaylist()
+        {
+            var result = _service.Save(SeedMod(), new(), new() { new("ui_stage_battle_field", "bgm_gametitle_cuphead", 4) });
+
+            Assert.Equal("bgmsmashbtl", result.Stages.Single(s => s.Id == "ui_stage_battle_field").PlaylistId);
         }
 
         [Fact]

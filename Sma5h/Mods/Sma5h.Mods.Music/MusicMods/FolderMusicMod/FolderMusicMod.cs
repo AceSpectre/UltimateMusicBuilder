@@ -543,26 +543,35 @@ namespace Sma5h.Mods.Music.MusicMods.FolderMusicMod
             output.SeriesPlaylists.Add(playlist);
         }
 
-        /// <summary>Reads playlists.toml; a playlist flagged with `series` always holds every song of those series.</summary>
+        public static FolderPlaylistsFileConfig ParsePlaylistsFile(string tomlPath) =>
+            Toml.ToModel<FolderPlaylistsFileConfig>(File.ReadAllText(tomlPath), options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
+
+        /// <summary>
+        /// Reads playlists.toml. A playlist with `tracks` replaces the one with its id; one flagged with `series` always
+        /// holds every song of those series, joining (or creating) the playlist like a series' own playlist.
+        /// </summary>
         private static void ReadPlaylistsFile(string tomlPath, MusicModEntries output, Dictionary<string, List<(string uiBgmId, int incidence)>> tracksBySeries)
         {
-            var file = Toml.ToModel<FolderPlaylistsFileConfig>(File.ReadAllText(tomlPath), options: new TomlModelOptions { ConvertPropertyName = ToKebabCase });
+            var file = ParsePlaylistsFile(tomlPath);
             foreach (var playlist in file.Playlists.Where(p => !string.IsNullOrWhiteSpace(p.Id)))
             {
-                var entry = new PlaylistEntry(playlist.Id, playlist.Name);
-                entry.Tracks.AddRange(playlist.Tracks.Where(t => !string.IsNullOrWhiteSpace(t.Song))
-                    .Select(t => PlaylistHelper.Track(t.Song, Slots<short>(t.Order, 0), Slots<ushort>(t.Incidence, 100))));
-                output.PlaylistOverrides.Add(entry);
+                if (playlist.Tracks != null)
+                {
+                    var entry = new PlaylistEntry(playlist.Id, playlist.Name);
+                    entry.Tracks.AddRange(playlist.Tracks.Where(t => !string.IsNullOrWhiteSpace(t.Song))
+                        .Select(t => PlaylistHelper.Track(t.Song, Slots<short>(t.Order, 0), Slots<ushort>(t.Incidence, 100))));
+                    output.PlaylistOverrides.Add(entry);
+                }
                 output.PlaylistSeriesFlags[playlist.Id] = playlist.Series;
                 foreach (var seriesId in playlist.Series.Where(tracksBySeries.ContainsKey))
-                    output.SeriesPlaylists.Add(BuildPlaylistEntry(playlist.Id, tracksBySeries[seriesId], playlist.Name));
+                    AddSeriesPlaylist(output, BuildPlaylistEntry(playlist.Id, tracksBySeries[seriesId], playlist.Name));
             }
             foreach (var stage in file.Stages.Where(s => !string.IsNullOrWhiteSpace(s.Id) && !string.IsNullOrWhiteSpace(s.Playlist)))
                 output.StageAssignments.Add(new StagePlaylistAssignment(stage.Id, stage.Playlist, (byte)Math.Clamp(stage.Order, 0, PlaylistHelper.OrderCount - 1)));
         }
 
         /// <summary>One value per order slot from a single value or an array (missing slots use the fallback).</summary>
-        private static T[] Slots<T>(object value, T fallback)
+        public static T[] Slots<T>(object value, T fallback)
         {
             var values = value switch
             {

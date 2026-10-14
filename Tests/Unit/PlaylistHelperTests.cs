@@ -41,7 +41,7 @@ namespace Tests.Unit
             var seriesPlaylist = TestCatalog.Playlist("bgm_gametitle_dev", "d");
             seriesPlaylist.Tracks[0].Incidence0 = 40;
 
-            var required = PlaylistHelper.RequiredSongs(stages, new[] { seriesPlaylist }, new[] { ("x", "ui_series_mario"), ("y", (string)null) });
+            var required = PlaylistHelper.RequiredSongs(stages, new[] { seriesPlaylist }, new[] { ("x", "ui_series_mario"), ("y", (string)null) }, 100);
 
             Assert.Equal(new[]
             {
@@ -50,6 +50,21 @@ namespace Tests.Unit
                 new RequiredSong("bgmmario", "x", 100),
                 new RequiredSong("bgmsmashbtl", "y", 100)
             }, required);
+        }
+
+        [Theory]
+        [InlineData(true, 40)]
+        [InlineData(false, 40)]
+        public void RequiredSongs_FollowTheSmashBattleSettings(bool addToSmashBattle, ushort incidence)
+        {
+            var stages = new[] { new StageEntry { UiStageId = "s", UiSeriesId = "ui_series_mario", BgmSetId = "bgmmario" } };
+            var options = new Sma5h.Mods.Music.Sma5hMusicOptions.Sma5hMusicOptionsSection { AddModSongsToSmashBattle = addToSmashBattle, SmashBattleIncidence = incidence };
+
+            var required = PlaylistHelper.RequiredSongs(stages, Array.Empty<PlaylistEntry>(), new[] { ("x", "ui_series_mario") }, PlaylistHelper.SmashBattleIncidence(options));
+
+            var expected = new List<RequiredSong> { new("bgmmario", "x", 100) };
+            if (addToSmashBattle) expected.Insert(0, new("bgmsmashbtl", "x", incidence));
+            Assert.Equal(expected, required);
         }
 
         [Fact]
@@ -88,7 +103,7 @@ namespace Tests.Unit
         {
             var playlists = Playlists(TestCatalog.Playlist("bgmmario"), new PlaylistEntry("bgmmine"));
             var stage = new StageEntry { UiStageId = "ui_stage_x", UiSeriesId = "ui_series_mario", BgmSetId = "bgmmario", BgmSettingNo = 0 };
-            var required = PlaylistHelper.RequiredSongs(new[] { stage }, Array.Empty<PlaylistEntry>(), new[] { ("x", "ui_series_mario") });
+            var required = PlaylistHelper.RequiredSongs(new[] { stage }, Array.Empty<PlaylistEntry>(), new[] { ("x", "ui_series_mario") }, 100);
 
             PlaylistHelper.ApplyModPlaylists(playlists, new[] { stage }, required, Array.Empty<PlaylistEntry>(),
                 new[] { new StagePlaylistAssignment("ui_stage_x", "bgmmine", 7) });
@@ -96,6 +111,19 @@ namespace Tests.Unit
             Assert.Equal(("bgmmine", (byte)7), (stage.BgmSetId, stage.BgmSettingNo));
             Assert.Equal(new[] { "x" }, Songs(playlists["bgmmario"]));
             Assert.Empty(playlists["bgmmine"].Tracks);
+        }
+    
+        [Fact]
+        public void ApplyModPlaylists_IgnoresGameTitlePlaylistOverridesAndStages()
+        {
+            var playlists = Playlists(TestCatalog.Playlist("bgm_gametitle_dev", "d"));
+            var stage = new StageEntry { UiStageId = "ui_stage_x", BgmSetId = "bgmmario", BgmSettingNo = 0 };
+
+            PlaylistHelper.ApplyModPlaylists(playlists, new[] { stage }, Array.Empty<RequiredSong>(),
+                new[] { TestCatalog.Playlist("bgm_gametitle_dev", "x") }, new[] { new StagePlaylistAssignment("ui_stage_x", "bgm_gametitle_dev", 1) });
+
+            Assert.Equal(new[] { "d" }, Songs(playlists["bgm_gametitle_dev"]));
+            Assert.Equal("bgmmario", stage.BgmSetId);
         }
     }
 }

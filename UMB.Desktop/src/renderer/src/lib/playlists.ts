@@ -1,4 +1,4 @@
-import type { ManagedPlaylist, ManagedStage, PlaylistTrack, StageAssignmentInput } from '$lib/types/electron'
+import type { ManagedPlaylist, ManagedStage, PlaylistTrack, SavedPlaylist, StageAssignmentInput } from '$lib/types/electron'
 
 // Each stage plays one order slot of its playlist; a track's order -1 leaves it out of that slot.
 export const ORDER_COUNT = 16
@@ -76,9 +76,14 @@ export function resetToDefault(playlist: ManagedPlaylist, defaults: Record<strin
   playlist.tracks = JSON.parse(defaults[playlist.id])
 }
 
-/** What playlists.toml holds: custom and series-flagged playlists, and game or series playlists differing from their default. */
-export function playlistsToSave(playlists: ManagedPlaylist[], defaults: Record<string, string>): ManagedPlaylist[] {
-  return playlists.filter((p) => p.kind === 'custom' || p.series.length > 0 || isChanged(p, defaults))
+/**
+ * What playlists.toml holds: custom playlists, game or series playlists differing from their default, and series-flagged
+ * ones. An unchanged series-flagged playlist keeps only its flag, so it follows the game and its series.
+ */
+export function playlistsToSave(playlists: ManagedPlaylist[], defaults: Record<string, string>): SavedPlaylist[] {
+  return playlists
+    .filter((p) => p.kind === 'custom' || p.series.length > 0 || isChanged(p, defaults))
+    .map((p) => (p.kind !== 'custom' && !isChanged(p, defaults) ? { ...p, tracks: null } : p))
 }
 
 /** Stages playing a different playlist or slot than in the game. */
