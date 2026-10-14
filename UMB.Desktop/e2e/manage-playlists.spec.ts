@@ -112,6 +112,20 @@ test('a changed game playlist comes back with its default for a reset', async ()
   expect(saved.defaultTracks?.length).toBe(zelda.tracks.length)
 })
 
+test('UI: locked vanilla songs in Manage Songs still show their values', async () => {
+  const page = await firstWindow(app)
+  await page.getByText('Manage Songs').first().click()
+  await page.getByRole('button', { name: 'mario' }).first().click()
+  await expect(page.getByRole('button', { name: 'Unlock Vanilla' })).toBeVisible({ timeout: 10000 })
+
+  const data = await page.evaluate((sp) => window.electron.umb.loadTrackOrder(sp), join(modDir, 'mario'))
+  const vanilla = data.items.find((i) => i.isVanilla && i.fields)!
+  const gameName = data.games.find((g) => g.id === vanilla.fields!.game)!.name
+  expect(data.items.filter((i) => !i.isVanilla).every((i) => i.fields?.game !== vanilla.fields!.game)).toBe(true)
+
+  await expect(page.getByRole('listitem').filter({ hasText: vanilla.fields!.title }).getByText(gameName, { exact: true }).first()).toBeVisible()
+})
+
 test('saving with nothing changed from the game removes playlists.toml', async () => {
   const page = await firstWindow(app)
   await page.evaluate((mp) => window.electron.umb.saveManagePlaylists(mp, [], []), modDir)
