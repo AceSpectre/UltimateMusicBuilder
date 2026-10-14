@@ -163,7 +163,7 @@
 </script>
 
 {#snippet sectionLabel(text: string)}
-  <div class="mb-2 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{text}</div>
+  <div class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{text}</div>
 {/snippet}
 
 {#snippet status(ok: boolean | undefined)}
@@ -178,9 +178,9 @@
 
 <ActionHeader title={$_('build.title')} subtitle={$_('build.subtitle')} />
 
-<div class="action-pane">
-  <section>
-    {@render sectionLabel($_('build.sections.build'))}
+<div class="action-pane grid grid-cols-2 items-start gap-6">
+  <section class="min-w-0">
+    <div class="mb-2 flex h-6 items-center">{@render sectionLabel($_('build.sections.build'))}</div>
     <CommandRow
       name={$_('build.buildButton')}
       description={$_('build.buildDescription')}
@@ -224,8 +224,8 @@
     </div>
   </section>
 
-  <section class="mt-4 border-t border-line2 pt-3">
-    <div class="flex items-start justify-between">
+  <section class="min-w-0">
+    <div class="mb-2 flex h-6 items-center justify-between">
       {@render sectionLabel($_('build.sections.setup'))}
       <button onclick={checkSetup} disabled={setupRunning} class="btn h-6">
         <RotateCw size={12} />
