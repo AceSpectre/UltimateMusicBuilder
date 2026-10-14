@@ -227,6 +227,8 @@ class Daemon {
     })
     proc.stdout?.on('data', stdout.push)
     proc.stderr?.on('data', stderr.push)
+    // A write racing the daemon's exit fails with EPIPE; the exit itself is handled below.
+    proc.stdin?.on('error', () => {})
 
     const onExit = (code: number | null): void => {
       if (this.process === proc) this.process = null

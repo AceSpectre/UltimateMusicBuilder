@@ -18,7 +18,7 @@ vi.mock('child_process', () => ({ spawn: mocks.spawn, spawnSync: mocks.spawnSync
 class FakeProc extends EventEmitter {
   stdout = new EventEmitter()
   stderr = new EventEmitter()
-  stdin = { write: vi.fn() }
+  stdin = Object.assign(new EventEmitter(), { write: vi.fn() })
   kill = vi.fn()
   pid = 4242
 
@@ -596,6 +596,18 @@ describe('shutdownDaemon', () => {
   it('is a no-op when no daemon was started', () => {
     expect(() => cli.shutdownDaemon()).not.toThrow()
     expect(mocks.spawn).not.toHaveBeenCalled()
+  })
+
+  it('ignores a stdin EPIPE from a daemon that already exited', async () => {
+    const done = cli.spawnCliAction(WS, 'config-volume-save', ['a'], onLine)
+    await flush()
+    const daemon = lastProc()
+    daemon.out('__DONE__\t1\t0\n')
+    await done
+
+    cli.shutdownDaemon()
+
+    expect(() => daemon.stdin.emit('error', new Error('write EPIPE'))).not.toThrow()
   })
 
   it('survives a stdin write that throws', async () => {
