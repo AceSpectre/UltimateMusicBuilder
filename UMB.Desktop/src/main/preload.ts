@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipc-channels'
 import type {
   AppSettings,
+  CleanupItem,
   CreateSeriesInput,
   DebugPingResult,
   ExtractIconsAnalysis,
@@ -13,7 +14,6 @@ import type {
   MergeResult,
   ModInfo,
   ModSeriesInfo,
-  ModStats,
   Nus3AnalysisResult,
   Nus3ConversionMeta,
   Nus3SourceTrack,
@@ -23,6 +23,7 @@ import type {
   SaveTrackItem,
   SeriesOrderData,
   SongPresets,
+  SetupStatus,
   StageAssignmentInput,
   SuspiciousVolumeTrack,
   TrackOrderData,
@@ -46,9 +47,12 @@ const api = {
   debugPing: (): Promise<DebugPingResult> => ipcRenderer.invoke(IPC.DEBUG_PING),
   listMods: (): Promise<ModInfo[]> => ipcRenderer.invoke(IPC.LIST_MODS),
   listModSeries: (modPath: string): Promise<ModSeriesInfo[]> => ipcRenderer.invoke(IPC.LIST_MOD_SERIES, modPath),
-  getModStats: (modPath: string): Promise<ModStats> => ipcRenderer.invoke(IPC.GET_MOD_STATS, modPath),
+  openFolder: (path: string): Promise<void> => ipcRenderer.invoke(IPC.OPEN_FOLDER, path),
   checkBuildVolumes: (modName: string | null): Promise<SuspiciousVolumeTrack[]> =>
     ipcRenderer.invoke(IPC.CHECK_BUILD_VOLUMES, modName),
+  checkSetup: (): Promise<SetupStatus> => ipcRenderer.invoke(IPC.CHECK_SETUP),
+  previewCleanup: (modPath: string): Promise<CleanupItem[]> => ipcRenderer.invoke(IPC.PREVIEW_CLEANUP, modPath),
+  runCleanup: (modPath: string): Promise<CleanupItem[]> => ipcRenderer.invoke(IPC.RUN_CLEANUP, modPath),
   resetAllVolumes: (): Promise<void> => ipcRenderer.invoke(IPC.RESET_ALL_VOLUMES),
   loadTrackOrder: (seriesPath: string): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.LOAD_TRACK_ORDER, seriesPath),
   saveTrackOrder: (seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData> => ipcRenderer.invoke(IPC.SAVE_TRACK_ORDER, seriesPath, items),

@@ -33,11 +33,12 @@
 
   let scrollContainer: HTMLDivElement | undefined = $state()
   let autoScroll = $state(true)
-  let panelHeight = $state(Number(localStorage.getItem('umb-bottom-panel-height') ?? '240'))
+  let panelHeight = $state(Number(localStorage.getItem('umb-bottom-panel-height') ?? '180'))
   let splitRatio = $state(Number(localStorage.getItem('umb-bottom-panel-split') ?? '0.5'))
-  let consoleCollapsed = $state(localStorage.getItem('umb-bottom-console-collapsed') === 'true')
   let debugCollapsed = $state(localStorage.getItem('umb-bottom-debug-collapsed') === 'true')
+  const iconButton = 'btn-ghost-icon h-[22px] w-[22px]'
   const filters = ['all', 'info', 'warn', 'error'] as const
+  const levelClass = { info: 'text-sec', warn: 'text-warn', error: 'text-destructive' }
 
   function handleScroll() {
     if (!scrollContainer) return
@@ -83,21 +84,8 @@
     window.addEventListener('pointerup', handleUp)
   }
 
-  function toggleConsoleCollapsed() {
-    consoleCollapsed = !consoleCollapsed
-    if (consoleCollapsed && debugCollapsed) {
-      debugCollapsed = false
-    }
-    localStorage.setItem('umb-bottom-console-collapsed', String(consoleCollapsed))
-    localStorage.setItem('umb-bottom-debug-collapsed', String(debugCollapsed))
-  }
-
   function toggleDebugCollapsed() {
     debugCollapsed = !debugCollapsed
-    if (debugCollapsed && consoleCollapsed) {
-      consoleCollapsed = false
-    }
-    localStorage.setItem('umb-bottom-console-collapsed', String(consoleCollapsed))
     localStorage.setItem('umb-bottom-debug-collapsed', String(debugCollapsed))
   }
 
@@ -113,157 +101,105 @@
   })
 </script>
 
-<div class="shrink-0 border-t border-border bg-card" style="height: {logStore.drawerOpen ? `${panelHeight}px` : '34px'}">
-  <div
-    class="h-2 cursor-row-resize border-b border-border bg-background/60 hover:bg-accent/50"
-    role="separator"
-    aria-label={$_('bottomPanel.resizePanel')}
-    aria-orientation="horizontal"
-    onpointerdown={startHeightResize}
-  ></div>
+<div class="surface-grain relative flex shrink-0 flex-col border-t border-border bg-rail" style="height: {logStore.drawerOpen ? `${panelHeight}px` : '30px'}">
+  {#if logStore.drawerOpen}
+    <div
+      class="absolute inset-x-0 -top-[3px] z-10 h-[5px] cursor-row-resize hover:bg-primary/30"
+      role="separator"
+      aria-label={$_('bottomPanel.resizePanel')}
+      aria-orientation="horizontal"
+      onpointerdown={startHeightResize}
+    ></div>
+  {/if}
 
-  {#if !logStore.drawerOpen}
-    <div class="flex h-[26px] items-center justify-between px-3.5">
-      <span class="font-mono text-xs text-muted-foreground">{$_('bottomPanel.collapsedLabel')}</span>
-      <button
-        onclick={() => logStore.toggleDrawer()}
-        class="flex items-center gap-1.5 rounded-[7px] px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-      >
+  <div class="flex h-[30px] shrink-0 items-center gap-2.5 border-b border-line2 px-3.5 text-[12px] text-dim">
+    <span class="font-semibold text-foreground">{$_('bottomPanel.console')}</span>
+    <span>{$_('bottomPanel.logLines', { values: { count: logStore.lineCount } })}</span>
+    <span class="flex-1"></span>
+    {#if logStore.drawerOpen}
+      {#each filters as filterName}
+        <button
+          onclick={() => logStore.setFilter(filterName)}
+          class="rounded-sm px-[7px] py-0.5 transition-colors duration-100 {logStore.filter === filterName ? 'bg-secondary text-secondary-foreground' : 'hover:text-foreground'}"
+        >
+          {$_('bottomPanel.filters.' + filterName)}
+        </button>
+      {/each}
+      <button onclick={() => logStore.clear()} class={iconButton} title={$_('bottomPanel.clear')}>
+        <X size={13} />
+      </button>
+      <button onclick={() => logStore.toggleDrawer()} class={iconButton} title={$_('bottomPanel.hide')}>
+        <PanelBottomClose size={13} />
+      </button>
+    {:else}
+      <button onclick={() => logStore.toggleDrawer()} class="flex items-center gap-1.5 rounded px-1.5 py-0.5 transition-colors duration-100 hover:bg-accent hover:text-foreground">
         <PanelBottomOpen size={13} />
         {$_('bottomPanel.show')}
       </button>
-    </div>
-  {:else}
-    <div class="flex h-[calc(100%-8px)] min-h-0 flex-col">
-      <div class="flex items-center justify-between border-b border-border px-3.5 py-2">
-        <div class="flex items-center gap-2">
-          <span class="text-[12.5px] font-semibold">{$_('bottomPanel.title')}</span>
-          <span class="font-mono text-xs text-muted-foreground">{$_('bottomPanel.logLines', { values: { count: logStore.lineCount } })}</span>
+    {/if}
+  </div>
+
+  {#if logStore.drawerOpen}
+    <div class="flex min-h-0 flex-1 overflow-hidden">
+      <section class="min-h-0 overflow-hidden" style="width: {debugCollapsed ? '100%' : `${splitRatio * 100}%`}">
+        <div bind:this={scrollContainer} onscroll={handleScroll} class="h-full overflow-y-auto px-3.5 py-1.5 font-mono text-[11.5px] leading-[1.75]">
+          {#if logStore.filtered.length === 0}
+            <div class="text-dim">{$_('bottomPanel.noLogs')}</div>
+          {:else}
+            {#each logStore.filtered as line}
+              <div class="flex gap-3">
+                <span class="shrink-0 text-dim">{line.timestamp}</span>
+                <span class="w-10 shrink-0 {levelClass[line.level] ?? 'text-dim'}">{line.level}</span>
+                <span class="min-w-0 break-words">{line.message}</span>
+              </div>
+            {/each}
+          {/if}
         </div>
-        <button
-          onclick={() => logStore.toggleDrawer()}
-          class="flex h-[26px] w-[26px] items-center justify-center rounded-[7px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        >
-          <PanelBottomClose size={13} />
-        </button>
-      </div>
+      </section>
 
-      <div class="flex min-h-0 flex-1 overflow-hidden">
-        <section class="min-h-0 overflow-hidden border-r border-border" style="width: {consoleCollapsed ? '44px' : debugCollapsed ? '100%' : `${splitRatio * 100}%`} ">
-          <div class="flex h-full min-h-0 flex-col">
-            <div class="flex items-center justify-between border-b border-border px-3 py-2">
-              <div class="flex items-center gap-2">
-                <button
-                  onclick={toggleConsoleCollapsed}
-                  class="flex h-[24px] w-[24px] items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  {#if consoleCollapsed}
-                    <ChevronRight size={14} />
-                  {:else}
-                    <ChevronLeft size={14} />
-                  {/if}
-                </button>
-                {#if !consoleCollapsed}
-                  <span class="text-[12px] font-semibold">{$_('bottomPanel.console')}</span>
-                {/if}
-              </div>
+      {#if !debugCollapsed}
+        <div
+          class="w-[5px] shrink-0 cursor-col-resize border-l border-line2 hover:bg-primary/30"
+          role="separator"
+          aria-label={$_('bottomPanel.resizeSections')}
+          aria-orientation="vertical"
+          onpointerdown={startSplitResize}
+        ></div>
+      {/if}
 
-              {#if !consoleCollapsed}
-                <div class="flex items-center gap-1">
-                  {#each filters as filterName}
-                    <button
-                      onclick={() => logStore.setFilter(filterName)}
-                      class="rounded-[7px] px-2 py-1 text-[11px] font-medium capitalize transition-colors {logStore.filter === filterName ? 'bg-accent text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}"
-                    >
-                      {$_('bottomPanel.filters.' + filterName)}
-                    </button>
-                  {/each}
-                  <button
-                    onclick={() => logStore.clear()}
-                    class="flex h-[24px] w-[24px] items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              {/if}
-            </div>
-
-            {#if !consoleCollapsed}
-              <div bind:this={scrollContainer} onscroll={handleScroll} class="min-h-0 flex-1 overflow-y-auto px-3.5 py-2">
-                {#if logStore.filtered.length === 0}
-                  <div class="py-2 font-mono text-xs text-muted-foreground">{$_('bottomPanel.noLogs')}</div>
-                {:else}
-                  {#each logStore.filtered as line}
-                    <div class="flex items-baseline gap-3 font-mono text-[11.5px] leading-[1.65]">
-                      <span class="shrink-0 text-muted-foreground">{line.timestamp}</span>
-                      <span class="inline-flex h-[18px] w-[44px] shrink-0 items-center justify-center rounded-full border text-[10px] font-medium {line.level === 'warn' ? 'border-[hsl(38_92%_50%/.3)] bg-[hsl(38_92%_50%/.14)] text-[hsl(38,92%,32%)]' : line.level === 'error' ? 'border-[hsl(var(--destructive)/.3)] bg-[hsl(var(--destructive)/.12)] text-destructive' : 'border-border bg-muted text-muted-foreground'}">
-                        {line.level}
-                      </span>
-                      <span class="text-foreground">{line.message}</span>
-                    </div>
-                  {/each}
-                {/if}
-              </div>
+      <section class="flex min-h-0 shrink-0 flex-col overflow-hidden {debugCollapsed ? 'border-l border-line2' : ''}" style="width: {debugCollapsed ? '34px' : `${(1 - splitRatio) * 100}%`}">
+        <div class="flex h-[30px] shrink-0 items-center gap-2 px-2 text-[12px]">
+          <button onclick={toggleDebugCollapsed} class={iconButton} title={$_('bottomPanel.runtimeDebug')}>
+            {#if debugCollapsed}
+              <ChevronLeft size={14} />
+            {:else}
+              <ChevronRight size={14} />
             {/if}
-          </div>
-        </section>
+          </button>
+          {#if !debugCollapsed}
+            <span class="font-semibold">{$_('bottomPanel.runtimeDebug')}</span>
+            <span class="flex-1"></span>
+            <button onclick={() => void onPingBridge()} class="btn h-[22px] px-2 text-[11px]">
+              <RefreshCw size={12} />
+              {$_('bottomPanel.ping')}
+            </button>
+          {/if}
+        </div>
 
-        {#if !consoleCollapsed && !debugCollapsed}
-          <div
-            class="w-2 shrink-0 cursor-col-resize bg-background/60 hover:bg-accent/50"
-            role="separator"
-            aria-label={$_('bottomPanel.resizeSections')}
-            aria-orientation="vertical"
-            onpointerdown={startSplitResize}
-          ></div>
+        {#if !debugCollapsed}
+          <div class="min-h-0 flex-1 overflow-y-auto px-3.5 pb-2 text-[11.5px] leading-5 text-dim">
+            <div>{$_('bottomPanel.debug.bridge')} <span class="text-foreground">{diagnostics.bridgeStatus}</span></div>
+            <div>{$_('bottomPanel.debug.workspace')} <span class="break-all text-foreground">{diagnostics.workspace}</span></div>
+            <div>{$_('bottomPanel.debug.mods')} <span class="text-foreground">{diagnostics.modsStatus}</span></div>
+            <div>{$_('bottomPanel.debug.activeTab')} <span class="text-foreground">{diagnostics.lastAction}</span></div>
+            <div>{$_('bottomPanel.debug.modSelections')} <span class="text-foreground">{diagnostics.modSelections}</span> / {diagnostics.lastMod}</div>
+            <div>{$_('bottomPanel.debug.actionClicks')} <span class="text-foreground">{diagnostics.actionClicks}</span></div>
+            <div>{$_('bottomPanel.debug.windowClicks')} <span class="text-foreground">{diagnostics.windowClicks}</span> / {diagnostics.lastWindowRequest}</div>
+            <div>{$_('bottomPanel.debug.windowAck')} <span class="text-foreground">{diagnostics.lastWindowAck}</span></div>
+            <div>{$_('bottomPanel.debug.lastError')} <span class="break-all text-foreground">{diagnostics.lastError}</span></div>
+          </div>
         {/if}
-
-        <section class="min-h-0 overflow-hidden" style="width: {debugCollapsed ? '44px' : consoleCollapsed ? '100%' : `${(1 - splitRatio) * 100}%`} ">
-          <div class="flex h-full min-h-0 flex-col">
-            <div class="flex items-center justify-between border-b border-border px-3 py-2">
-              <div class="flex items-center gap-2">
-                <button
-                  onclick={toggleDebugCollapsed}
-                  class="flex h-[24px] w-[24px] items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                >
-                  {#if debugCollapsed}
-                    <ChevronLeft size={14} />
-                  {:else}
-                    <ChevronRight size={14} />
-                  {/if}
-                </button>
-                {#if !debugCollapsed}
-                  <span class="text-[12px] font-semibold">{$_('bottomPanel.runtimeDebug')}</span>
-                {/if}
-              </div>
-
-              {#if !debugCollapsed}
-                <button
-                  onclick={() => void onPingBridge()}
-                  class="flex items-center gap-1 rounded-md border border-input bg-background px-2 py-1 text-[11px] font-medium transition-colors hover:bg-muted"
-                >
-                  <RefreshCw size={12} />
-                  {$_('bottomPanel.ping')}
-                </button>
-              {/if}
-            </div>
-
-            {#if !debugCollapsed}
-              <div class="min-h-0 flex-1 overflow-y-auto px-3.5 py-2 font-mono text-[11px] leading-5 text-muted-foreground">
-                <div>{$_('bottomPanel.debug.bridge')} <span class="text-foreground">{diagnostics.bridgeStatus}</span></div>
-                <div>{$_('bottomPanel.debug.workspace')} <span class="break-all text-foreground">{diagnostics.workspace}</span></div>
-                <div>{$_('bottomPanel.debug.mods')} <span class="text-foreground">{diagnostics.modsStatus}</span></div>
-                <div>{$_('bottomPanel.debug.activeTab')} <span class="text-foreground">{diagnostics.lastAction}</span></div>
-                <div>{$_('bottomPanel.debug.modSelections')} <span class="text-foreground">{diagnostics.modSelections}</span> / {diagnostics.lastMod}</div>
-                <div>{$_('bottomPanel.debug.actionClicks')} <span class="text-foreground">{diagnostics.actionClicks}</span></div>
-                <div>{$_('bottomPanel.debug.windowClicks')} <span class="text-foreground">{diagnostics.windowClicks}</span> / {diagnostics.lastWindowRequest}</div>
-                <div>{$_('bottomPanel.debug.windowAck')} <span class="text-foreground">{diagnostics.lastWindowAck}</span></div>
-                <div>{$_('bottomPanel.debug.lastError')} <span class="break-all text-foreground">{diagnostics.lastError}</span></div>
-              </div>
-            {/if}
-          </div>
-        </section>
-      </div>
+      </section>
     </div>
   {/if}
 </div>

@@ -11,8 +11,8 @@ UMB is a fork of [Sma5hMusic](https://github.com/Deinonychus71/Sma5hMusic) for a
 ## Dependencies
 
 1. **FFmpeg** - For LUFS volume normalisation, decoding, waveforms, and playback previews. `ffmpeg`, `ffprobe`, and `ffplay` must be on PATH.
-2. **pymusiclooper** - For detecting loop points during standard audio -> `nus3audio` conversion
-   - Installed in an isolated environment using pipx, rather than into system Python.
+2. **uv** - Installs [pymusiclooper](https://github.com/arkrow/PyMusicLooper), which detects loop points during standard audio -> `nus3audio` conversion
+   - `uv tool install --python 3.12 pymusiclooper` gives it its own Python, so no system Python is needed.
 3. A partial dump of Smash Ultimate assets from `data.arc` (identical to Sma5h) in `Resources/Game`
    - [Video guide to dump](https://youtu.be/CXe_Su-Yo2c?si=8iFYrD_xxfrzwhog)
    - [Guide to setup resources](https://github.com/Deinonychus71/Sma5hMusic/wiki/Setup) 
@@ -37,8 +37,9 @@ Setup checks for existing commands and installs only missing dependencies.
 macOS requires Homebrew; Linux supports Debian/Ubuntu (`apt`), Fedora (`dnf`),
 and Arch (`pacman`); Windows requires App Installer (`winget`). System package
 installs may ask for administrator access. Fedora uses its `ffmpeg-free` package;
-codec availability depends on the distribution's build. Setup uses pipx for
-pymusiclooper and adds its application directory to PATH. Open a new terminal
+codec availability depends on the distribution's build. uv comes from `winget` on
+Windows, Homebrew on macOS and Astral's installer on Linux; setup then installs
+pymusiclooper with uv and adds uv's tool directory to PATH. Open a new terminal
 after setup, and restart UMB if it was already running.
 
 Game data and `Resources/template.nus3bank` must be supplied separately; setup

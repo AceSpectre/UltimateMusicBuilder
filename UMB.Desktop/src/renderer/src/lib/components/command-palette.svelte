@@ -25,7 +25,7 @@
   const filtered = $derived(() => {
     if (!query.trim()) return actions
     const q = query.toLowerCase()
-    return actions.filter(a => $_('nav.items.' + a.id).toLowerCase().includes(q))
+    return actions.filter(a => $_('nav.items.' + a).toLowerCase().includes(q))
   })
 
   function selectAction(id: string) {
@@ -57,7 +57,7 @@
   >
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="w-full max-w-[520px] rounded-xl border border-border bg-popover shadow-2xl overflow-hidden"
+      class="w-full max-w-[520px] rounded-xl border border-border bg-popover shadow-overlay overflow-hidden"
       onclick={(e) => e.stopPropagation()}
       onkeydown={handleKeydown}
     >
@@ -75,29 +75,29 @@
         {#if filtered().length === 0}
           <div class="px-3 py-6 text-center text-sm text-muted-foreground">{$_('commandPalette.noResults')}</div>
         {:else}
-          <div class="px-2 py-1.5 text-[10.5px] font-semibold tracking-[.12em] uppercase text-muted-foreground">
+          <div class="px-2 py-1.5 text-[10.5px] font-semibold tracking-[.1em] uppercase text-dim">
             {$_('commandPalette.actions')}
           </div>
           {#each filtered() as action}
             <button
-              onclick={() => selectAction(action.id)}
+              onclick={() => selectAction(action)}
               class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left hover:bg-accent transition-colors
-                {activeTab === action.id ? 'bg-accent font-medium' : ''}"
+                {activeTab === action ? 'bg-accbg font-medium text-accink' : ''}"
             >
-              {$_('nav.items.' + action.id)}
+              {$_('nav.items.' + action)}
             </button>
           {/each}
         {/if}
 
         {#if mods.length > 0 && !query.trim()}
-          <div class="mt-2 px-2 py-1.5 text-[10.5px] font-semibold tracking-[.12em] uppercase text-muted-foreground">
+          <div class="mt-2 px-2 py-1.5 text-[10.5px] font-semibold tracking-[.1em] uppercase text-dim">
             {$_('commandPalette.mods')}
           </div>
           {#each mods as mod}
             <button
               onclick={() => { onSelectMod(mod); open = false }}
               class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-left hover:bg-accent transition-colors
-                {activeMod?.name === mod.name ? 'bg-accent font-medium' : ''}"
+                {activeMod?.name === mod.name ? 'bg-accbg font-medium text-accink' : ''}"
             >
               {mod.name}
             </button>

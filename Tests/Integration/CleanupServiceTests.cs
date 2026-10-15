@@ -1,5 +1,6 @@
 using Sma5h.Mods.Music.Helpers;
 using Tests.Helpers;
+using UMB.CLI.Desktop;
 using UMB.CLI.Services;
 using Xunit;
 
@@ -81,6 +82,53 @@ namespace Tests.Integration
             CreateService().Run();
 
             Assert.Contains("ui_bgm_a01_smb_chijyou", File.ReadAllText(Path.Combine(modDir, "mario", "tracks.csv")));
+        }
+
+        [Fact]
+        public void Preview_ListsEveryEntryExecuteRemoves()
+        {
+            var modDir = _env.CreateConfiguredMod();
+            const string karts = "flowerhead - Somewhat Good- Karts - 01 KARTS!.flac";
+            File.Delete(Path.Combine(modDir, "dev", karts));
+            File.AppendAllText(Path.Combine(modDir, "dev", "series.toml"), "\n[[playlists]]\nid = \"bgm_dev\"\nsongs = [\"01 gone\", \"" + karts + "\"]\n");
+            File.WriteAllText(Path.Combine(modDir, "playlists.toml"), TomlWithSongs("ui_bgm_a01_smb_chijyou", KartsSong, "ui_bgm_gone"));
+            var service = CreateService();
+
+            var expected = new[]
+            {
+                new CleanupItem("dev/tracks.csv", karts),
+                new CleanupItem("dev/series.toml", "01 gone"),
+                new CleanupItem("dev/series.toml", karts),
+                new CleanupItem("playlists.toml", $"bgmmine: {KartsSong}"),
+                new CleanupItem("playlists.toml", "bgmmine: ui_bgm_gone"),
+            };
+            Assert.Equal(expected, service.Preview(modDir));
+            Assert.Equal(expected, service.Execute(modDir));
+            Assert.Empty(service.Preview(modDir));
+        }
+
+        [Fact]
+        public void Execute_KeepsEveryColumnOfTheRowsLeft()
+        {
+            var modDir = _env.CreateConfiguredMod();
+            var csv = Path.Combine(modDir, "dev", "tracks.csv");
+            File.WriteAllText(csv, "filename,title,order,extra\nflowerhead - Somewhat Good- Karts - 01 KARTS!.flac,Karts,0,x\ngone.flac,Gone,1,y\n");
+
+            CreateService().Execute(modDir);
+
+            Assert.Equal("filename,title,order,extra\nflowerhead - Somewhat Good- Karts - 01 KARTS!.flac,Karts,0,x\n", File.ReadAllText(csv));
+        }
+
+        [Fact]
+        public void Preview_ChangesNothing()
+        {
+            var modDir = _env.CreateConfiguredMod();
+            File.Delete(Path.Combine(modDir, "dev", "flowerhead - Somewhat Good- Karts - 01 KARTS!.flac"));
+            var csv = Path.Combine(modDir, "dev", "tracks.csv");
+            var before = File.ReadAllText(csv);
+
+            Assert.Single(CreateService().Preview(modDir));
+            Assert.Equal(before, File.ReadAllText(csv));
         }
 
         [Fact]

@@ -17,7 +17,7 @@
 #
 # Not bundled (script prints a hint — install via your system package manager):
 #   - ffmpeg / ffprobe / ffplay   (`choco install ffmpeg`)
-#   - pymusiclooper                (`pipx install pymusiclooper`)
+#   - pymusiclooper                (`uv tool install --python 3.12 pymusiclooper`)
 #
 # Re-running is safe: existing binaries are skipped unless -Force is passed.
 
@@ -201,10 +201,8 @@ function Show-PathToolHints {
     if (Get-Command pymusiclooper -ErrorAction SilentlyContinue) {
         Write-Host "   + pymusiclooper found on PATH"
     } else {
-        Write-Host "   Install pymusiclooper via pipx (recommended):"
-        Write-Host "       pipx install pymusiclooper"
-        Write-Host "   If pipx isn't installed:"
-        Write-Host "       python -m pip install --user pipx; python -m pipx ensurepath"
+        Write-Host "   Install pymusiclooper with uv (setup.ps1 does this):"
+        Write-Host "       uv tool install --python 3.12 pymusiclooper"
     }
 }
 

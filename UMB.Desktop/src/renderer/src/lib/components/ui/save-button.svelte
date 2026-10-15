@@ -1,28 +1,25 @@
 <script lang="ts">
   import Save from '@lucide/svelte/icons/save'
+  import { _ } from 'svelte-i18n'
 
   let {
     saveState,
     disabled,
     onclick,
-    save,
-    saving,
-    saved
+    save = ''
   }: {
     saveState: 'idle' | 'saving' | 'saved'
     disabled: boolean
     onclick: () => void
-    save: string
-    saving: string
-    saved: string
+    save?: string
   } = $props()
 </script>
 
 <button
   {onclick}
   {disabled}
-  class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60 {!disabled && saveState === 'idle' ? 'save-glow' : ''}"
+  class="{!disabled && saveState === 'idle' ? 'btn-primary' : 'btn'} min-w-24 shrink-0"
 >
-  <Save size={14} />
-  {saveState === 'saving' ? saving : saveState === 'saved' ? saved : save}
+  <Save size={13} />
+  {saveState === 'saving' ? $_('common.saving') : saveState === 'saved' ? $_('common.saved') : save || $_('common.save')}
 </button>

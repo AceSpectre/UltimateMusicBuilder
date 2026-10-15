@@ -38,6 +38,8 @@
     lastError: 'none'
   })
 
+  const bridgeFailed = $derived(diagnostics.bridgeStatus === 'error' || diagnostics.bridgeStatus === 'not-ok')
+
   async function runBridgePing() {
     diagnostics.bridgeStatus = 'pinging'
     try {
@@ -142,10 +144,6 @@
         e.preventDefault()
         commandPaletteOpen = !commandPaletteOpen
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
-        e.preventDefault()
-        logStore.toggleDrawer()
-      }
     }
 
     window.addEventListener('keydown', handleKeydown)
@@ -170,57 +168,68 @@
   <div class="flex flex-1 overflow-hidden">
     <Sidebar activeTab={activeTab} onSelectAction={selectAction} />
 
-    <main class="flex-1 flex flex-col overflow-hidden bg-background">
-      {#if activeTab === 'build'}
-        <BuildView activeMod={activeMod} />
-      {:else if activeTab === 'order-series'}
-        <OrderSeriesView activeMod={activeMod} onNavigate={selectAction} />
-      {:else if activeTab === 'nus3-convert'}
-        <Nus3ConvertView activeMod={activeMod} />
-      {:else if activeTab === 'config-volume'}
-        <ConfigVolumeView activeMod={activeMod} />
-      {:else if activeTab === 'order-tracks'}
-        <OrderTracksView activeMod={activeMod} />
-      {:else if activeTab === 'manage-presets'}
-        <ManagePresetsView activeMod={activeMod} />
-      {:else if activeTab === 'manage-playlists'}
-        <ManagePlaylistsView activeMod={activeMod} />
-      {:else if activeTab === 'extract-icons'}
-        <ExtractIconsView activeMod={activeMod} mods={mods} />
-      {:else if activeTab === 'merge'}
-        <MergeView mods={mods} />
-      {/if}
-    </main>
-  </div>
+    <div class="flex min-w-0 flex-1 flex-col">
+      <main class="flex min-h-0 flex-1 flex-col overflow-hidden">
+        {#if activeTab === 'build'}
+          <BuildView activeMod={activeMod} />
+        {:else if activeTab === 'order-series'}
+          <OrderSeriesView activeMod={activeMod} onNavigate={selectAction} />
+        {:else if activeTab === 'nus3-convert'}
+          <Nus3ConvertView activeMod={activeMod} />
+        {:else if activeTab === 'config-volume'}
+          <ConfigVolumeView activeMod={activeMod} />
+        {:else if activeTab === 'order-tracks'}
+          <OrderTracksView activeMod={activeMod} />
+        {:else if activeTab === 'manage-presets'}
+          <ManagePresetsView activeMod={activeMod} />
+        {:else if activeTab === 'manage-playlists'}
+          <ManagePlaylistsView activeMod={activeMod} />
+        {:else if activeTab === 'extract-icons'}
+          <ExtractIconsView activeMod={activeMod} mods={mods} />
+        {:else if activeTab === 'merge'}
+          <MergeView mods={mods} />
+        {/if}
+      </main>
 
-  <BottomPanel diagnostics={diagnostics} onPingBridge={runBridgePing} />
+      <BottomPanel diagnostics={diagnostics} onPingBridge={runBridgePing} />
+
+      <footer class="flex h-[22px] shrink-0 items-center gap-4 bg-sb px-3.5 text-[11px] text-sb-ink">
+        {#if activeMod}
+          <span class="font-semibold text-sb-acc">{activeMod.name}</span>
+        {/if}
+        <span class={bridgeFailed ? 'text-destructive dark:text-sb-ink' : ''}>{$_('statusBar.bridge', { values: { status: diagnostics.bridgeStatus } })}</span>
+        <span class="flex-1"></span>
+        <span>{$_('statusBar.palette')}</span>
+      </footer>
+    </div>
+  </div>
 </div>
 
 {#if unsavedStore.pendingLeave}
   <Modal>
     <div class="px-5 py-4">
-      <h3 class="text-sm font-semibold">{$_('unsaved.title')}</h3>
+      <h3 class="text-[13.5px] font-semibold">{$_('unsaved.title')}</h3>
       <p class="pt-1.5 text-[13px] text-muted-foreground">{$_('unsaved.body')}</p>
     </div>
     <div class="flex flex-col gap-2 border-t border-border px-5 py-4">
       <button
         onclick={saveAndLeave}
         disabled={leaveSaving}
-        class="inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:opacity-60"
+        class="btn-primary h-8"
       >
         {$_('unsaved.save')}
       </button>
       <button
         onclick={leaveNow}
         disabled={leaveSaving}
-        class="inline-flex items-center justify-center rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:opacity-60"
+        class="btn h-8"
       >
         {$_('unsaved.discard')}
       </button>
       <button
         onclick={() => (unsavedStore.pendingLeave = null)}
         disabled={leaveSaving}
-        class="inline-flex items-center justify-center rounded-lg px-3 py-2 text-[12.5px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+        class="btn h-8 border-transparent text-muted-foreground"
       >
         {$_('unsaved.stay')}
       </button>

@@ -7,18 +7,20 @@ import type { LogLine } from './cli'
 
 const mocks = vi.hoisted(() => ({
   app: { isPackaged: false },
-  spawn: vi.fn()
+  spawn: vi.fn(),
+  spawnSync: vi.fn()
 }))
 
 vi.mock('electron', () => ({ app: mocks.app }))
-vi.mock('child_process', () => ({ spawn: mocks.spawn }))
+vi.mock('child_process', () => ({ spawn: mocks.spawn, spawnSync: mocks.spawnSync }))
 
 /** Minimal stand-in for the ChildProcess surface cli.ts actually touches. */
 class FakeProc extends EventEmitter {
   stdout = new EventEmitter()
   stderr = new EventEmitter()
-  stdin = { write: vi.fn() }
+  stdin = Object.assign(new EventEmitter(), { write: vi.fn() })
   kill = vi.fn()
+  pid = 4242
 
   out(chunk: string): void {
     this.stdout.emit('data', Buffer.from(chunk))
@@ -70,6 +72,7 @@ function messages(): string[] {
 beforeEach(async () => {
   vi.resetModules()
   mocks.spawn.mockReset()
+  mocks.spawnSync.mockReset()
   mocks.app.isPackaged = false
   procs = []
   lines = []
@@ -570,9 +573,41 @@ describe('shutdownDaemon', () => {
     expect(daemon.kill).toHaveBeenCalledTimes(1)
   })
 
+  it.each([
+    ['win32', 1],
+    ['linux', 0]
+  ] as const)('kills the process tree on %s only', async (platform, taskkills) => {
+    const done = cli.spawnCliAction(WS, 'config-volume-save', ['a'], onLine)
+    await flush()
+    lastProc().out('__DONE__\t1\t0\n')
+    await done
+    const original = process.platform
+    Object.defineProperty(process, 'platform', { value: platform })
+    try {
+      cli.shutdownDaemon()
+    } finally {
+      Object.defineProperty(process, 'platform', { value: original })
+    }
+
+    expect(mocks.spawnSync).toHaveBeenCalledTimes(taskkills)
+    if (taskkills) expect(mocks.spawnSync).toHaveBeenCalledWith('taskkill', ['/pid', '4242', '/T', '/F'])
+  })
+
   it('is a no-op when no daemon was started', () => {
     expect(() => cli.shutdownDaemon()).not.toThrow()
     expect(mocks.spawn).not.toHaveBeenCalled()
+  })
+
+  it('ignores a stdin EPIPE from a daemon that already exited', async () => {
+    const done = cli.spawnCliAction(WS, 'config-volume-save', ['a'], onLine)
+    await flush()
+    const daemon = lastProc()
+    daemon.out('__DONE__\t1\t0\n')
+    await done
+
+    cli.shutdownDaemon()
+
+    expect(() => daemon.stdin.emit('error', new Error('write EPIPE'))).not.toThrow()
   })
 
   it('survives a stdin write that throws', async () => {

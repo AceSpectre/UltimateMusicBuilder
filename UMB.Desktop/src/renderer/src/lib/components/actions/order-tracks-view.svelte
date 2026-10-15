@@ -1,7 +1,6 @@
 <script lang="ts">
   import ArrowDown from '@lucide/svelte/icons/arrow-down'
   import ArrowUp from '@lucide/svelte/icons/arrow-up'
-  import ArrowUpDown from '@lucide/svelte/icons/arrow-up-down'
   import GripVertical from '@lucide/svelte/icons/grip-vertical'
   import Lock from '@lucide/svelte/icons/lock'
   import LockOpen from '@lucide/svelte/icons/lock-open'
@@ -16,15 +15,16 @@
   import { modsStore } from '$lib/stores/mods.svelte'
   import { guardLeave, trackUnsaved } from '$lib/stores/unsaved.svelte'
   import { createSeriesSelection } from '$lib/series-selection.svelte'
-  import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
+  import ActionHeader from '$lib/components/ui/action-header.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
+  import MissingFileNote from '$lib/components/ui/missing-file-note.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import GameSelect from '$lib/components/ui/game-select.svelte'
   import { inSoundtest, overlayLegend, overlayStyle, seriesGameIds } from '$lib/song-overlay'
   import { nextSort, sortBy, type SortKey, type SortState } from '$lib/table-sort'
   import { RECORD_OPTIONS, applyChoice, missingDefaults, presetChoices, type PresetChoice } from '$lib/presets'
-  import { inputClass, secondaryButtonClass, textareaClass, toolbarButtonClass } from '$lib/ui-classes'
+  import { inputClass, textareaClass } from '$lib/ui-classes'
   import type { ModInfo, TrackOrderData, TrackOrderItem } from '$lib/types/electron'
 
   const FLIP_MS = 180
@@ -115,7 +115,6 @@
     return sortBy(dndItems, sort.desc, sortKeys[sort.column])
   })
 
-
   function isPinchTarget(item: TrackOrderItem): boolean {
     return Boolean(item.filename) && pinchTargets.has(item.filename)
   }
@@ -185,7 +184,6 @@
     }
   }
 
-
   $effect(() => {
     dndItems = orderData ? orderData.items : []
   })
@@ -254,8 +252,11 @@
     }
   }
 
+  // A new mod or series starts empty, so Save can never write the previous one's data into it.
   $effect(() => {
-    void loadOrderData(modsStore.activeSeriesPath)
+    const path = modsStore.activeSeriesPath
+    orderData = null
+    void loadOrderData(path)
   })
 
   const recordLabel = (value: string): string => $_(`orderTracks.record.${value}`, { default: value })
@@ -274,20 +275,11 @@
       onReload={handleReload}
     />
 
-    <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
-      <div class="gradient-strip h-[3px] shrink-0"></div>
-      <div class="shrink-0 border-b border-border px-4 py-3 flex items-center justify-between gap-4">
-        <div class="flex min-w-0 items-center gap-3">
-          <GradientIcon>
-            <ArrowUpDown size={18} />
-          </GradientIcon>
-          <h2 class="min-w-0 truncate text-sm font-semibold">{orderData?.seriesName ?? selection.selected?.name ?? $_('orderTracks.title')}</h2>
-        </div>
-
-        <div class="flex shrink-0 items-center gap-2">
+    <section class="surface-grain flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-card">
+      <ActionHeader title={$_('orderTracks.title')} subtitle={orderData?.seriesName ?? selection.selected?.name ?? ''}>
           <button
             onclick={() => (overlayOn = !overlayOn)}
-            class="{toolbarButtonClass} {overlayOn ? 'bg-muted' : ''}"
+            class="btn {overlayOn ? 'border-transparent bg-accbg text-accink' : ''}"
             disabled={!orderData}
             aria-pressed={overlayOn}
             title={$_('orderTracks.overlayHint')}
@@ -298,7 +290,7 @@
 
           <button
             onclick={() => (vanillaLocked = !vanillaLocked)}
-            class="{toolbarButtonClass} w-[140px] justify-center"
+            class="btn w-[130px]"
             disabled={!hasVanilla}
             aria-pressed={!vanillaLocked}
           >
@@ -308,7 +300,7 @@
 
           <button
             onclick={fillDefaults}
-            class={secondaryButtonClass}
+            class="btn"
             disabled={!orderData}
             title={$_('orderTracks.fillDefaultsHint')}
           >
@@ -317,18 +309,18 @@
           </button>
 
           <DropdownMenu.Root>
-            <DropdownMenu.Trigger class={toolbarButtonClass} disabled={!selectedItem?.fields} title={$_('orderTracks.applyPresetHint')}>
+            <DropdownMenu.Trigger class="btn" disabled={!selectedItem?.fields} title={$_('orderTracks.applyPresetHint')}>
               <Wand2 size={14} />
               {$_('orderTracks.applyPreset')}
             </DropdownMenu.Trigger>
             <DropdownMenu.Portal>
-              <DropdownMenu.Content align="end" sideOffset={4} class="z-50 min-w-[160px] rounded-lg border border-border bg-card p-1 text-[12.5px] shadow-lg">
+              <DropdownMenu.Content align="end" sideOffset={4} class="shadow-overlay z-50 min-w-[160px] rounded border border-border bg-popover p-1 text-[12.5px]">
                 {#each choices as choice, index}
                   {#if index > 0 && choices[index - 1].kind !== choice.kind}
-                    <DropdownMenu.Separator class="my-1 h-px bg-border" />
+                    <DropdownMenu.Separator class="my-1 h-px bg-line2" />
                   {/if}
                   <DropdownMenu.Item
-                    class="cursor-pointer rounded px-2 py-1.5 outline-none data-[highlighted]:bg-muted"
+                    class="cursor-pointer rounded px-2 py-1.5 outline-none data-[highlighted]:bg-accent"
                     onSelect={() => applyPreset(choice)}
                   >
                     {choice.kind === 'series' ? $_('orderTracks.presetSeriesDefault') : choice.label || $_('managePresets.unnamed')}
@@ -342,24 +334,20 @@
             {saveState}
             onclick={handleSave}
             disabled={!orderData || !isDirty || saveState === 'saving'}
-            save={$_('orderTracks.save')}
-            saving={$_('orderTracks.saving')}
-            saved={$_('orderTracks.saved')}
           />
-        </div>
-      </div>
+      </ActionHeader>
 
       {#if orderData && legend.length > 0}
-        <div class="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border px-4 py-1.5">
+        <div class="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-line2 px-[22px] py-1.5">
           {#each legend as entry}
-            <span class="rounded border border-border bg-background px-2 py-0.5 text-[11px]" style={entry.style}>{entry.label}</span>
+            <span class="chip" style={entry.style}>{entry.label}</span>
           {/each}
         </div>
       {/if}
 
-      <div class="min-h-0 flex-1 overflow-auto p-1">
+      <div class="min-h-0 flex-1 overflow-auto px-[22px] py-3.5">
         {#if orderLoading}
-          <div class="grid h-full min-h-[320px] place-items-center rounded-2xl border border-dashed border-border bg-background/60 text-[13px] text-muted-foreground">
+          <div class="grid h-full min-h-[320px] place-items-center rounded-xl border border-dashed border-border text-[13px] text-muted-foreground">
             {$_('orderTracks.loadingOrder')}
           </div>
         {:else if orderData}
@@ -371,13 +359,13 @@
 
           <div class="min-w-[1000px]">
             <div
-              class="sticky z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
-              style="{GRID_COLUMNS} top: -5px"
+              class="sticky z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 kicker"
+              style="{GRID_COLUMNS} top: -14px"
             >
               {#each COLUMNS as column}
                 <button
                   type="button"
-                  class="inline-flex items-center gap-1 uppercase tracking-wide hover:text-foreground {CENTERED_COLUMNS.has(column.id) ? 'justify-center' : ''}"
+                  class="inline-flex items-center gap-1 uppercase tracking-[.1em] hover:text-foreground {CENTERED_COLUMNS.has(column.id) ? 'justify-center' : ''}"
                   onclick={() => (sort = nextSort(sort, column.id))}
                 >
                   {$_(column.label)}
@@ -399,7 +387,7 @@
                 {@const isSelected = !readOnly && item.id === selectedItemId}
                 <div
                   animate:flip={{ duration: FLIP_MS }}
-                  class="grid items-center gap-1 rounded border px-1 py-0.5 {readOnly ? 'border-border bg-background/75 opacity-80' : isSelected ? 'border-transparent bg-background ring-1 ring-[hsl(var(--gradient-from))]' : 'border-border bg-background/75'}"
+                  class="grid items-center gap-1 rounded border px-1 py-0.5 {readOnly ? 'border-line2 opacity-80' : isSelected ? 'border-primary bg-accbg/40' : 'border-line2 hover:border-border'}"
                   style="{GRID_COLUMNS} {overlayOn ? overlayStyle(item, gameIds) : ''}"
                   role="listitem"
                   onfocusincapture={() => { if (!readOnly) selectedItemId = item.id }}
@@ -408,7 +396,7 @@
                   <div class="flex items-center gap-1">
                     <span class="w-6 text-right text-[11px] tabular-nums text-muted-foreground">{dndItems.indexOf(item) + 1}</span>
                     {#if readOnly}
-                      <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted/70 text-muted-foreground" title={$_('orderTracks.locked')}>
+                      <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded text-dim" title={$_('orderTracks.locked')}>
                         <Lock size={13} />
                       </div>
                     {:else}
@@ -416,7 +404,7 @@
                         use:dragHandle
                         aria-label={$_('orderTracks.dragAria')}
                         title={canDrag ? '' : $_('orderTracks.sortedDragHint')}
-                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-muted text-muted-foreground {canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-50'}"
+                        class="flex h-6 w-6 shrink-0 items-center justify-center rounded text-dim hover:bg-accent hover:text-foreground {canDrag ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed opacity-50'}"
                       >
                         <GripVertical size={14} />
                       </div>
@@ -425,12 +413,15 @@
 
                   {#if item.fields && !readOnly}
                     {@const f = item.fields}
-                    <textarea
-                      class="{textareaClass} {item.isVanilla ? 'italic' : ''}"
-                      bind:value={f.title}
-                      title={item.isVanilla ? $_('orderTracks.vanillaHint') : ''}
-                      aria-label={$_('orderTracks.colTitle')}
-                    ></textarea>
+                    <div class="flex min-w-0 flex-col">
+                      <textarea
+                        class="{textareaClass} {item.isVanilla ? 'italic' : ''}"
+                        bind:value={f.title}
+                        title={item.isVanilla ? $_('orderTracks.vanillaHint') : ''}
+                        aria-label={$_('orderTracks.colTitle')}
+                      ></textarea>
+                      <MissingFileNote missing={item.missing} class="px-1.5" />
+                    </div>
 
                     {#if orderData.games.length > 0}
                       <GameSelect bind:value={f.game} games={orderData.games} label={$_('orderTracks.colGame')} />
@@ -471,7 +462,7 @@
                     <div class="flex items-center justify-center">
                       <input
                         type="checkbox"
-                        class="h-4 w-4 accent-[hsl(var(--gradient-from))]"
+                        class="h-4 w-4 accent-primary"
                         checked={inSoundtest(f)}
                         aria-label={$_('orderTracks.colInSoundtest')}
                         onchange={(event) => {
@@ -482,7 +473,10 @@
                   {:else}
                     <!-- Locked row: its current values, read-only, in the same grid as editable rows -->
                     {@const f = item.fields}
-                    <span class="{lockedCellClass} font-medium {item.isVanilla ? 'italic' : ''}">{f?.title ?? item.title}</span>
+                    <div class="flex min-w-0 flex-col self-center">
+                      <span class="{lockedCellClass} font-medium {item.isVanilla ? 'italic' : ''}">{f?.title ?? item.title}</span>
+                      <MissingFileNote missing={item.missing} class="px-1.5" />
+                    </div>
                     <span class={lockedCellClass}>{f ? gameName(f.game) : ''}</span>
                     <span class={lockedCellClass}>{f?.author ?? ''}</span>
                     <span class={lockedCellClass}>{f?.copyright ?? ''}</span>
@@ -497,7 +491,7 @@
             </div>
           </div>
         {:else}
-          <EmptyState dashed title={$_('orderTracks.emptyTitle')} body={$_('orderTracks.emptyBody')}>
+          <EmptyState dashed title={$_('orderTracks.emptyTitle')} body={$_('common.selectSeries')}>
             {#snippet icon()}<Music4 size={20} />{/snippet}
           </EmptyState>
         {/if}

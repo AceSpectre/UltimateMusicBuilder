@@ -13,8 +13,9 @@
   import { settingsStore } from '$lib/stores/settings.svelte'
   import { createSeriesLoader } from '$lib/series-loader'
   import { DB_INPUT, dbToGain, formatBankDb, formatDb, parseDb } from '$lib/volume'
-  import GradientIcon from '$lib/components/ui/gradient-icon.svelte'
+  import ActionHeader from '$lib/components/ui/action-header.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
+  import MissingFileNote from '$lib/components/ui/missing-file-note.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import type { ModInfo, ModSeriesInfo, VolumeConfigData, VolumeRowItem, VolumeProgress } from '$lib/types/electron'
@@ -35,8 +36,8 @@
   let seriesDb = $state(0)
   let baselineSeriesDb = $state(0)
   const seriesLoader = createSeriesLoader((v) => (loading = v))
-  const thClass = 'px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground'
-  const dbInputClass = 'h-8 w-[88px] rounded-lg border border-input bg-background px-2 text-right font-mono text-[12px] focus:outline-none focus:ring-2 focus:ring-ring'
+  const thClass = 'px-3 py-2 kicker'
+  const dbInputClass = 'field w-[88px] text-right tabular-nums text-[12px]'
 
   // Web Audio preview
   let audioCtx: AudioContext | null = null
@@ -163,7 +164,6 @@
       saveState = 'idle'
     }
   }
-
 
   function stopPreview() {
     if (sourceNode) {
@@ -299,26 +299,13 @@
       onReload={handleReload}
     />
 
-    <section class="flex h-full min-h-0 min-w-0 flex-1 flex-col border border-border bg-card overflow-hidden">
-      <div class="gradient-strip h-[3px] shrink-0"></div>
-
-      <div class="shrink-0 border-b border-border px-5 py-3 flex items-center justify-between gap-4">
-        <div class="flex min-w-0 items-center gap-3">
-          <GradientIcon>
-            <Volume2 size={18} />
-          </GradientIcon>
-          <div class="min-w-0">
-            <h2 class="truncate text-sm font-semibold">{$_('configVolume.title')}</h2>
-            <p class="truncate text-[12.5px] text-muted-foreground">{selectedSeries?.name ?? ''}</p>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-2">
+    <section class="surface-grain flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-card">
+      <ActionHeader title={$_('configVolume.title')} subtitle={selectedSeries?.name ?? ''}>
           {#if data && rows.length > 0}
-            <span class="shrink-0 inline-flex h-[22px] items-center rounded-full border border-border bg-muted px-2 text-[11px] font-medium text-muted-foreground">
+            <span class="chip">
               {$_('configVolume.globalLabel', { values: { value: formatDb(data.globalDb) } })}
             </span>
-            <span class="shrink-0 inline-flex h-[22px] items-center rounded-full border border-border bg-muted px-2 text-[11px] font-medium text-muted-foreground">
+            <span class="chip">
               {$_('configVolume.targetLabel', { values: { value: data.targetLufs.toFixed(1) } })}
             </span>
           {/if}
@@ -326,12 +313,7 @@
             <button
               onclick={handleAnalyze}
               title={data?.ffmpegAvailable ? $_('configVolume.analyzeHint') : $_('configVolume.ffmpegWarning')}
-              class="shrink-0 inline-flex items-center gap-2 rounded-lg px-3 py-2 text-[12.5px] font-medium transition-colors {needsAnalysis
-                ? 'border-0 text-white'
-                : 'border border-input bg-background hover:bg-muted'}"
-              style={needsAnalysis
-                ? 'background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 4px 14px -2px hsl(var(--gradient-from) / .35);'
-                : ''}
+              class="{needsAnalysis ? 'btn-primary' : 'btn'} shrink-0"
             >
               <Activity size={14} />
               {needsAnalysis ? $_('configVolume.analyze') : $_('configVolume.reanalyze')}
@@ -342,26 +324,20 @@
             onclick={handleSave}
             disabled={!data || rows.length === 0 || !isDirty || saveState === 'saving'}
             save={$_('configVolume.save')}
-            saving={$_('configVolume.saving')}
-            saved={$_('configVolume.saved')}
           />
-        </div>
-      </div>
+      </ActionHeader>
 
       {#if analyzing}
         <div class="grid h-full min-h-[320px] place-items-center">
           <div class="flex w-full max-w-[400px] flex-col items-center gap-4 px-6 text-center">
             {#if analyzeProgress}
               {@const pct = Math.round((analyzeProgress.completed / analyzeProgress.total) * 100)}
-              <Activity size={36} class="animate-pulse" style="color: hsl(var(--gradient-from));" />
-              <p class="text-sm font-semibold">
+              <Activity size={28} class="animate-pulse text-primary" />
+              <p class="text-[13.5px] font-semibold">
                 {$_('configVolume.analyzingProgress', { values: { completed: analyzeProgress.completed, total: analyzeProgress.total } })}
               </p>
-              <div class="w-full overflow-hidden rounded-full border border-border bg-muted" style="height: 8px;">
-                <div
-                  class="h-full rounded-full transition-all duration-300 ease-out"
-                  style="width: {pct}%; background: linear-gradient(90deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));"
-                ></div>
+              <div class="h-1.5 w-full overflow-hidden rounded-sm bg-muted">
+                <div class="h-full bg-primary transition-all duration-300 ease-out" style="width: {pct}%;"></div>
               </div>
               <p class="flex items-center gap-1.5 text-[12px] text-muted-foreground">
                 <span class="font-semibold">{pct}%</span>
@@ -369,20 +345,20 @@
                 <span class="truncate">{analyzeProgress.currentFile}</span>
               </p>
             {:else}
-              <RefreshCw size={36} class="animate-spin" style="color: hsl(var(--gradient-from));" />
-              <p class="text-sm font-semibold">{$_('configVolume.analyzing')}</p>
+              <RefreshCw size={28} class="animate-spin text-primary" />
+              <p class="text-[13.5px] font-semibold">{$_('configVolume.analyzing')}</p>
             {/if}
           </div>
         </div>
       {:else if !selectedSeries}
-        <EmptyState body={$_('configVolume.chooseSeries')}>
+        <EmptyState body={$_('common.selectSeries')}>
           {#snippet icon()}<Volume2 size={20} />{/snippet}
         </EmptyState>
       {:else if loadingConfig}
         <div class="grid h-full min-h-[320px] place-items-center">
           <div class="flex flex-col items-center gap-4 text-center">
-            <RefreshCw size={36} class="animate-spin" style="color: hsl(var(--gradient-from));" />
-            <p class="text-sm font-semibold">{$_('configVolume.loadingTracks')}</p>
+            <RefreshCw size={28} class="animate-spin text-primary" />
+            <p class="text-[13.5px] font-semibold">{$_('configVolume.loadingTracks')}</p>
           </div>
         </div>
       {:else if rows.length === 0}
@@ -390,10 +366,10 @@
           <p class="max-w-[340px] px-6 text-center text-[13px] text-muted-foreground">{$_('configVolume.empty')}</p>
         </div>
       {:else}
-        <div class="min-h-0 flex-1 overflow-auto bg-background px-5 py-3">
+        <div class="min-h-0 flex-1 overflow-auto px-[22px] py-3.5">
           <p class="mb-3 max-w-[820px] text-[12.5px] leading-relaxed text-muted-foreground">{$_('configVolume.intro')}</p>
 
-          <div class="mb-3 flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2">
+          <div class="mb-3 flex items-center gap-3 rounded-xl border border-line2 px-[13px] py-2">
             <label for="series-db" class="text-[12.5px] font-semibold">{$_('configVolume.seriesDb')}</label>
             <input
               id="series-db"
@@ -407,21 +383,21 @@
           </div>
 
           {#if data && !data.ffmpegAvailable}
-            <div class="mb-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-[12px]" style="border-color: hsl(38 92% 50% / .4); background: hsl(38 92% 50% / .1); color: hsl(38 92% 35%);">
+            <div class="mb-3 flex items-start gap-2 rounded-lg border border-line2 px-3 py-2 text-[12px] text-warn">
               <AlertTriangle size={15} class="mt-0.5 shrink-0" />
               <span>{$_('configVolume.ffmpegWarning')}</span>
             </div>
           {:else if needsAnalysis}
-            <div class="mb-3 flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">
+            <div class="mb-3 flex items-start gap-2 rounded-lg border border-line2 px-3 py-2 text-[12px] text-muted-foreground">
               <Activity size={15} class="mt-0.5 shrink-0" />
               <span>{$_('configVolume.notAnalyzed')}</span>
             </div>
           {/if}
 
-          <div class="overflow-hidden rounded-xl border border-border bg-card">
+          <div class="overflow-hidden rounded-xl border border-border">
             <table class="w-full border-collapse text-[12.5px]">
               <thead class="sticky top-0">
-                <tr style="background: hsl(var(--muted) / .5);">
+                <tr class="bg-card">
                   <th class="w-full text-left {thClass}">{$_('configVolume.colTrack')}</th>
                   <th class="whitespace-nowrap text-right {thClass}">{$_('configVolume.colMeasured')}</th>
                   <th class="whitespace-nowrap text-right {thClass}">{$_('configVolume.colAutoGain')}</th>
@@ -435,31 +411,32 @@
                 {#each rows as row (row.originalIndex)}
                   {@const isPlaying = playingIndex === row.originalIndex}
                   {@const isPreviewLoading = previewLoadingIndex === row.originalIndex}
-                  <tr class="border-t border-border transition-colors hover:bg-muted/40">
+                  <tr class="border-t border-line2 transition-colors duration-100 hover:bg-accent">
                     <td class="w-full max-w-0 px-3 py-2">
                       <div class="flex min-w-0 flex-col">
                         <span class="truncate font-semibold">{row.title}</span>
                         <span class="truncate text-[11px] text-muted-foreground">{row.isVanilla ? `${$_('orderTracks.vanillaTag')} · ` : ''}{row.filename}</span>
+                        <MissingFileNote missing={row.missing} />
                       </div>
                     </td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px]">
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[12px]">
                       {row.hasMeasurement ? `${row.measuredLufs.toFixed(1)} LUFS` : '—'}
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-right">
                       <div class="flex items-center justify-end gap-1.5">
                         {#if row.wasClamped}
-                          <span title={$_('configVolume.clampWarning')} style="color: hsl(38 92% 45%);">
+                          <span title={$_('configVolume.clampWarning')} class="text-warn">
                             <AlertTriangle size={13} />
                           </span>
                         {/if}
-                        <span class="font-mono text-[12px]">{row.hasMeasurement ? formatDb(row.autoGainDb) : '—'}</span>
+                        <span class="tabular-nums text-[12px]">{row.hasMeasurement ? formatDb(row.autoGainDb) : '—'}</span>
                       </div>
                     </td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px]">
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[12px]">
                       {row.hasMeasurement || row.isVanilla ? formatBankDb(row.bankBaseDb + row.autoGainDb) : '—'}
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-right">
-                      <div class="flex items-center justify-end gap-2 font-mono text-[12px]">
+                      <div class="flex items-center justify-end gap-2 tabular-nums text-[12px]">
                         {@render boost(data?.globalDb ?? 0, $_('configVolume.globalCaption'), $_('configVolume.globalHint'))}
                         <span class="text-muted-foreground">+</span>
                         {@render boost(seriesDb, $_('configVolume.seriesCaption'), $_('configVolume.seriesDbHint'))}
@@ -474,14 +451,13 @@
                         />
                       </div>
                     </td>
-                    <td class="whitespace-nowrap px-3 py-2 text-right font-mono text-[12px] font-semibold">{formatBankDb(row.bankBaseDb + effectiveDb(row))}</td>
+                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[12px] font-semibold">{formatBankDb(row.bankBaseDb + effectiveDb(row))}</td>
                     <td class="whitespace-nowrap px-3 py-2 text-right">
                       <button
                         onclick={() => togglePreview(row)}
                         disabled={isPreviewLoading}
                         title={isPlaying ? $_('configVolume.stop') : $_('configVolume.play')}
-                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border-0 text-white disabled:opacity-60"
-                        style="background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 4px 14px -2px hsl(var(--gradient-from) / .35);"
+                        class="btn-icon"
                       >
                         {#if isPreviewLoading}
                           <RefreshCw size={13} class="animate-spin" />

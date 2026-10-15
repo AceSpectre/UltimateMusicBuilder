@@ -6,7 +6,8 @@ namespace UMB.CLI.Desktop
 {
     // ── Mods ───────────────────────────────────────────────────────────────
     public record ModInfo(string Name, string Path);
-    public record ModStats(int SeriesCount, int TrackCount);
+    /// <summary>One entry cleanup removes: the file it is in, relative to the mod, and the entry.</summary>
+    public record CleanupItem(string File, string Entry);
 
     // ── Series order ───────────────────────────────────────────────────────
     public record SeriesGame(string Id, string Name);
@@ -53,7 +54,7 @@ namespace UMB.CLI.Desktop
     }
 
     public record TrackOrderItem(string Id, string Title, string Subtitle, string BgmId, string Filename,
-        bool IsLocked, int? OriginalIndex, TrackFields Fields, bool IsPinchTarget, bool IsVanilla);
+        bool IsLocked, int? OriginalIndex, TrackFields Fields, bool IsPinchTarget, bool IsVanilla, bool Missing = false);
 
     public record VanillaSongOption(string InfoId, string Name);
 

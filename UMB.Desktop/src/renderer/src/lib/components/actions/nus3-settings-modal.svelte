@@ -28,13 +28,12 @@
   onkeydown={(e) => { if (e.key === 'Escape') onClose() }}
   onclick={(e) => { if (e.target === e.currentTarget) onClose() }}
 >
-  <div class="w-[400px] rounded-xl border border-border bg-card shadow-2xl">
-    <div class="gradient-strip h-[3px] rounded-t-xl"></div>
+  <div class="w-[400px] rounded-xl border border-border bg-card shadow-overlay">
     <div class="flex items-center justify-between border-b border-border px-5 py-3">
-      <h2 class="text-sm font-semibold">{$_('nus3Convert.settingsTitle')}</h2>
+      <h2 class="text-[13.5px] font-semibold">{$_('nus3Convert.settingsTitle')}</h2>
       <button
         onclick={onClose}
-        class="inline-flex h-7 w-7 items-center justify-center rounded-lg hover:bg-accent transition-colors"
+        class="inline-flex h-[26px] w-[26px] items-center justify-center rounded text-dim transition-colors duration-100 hover:bg-accent hover:text-foreground"
       >
         <X size={14} />
       </button>
@@ -51,7 +50,7 @@
           min="0"
           max="100"
           bind:value={minScore}
-          class="h-9 rounded-lg border border-input bg-background px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
+          class="field"
         />
         <p class="text-[11px] text-muted-foreground">{$_('nus3Convert.settingsMinScoreHint')}</p>
       </div>
@@ -66,7 +65,7 @@
           min="1"
           max="30"
           bind:value={previewLen}
-          class="h-9 rounded-lg border border-input bg-background px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
+          class="field"
         />
         <p class="text-[11px] text-muted-foreground">{$_('nus3Convert.settingsPreviewLengthHint')}</p>
       </div>
@@ -80,7 +79,7 @@
           step="0.5"
           min="0"
           bind:value={minLoopDuration}
-          class="h-9 rounded-lg border border-input bg-background px-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-ring"
+          class="field"
         />
         <p class="text-[11px] text-muted-foreground">{$_('nus3Convert.settingsMinLoopDurationHint')}</p>
       </div>
@@ -88,7 +87,7 @@
         <input
           type="checkbox"
           bind:checked={disablePruning}
-          class="mt-0.5 h-4 w-4 shrink-0 rounded border-input"
+          class="mt-0.5 h-4 w-4 shrink-0 accent-primary"
         />
         <span class="flex flex-col gap-0.5">
           <span class="text-[13px] font-medium">{$_('nus3Convert.settingsDisablePruning')}</span>
@@ -99,14 +98,13 @@
     <div class="flex justify-end gap-2 border-t border-border px-5 py-3">
       <button
         onclick={onClose}
-        class="inline-flex h-8 items-center rounded-md border border-border bg-background px-3 text-[12.5px] font-medium transition-colors hover:bg-muted"
+        class="btn"
       >
         {$_('nus3Convert.settingsClose')}
       </button>
       <button
         onclick={() => onApply({ minScoreThreshold: minScore, previewLength: previewLen, minLoopDuration, disablePruning })}
-        class="inline-flex h-8 items-center rounded-md border-0 px-3 text-[12.5px] font-medium text-white transition-colors"
-        style="background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 4px 14px -2px hsl(var(--gradient-from) / .35);"
+        class="btn-primary"
       >
         {$_('nus3Convert.settingsSave')}
       </button>

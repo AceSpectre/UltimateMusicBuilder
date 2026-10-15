@@ -63,9 +63,10 @@ namespace UMB.CLI.Services
             }
         }
 
-        /// <summary>Rows other than vanilla song edits; 0 when the file is missing or unreadable.</summary>
-        public static int CountDataRows(string csvPath) =>
-            ReadLenient(csvPath).Count(r => !FolderMusicMod.IsVanillaBgmId(r.Get("filename")));
+        /// <summary>A row whose audio file is not in the series folder; vanilla song edits have no file.</summary>
+        public static bool IsMissingFile(string seriesDir, string filename) =>
+            !FolderMusicMod.IsVanillaBgmId(filename) && !File.Exists(Path.Combine(seriesDir, filename));
+
 
         private static (List<CsvRow> rows, string[] headers) Read(string csvPath, TrimOptions trim)
         {

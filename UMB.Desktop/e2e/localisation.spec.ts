@@ -34,8 +34,8 @@ test('sidebar labels match locale strings', async () => {
 
   // see src/renderer/src/lib/actions.ts
   const expectedLabels = [
-    'Build',
-    'Nus3 Convert', 'Config Volume',
+    'Build & Setup',
+    'Add Music', 'Config Volume',
     'Manage Series', 'Manage Songs',
     'Merge', 'Extract Icons'
   ]

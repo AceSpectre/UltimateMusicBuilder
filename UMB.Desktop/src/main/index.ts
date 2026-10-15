@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { statSync } from 'fs'
 import { join, resolve } from 'path'
 import { homedir, tmpdir } from 'os'
 import { macToolPath, packagedWorkspacePath } from './runtime-paths'
@@ -14,7 +15,7 @@ import type {
 let mainWindow: BrowserWindow | null = null
 
 if (process.platform === 'darwin') {
-  process.env.PATH = macToolPath(process.env.PATH ?? '', homedir(), process.env.PIPX_BIN_DIR)
+  process.env.PATH = macToolPath(process.env.PATH ?? '', homedir(), process.env.UV_TOOL_BIN_DIR)
 }
 
 if (process.env['NODE_ENV'] === 'test') {
@@ -116,9 +117,18 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(IPC.LIST_MOD_SERIES, (_event, modPath: string) => api('mod-series-list', { modPath }))
 
-  ipcMain.handle(IPC.GET_MOD_STATS, (_event, modPath: string) => api('mod-stats', { modPath }))
+  // Folders only: shell.openPath would also launch files.
+  ipcMain.handle(IPC.OPEN_FOLDER, (_event, path: string) => {
+    if (statSync(path, { throwIfNoEntry: false })?.isDirectory()) void shell.openPath(path)
+  })
 
   ipcMain.handle(IPC.CHECK_BUILD_VOLUMES, (_event, modName: string | null) => api('build-volume-check', { modName }))
+
+  ipcMain.handle(IPC.CHECK_SETUP, () => api('setup-check'))
+
+  ipcMain.handle(IPC.PREVIEW_CLEANUP, (_event, modPath: string) => api('cleanup-preview', { modPath }))
+
+  ipcMain.handle(IPC.RUN_CLEANUP, (_event, modPath: string) => api('cleanup-run', { modPath }))
 
   ipcMain.handle(IPC.RESET_ALL_VOLUMES, () => api('volume-reset-all'))
 

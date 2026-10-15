@@ -5,13 +5,12 @@
   import PanelLeftOpen from '@lucide/svelte/icons/panel-left-open'
   import RefreshCw from '@lucide/svelte/icons/refresh-cw'
   import { _ } from 'svelte-i18n'
-  import GradientIcon from './gradient-icon.svelte'
   import IconButton from './icon-button.svelte'
   import SearchableList from './searchable-list.svelte'
   import { matchesSearch } from '$lib/search'
   import type { ModInfo, ModSeriesInfo } from '$lib/types/electron'
 
-  // Left-hand series sidebar shared by Manage Songs / Config Volume / Nus3 Convert.
+  // Left-hand series sidebar shared by Manage Songs / Config Volume / Add Music.
   let {
     activeMod,
     series,
@@ -38,26 +37,20 @@
 </script>
 
 <section
-  class="flex h-full min-h-0 shrink-0 flex-col border border-border bg-card overflow-hidden transition-[width] duration-150 {collapsed ? 'w-[46px]' : 'w-[220px]'}"
+  class="surface-grain flex h-full min-h-0 shrink-0 flex-col overflow-hidden border-r border-border bg-rail {collapsed ? 'w-[46px]' : 'w-[220px]'}"
 >
-  <div class="gradient-strip h-[3px] shrink-0"></div>
   {#if collapsed}
     <div class="flex flex-1 flex-col items-center gap-2 py-3">
       <IconButton onclick={() => (collapsed = false)} title={$_('seriesPicker.expand')}>
         <PanelLeftOpen size={15} />
       </IconButton>
-      <GradientIcon size="sm">
-        <Folder size={16} />
-      </GradientIcon>
-      <span class="text-[11px] text-muted-foreground">{series.length}</span>
+      <Folder size={14} class="text-dim" />
+      <span class="text-[11px] text-dim">{series.length}</span>
     </div>
   {:else}
-    <div class="shrink-0 border-b border-border px-4 py-3">
-      <div class="flex items-center gap-2">
-        <GradientIcon>
-          <Folder size={18} />
-        </GradientIcon>
-        <h2 class="min-w-0 flex-1 truncate text-sm font-semibold">{$_('seriesPicker.heading')}</h2>
+    <div class="shrink-0 border-b border-line2 px-3 py-2">
+      <div class="flex items-center gap-1.5">
+        <h2 class="min-w-0 flex-1 truncate kicker">{$_('seriesPicker.heading')}</h2>
         {#if actions}
           {@render actions()}
         {/if}
@@ -82,8 +75,8 @@
       />
     {:else}
       <div class="min-h-0 flex-1 overflow-auto p-2">
-        <div class="rounded-xl border border-dashed border-border bg-background/70 px-3 py-8 text-center text-[13px] text-muted-foreground">
-          {$_(!activeMod ? 'seriesPicker.chooseMod' : loading ? 'seriesPicker.loading' : 'seriesPicker.noSeries')}
+        <div class="rounded-xl border border-dashed border-border px-3 py-8 text-center text-[12.5px] text-muted-foreground">
+          {$_(!activeMod ? 'common.chooseMod' : loading ? 'seriesPicker.loading' : 'seriesPicker.noSeries')}
         </div>
       </div>
     {/if}

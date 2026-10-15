@@ -23,7 +23,8 @@ const item = (f: TrackFields | null): TrackOrderItem => ({
   isLocked: f === null,
   originalIndex: 0,
   fields: f,
-  isVanilla: false
+  isVanilla: false,
+  missing: false
 })
 
 describe('seriesGameIds', () => {

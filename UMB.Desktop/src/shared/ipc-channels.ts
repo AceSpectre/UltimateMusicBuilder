@@ -1,8 +1,11 @@
 export const IPC = {
   LIST_MODS: 'umb:list-mods',
   LIST_MOD_SERIES: 'umb:list-mod-series',
-  GET_MOD_STATS: 'umb:get-mod-stats',
+  OPEN_FOLDER: 'umb:open-folder',
   CHECK_BUILD_VOLUMES: 'umb:check-build-volumes',
+  CHECK_SETUP: 'umb:check-setup',
+  PREVIEW_CLEANUP: 'umb:preview-cleanup',
+  RUN_CLEANUP: 'umb:run-cleanup',
   RESET_ALL_VOLUMES: 'umb:reset-all-volumes',
   LOAD_TRACK_ORDER: 'umb:load-track-order',
   SAVE_TRACK_ORDER: 'umb:save-track-order',

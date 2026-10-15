@@ -80,7 +80,7 @@ test('UI: create a playlist, add a song, give it to a stage and save to playlist
   await page.getByRole('button', { name: 'Done' }).click()
 
   await page.getByRole('tab', { name: 'Stages' }).click()
-  await page.getByPlaceholder('Search stages...').fill('ui_stage_battle_field')
+  await page.getByPlaceholder('Search stages…').fill('ui_stage_battle_field')
   await page.getByRole('row', { name: /^Battlefield/ }).getByLabel('Playlist').selectOption('bgmeemix')
 
   await page.getByRole('button', { name: 'Save Changes' }).click()

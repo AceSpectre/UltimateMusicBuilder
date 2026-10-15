@@ -2,7 +2,6 @@
   import AlertTriangle from '@lucide/svelte/icons/alert-triangle'
   import FlaskConical from '@lucide/svelte/icons/flask-conical'
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw'
-  import Settings from '@lucide/svelte/icons/settings'
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal'
   import Volume2 from '@lucide/svelte/icons/volume-2'
   import { _ } from 'svelte-i18n'
@@ -91,10 +90,10 @@
   }
 </script>
 
-{#snippet tabButton(id: 'general' | 'experimental', Icon: typeof Settings, label: string)}
+{#snippet tabButton(id: 'general' | 'experimental', Icon: typeof Volume2, label: string)}
   <button
     onclick={() => (tab = id)}
-    class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-medium transition-colors {tab === id ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/60'}"
+    class="inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-[12.5px] font-medium transition-colors duration-100 {tab === id ? 'bg-accbg text-accink' : 'text-muted-foreground hover:bg-accent hover:text-foreground'}"
   >
     <Icon size={13} />
     {label}
@@ -109,16 +108,16 @@
       aria-checked={value}
       aria-labelledby="{id}-label"
       onclick={() => { set(!value); markEdited() }}
-      class="relative h-5 w-9 shrink-0 rounded-full transition-colors {value ? onClass : 'bg-muted-foreground/30'}"
+      class="relative h-5 w-9 shrink-0 rounded-full transition-colors {value ? onClass : 'bg-dim/50'}"
     >
-      <span class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-background shadow transition-transform {value ? 'translate-x-4' : ''}"></span>
+      <span class="absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-card transition-transform {value ? 'translate-x-4' : ''}"></span>
     </button>
   </div>
 {/snippet}
 
 {#snippet toggle(id: string, label: string, hint: string, value: boolean, set: (value: boolean) => void)}
   <div class="flex flex-col gap-1">
-    {@render switchRow(id, label, value, set, 'bg-[hsl(var(--gradient-from))]')}
+    {@render switchRow(id, label, value, set, 'bg-primary')}
     <p class="text-[11.5px] text-muted-foreground">{$_(hint)}</p>
   </div>
 {/snippet}
@@ -132,25 +131,16 @@
   >
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="w-full max-w-[420px] rounded-xl border border-border bg-popover shadow-2xl overflow-hidden"
+      class="w-full max-w-[420px] rounded-xl border border-border bg-popover shadow-overlay overflow-hidden"
       onclick={(e) => e.stopPropagation()}
       onkeydown={(e) => e.stopPropagation()}
     >
-      <div class="gradient-strip h-[3px] shrink-0"></div>
-      <div class="border-b border-border px-5 py-4 flex items-center gap-3">
-        <div
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border"
-          style="background: linear-gradient(135deg, hsl(var(--gradient-from) / .13), hsl(var(--gradient-to) / .16)); color: hsl(var(--gradient-from));"
-        >
-          <Settings size={18} />
-        </div>
-        <div class="min-w-0">
-          <h2 class="truncate text-sm font-semibold">{$_('settings.title')}</h2>
-          <p class="truncate text-[12.5px] text-muted-foreground">{$_('settings.subtitle')}</p>
-        </div>
+      <div class="border-b border-border px-5 py-4">
+        <h2 class="text-[13.5px] font-semibold">{$_('settings.title')}</h2>
+        <p class="mt-[3px] text-[12.5px] text-muted-foreground">{$_('settings.subtitle')}</p>
       </div>
 
-      <div class="flex items-center gap-1 border-b border-border px-2 py-1.5">
+      <div class="flex items-center gap-1 border-b border-line2 px-2 py-1.5">
         {@render tabButton('general', SlidersHorizontal, $_('settings.tabGeneral'))}
         {@render tabButton('experimental', FlaskConical, $_('settings.tabExperimental'))}
       </div>
@@ -159,7 +149,7 @@
         <div class="px-5 py-5 flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
             <label for="global-volume" class="flex items-center gap-1.5 text-[12.5px] font-medium">
-              <Volume2 size={13} class="text-muted-foreground" />
+              <Volume2 size={13} class="text-dim" />
               {$_('settings.globalVolume')}
             </label>
             <input
@@ -168,7 +158,7 @@
               {...DB_INPUT}
               bind:value={globalVolumeDb}
               oninput={markEdited}
-              class="rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-mono outline-none focus:border-ring"
+              class="field"
             />
             <p class="text-[11.5px] text-muted-foreground">{$_('settings.globalVolumeHint')}</p>
           </div>
@@ -181,7 +171,7 @@
             {$_('settings.resetVolumes')}
           </button>
 
-          <div class="flex flex-col gap-3 border-t border-border pt-4">
+          <div class="flex flex-col gap-3 border-t border-line2 pt-4">
             {@render toggle('add-smash-battle', 'settings.addModSongsToSmashBattle', 'settings.addModSongsToSmashBattleHint', addModSongsToSmashBattle, (v) => (addModSongsToSmashBattle = v))}
             <div class="flex flex-col gap-1.5">
               <label for="smash-battle-incidence" class="text-[12.5px] font-medium">{$_('settings.smashBattleIncidence')}</label>
@@ -193,7 +183,7 @@
                 bind:value={smashBattleIncidence}
                 oninput={markEdited}
                 disabled={!addModSongsToSmashBattle}
-                class="rounded-lg border border-input bg-background px-3 py-2 text-[12.5px] font-mono outline-none focus:border-ring disabled:opacity-50"
+                class="field font-mono"
               />
               <p class="text-[11.5px] text-muted-foreground">{$_('settings.smashBattleIncidenceHint')}</p>
             </div>
@@ -214,17 +204,16 @@
         <button
           onclick={onClose}
           disabled={saveState === 'saving'}
-          class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+          class="btn"
         >
-          {$_('settings.cancel')}
+          {$_('common.cancel')}
         </button>
         <button
           onclick={handleSave}
           disabled={saveState === 'saving'}
-          class="inline-flex items-center gap-2 rounded-lg border-0 px-4 py-2 text-[12.5px] font-medium text-white transition-colors disabled:opacity-60"
-          style="background: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to))); box-shadow: 0 4px 14px -2px hsl(var(--gradient-from) / .35);"
+          class="btn-primary"
         >
-          {saveState === 'saving' ? $_('settings.saving') : saveState === 'saved' ? $_('settings.saved') : $_('settings.save')}
+          {saveState === 'saving' ? $_('common.saving') : saveState === 'saved' ? $_('common.saved') : $_('settings.save')}
         </button>
       </div>
     </div>
@@ -234,8 +223,8 @@
 {#if resetConfirmOpen}
   <Modal>
     <div class="flex flex-col gap-3 px-5 py-4">
-      <h3 class="flex items-center gap-2 text-sm font-semibold">
-        <AlertTriangle size={16} class="text-destructive" />
+      <h3 class="flex items-center gap-2 text-[13.5px] font-semibold">
+        <AlertTriangle size={15} class="text-destructive" />
         {$_('settings.resetModal.title')}
       </h3>
       <p class="text-[12.5px] text-muted-foreground">{$_('settings.resetModal.description')}</p>
@@ -243,13 +232,13 @@
         <p class="text-[12px] text-destructive">{$_('settings.resetModal.failed')}</p>
       {/if}
     </div>
-    <div class="flex justify-end gap-2 border-t border-border px-5 py-4">
+    {#snippet footer()}
       <button
         onclick={() => { resetConfirmOpen = false }}
         disabled={resetting}
-        class="inline-flex items-center gap-2 rounded-lg border border-input bg-background px-4 py-2 text-[12.5px] font-medium transition-colors hover:bg-muted disabled:opacity-60"
+        class="btn"
       >
-        {$_('settings.resetModal.cancel')}
+        {$_('common.cancel')}
       </button>
       <button
         onclick={handleReset}
@@ -259,6 +248,6 @@
         <RotateCcw size={14} />
         {resetting ? $_('settings.resetModal.resetting') : $_('settings.resetModal.confirm')}
       </button>
-    </div>
+    {/snippet}
   </Modal>
 {/if}

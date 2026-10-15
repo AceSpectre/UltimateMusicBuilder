@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess } from 'child_process'
+import { spawn, spawnSync, type ChildProcess } from 'child_process'
 import { existsSync, unlinkSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
 import { app } from 'electron'
@@ -63,6 +63,7 @@ function spawnCli(workspace: string, trailing: string[]): ChildProcess {
 const BACKGROUND_ACTIONS = new Set([
   'config-volume-analyze',
   'nus3-analyze-loop',
+  'setup-check',
   'nus3-convert-track',
   'nus3-accept',
   'merge-execute',
@@ -192,6 +193,8 @@ class Daemon {
       /* ignore */
     }
     try {
+      // Windows keeps the daemon's tools (pymusiclooper, ffmpeg) running, holding the workspace open.
+      if (process.platform === 'win32' && this.process.pid) spawnSync('taskkill', ['/pid', String(this.process.pid), '/T', '/F'])
       this.process.kill()
     } catch {
       /* ignore */
@@ -224,6 +227,8 @@ class Daemon {
     })
     proc.stdout?.on('data', stdout.push)
     proc.stderr?.on('data', stderr.push)
+    // A write racing the daemon's exit fails with EPIPE; the exit itself is handled below.
+    proc.stdin?.on('error', () => {})
 
     const onExit = (code: number | null): void => {
       if (this.process === proc) this.process = null

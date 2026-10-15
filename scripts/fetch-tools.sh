@@ -10,7 +10,7 @@
 #
 # Tools that should be on PATH (script prints install hints; not bundled):
 #   - ffmpeg / ffprobe / ffplay   (Homebrew / apt / dnf)
-#   - pymusiclooper                (`pipx install pymusiclooper`)
+#   - pymusiclooper                (`uv tool install --python 3.12 pymusiclooper`)
 #
 # Re-running verifies existing binaries and repairs broken ones.
 
@@ -259,10 +259,8 @@ print_path_tools() {
     if have pymusiclooper; then
         echo "   ✓ pymusiclooper found on PATH"
     else
-        echo "   Install pymusiclooper via pipx (recommended):"
-        echo "       pipx install pymusiclooper"
-        echo "   Or via pip:"
-        echo "       pip install --user pymusiclooper"
+        echo "   Install pymusiclooper with uv (setup.sh does this):"
+        echo "       uv tool install --python 3.12 pymusiclooper"
     fi
 }
 

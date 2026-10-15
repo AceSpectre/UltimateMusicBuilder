@@ -172,7 +172,7 @@ namespace UMB.CLI.Services
                     var source = series.Sources[0];
                     foreach (var file in Directory.GetFiles(source.SeriesPath))
                         File.Copy(file, Path.Combine(outputSeriesDir, Path.GetFileName(file)), overwrite: true);
-                    var trackCount = TracksCsv.CountDataRows(Path.Combine(outputSeriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE));
+                    var trackCount = CountDataRows(Path.Combine(outputSeriesDir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE));
                     totalTracks += trackCount;
                     _logger.LogInformation("Copied series '{Series}' from {Mod} ({Tracks} tracks)", series.Name, source.ModName, trackCount);
                 }
@@ -386,5 +386,9 @@ namespace UMB.CLI.Services
             if (lines.Count > 0)
                 SeriesToml.WriteLines(Path.Combine(outputDir, MusicConstants.MusicModFiles.FOLDER_MOD_PLAYLISTS_TOML_FILE), lines);
         }
+
+        /// <summary>Rows other than vanilla song edits; 0 when the file is missing or unreadable.</summary>
+        private static int CountDataRows(string csvPath) =>
+            TracksCsv.ReadLenient(csvPath).Count(r => !FolderMusicMod.IsVanillaBgmId(r.Get("filename")));
     }
 }

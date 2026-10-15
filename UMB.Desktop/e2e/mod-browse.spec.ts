@@ -9,7 +9,6 @@ let modPath: string
 
 // Tests/TestData/configured-mod fixture counts.
 const DEV_TRACKS = 13
-const MARIO_TRACKS = 6
 
 test.beforeAll(async () => {
   ws = createWorkspace()
@@ -63,20 +62,6 @@ test('listModSeries refuses a path outside Mods/MusicMods', async () => {
   const page = await firstWindow(app)
   const escaped = await page.evaluate((root) => window.electron.umb.listModSeries(root), ws.root)
   expect(escaped).toEqual([])
-})
-
-test('getModStats counts series and tracks across the whole mod', async () => {
-  const page = await firstWindow(app)
-  const stats = await page.evaluate((mp) => window.electron.umb.getModStats(mp), modPath)
-
-  expect(stats.seriesCount).toBe(2)
-  expect(stats.trackCount).toBe(DEV_TRACKS + MARIO_TRACKS)
-})
-
-test('app bar shows the series and track counts for the active mod', async () => {
-  const page = await firstWindow(app)
-  await expect(page.getByText('2 series')).toBeVisible({ timeout: 8000 })
-  await expect(page.getByText(`${DEV_TRACKS + MARIO_TRACKS} tracks`)).toBeVisible({ timeout: 8000 })
 })
 
 test('listNus3Sources lists every convertible audio file in the series', async () => {
@@ -198,4 +183,21 @@ test('cancelAction is safe when no CLI action is running', async () => {
   const page = await firstWindow(app)
   await page.evaluate(() => window.electron.umb.cancelAction())
   expect((await page.evaluate(() => window.electron.umb.debugPing())).ok).toBe(true)
+})
+
+test('UI: Cleanup lists what it removes and removes it on confirm', async () => {
+  const page = await firstWindow(app)
+  const csv = join(modPath, 'dev', 'tracks.csv')
+  writeFileSync(csv, readFileSync(csv, 'utf-8') + 'gone.nus3audio,somewhat_good_karts,Gone,,,original,,0,,True\n')
+
+  await page.getByRole('navigation').getByText('Manage Songs', { exact: true }).click()
+  await page.getByRole('navigation').getByText('Build & Setup', { exact: true }).click()
+  await expect(page.getByText('Invalid entries: 1')).toBeVisible({ timeout: 8000 })
+  await page.getByRole('button', { name: 'Cleanup', exact: true }).click()
+  await expect(page.getByText('dev/tracks.csv')).toBeVisible()
+  await expect(page.getByText('gone.nus3audio')).toBeVisible()
+  await page.getByRole('button', { name: 'Remove 1 entry' }).click()
+
+  await expect(page.getByText('Invalid entries: 1')).toBeHidden({ timeout: 8000 })
+  expect(readFileSync(csv, 'utf-8')).not.toContain('gone.nus3audio')
 })
