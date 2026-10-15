@@ -9,7 +9,7 @@ let app: ElectronApplication
 // nav order — src/renderer/src/lib/actions.ts
 const NAV_ITEMS: Array<{ id: string; label: string }> = [
   { id: 'build', label: 'Build & Setup' },
-  { id: 'nus3-convert', label: 'Nus3 Convert' },
+  { id: 'nus3-convert', label: 'Add Music' },
   { id: 'config-volume', label: 'Config Volume' },
   { id: 'order-series', label: 'Manage Series' },
   { id: 'order-tracks', label: 'Manage Songs' },

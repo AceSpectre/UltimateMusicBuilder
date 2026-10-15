@@ -212,7 +212,7 @@ namespace UMB.CLI.Services
             var declared = series.Games.Select(g => g.Id).ToHashSet();
             var games = series.Games.Concat(vanillaGames.Where(g => !declared.Contains(g.Id))).ToList();
 
-            var items = OrderItems(BuildModItems(rows), rows, songOrder, ResolveVanillaTitle);
+            var items = OrderItems(BuildModItems(rows, seriesPath), rows, songOrder, ResolveVanillaTitle);
             var data = new TrackOrderData(Path.GetFileName(seriesPath), seriesPath, series.ExistingSeries, songOrder.Count > 0,
                 games, vanillaSongs, series.Presets, items);
             return (data, rows, headers);
@@ -227,7 +227,7 @@ namespace UMB.CLI.Services
             return new SeriesInfo(header.Id, header.ExistingSeries, SeriesToml.Games(text), SongPresetsToml.Read(text));
         }
 
-        private static List<TrackOrderItem> BuildModItems(List<CsvRow> rows)
+        private static List<TrackOrderItem> BuildModItems(List<CsvRow> rows, string seriesPath)
         {
             // A track is a "pinch target" when another row's info1 references its filename.
             var referencedFilenames = rows.Select(r => r.Get("info1").Trim())
@@ -244,7 +244,8 @@ namespace UMB.CLI.Services
                     : filename.Length > 0 ? MusicConstants.InternalIds.UI_BGM_ID_PREFIX + FolderMusicMod.DeriveToneId(filename)
                     : $"{MusicConstants.InternalIds.UI_BGM_ID_PREFIX}track_{index}";
                 return new TrackOrderItem($"mod:{index}", title, game.Length > 0 ? $"{game} - {filename}" : filename,
-                    bgmId, filename, false, index, BuildFields(row), filename.Length > 0 && referencedFilenames.Contains(filename), isVanilla);
+                    bgmId, filename, false, index, BuildFields(row), filename.Length > 0 && referencedFilenames.Contains(filename), isVanilla,
+                    TracksCsv.IsMissingFile(seriesPath, filename));
             }).ToList();
         }
 

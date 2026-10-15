@@ -12,14 +12,15 @@ export interface ModInfo {
   path: string
 }
 
+/** One entry cleanup removes: the file it is in, relative to the mod, and the entry. */
+export interface CleanupItem {
+  file: string
+  entry: string
+}
+
 export interface ModSeriesInfo {
   name: string
   path: string
-}
-
-export interface ModStats {
-  seriesCount: number
-  trackCount: number
 }
 
 export interface TrackFields {
@@ -44,6 +45,8 @@ export interface TrackOrderItem {
   fields: TrackFields | null
   /** A vanilla song: a tracks.csv row named by its ui_bgm id, or a locked song_order.toml entry. */
   isVanilla: boolean
+  /** A tracks.csv row whose audio file is not in the series folder. */
+  missing: boolean
 }
 
 export interface SeriesGame {
@@ -213,6 +216,8 @@ export interface VolumeRowItem {
   bankBaseDb: number
   /** A vanilla song: no auto-gain. Only listed with applyVolumeToVanilla. */
   isVanilla: boolean
+  /** The row's audio file is not in the series folder. */
+  missing: boolean
 }
 
 export interface VolumeConfigData {

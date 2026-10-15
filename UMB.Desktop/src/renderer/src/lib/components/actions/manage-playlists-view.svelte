@@ -16,6 +16,7 @@
   import ActionHeader from '$lib/components/ui/action-header.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import SearchInput from '$lib/components/ui/search-input.svelte'
+  import TabBar from '$lib/components/ui/tab-bar.svelte'
   import Modal from '$lib/components/ui/modal.svelte'
   import SearchableList from '$lib/components/ui/searchable-list.svelte'
   import { trackUnsaved } from '$lib/stores/unsaved.svelte'
@@ -51,8 +52,6 @@
   }
   const iconButtonClass =
     'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-dim transition-colors duration-100 hover:bg-accent hover:text-foreground'
-  const chipClass = (active: boolean) =>
-    `chip transition-colors duration-100 ${active ? 'border-transparent bg-accbg font-medium text-accink' : 'bg-transparent hover:text-foreground'}`
 
   let data = $state<ManagePlaylistsData | null>(null)
   let loading = $state(false)
@@ -121,16 +120,22 @@
     showMigrate = next.legacyBlocks
   }
 
+  // Plain, not $state: the load effect must not depend on it.
+  let loadedPath: string | null = null
+
   async function loadData(modPath: string | null) {
     if (!modPath) {
       data = null
       return
     }
+    // Never show (or save) another mod's data while this one loads.
+    if (loadedPath !== modPath) data = null
     loading = true
     saveState = 'idle'
     showAddSong = false
     try {
       setData(await window.electron.umb.loadManagePlaylists(modPath))
+      loadedPath = modPath
     } finally {
       loading = false
     }
@@ -203,16 +208,7 @@
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
     <section class="surface-grain flex h-full min-h-0 w-full flex-col overflow-hidden bg-card">
-      <ActionHeader title={$_('managePlaylists.title')} subtitle={activeMod ? $_('managePlaylists.subtitle') : $_('common.chooseMod')}>
-        {#if data}
-          <div class="flex gap-1" role="tablist">
-            {#each [['playlists', 'managePlaylists.tabPlaylists'], ['stages', 'managePlaylists.tabStages']] as [id, label] (id)}
-              <button role="tab" aria-selected={tab === id} onclick={() => (tab = id as 'playlists' | 'stages')} class={chipClass(tab === id)}>
-                {$_(label)}
-              </button>
-            {/each}
-          </div>
-        {/if}
+      <ActionHeader inline title={$_('managePlaylists.title')} subtitle={activeMod ? $_('managePlaylists.subtitle') : $_('common.chooseMod')}>
         <button onclick={() => void loadData(activeMod?.path ?? null)} class="btn w-[27px] shrink-0 px-0" title={$_('managePlaylists.reload')}>
           <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
         </button>
@@ -225,6 +221,13 @@
           saved={$_('managePlaylists.saved')}
         />
       </ActionHeader>
+
+      {#if data}
+        <TabBar
+          bind:active={tab}
+          tabs={[{ id: 'playlists', label: $_('managePlaylists.tabPlaylists') }, { id: 'stages', label: $_('managePlaylists.tabStages') }]}
+        />
+      {/if}
 
       {#if data?.legacyBlocks}
         <div class="flex shrink-0 items-center gap-2 border-b border-border bg-warn/10 px-[22px] py-2 text-[12.5px] text-warn">

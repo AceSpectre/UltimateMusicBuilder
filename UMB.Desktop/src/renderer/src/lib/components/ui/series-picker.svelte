@@ -10,7 +10,7 @@
   import { matchesSearch } from '$lib/search'
   import type { ModInfo, ModSeriesInfo } from '$lib/types/electron'
 
-  // Left-hand series sidebar shared by Manage Songs / Config Volume / Nus3 Convert.
+  // Left-hand series sidebar shared by Manage Songs / Config Volume / Add Music.
   let {
     activeMod,
     series,

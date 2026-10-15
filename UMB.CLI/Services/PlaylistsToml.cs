@@ -19,6 +19,7 @@ namespace UMB.CLI.Services
         public const string LegacySeriesPlaylistKey = "series-playlist";
 
         private static readonly Regex SongLine = new(@"^\s*\{\s*song\s*=\s*""([^""]*)""");
+        private static readonly Regex IdLine = new(@"^\s*id\s*=\s*""([^""]*)""");
 
         public static string PathIn(string modPath) => Path.Combine(modPath, MusicConstants.MusicModFiles.FOLDER_MOD_PLAYLISTS_TOML_FILE);
 
@@ -117,15 +118,28 @@ namespace UMB.CLI.Services
             Write(modPath, file);
         }
 
-        /// <summary>Drops playlist tracks whose song is not kept, leaving the rest of the file as written. Returns the dropped song ids.</summary>
-        public static List<string> RemoveSongs(string modPath, Func<string, bool> keep)
+        /// <summary>
+        /// The playlist tracks whose song is not kept, with their playlist id; with apply, drops them and leaves the rest
+        /// of the file as written.
+        /// </summary>
+        public static List<(string Playlist, string Song)> RemoveSongs(string modPath, Func<string, bool> keep, bool apply = true)
         {
             var path = PathIn(modPath);
-            if (!File.Exists(path)) return new List<string>();
+            if (!File.Exists(path)) return new();
             var lines = SeriesToml.ReadLines(path);
-            var dropped = lines.Select(l => SongLine.Match(l)).Where(m => m.Success && !keep(m.Groups[1].Value)).Select(m => m.Groups[1].Value).ToList();
-            if (dropped.Count > 0)
-                SeriesToml.WriteLines(path, lines.Where(l => SongLine.Match(l) is not { Success: true } m || keep(m.Groups[1].Value)));
+            var dropped = new List<(string, string)>();
+            var kept = new List<string>();
+            var playlist = "";
+            foreach (var line in lines)
+            {
+                if (IdLine.Match(line) is { Success: true } id) playlist = id.Groups[1].Value;
+                if (SongLine.Match(line) is { Success: true } song && !keep(song.Groups[1].Value))
+                    dropped.Add((playlist, song.Groups[1].Value));
+                else
+                    kept.Add(line);
+            }
+            if (apply && dropped.Count > 0)
+                SeriesToml.WriteLines(path, kept);
             return dropped;
         }
 

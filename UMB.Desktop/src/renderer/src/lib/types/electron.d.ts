@@ -16,7 +16,6 @@ import type {
   MergeResult,
   ModInfo,
   ModSeriesInfo,
-  ModStats,
   Nus3AnalysisResult,
   Nus3ConversionMeta,
   Nus3SourceTrack,
@@ -42,9 +41,12 @@ export interface UmbApi {
   debugPing(): Promise<DebugPingResult>
   listMods(): Promise<ModInfo[]>
   listModSeries(modPath: string): Promise<ModSeriesInfo[]>
-  getModStats(modPath: string): Promise<ModStats>
+  openFolder(path: string): Promise<void>
   checkBuildVolumes(modName: string | null): Promise<SuspiciousVolumeTrack[]>
   checkSetup(): Promise<SetupStatus>
+  /** Every entry cleaning the mod would remove; runCleanup removes them and returns what it removed. */
+  previewCleanup(modPath: string): Promise<CleanupItem[]>
+  runCleanup(modPath: string): Promise<CleanupItem[]>
   resetAllVolumes(): Promise<void>
   loadTrackOrder(seriesPath: string): Promise<TrackOrderData>
   saveTrackOrder(seriesPath: string, items: SaveTrackItem[]): Promise<TrackOrderData>

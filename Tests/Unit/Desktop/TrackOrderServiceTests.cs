@@ -55,6 +55,15 @@ namespace Tests.Unit.Desktop
         }
 
         [Fact]
+        public void Load_FlagsRowsWhoseAudioFileIsMissing()
+        {
+            var dir = _ws.WriteSeries("m", "s", "filename,title\nhere.flac,Here\ngone.flac,Gone\nui_bgm_vanilla,Vanilla\n");
+            DesktopWorkspace.WriteFile(dir, "here.flac", "");
+
+            Assert.Equal(new[] { false, true, false }, _service.Load(dir).Items.Select(i => i.Missing));
+        }
+
+        [Fact]
         public void Load_TitleFallsBackToFilenameThenTrackNumber()
         {
             var data = _service.Load(_ws.WriteSeries("m", "s", "filename,title,game\nonly-file.flac,,\n,,\n"));

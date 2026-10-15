@@ -69,17 +69,25 @@
     baselineSnapshot = JSON.stringify(edited)
   }
 
+  // Plain, not $state: the load effect must not depend on it.
+  let loadedPath: string | null = null
+
   async function loadData(seriesPath: string | null) {
     if (!seriesPath) {
       data = null
       return
     }
 
+    // Never show (or save) another series' data while this one loads.
+    if (loadedPath !== seriesPath) data = null
     dataLoading = true
     saveState = 'idle'
     try {
       const result = await window.electron.umb.loadTrackOrder(seriesPath)
-      if (seriesPath === modsStore.activeSeriesPath) setFrom(result)
+      if (seriesPath === modsStore.activeSeriesPath) {
+        setFrom(result)
+        loadedPath = seriesPath
+      }
     } finally {
       dataLoading = false
     }

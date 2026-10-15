@@ -417,6 +417,7 @@
                       <div class="flex min-w-0 flex-col">
                         <span class="truncate font-semibold">{row.title}</span>
                         <span class="truncate text-[11px] text-muted-foreground">{row.isVanilla ? `${$_('orderTracks.vanillaTag')} · ` : ''}{row.filename}</span>
+                        {#if row.missing}<span class="text-[11px] text-warn">{$_('common.fileNotFound')}</span>{/if}
                       </div>
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[12px]">

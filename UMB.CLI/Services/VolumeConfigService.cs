@@ -66,6 +66,8 @@ namespace UMB.CLI.Services
         public float BankBaseDb { get; set; } = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB;
         /// <summary>A vanilla song: no auto-gain, and the desktop app lists it only with ApplyVolumeToVanilla.</summary>
         public bool IsVanilla { get; set; }
+        /// <summary>The row's audio file is not in the series folder.</summary>
+        public bool Missing { get; set; }
     }
 
     public class VolumeAnalyzeResultDto
@@ -262,6 +264,7 @@ namespace UMB.CLI.Services
             }
             else
             {
+                dto.Missing = true;
                 _logger.LogWarning("Source file missing for row {Index}: {Path}", index, sourcePath);
             }
 

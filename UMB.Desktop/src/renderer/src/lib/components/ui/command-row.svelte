@@ -1,14 +1,15 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
 
-  // One sub-action in a command list: name, description and an optional note, then a fixed-width button.
+  // One sub-action in a command list: name, description, an optional note and warning, then a fixed-width button.
   let {
     name,
     description,
     note = '',
     tone = 'dim',
+    warning = '',
     children
-  }: { name: string; description: string; note?: string; tone?: 'dim' | 'warn' | 'err'; children: Snippet } = $props()
+  }: { name: string; description: string; note?: string; tone?: 'dim' | 'warn' | 'err'; warning?: string; children: Snippet } = $props()
 
   const toneClass = { dim: 'text-dim', warn: 'text-warn', err: 'text-destructive' }
 </script>
@@ -19,6 +20,9 @@
     <div class="mt-[3px] break-words text-[12.5px] text-muted-foreground">{description}</div>
     {#if note}
       <div class="mt-[3px] text-[12px] {toneClass[tone]}">{note}</div>
+    {/if}
+    {#if warning}
+      <div class="mt-[3px] text-[12px] text-warn">{warning}</div>
     {/if}
   </div>
   <div class="[&>*]:w-24">{@render children()}</div>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import AudioWaveform from '@lucide/svelte/icons/audio-waveform'
   import CheckCircle from '@lucide/svelte/icons/check-circle'
+  import FolderOpen from '@lucide/svelte/icons/folder-open'
   import X from '@lucide/svelte/icons/x'
   import Play from '@lucide/svelte/icons/play'
   import Trash2 from '@lucide/svelte/icons/trash-2'
@@ -15,6 +16,7 @@
   import EmptyState from '$lib/components/ui/empty-state.svelte'
   import IconButton from '$lib/components/ui/icon-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
+  import TabBar from '$lib/components/ui/tab-bar.svelte'
   import Nus3SettingsModal from './nus3-settings-modal.svelte'
   import Nus3AcceptModal from './nus3-accept-modal.svelte'
   import type {
@@ -538,28 +540,18 @@
           body={analyzing ? $_('nus3Convert.loading') : selectedSeries ? $_('nus3Convert.noConvertableHint') : ''}
         >
           {#snippet icon()}<AudioWaveform size={20} />{/snippet}
+          {#if selectedSeries && !analyzing}
+            <button onclick={() => window.electron.umb.openFolder(selectedSeries.path)} class="btn">
+              <FolderOpen size={14} />
+              {$_('nus3Convert.openSeriesFolder')}
+            </button>
+          {/if}
         </EmptyState>
       {:else}
-        <div class="shrink-0 flex items-center gap-1 border-b border-line2 px-[22px]">
-          <button
-            onclick={() => (tab = 'convert')}
-            class="relative px-3 py-2.5 text-[13px] font-medium transition-colors duration-100 {tab === 'convert' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}"
-          >
-            {$_('nus3Convert.tabConvert')}
-            {#if tab === 'convert'}
-              <span class="absolute inset-x-2 -bottom-px h-0.5 bg-primary"></span>
-            {/if}
-          </button>
-          <button
-            onclick={() => (tab = 'review')}
-            class="relative px-3 py-2.5 text-[13px] font-medium transition-colors duration-100 {tab === 'review' ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}"
-          >
-            {$_('nus3Convert.tabReview')}
-            {#if tab === 'review'}
-              <span class="absolute inset-x-2 -bottom-px h-0.5 bg-primary"></span>
-            {/if}
-          </button>
-        </div>
+        <TabBar
+          bind:active={tab}
+          tabs={[{ id: 'convert', label: $_('nus3Convert.tabConvert') }, { id: 'review', label: $_('nus3Convert.tabReview') }]}
+        />
 
         {#if tab === 'convert'}
         <!-- ── Convert tab ── -->

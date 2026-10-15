@@ -252,12 +252,17 @@
     if (orderData) orderData = { ...orderData, items: event.detail.items }
   }
 
+  // Plain, not $state: the load effect must not depend on it.
+  let loadedPath: string | null = null
+
   async function loadOrder(modPath: string | null) {
     if (!modPath) {
       orderData = null
       return
     }
 
+    // Never show (or save) another mod's data while this one loads.
+    if (loadedPath !== modPath) orderData = null
     loading = true
     saveState = 'idle'
     selectedItemId = null
@@ -265,6 +270,7 @@
     showAddGame = false
     try {
       orderData = await window.electron.umb.loadSeriesOrder(modPath)
+      loadedPath = modPath
       baselineSnapshot = snapshot([...orderData.items, ...orderData.vanillaItems])
     } finally {
       loading = false

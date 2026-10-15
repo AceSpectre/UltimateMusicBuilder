@@ -1,7 +1,8 @@
 export default {
   common: {
     chooseMod: 'Choose a mod from the app bar.',
-    selectSeries: 'Select a series.'
+    selectSeries: 'Select a series.',
+    fileNotFound: 'File not found'
   },
   build: {
     title: 'Build & Setup',
@@ -16,7 +17,7 @@ export default {
       ready: 'Ready',
       missing: 'Missing',
       toolNotFound: 'Not found on PATH. Run the setup script.',
-      pymusiclooperDescription: 'Finds loop points for Nus3 Convert.',
+      pymusiclooperDescription: 'Finds loop points for Add Music.',
       ffmpegDescription: 'Decodes audio for conversion, previews and loudness.',
       resourcesName: 'Game resources',
       resourcesDescription: 'Extracted game files in {path}.',
@@ -27,7 +28,15 @@ export default {
     scaffoldButton: 'Scaffold',
     scaffoldDescription: 'Generate folder structure and series order for existing mods.',
     cleanupButton: 'Cleanup',
-    cleanupDescription: 'Remove generated output and temporary build files.',
+    cleanupDescription: 'Remove entries in the selected mod that point at missing audio files.',
+    invalidEntries: 'Invalid entries: {count}',
+    cleanupModal: {
+      title: 'Clean up {mod}',
+      description: 'These {count, plural, one {entry points} other {entries point}} at audio files that no longer exist. Cleanup removes {count, plural, one {it} other {them}}, and this cannot be undone.',
+      empty: 'Nothing to clean up.',
+      cancel: 'Cancel',
+      confirm: 'Remove {count, plural, one {# entry} other {# entries}}'
+    },
     importButton: 'Import',
     importDescription: 'Import a Sma5h mod into UMB folder format.',
     importNote: 'Sma5h → UMB',
@@ -73,8 +82,6 @@ export default {
     noModSelected: 'No mod selected',
     selectMod: 'Select Mod',
     modPath: 'Mods/MusicMods/{name}',
-    seriesCount: '{value} series',
-    tracksCount: '{value} tracks',
     minimize: 'Minimize window',
     fullscreen: 'Toggle fullscreen',
     close: 'Close window',
@@ -119,7 +126,7 @@ export default {
     },
     items: {
       build: 'Build & Setup',
-      'nus3-convert': 'Nus3 Convert',
+      'nus3-convert': 'Add Music',
       'config-volume': 'Config Volume',
       'order-series': 'Manage Series',
       'order-tracks': 'Manage Songs',
@@ -236,8 +243,8 @@ export default {
     iconNotPng: 'Icon must be a PNG.'
   },
   nus3Convert: {
-    kicker1: 'NUS3 CONVERT · STEP 1 of 2 · SELECTING LOOP POINTS',
-    kicker2: 'NUS3 CONVERT · STEP 2 of 2 · REVIEWING CONVERTED LOOPS',
+    kicker1: 'ADD MUSIC · STEP 1 of 2 · SELECTING LOOP POINTS',
+    kicker2: 'ADD MUSIC · STEP 2 of 2 · REVIEWING CONVERTED LOOPS',
     tabConvert: 'Convert',
     tabReview: 'Review & Save',
     rejectAll: 'Reject all · use end-to-end',
@@ -282,8 +289,9 @@ export default {
     reanalyzeHint: 'Re-run pymusiclooper for this song using the current analysis settings.',
     noConvertableTitle: 'No songs to convert',
     noConvertableHint: 'No wav, mp3 or flac files in this series.',
+    openSeriesFolder: 'Open series folder',
     writing: 'Writing nus3 files…',
-    settingsTitle: 'Nus3 Convert Settings',
+    settingsTitle: 'Add Music Settings',
     settingsMinScore: 'Minimum score threshold',
     settingsMinScoreHint: 'Only candidates scoring above this threshold are shown. Default: 94.5',
     settingsPreviewLength: 'Preview length (seconds)',

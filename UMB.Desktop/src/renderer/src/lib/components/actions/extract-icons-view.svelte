@@ -13,16 +13,17 @@
   let { activeMod, mods }: { activeMod: ModInfo | null; mods: ModInfo[] } = $props()
 
   let compiledModPath = $state<string | null>(null)
-  let selectedMod = $state<ModInfo | null>(activeMod)
+  let selectedMod = $state<ModInfo | null>(null)
   let analysis = $state<ExtractIconsAnalysis | null>(null)
   let result = $state<ExtractIconsResult | null>(null)
   let analyzing = $state(false)
   let extracting = $state(false)
 
+  // Follow the app bar's mod; an analysis of the previous one no longer applies.
   $effect(() => {
-    if (activeMod && !selectedMod) {
-      selectedMod = activeMod
-    }
+    selectedMod = activeMod
+    analysis = null
+    result = null
   })
 
   async function handleBrowse() {

@@ -239,7 +239,7 @@ namespace UMB.CLI
             ["Convert        - Import a Sma5h mod to UMB folder format"] = "convert",
             ["Merge          - Merge two or more UMB mods into one"] = "merge",
             ["Extract Icons  - Extract series icons from a built Sma5h mod"] = "extract-icons",
-            ["Cleanup        - Remove tracks.csv entries for missing audio files"] = "cleanup",
+            ["Cleanup        - Remove entries that point at missing audio files"] = "cleanup",
             ["Order Series   - Reorder custom series display order via drag-and-drop"] = "order-series",
             ["Order Tracks   - Reorder tracks within a series via drag-and-drop"] = "order-tracks",
             ["Config Volume  - Preview tracks at post-build loudness, override per-track gain"] = "config-volume",

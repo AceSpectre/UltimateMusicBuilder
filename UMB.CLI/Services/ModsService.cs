@@ -42,12 +42,5 @@ namespace UMB.CLI.Services
                 .Select(dir => new ModInfo(Path.GetFileName(dir), dir))
                 .ToList();
         }
-
-        public ModStats GetModStats(string modPath)
-        {
-            var series = ListModSeries(modPath);
-            var trackCount = series.Sum(s => TracksCsv.CountDataRows(Path.Combine(s.Path, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE)));
-            return new ModStats(series.Count, trackCount);
-        }
     }
 }

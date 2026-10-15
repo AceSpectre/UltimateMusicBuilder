@@ -12,7 +12,7 @@
   import Modal from '$lib/components/ui/modal.svelte'
   import { settingsStore } from '$lib/stores/settings.svelte'
   import { formatDb } from '$lib/volume'
-  import type { ModInfo, SetupStatus, SuspiciousVolumeTrack } from '$lib/types/electron'
+  import type { CleanupItem, ModInfo, SetupStatus, SuspiciousVolumeTrack } from '$lib/types/electron'
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
 
@@ -54,6 +54,26 @@
 
   $effect(() => {
     void checkSetup()
+  })
+
+  // What cleanup would remove from the active mod; re-read on mod switch, after every action and on window
+  // focus (files may have changed outside the app).
+  let cleanupItems = $state<CleanupItem[]>([])
+  let focusCount = $state(0)
+  let cleanupModalOpen = $state(false)
+  const cleanupGroups = $derived(
+    [...new Set(cleanupItems.map((item) => item.file))].map((file) => [file, cleanupItems.filter((item) => item.file === file)] as const)
+  )
+  $effect(() => {
+    const path = activeMod?.path
+    void focusCount
+    if (!path || anyRunning) {
+      cleanupItems = []
+      return
+    }
+    let cancelled = false
+    void window.electron.umb.previewCleanup(path).then((items) => { if (!cancelled) cleanupItems = items })
+    return () => { cancelled = true }
   })
 
   async function handleBuildClick() {
@@ -112,9 +132,16 @@
     }
   }
 
-  async function handleCleanup() {
-    if (cleanupRunning) return
+  async function openCleanupModal() {
+    if (!activeMod) return
+    cleanupItems = await window.electron.umb.previewCleanup(activeMod.path)
+    cleanupModalOpen = true
+  }
 
+  async function handleCleanup() {
+    if (cleanupRunning || !activeMod) return
+
+    cleanupModalOpen = false
     cleanupRunning = true
     logStore.clear()
     if (!logStore.drawerOpen) {
@@ -122,7 +149,7 @@
     }
 
     try {
-      await window.electron.umb.runAction('cleanup')
+      await window.electron.umb.runCleanup(activeMod.path)
     } finally {
       cleanupRunning = false
     }
@@ -162,6 +189,8 @@
   }
 </script>
 
+<svelte:window onfocus={() => focusCount++} />
+
 {#snippet sectionLabel(text: string)}
   <div class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{text}</div>
 {/snippet}
@@ -198,8 +227,14 @@
       </button>
     </CommandRow>
 
-    <CommandRow name={$_('build.cleanupButton')} description={$_('build.cleanupDescription')} note={$_('build.destructive')} tone="err">
-      <button onclick={handleCleanup} disabled={anyRunning} class="btn-danger">
+    <CommandRow
+      name={$_('build.cleanupButton')}
+      description={$_('build.cleanupDescription')}
+      note={$_('build.destructive')}
+      tone="err"
+      warning={cleanupItems.length > 0 ? $_('build.invalidEntries', { values: { count: cleanupItems.length } }) : ''}
+    >
+      <button onclick={openCleanupModal} disabled={anyRunning || !activeMod} class="btn-danger">
         {#if cleanupRunning}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.cleanupButton')}{/if}
       </button>
     </CommandRow>
@@ -300,6 +335,48 @@
       <button onclick={handleImport} disabled={!canImport} class="btn-primary">
         {importRunning ? $_('build.running') : $_('build.importModal.import')}
       </button>
+    </div>
+  </Modal>
+{/if}
+
+{#if cleanupModalOpen}
+  <Modal maxWidth="560px" maxHeight="80vh">
+    <div class="border-b border-border px-5 py-4">
+      <h2 class="flex items-center gap-2 text-[13.5px] font-semibold">
+        <AlertTriangle size={15} class="text-warn" />
+        {$_('build.cleanupModal.title', { values: { mod: activeMod?.name ?? '' } })}
+      </h2>
+      <p class="mt-[3px] text-[12.5px] text-muted-foreground">
+        {cleanupItems.length > 0
+          ? $_('build.cleanupModal.description', { values: { count: cleanupItems.length } })
+          : $_('build.cleanupModal.empty')}
+      </p>
+    </div>
+
+    {#if cleanupItems.length > 0}
+      <div class="min-h-0 flex-1 overflow-auto px-5 py-4">
+        {#each cleanupGroups as [file, items] (file)}
+          <div class="mb-3 last:mb-0">
+            <div class="mb-1 font-mono text-[11.5px] text-dim">{file}</div>
+            <ul class="rounded border border-border text-[12px]">
+              {#each items as item, i (i)}
+                <li class="break-all border-b border-line2 px-3 py-1.5 last:border-b-0">{item.entry}</li>
+              {/each}
+            </ul>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    <div class="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
+      <button onclick={() => { cleanupModalOpen = false }} class="btn">
+        {$_('build.cleanupModal.cancel')}
+      </button>
+      {#if cleanupItems.length > 0}
+        <button onclick={handleCleanup} class="btn-danger">
+          {$_('build.cleanupModal.confirm', { values: { count: cleanupItems.length } })}
+        </button>
+      {/if}
     </div>
   </Modal>
 {/if}

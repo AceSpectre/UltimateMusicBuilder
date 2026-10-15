@@ -35,19 +35,7 @@
   let settingsOpen = $state(false)
   let pickerOpen = $state(false)
   let pickerEl: HTMLDivElement | undefined = $state()
-  let stats = $state<{ seriesCount: number; trackCount: number } | null>(null)
   let version = $state('')
-
-  $effect(() => {
-    const path = activeMod?.path ?? null
-    stats = null
-    if (!path) return
-    let cancelled = false
-    void window.electron.umb.getModStats(path).then((s) => {
-      if (!cancelled) stats = s
-    })
-    return () => { cancelled = true }
-  })
 
   function togglePicker() {
     if (mods.length === 0) {
@@ -140,11 +128,6 @@
   </div>
 
   <div class="flex-1"></div>
-
-  <div class="no-drag flex items-center gap-[5px]">
-    <span class="chip-sec">{$_('appBar.seriesCount', { values: { value: activeMod ? (stats?.seriesCount ?? '—') : '0' } })}</span>
-    <span class="chip">{$_('appBar.tracksCount', { values: { value: activeMod ? (stats?.trackCount ?? '—') : '0' } })}</span>
-  </div>
 
   <div class="no-drag flex items-center">
     <button
