@@ -62,9 +62,18 @@ namespace Sma5h.Helpers
             return null;
         }
 
+        // On Windows also read the registry PATH, which installers update but running processes never re-read,
+        // so a tool installed while the app is open is found without a restart.
+        private static string SearchPath() => !OperatingSystem.IsWindows()
+            ? Environment.GetEnvironmentVariable("PATH")
+            : string.Join(Path.PathSeparator,
+                Environment.GetEnvironmentVariable("PATH"),
+                Environment.ExpandEnvironmentVariables(Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) ?? ""),
+                Environment.ExpandEnvironmentVariables(Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User) ?? ""));
+
         private static string FindOnPath(string command)
         {
-            var pathEnv = Environment.GetEnvironmentVariable("PATH");
+            var pathEnv = SearchPath();
             if (string.IsNullOrEmpty(pathEnv))
                 return null;
 
