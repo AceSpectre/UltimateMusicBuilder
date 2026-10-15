@@ -105,9 +105,28 @@
     @apply btn text-destructive;
   }
 
+  .btn-icon {
+    @apply btn w-[27px] shrink-0 px-0;
+  }
+
+  /* Borderless icon button; callers set the size. */
+  .btn-ghost-icon {
+    @apply inline-flex shrink-0 items-center justify-center rounded text-dim transition-colors duration-100 hover:bg-accent hover:text-foreground;
+  }
+
+  /* Small uppercase section label. */
+  .kicker {
+    @apply text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim;
+  }
+
+  /* Input border, focus ring and disabled look. */
+  .field-base {
+    @apply rounded border border-input bg-card outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-45;
+  }
+
   /* 28px form input. */
   .field {
-    @apply h-7 rounded border border-input bg-card px-2 text-[12.5px] outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-45;
+    @apply field-base h-7 px-2 text-[12.5px];
   }
 
   /* Scrolling body under an action header. */

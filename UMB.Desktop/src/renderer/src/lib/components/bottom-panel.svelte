@@ -36,8 +36,7 @@
   let panelHeight = $state(Number(localStorage.getItem('umb-bottom-panel-height') ?? '180'))
   let splitRatio = $state(Number(localStorage.getItem('umb-bottom-panel-split') ?? '0.5'))
   let debugCollapsed = $state(localStorage.getItem('umb-bottom-debug-collapsed') === 'true')
-  const iconButton =
-    'flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded text-dim transition-colors duration-100 hover:bg-accent hover:text-foreground'
+  const iconButton = 'btn-ghost-icon h-[22px] w-[22px]'
   const filters = ['all', 'info', 'warn', 'error'] as const
   const levelClass = { info: 'text-sec', warn: 'text-warn', error: 'text-destructive' }
 

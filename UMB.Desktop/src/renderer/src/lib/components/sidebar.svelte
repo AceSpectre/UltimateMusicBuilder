@@ -13,7 +13,7 @@
 <aside class="surface-grain flex w-[176px] shrink-0 flex-col border-r border-border bg-rail">
   <nav class="flex-1 overflow-y-auto py-1.5">
     {#each navGroups as group}
-      <div class="px-3 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">
+      <div class="px-3 pb-1 pt-3 kicker">
         {$_('nav.groups.' + group.id)}
       </div>
 

@@ -16,9 +16,12 @@ namespace UMB.CLI.Services
         /// <summary>Version is the tool's first output line, or null when it can't be run.</summary>
         public record ToolStatus(bool Ok, string Version);
         public record ResourcesStatus(bool Ok, string Path, List<string> Missing);
-        public record SetupStatus(ToolStatus Uv, ToolStatus Pymusiclooper, ToolStatus Ffmpeg, ResourcesStatus Resources);
+        public record SetupStatus(Dictionary<string, ToolStatus> Tools, ResourcesStatus Resources);
 
         private static readonly TimeSpan ToolTimeout = TimeSpan.FromSeconds(30);
+
+        private static readonly (string Name, string VersionArgument)[] Tools =
+            { ("uv", "--version"), ("pymusiclooper", "--version"), ("ffmpeg", "-version") };
 
         // Game files the build reads from Resources/Game.
         private static readonly string[] GameFiles =
@@ -35,9 +38,7 @@ namespace UMB.CLI.Services
         public SetupCheckService(IOptionsMonitor<Sma5hOptions> config) => _config = config;
 
         public SetupStatus Check() => new(
-            CheckTool("uv", "--version"),
-            CheckTool("pymusiclooper", "--version"),
-            CheckTool("ffmpeg", "-version"),
+            Tools.ToDictionary(t => t.Name, t => CheckTool(t.Name, t.VersionArgument)),
             CheckResources(_config.CurrentValue.GameResourcesPath));
 
         public static ToolStatus CheckTool(string name, string versionArgument)

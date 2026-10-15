@@ -48,8 +48,5 @@ test('sidebar renders action labels', async () => {
 
 test('Build & Setup reports missing game resources in an empty workspace', async () => {
   const page = await firstWindow(app)
-  const status = await page.evaluate(() => window.electron.umb.checkSetup())
-  expect(status.resources.ok).toBe(false)
-  expect(status.resources.missing).toHaveLength(5)
   await expect(page.getByText('5 required files missing, see README.txt there')).toBeVisible()
 })

@@ -396,8 +396,7 @@
     acceptModalOpen = false
     if (!seriesPath) return
     writing = true
-    logStore.clear()
-    if (!logStore.drawerOpen) logStore.toggleDrawer()
+    logStore.openFresh()
 
     try {
       await window.electron.umb.acceptNus3Files(seriesPath, deleteSources)
@@ -569,7 +568,7 @@
         {:else}
         <div class="shrink-0 border-b border-line2 px-[22px] py-3">
           <div class="flex flex-col gap-2">
-            <span class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">
+            <span class="kicker">
               {$_('nus3Convert.kicker1')}
             </span>
             <div class="flex items-center gap-4">
@@ -618,7 +617,7 @@
         <div class="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto px-[22px] py-3.5">
           <!-- Progress strip + track pills (single row) -->
           <div class="flex items-center gap-2">
-            <span class="shrink-0 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">
+            <span class="shrink-0 kicker">
               {$_('nus3Convert.seriesQueue', { values: { series: selectedSeries?.name ?? '' } })}
             </span>
             <span class="chip shrink-0 tabular-nums">
@@ -819,7 +818,7 @@
                   <thead class="sticky top-0">
                     <tr class="bg-card">
                       {#each [$_('nus3Convert.colRank'), $_('nus3Convert.colScore'), $_('nus3Convert.colLoopStart'), $_('nus3Convert.colLoopEnd'), $_('nus3Convert.colLength'), $_('nus3Convert.colNoteDist'), $_('nus3Convert.colRms'), $_('nus3Convert.colSpec')] as header}
-                        <th class="px-2 py-1.5 text-left text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">
+                        <th class="px-2 py-1.5 text-left kicker">
                           {header}
                         </th>
                       {/each}
@@ -870,7 +869,7 @@
         <div class="shrink-0 border-b border-line2 px-[22px] py-3">
           <div class="flex items-center gap-4">
             <div class="flex min-w-0 flex-1 flex-col gap-1">
-              <span class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">
+              <span class="kicker">
                 {$_('nus3Convert.kicker2')}
               </span>
               <h2 class="text-[15px] font-semibold tracking-[-.01em]">
@@ -900,7 +899,7 @@
             </div>
           {:else}
           <div class="flex items-center gap-2.5">
-            <span class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">
+            <span class="kicker">
               {$_('nus3Convert.reviewQueue')}
             </span>
             <span class="chip border-transparent bg-accbg text-accink">
@@ -918,7 +917,7 @@
                 <button
                   onclick={() => playReviewPreview(track)}
                   disabled={reviewLoadingId === track.id}
-                  class="btn w-[27px] px-0 shrink-0"
+                  class="btn-icon"
                 >
                   {#if reviewLoadingId === track.id}
                     <RefreshCw size={13} class="animate-spin" />

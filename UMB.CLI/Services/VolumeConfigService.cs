@@ -66,7 +66,6 @@ namespace UMB.CLI.Services
         public float BankBaseDb { get; set; } = MusicConstants.DEFAULT_NUS3BANK_VOLUME_DB;
         /// <summary>A vanilla song: no auto-gain, and the desktop app lists it only with ApplyVolumeToVanilla.</summary>
         public bool IsVanilla { get; set; }
-        /// <summary>The row's audio file is not in the series folder.</summary>
         public bool Missing { get; set; }
     }
 
@@ -250,7 +249,7 @@ namespace UMB.CLI.Services
                 if (VanillaToneId(filename) is { } toneId && _vanillaBankDb.Value.TryGetValue(toneId, out var bankDb))
                     dto.BankBaseDb = bankDb;
             }
-            else if (!string.IsNullOrEmpty(sourcePath) && File.Exists(sourcePath))
+            else if (!TracksCsv.IsMissingFile(seriesDir, filename))
             {
                 var measurement = useCacheOnly ? _lufsService.MeasureCached(sourcePath) : _lufsService.Measure(sourcePath);
                 if (measurement.IsValid)

@@ -15,6 +15,7 @@
   import { DB_INPUT, dbToGain, formatBankDb, formatDb, parseDb } from '$lib/volume'
   import ActionHeader from '$lib/components/ui/action-header.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
+  import MissingFileNote from '$lib/components/ui/missing-file-note.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import type { ModInfo, ModSeriesInfo, VolumeConfigData, VolumeRowItem, VolumeProgress } from '$lib/types/electron'
@@ -35,7 +36,7 @@
   let seriesDb = $state(0)
   let baselineSeriesDb = $state(0)
   const seriesLoader = createSeriesLoader((v) => (loading = v))
-  const thClass = 'px-3 py-2 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim'
+  const thClass = 'px-3 py-2 kicker'
   const dbInputClass = 'field w-[88px] text-right tabular-nums text-[12px]'
 
   // Web Audio preview
@@ -323,8 +324,6 @@
             onclick={handleSave}
             disabled={!data || rows.length === 0 || !isDirty || saveState === 'saving'}
             save={$_('configVolume.save')}
-            saving={$_('configVolume.saving')}
-            saved={$_('configVolume.saved')}
           />
       </ActionHeader>
 
@@ -417,7 +416,7 @@
                       <div class="flex min-w-0 flex-col">
                         <span class="truncate font-semibold">{row.title}</span>
                         <span class="truncate text-[11px] text-muted-foreground">{row.isVanilla ? `${$_('orderTracks.vanillaTag')} · ` : ''}{row.filename}</span>
-                        {#if row.missing}<span class="text-[11px] text-warn">{$_('common.fileNotFound')}</span>{/if}
+                        <MissingFileNote missing={row.missing} />
                       </div>
                     </td>
                     <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[12px]">
@@ -458,7 +457,7 @@
                         onclick={() => togglePreview(row)}
                         disabled={isPreviewLoading}
                         title={isPlaying ? $_('configVolume.stop') : $_('configVolume.play')}
-                        class="btn w-[27px] px-0"
+                        class="btn-icon"
                       >
                         {#if isPreviewLoading}
                           <RefreshCw size={13} class="animate-spin" />

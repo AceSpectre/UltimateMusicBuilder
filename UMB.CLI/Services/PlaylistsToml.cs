@@ -122,7 +122,7 @@ namespace UMB.CLI.Services
         /// The playlist tracks whose song is not kept, with their playlist id; with apply, drops them and leaves the rest
         /// of the file as written.
         /// </summary>
-        public static List<(string Playlist, string Song)> RemoveSongs(string modPath, Func<string, bool> keep, bool apply = true)
+        public static List<(string Playlist, string Song)> PruneSongs(string modPath, Func<string, bool> keep, bool apply)
         {
             var path = PathIn(modPath);
             if (!File.Exists(path)) return new();

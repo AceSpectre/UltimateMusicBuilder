@@ -2,7 +2,11 @@ export default {
   common: {
     chooseMod: 'Choose a mod from the app bar.',
     selectSeries: 'Select a series.',
-    fileNotFound: 'File not found'
+    fileNotFound: 'File not found',
+    cancel: 'Cancel',
+    save: 'Save Changes',
+    saving: 'Saving…',
+    saved: 'Saved'
   },
   build: {
     title: 'Build & Setup',
@@ -35,7 +39,6 @@ export default {
       title: 'Clean up {mod}',
       description: 'These {count, plural, one {entry points} other {entries point}} at audio files that no longer exist. Cleanup removes {count, plural, one {it} other {them}}, and this cannot be undone.',
       empty: 'Nothing to clean up.',
-      cancel: 'Cancel',
       confirm: 'Remove {count, plural, one {# entry} other {# entries}}'
     },
     importButton: 'Import',
@@ -63,7 +66,6 @@ export default {
       title: 'Overwrite Previous Build',
       subtitle: 'ArcOutput already contains files from a previous build.',
       description: 'Building replaces the existing output.',
-      cancel: 'Cancel',
       overwrite: 'Overwrite & Build'
     },
     volumeModal: {
@@ -71,7 +73,6 @@ export default {
       subtitle: '{count, plural, one {# track is} other {# tracks are}} boosted by +6 dB or more (global + series + track dB boost).',
       description:
         '+6 dB is roughly twice as loud. Lower the boost unless this is intended.',
-      cancel: 'Cancel',
       build: 'Build Anyway'
     }
   },
@@ -94,9 +95,6 @@ export default {
     globalVolume: 'Global dB Boost',
     globalVolumeHint: 'Added to every track during build, in dB (+ or -). Default is 0 dB.',
     save: 'Save',
-    saving: 'Saving…',
-    saved: 'Saved',
-    cancel: 'Cancel',
     resetVolumes: 'Reset All Volumes',
     tabGeneral: 'General',
     tabExperimental: 'Experimental',
@@ -112,7 +110,6 @@ export default {
       title: 'Reset All Volumes?',
       description:
         'Sets every global, series and track dB boost in every mod to 0 dB. This cannot be undone.',
-      cancel: 'Cancel',
       confirm: 'Reset Volumes',
       resetting: 'Resetting…',
       failed: 'Reset failed. See the log for details.'
@@ -190,9 +187,6 @@ export default {
     noCustomSeries: 'No custom series found in this mod.',
     loading: 'Loading series…',
     reload: 'Reload series',
-    save: 'Save Changes',
-    saving: 'Saving…',
-    saved: 'Saved',
     dragAria: 'Drag to reorder',
     emptyTitle: 'No custom series',
     emptyBody: 'Only custom series can be reordered.',
@@ -222,7 +216,6 @@ export default {
     fldGameId: 'ID',
     fldGameName: 'Name',
     addGameTitle: 'Add a game',
-    cancel: 'Cancel',
     add: 'Add',
     newSeries: 'New Series',
     newSeriesTitle: 'Create a new series',
@@ -258,7 +251,6 @@ export default {
     removeConverted: 'Reject · convert again',
     acceptModalTitle: 'Save converted songs into the series',
     acceptModalBody: 'Moves converted files into the series and adds them to tracks.csv. Delete the original audio files too?',
-    acceptModalCancel: 'Cancel',
     acceptModalKeep: 'Keep source files',
     acceptModalDelete: 'Delete source files',
     seriesQueue: 'Series queue · {series}',
@@ -318,8 +310,6 @@ export default {
   configVolume: {
     title: 'Config Volume',
     save: 'Save Boosts',
-    saving: 'Saving…',
-    saved: 'Saved',
     analyze: 'Calculate Loudness',
     reanalyze: 'Recalculate Loudness',
     analyzeHint: 'Measure loudness with FFmpeg to set auto-gain.',
@@ -401,9 +391,6 @@ export default {
     chooseMod: 'Choose a mod',
     loading: 'Loading playlists…',
     reload: 'Reload',
-    save: 'Save Changes',
-    saving: 'Saving…',
-    saved: 'Saved',
     tabPlaylists: 'Playlists',
     tabStages: 'Stages',
     searchPlaylists: 'Search playlists…',
@@ -463,14 +450,10 @@ export default {
     silentStage: 'This order of the playlist has no songs, so the stage would be silent.',
     silentWarning: '{count} stage(s) would play an order with no songs. See the Stages tab.',
     done: 'Done',
-    cancel: 'Cancel'
   },
   managePresets: {
     title: 'Manage Presets',
     add: 'Add Preset',
-    save: 'Save Changes',
-    saving: 'Saving…',
-    saved: 'Saved',
     loading: 'Loading presets…',
     colName: 'Preset',
     colGame: 'Game',
@@ -496,9 +479,6 @@ export default {
   },
   orderTracks: {
     title: 'Manage Songs',
-    save: 'Save Changes',
-    saving: 'Saving…',
-    saved: 'Saved',
     applyPreset: 'Apply Preset',
     applyPresetHint: 'Fill the selected song from the series default, a game default or a preset.',
     presetSeriesDefault: 'Series Default',

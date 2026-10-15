@@ -50,8 +50,7 @@
     series: 'managePlaylists.kindSeries',
     vanilla: 'managePlaylists.kindVanilla'
   }
-  const iconButtonClass =
-    'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-dim transition-colors duration-100 hover:bg-accent hover:text-foreground'
+  const iconButtonClass = 'btn-ghost-icon h-7 w-7'
 
   let data = $state<ManagePlaylistsData | null>(null)
   let loading = $state(false)
@@ -98,8 +97,11 @@
 
   const createError = $derived(creating ? playlistIdError(creating.id, (data?.playlists ?? []).map((p) => p.id)) : null)
 
+  // A new mod or series starts empty, so Save can never write the previous one's data into it.
   $effect(() => {
-    void loadData(activeMod?.path ?? null)
+    const path = activeMod?.path ?? null
+    data = null
+    void loadData(path)
   })
 
   $effect(() => {
@@ -120,22 +122,16 @@
     showMigrate = next.legacyBlocks
   }
 
-  // Plain, not $state: the load effect must not depend on it.
-  let loadedPath: string | null = null
-
   async function loadData(modPath: string | null) {
     if (!modPath) {
       data = null
       return
     }
-    // Never show (or save) another mod's data while this one loads.
-    if (loadedPath !== modPath) data = null
     loading = true
     saveState = 'idle'
     showAddSong = false
     try {
       setData(await window.electron.umb.loadManagePlaylists(modPath))
-      loadedPath = modPath
     } finally {
       loading = false
     }
@@ -209,16 +205,13 @@
   <div class="flex h-full min-h-0">
     <section class="surface-grain flex h-full min-h-0 w-full flex-col overflow-hidden bg-card">
       <ActionHeader inline title={$_('managePlaylists.title')} subtitle={activeMod ? $_('managePlaylists.subtitle') : $_('common.chooseMod')}>
-        <button onclick={() => void loadData(activeMod?.path ?? null)} class="btn w-[27px] shrink-0 px-0" title={$_('managePlaylists.reload')}>
+        <button onclick={() => void loadData(activeMod?.path ?? null)} class="btn-icon" title={$_('managePlaylists.reload')}>
           <RefreshCw size={14} class={loading ? 'animate-spin' : ''} />
         </button>
         <SaveButton
           {saveState}
           onclick={handleSave}
           disabled={!data || data.legacyBlocks || !isDirty || saveState === 'saving'}
-          save={$_('managePlaylists.save')}
-          saving={$_('managePlaylists.saving')}
-          saved={$_('managePlaylists.saved')}
         />
       </ActionHeader>
 
@@ -313,7 +306,7 @@
                       {#if isChanged(playlist, defaults)}
                         <button
                           onclick={() => resetToDefault(playlist, defaults)}
-                          class="btn w-[27px] px-0"
+                          class="btn-icon"
                           aria-label={$_('managePlaylists.resetPlaylist')}
                           title={$_('managePlaylists.resetPlaylistHint')}
                         >
@@ -324,7 +317,7 @@
                         <button
                           onclick={() => deletePlaylist(playlist)}
                           disabled={playlistStages.length > 0}
-                          class="btn w-[27px] px-0 hover:text-destructive"
+                          class="btn-icon hover:text-destructive"
                           aria-label={$_('managePlaylists.deletePlaylist')}
                           title={playlistStages.length > 0 ? $_('managePlaylists.deleteInUse') : $_('managePlaylists.deletePlaylist')}
                         >
@@ -444,7 +437,7 @@
             </div>
             <div class="min-h-0 flex-1 overflow-auto px-[22px] py-3">
               <table class="w-full text-[12.5px]">
-                <thead class="text-left text-[10.5px] uppercase tracking-[.1em] text-dim">
+                <thead class="kicker text-left">
                   <tr>
                     <th class="py-1.5 font-semibold">{$_('managePlaylists.colStage')}</th>
                     <th class="py-1.5 font-semibold">{$_('managePlaylists.colSeries')}</th>
@@ -532,9 +525,9 @@
         </div>
       {/if}
     </div>
-    <div class="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-4">
+    {#snippet footer()}
       <button onclick={() => (showAddSong = false)} class="btn">{$_('managePlaylists.done')}</button>
-    </div>
+    {/snippet}
   </Modal>
 {/if}
 
@@ -548,10 +541,10 @@
       <p class="text-[12.5px] text-muted-foreground">{$_('managePlaylists.migrateBody')}</p>
       <p class="text-[12.5px] font-medium">{$_('managePlaylists.migrateBackup')}</p>
     </div>
-    <div class="flex justify-end gap-2 border-t border-border px-5 py-4">
+    {#snippet footer()}
       <button onclick={() => (showMigrate = false)} class="btn">{$_('managePlaylists.notNow')}</button>
       <button onclick={handleSave} disabled={saveState === 'saving'} class="btn-primary">{$_('managePlaylists.migrate')}</button>
-    </div>
+    {/snippet}
   </Modal>
 {/if}
 
@@ -572,9 +565,9 @@
         <p class="text-[12px] text-destructive">{$_(createError === 'taken' ? 'managePlaylists.idTaken' : 'managePlaylists.idInvalid')}</p>
       {/if}
     </div>
-    <div class="flex justify-end gap-2 border-t border-border px-5 py-4">
-      <button onclick={() => (creating = null)} class="btn">{$_('managePlaylists.cancel')}</button>
+    {#snippet footer()}
+      <button onclick={() => (creating = null)} class="btn">{$_('common.cancel')}</button>
       <button onclick={createPlaylist} disabled={Boolean(createError)} class="btn-primary">{$_('managePlaylists.create')}</button>
-    </div>
+    {/snippet}
   </Modal>
 {/if}

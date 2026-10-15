@@ -46,6 +46,12 @@ export const logStore = $state({
     localStorage.setItem('umb-log-open', String(logStore.drawerOpen))
   },
 
+  /** Clears the log and shows the drawer, for an action about to stream output. */
+  openFresh() {
+    logStore.clear()
+    if (!logStore.drawerOpen) logStore.toggleDrawer()
+  },
+
   push(entry: LogLine) {
     pending.push(entry)
     scheduleFlush()

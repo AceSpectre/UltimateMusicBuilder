@@ -1,15 +1,15 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
 
-  // One sub-action in a command list: name, description, an optional note and warning, then a fixed-width button.
+  type Tone = 'dim' | 'warn' | 'err'
+
+  // One sub-action in a command list: name, description and notes (empty ones are skipped), then a fixed-width button.
   let {
     name,
     description,
-    note = '',
-    tone = 'dim',
-    warning = '',
+    notes = [],
     children
-  }: { name: string; description: string; note?: string; tone?: 'dim' | 'warn' | 'err'; warning?: string; children: Snippet } = $props()
+  }: { name: string; description: string; notes?: { text: string; tone?: Tone }[]; children: Snippet } = $props()
 
   const toneClass = { dim: 'text-dim', warn: 'text-warn', err: 'text-destructive' }
 </script>
@@ -18,12 +18,9 @@
   <div class="min-w-0">
     <div class="text-[13.5px] font-semibold tracking-[-.01em]">{name}</div>
     <div class="mt-[3px] break-words text-[12.5px] text-muted-foreground">{description}</div>
-    {#if note}
-      <div class="mt-[3px] text-[12px] {toneClass[tone]}">{note}</div>
-    {/if}
-    {#if warning}
-      <div class="mt-[3px] text-[12px] text-warn">{warning}</div>
-    {/if}
+    {#each notes.filter((n) => n.text) as note, i (i)}
+      <div class="mt-[3px] text-[12px] {toneClass[note.tone ?? 'dim']}">{note.text}</div>
+    {/each}
   </div>
   <div class="[&>*]:w-24">{@render children()}</div>
 </div>

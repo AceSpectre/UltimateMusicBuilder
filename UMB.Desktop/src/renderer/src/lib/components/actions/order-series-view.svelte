@@ -252,17 +252,12 @@
     if (orderData) orderData = { ...orderData, items: event.detail.items }
   }
 
-  // Plain, not $state: the load effect must not depend on it.
-  let loadedPath: string | null = null
-
   async function loadOrder(modPath: string | null) {
     if (!modPath) {
       orderData = null
       return
     }
 
-    // Never show (or save) another mod's data while this one loads.
-    if (loadedPath !== modPath) orderData = null
     loading = true
     saveState = 'idle'
     selectedItemId = null
@@ -270,7 +265,6 @@
     showAddGame = false
     try {
       orderData = await window.electron.umb.loadSeriesOrder(modPath)
-      loadedPath = modPath
       baselineSnapshot = snapshot([...orderData.items, ...orderData.vanillaItems])
     } finally {
       loading = false
@@ -301,8 +295,11 @@
     }
   }
 
+  // A new mod or series starts empty, so Save can never write the previous one's data into it.
   $effect(() => {
-    void loadOrder(activeMod?.path ?? null)
+    const path = activeMod?.path ?? null
+    orderData = null
+    void loadOrder(path)
   })
 
   const inputClass =
@@ -352,9 +349,6 @@
     {saveState}
     onclick={handleSave}
     disabled={!orderData || !isDirty || saveState === 'saving'}
-    save={$_('orderSeries.save')}
-    saving={$_('orderSeries.saving')}
-    saved={$_('orderSeries.saved')}
   />
 </ActionHeader>
 
@@ -400,7 +394,7 @@
             <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, 128px);" aria-label={$_('orderSeries.vanillaHeading')}>
               {#each vanillaItems as item (item.id)}
                 <div class={cardClass(item)} role="listitem" onpointerdown={() => (selectedItemId = item.id)}>
-                  <span class="mb-1 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('orderSeries.vanillaTag')}</span>
+                  <span class="mb-1 kicker">{$_('orderSeries.vanillaTag')}</span>
                   {@render seriesCard(item)}
                 </div>
               {/each}
@@ -584,12 +578,12 @@
           <input type="text" class={inputClass} bind:value={newGameName} placeholder="Mario Kart 8" />
         </label>
       </div>
-      <div class="flex justify-end gap-2 border-t border-border px-5 py-4">
+      {#snippet footer()}
         <button
           onclick={() => (showAddGame = false)}
           class="btn border-transparent text-muted-foreground"
         >
-          {$_('orderSeries.cancel')}
+          {$_('common.cancel')}
         </button>
         <button
           onclick={confirmAddGame}
@@ -598,7 +592,7 @@
         >
           {$_('orderSeries.add')}
         </button>
-      </div>
+      {/snippet}
   </Modal>
 {/if}
 
@@ -697,7 +691,7 @@
               disabled={!nsGameValid}
               aria-label={$_('orderSeries.addGame')}
               title={$_('orderSeries.addGame')}
-              class="btn w-[27px] px-0 shrink-0"
+              class="btn-icon"
             >
               <Plus size={14} />
             </button>
@@ -709,12 +703,12 @@
         </div>
       </div>
 
-      <div class="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-4">
+      {#snippet footer()}
         <button
           onclick={() => (showNewSeries = false)}
           class="btn border-transparent text-muted-foreground"
         >
-          {$_('orderSeries.cancel')}
+          {$_('common.cancel')}
         </button>
         <button
           onclick={confirmNewSeries}
@@ -723,6 +717,6 @@
         >
           {nsCreating ? $_('orderSeries.creating') : $_('orderSeries.create')}
         </button>
-      </div>
+      {/snippet}
   </Modal>
 {/if}

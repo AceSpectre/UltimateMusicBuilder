@@ -45,7 +45,6 @@ export interface TrackOrderItem {
   fields: TrackFields | null
   /** A vanilla song: a tracks.csv row named by its ui_bgm id, or a locked song_order.toml entry. */
   isVanilla: boolean
-  /** A tracks.csv row whose audio file is not in the series folder. */
   missing: boolean
 }
 
@@ -216,7 +215,6 @@ export interface VolumeRowItem {
   bankBaseDb: number
   /** A vanilla song: no auto-gain. Only listed with applyVolumeToVanilla. */
   isVanilla: boolean
-  /** The row's audio file is not in the series folder. */
   missing: boolean
 }
 
@@ -382,9 +380,7 @@ export interface ToolStatus {
 }
 
 export interface SetupStatus {
-  uv: ToolStatus
-  pymusiclooper: ToolStatus
-  ffmpeg: ToolStatus
+  tools: Record<'uv' | 'pymusiclooper' | 'ffmpeg', ToolStatus>
   resources: { ok: boolean; path: string; missing: string[] }
 }
 

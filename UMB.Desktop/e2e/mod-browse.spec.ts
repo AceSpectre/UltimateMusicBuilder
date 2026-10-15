@@ -190,7 +190,6 @@ test('UI: Cleanup lists what it removes and removes it on confirm', async () => 
   const csv = join(modPath, 'dev', 'tracks.csv')
   writeFileSync(csv, readFileSync(csv, 'utf-8') + 'gone.nus3audio,somewhat_good_karts,Gone,,,original,,0,,True\n')
 
-  // Opening the view reads the count fresh.
   await page.getByRole('navigation').getByText('Manage Songs', { exact: true }).click()
   await page.getByRole('navigation').getByText('Build & Setup', { exact: true }).click()
   await expect(page.getByText('Invalid entries: 1')).toBeVisible({ timeout: 8000 })

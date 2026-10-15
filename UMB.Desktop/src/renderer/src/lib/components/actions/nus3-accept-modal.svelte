@@ -31,7 +31,7 @@
         onclick={onClose}
         class="btn"
       >
-        {$_('nus3Convert.acceptModalCancel')}
+        {$_('common.cancel')}
       </button>
       <button
         onclick={() => onAccept(false)}

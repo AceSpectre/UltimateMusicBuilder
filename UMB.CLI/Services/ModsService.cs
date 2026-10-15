@@ -32,15 +32,16 @@ namespace UMB.CLI.Services
         {
             if (string.IsNullOrWhiteSpace(modPath) || !ModPaths.IsUnderMods(_musicConfig, modPath) || !Directory.Exists(modPath))
                 return new List<ModInfo>();
-            return Directory.GetDirectories(Path.GetFullPath(modPath))
-                .Where(dir =>
-                {
-                    var name = Path.GetFileName(dir);
-                    return !name.StartsWith(".") && name != CliUtil.ValidateFolder
-                        && File.Exists(Path.Combine(dir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE));
-                })
-                .Select(dir => new ModInfo(Path.GetFileName(dir), dir))
-                .ToList();
+            return SeriesDirs(Path.GetFullPath(modPath)).Select(dir => new ModInfo(Path.GetFileName(dir), dir)).ToList();
         }
+
+        /// <summary>A mod's series folders: those with a tracks.csv, skipping hidden and validation folders.</summary>
+        public static IEnumerable<string> SeriesDirs(string modDir) =>
+            Directory.GetDirectories(modDir).Where(dir =>
+            {
+                var name = Path.GetFileName(dir);
+                return !name.StartsWith(".") && name != CliUtil.ValidateFolder
+                    && File.Exists(Path.Combine(dir, MusicConstants.MusicModFiles.FOLDER_MOD_TRACKS_CSV_FILE));
+            });
     }
 }

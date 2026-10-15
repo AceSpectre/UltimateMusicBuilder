@@ -53,7 +53,6 @@ namespace UMB.CLI.Desktop
         [JsonPropertyName("in_soundtest")] public string InSoundtest { get; set; } = "True";
     }
 
-    /// <summary>Missing: a tracks.csv row whose audio file is not in the series folder.</summary>
     public record TrackOrderItem(string Id, string Title, string Subtitle, string BgmId, string Filename,
         bool IsLocked, int? OriginalIndex, TrackFields Fields, bool IsPinchTarget, bool IsVanilla, bool Missing = false);
 

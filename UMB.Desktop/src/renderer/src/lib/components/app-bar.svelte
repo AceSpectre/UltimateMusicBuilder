@@ -29,8 +29,7 @@
     onWindowControlAttempt: (action: 'minimize' | 'fullscreen' | 'close') => void | Promise<void>
   } = $props()
 
-  const iconButton =
-    'flex h-[26px] w-[26px] items-center justify-center rounded text-dim transition-colors duration-100 hover:bg-accent hover:text-foreground'
+  const iconButton = 'btn-ghost-icon h-[26px] w-[26px]'
 
   let settingsOpen = $state(false)
   let pickerOpen = $state(false)
@@ -104,7 +103,7 @@
 
     {#if pickerOpen}
       <div class="shadow-overlay absolute left-0 right-0 top-[calc(100%+6px)] z-40 overflow-hidden rounded border border-border bg-popover">
-        <div class="border-b border-line2 px-3 py-2 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('appBar.selectMod')}</div>
+        <div class="border-b border-line2 px-3 py-2 kicker">{$_('appBar.selectMod')}</div>
 
         <div class="max-h-[320px] overflow-y-auto p-1">
           {#each mods as mod}

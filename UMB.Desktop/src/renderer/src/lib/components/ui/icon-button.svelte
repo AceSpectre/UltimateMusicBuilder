@@ -9,6 +9,6 @@
   }: { onclick: () => void; title: string; disabled?: boolean; children: Snippet } = $props()
 </script>
 
-<button {onclick} {title} {disabled} class="btn w-[27px] shrink-0 px-0 text-muted-foreground">
+<button {onclick} {title} {disabled} class="btn-icon text-muted-foreground">
   {@render children()}
 </button>

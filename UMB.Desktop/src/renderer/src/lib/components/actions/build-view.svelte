@@ -5,6 +5,7 @@
   import CircleCheck from '@lucide/svelte/icons/circle-check'
   import CircleX from '@lucide/svelte/icons/circle-x'
   import RotateCw from '@lucide/svelte/icons/rotate-cw'
+  import { onMount, untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
   import { logStore } from '$lib/stores/logs.svelte'
   import ActionHeader from '$lib/components/ui/action-header.svelte'
@@ -16,10 +17,8 @@
 
   let { activeMod }: { activeMod: ModInfo | null } = $props()
 
-  let buildRunning = $state(false)
-  let scaffoldRunning = $state(false)
-  let cleanupRunning = $state(false)
-  let importRunning = $state(false)
+  type Action = 'build' | 'scaffold' | 'cleanup' | 'import'
+  let running = $state<Action | null>(null)
 
   let importModalOpen = $state(false)
   let importSource = $state('')
@@ -27,8 +26,20 @@
   let overwriteModalOpen = $state(false)
   let volumeWarnings = $state<SuspiciousVolumeTrack[]>([])
 
-  const canImport = $derived(importSource.trim() !== '' && importName.trim() !== '' && !importRunning)
-  const anyRunning = $derived(buildRunning || scaffoldRunning || cleanupRunning || importRunning)
+  const canImport = $derived(importSource.trim() !== '' && importName.trim() !== '' && running !== 'import')
+  const anyRunning = $derived(running !== null)
+
+  // Runs one action at a time, streaming its output into a fresh log.
+  async function run(action: Action, task: () => Promise<unknown>) {
+    if (running) return
+    running = action
+    logStore.openFresh()
+    try {
+      await task()
+    } finally {
+      running = null
+    }
+  }
 
   // Facts for the strip under the commands; re-read when settings change or an action finishes.
   let hasOutput = $state(false)
@@ -52,32 +63,35 @@
     }
   }
 
-  $effect(() => {
-    void checkSetup()
-  })
+  onMount(checkSetup)
 
-  // What cleanup would remove from the active mod; re-read on mod switch, after every action and on window
-  // focus (files may have changed outside the app).
+  // What cleanup would remove from the active mod.
   let cleanupItems = $state<CleanupItem[]>([])
-  let focusCount = $state(0)
   let cleanupModalOpen = $state(false)
+  let cleanupRequest = 0
   const cleanupGroups = $derived(
     [...new Set(cleanupItems.map((item) => item.file))].map((file) => [file, cleanupItems.filter((item) => item.file === file)] as const)
   )
-  $effect(() => {
+
+  async function refreshCleanup() {
+    const request = ++cleanupRequest
     const path = activeMod?.path
-    void focusCount
-    if (!path || anyRunning) {
+    const items = path && !anyRunning ? await window.electron.umb.previewCleanup(path) : []
+    if (request === cleanupRequest) cleanupItems = items
+  }
+
+  // Mod switches and finished actions start from an empty list rather than the old count.
+  $effect(() => {
+    void activeMod?.path
+    void anyRunning
+    untrack(() => {
       cleanupItems = []
-      return
-    }
-    let cancelled = false
-    void window.electron.umb.previewCleanup(path).then((items) => { if (!cancelled) cleanupItems = items })
-    return () => { cancelled = true }
+      void refreshCleanup()
+    })
   })
 
   async function handleBuildClick() {
-    if (buildRunning) {
+    if (running === 'build') {
       window.electron.umb.cancelAction()
       return
     }
@@ -104,55 +118,19 @@
 
   function startBuild() {
     overwriteModalOpen = false
-    buildRunning = true
-    logStore.clear()
-    if (!logStore.drawerOpen) {
-      logStore.toggleDrawer()
-    }
-
     const mod = activeMod?.name
-    window.electron.umb.runAction('build', mod ? [mod] : []).finally(() => {
-      buildRunning = false
-    })
-  }
-
-  async function handleScaffold() {
-    if (scaffoldRunning) return
-
-    scaffoldRunning = true
-    logStore.clear()
-    if (!logStore.drawerOpen) {
-      logStore.toggleDrawer()
-    }
-
-    try {
-      await window.electron.umb.runAction('scaffold')
-    } finally {
-      scaffoldRunning = false
-    }
+    void run('build', () => window.electron.umb.runAction('build', mod ? [mod] : []))
   }
 
   async function openCleanupModal() {
-    if (!activeMod) return
-    cleanupItems = await window.electron.umb.previewCleanup(activeMod.path)
+    await refreshCleanup()
     cleanupModalOpen = true
   }
 
-  async function handleCleanup() {
-    if (cleanupRunning || !activeMod) return
-
+  function handleCleanup() {
+    const path = activeMod?.path
     cleanupModalOpen = false
-    cleanupRunning = true
-    logStore.clear()
-    if (!logStore.drawerOpen) {
-      logStore.toggleDrawer()
-    }
-
-    try {
-      await window.electron.umb.runCleanup(activeMod.path)
-    } finally {
-      cleanupRunning = false
-    }
+    if (path) void run('cleanup', () => window.electron.umb.runCleanup(path))
   }
 
   function openImportModal() {
@@ -162,8 +140,7 @@
   }
 
   function closeImportModal() {
-    if (importRunning) return
-    importModalOpen = false
+    if (running !== 'import') importModalOpen = false
   }
 
   async function pickImportSource() {
@@ -173,27 +150,14 @@
 
   async function handleImport() {
     if (!canImport) return
-
-    importRunning = true
-    logStore.clear()
-    if (!logStore.drawerOpen) {
-      logStore.toggleDrawer()
-    }
-
-    try {
+    await run('import', async () => {
       await window.electron.umb.runAction('convert', [importSource.trim(), importName.trim()])
       importModalOpen = false
-    } finally {
-      importRunning = false
-    }
+    })
   }
 </script>
 
-<svelte:window onfocus={() => focusCount++} />
-
-{#snippet sectionLabel(text: string)}
-  <div class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{text}</div>
-{/snippet}
+<svelte:window onfocus={refreshCleanup} />
 
 {#snippet status(ok: boolean | undefined)}
   {#if setupRunning || ok === undefined}
@@ -209,50 +173,50 @@
 
 <div class="action-pane grid grid-cols-2 items-start gap-6">
   <section class="min-w-0">
-    <div class="mb-2 flex h-6 items-center">{@render sectionLabel($_('build.sections.build'))}</div>
+    <div class="kicker mb-2 flex h-6 items-center">{$_('build.sections.build')}</div>
     <CommandRow
       name={$_('build.buildButton')}
       description={$_('build.buildDescription')}
-      note={hasOutput ? $_('build.outputNotEmpty') : ''}
-      tone="warn"
+      notes={[{ text: hasOutput ? $_('build.outputNotEmpty') : '', tone: 'warn' }]}
     >
-      <button onclick={handleBuildClick} disabled={anyRunning && !buildRunning} class="btn-primary">
-        {buildRunning ? $_('build.stopBuild') : $_('build.buildButton')}
+      <button onclick={handleBuildClick} disabled={anyRunning && running !== 'build'} class="btn-primary">
+        {running === 'build' ? $_('build.stopBuild') : $_('build.buildButton')}
       </button>
     </CommandRow>
 
     <CommandRow name={$_('build.scaffoldButton')} description={$_('build.scaffoldDescription')}>
-      <button onclick={handleScaffold} disabled={anyRunning} class="btn">
-        {#if scaffoldRunning}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.scaffoldButton')}{/if}
+      <button onclick={() => run('scaffold', () => window.electron.umb.runAction('scaffold'))} disabled={anyRunning} class="btn">
+        {#if running === 'scaffold'}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.scaffoldButton')}{/if}
       </button>
     </CommandRow>
 
     <CommandRow
       name={$_('build.cleanupButton')}
       description={$_('build.cleanupDescription')}
-      note={$_('build.destructive')}
-      tone="err"
-      warning={cleanupItems.length > 0 ? $_('build.invalidEntries', { values: { count: cleanupItems.length } }) : ''}
+      notes={[
+        { text: $_('build.destructive'), tone: 'err' },
+        { text: cleanupItems.length > 0 ? $_('build.invalidEntries', { values: { count: cleanupItems.length } }) : '', tone: 'warn' }
+      ]}
     >
       <button onclick={openCleanupModal} disabled={anyRunning || !activeMod} class="btn-danger">
-        {#if cleanupRunning}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.cleanupButton')}{/if}
+        {#if running === 'cleanup'}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.cleanupButton')}{/if}
       </button>
     </CommandRow>
 
-    <CommandRow name={$_('build.importButton')} description={$_('build.importDescription')} note={$_('build.importNote')}>
+    <CommandRow name={$_('build.importButton')} description={$_('build.importDescription')} notes={[{ text: $_('build.importNote') }]}>
       <button onclick={openImportModal} disabled={anyRunning} class="btn">
-        {#if importRunning}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.importButton')}…{/if}
+        {#if running === 'import'}<LoaderCircle size={12} class="animate-spin" />{:else}{$_('build.importButton')}…{/if}
       </button>
     </CommandRow>
 
     <div class="mt-3 grid grid-cols-[repeat(3,minmax(0,180px))] gap-[18px]">
       <div>
-        <div class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('build.facts.target')}</div>
+        <div class="kicker">{$_('build.facts.target')}</div>
         <div class="mt-[5px] text-[13.5px] font-medium">ArcOutput/</div>
       </div>
       {#if globalVolumeDb !== null}
         <div>
-          <div class="text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('build.facts.globalVolume')}</div>
+          <div class="kicker">{$_('build.facts.globalVolume')}</div>
           <div class="mt-[5px] text-[13.5px] font-medium">{formatDb(globalVolumeDb)}</div>
         </div>
       {/if}
@@ -261,7 +225,7 @@
 
   <section class="min-w-0">
     <div class="mb-2 flex h-6 items-center justify-between">
-      {@render sectionLabel($_('build.sections.setup'))}
+      <div class="kicker">{$_('build.sections.setup')}</div>
       <button onclick={checkSetup} disabled={setupRunning} class="btn h-6">
         <RotateCw size={12} />
         {$_('build.setup.recheck')}
@@ -272,18 +236,22 @@
       <CommandRow
         name={tool}
         description={$_(`build.setup.${tool}Description`)}
-        note={setup?.[tool].version ?? (setup ? $_('build.setup.toolNotFound') : '')}
-        tone={setup && !setup[tool].ok ? 'err' : 'dim'}
+        notes={[{
+          text: setup?.tools[tool].version ?? (setup ? $_('build.setup.toolNotFound') : ''),
+          tone: setup && !setup.tools[tool].ok ? 'err' : 'dim'
+        }]}
       >
-        {@render status(setup?.[tool].ok)}
+        {@render status(setup?.tools[tool].ok)}
       </CommandRow>
     {/each}
 
     <CommandRow
       name={$_('build.setup.resourcesName')}
       description={setup ? $_('build.setup.resourcesDescription', { values: { path: setup.resources.path } }) : ''}
-      note={setup && !setup.resources.ok ? $_('build.setup.resourcesMissing', { values: { count: setup.resources.missing.length } }) : ''}
-      tone="err"
+      notes={[{
+        text: setup && !setup.resources.ok ? $_('build.setup.resourcesMissing', { values: { count: setup.resources.missing.length } }) : '',
+        tone: 'err'
+      }]}
     >
       {@render status(setup?.resources.ok)}
     </CommandRow>
@@ -308,7 +276,7 @@
             placeholder={$_('build.importModal.sourcePlaceholder')}
             class="field min-w-0 flex-1 text-muted-foreground"
           />
-          <button onclick={pickImportSource} disabled={importRunning} class="btn h-7 shrink-0">
+          <button onclick={pickImportSource} disabled={running === 'import'} class="btn h-7 shrink-0">
             <Folder size={13} />
             {$_('build.importModal.browse')}
           </button>
@@ -322,20 +290,20 @@
           type="text"
           bind:value={importName}
           placeholder={$_('build.importModal.namePlaceholder')}
-          disabled={importRunning}
+          disabled={running === 'import'}
           class="field"
         />
       </div>
     </div>
 
-    <div class="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
-      <button onclick={closeImportModal} disabled={importRunning} class="btn">
+    {#snippet footer()}
+      <button onclick={closeImportModal} disabled={running === 'import'} class="btn">
         {$_('build.importModal.close')}
       </button>
       <button onclick={handleImport} disabled={!canImport} class="btn-primary">
-        {importRunning ? $_('build.running') : $_('build.importModal.import')}
+        {running === 'import' ? $_('build.running') : $_('build.importModal.import')}
       </button>
-    </div>
+    {/snippet}
   </Modal>
 {/if}
 
@@ -368,16 +336,16 @@
       </div>
     {/if}
 
-    <div class="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
+    {#snippet footer()}
       <button onclick={() => { cleanupModalOpen = false }} class="btn">
-        {$_('build.cleanupModal.cancel')}
+        {$_('common.cancel')}
       </button>
       {#if cleanupItems.length > 0}
         <button onclick={handleCleanup} class="btn-danger">
           {$_('build.cleanupModal.confirm', { values: { count: cleanupItems.length } })}
         </button>
       {/if}
-    </div>
+    {/snippet}
   </Modal>
 {/if}
 
@@ -393,14 +361,14 @@
 
     <p class="px-5 py-5 text-[12.5px] text-muted-foreground">{$_('build.overwriteModal.description')}</p>
 
-    <div class="flex items-center justify-end gap-2 border-t border-border px-5 py-4">
+    {#snippet footer()}
       <button onclick={() => { overwriteModalOpen = false }} class="btn">
-        {$_('build.overwriteModal.cancel')}
+        {$_('common.cancel')}
       </button>
       <button onclick={startBuild} class="btn-danger">
         {$_('build.overwriteModal.overwrite')}
       </button>
-    </div>
+    {/snippet}
   </Modal>
 {/if}
 
@@ -426,13 +394,13 @@
         {/each}
       </ul>
     </div>
-    <div class="flex justify-end gap-2 border-t border-border px-5 py-4">
+    {#snippet footer()}
       <button onclick={() => { volumeWarnings = [] }} class="btn">
-        {$_('build.volumeModal.cancel')}
+        {$_('common.cancel')}
       </button>
       <button onclick={checkOutputAndBuild} class="btn-danger">
         {$_('build.volumeModal.build')}
       </button>
-    </div>
+    {/snippet}
   </Modal>
 {/if}

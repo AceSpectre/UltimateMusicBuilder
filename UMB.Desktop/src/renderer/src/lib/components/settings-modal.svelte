@@ -206,14 +206,14 @@
           disabled={saveState === 'saving'}
           class="btn"
         >
-          {$_('settings.cancel')}
+          {$_('common.cancel')}
         </button>
         <button
           onclick={handleSave}
           disabled={saveState === 'saving'}
           class="btn-primary"
         >
-          {saveState === 'saving' ? $_('settings.saving') : saveState === 'saved' ? $_('settings.saved') : $_('settings.save')}
+          {saveState === 'saving' ? $_('common.saving') : saveState === 'saved' ? $_('common.saved') : $_('settings.save')}
         </button>
       </div>
     </div>
@@ -232,13 +232,13 @@
         <p class="text-[12px] text-destructive">{$_('settings.resetModal.failed')}</p>
       {/if}
     </div>
-    <div class="flex justify-end gap-2 border-t border-border px-5 py-4">
+    {#snippet footer()}
       <button
         onclick={() => { resetConfirmOpen = false }}
         disabled={resetting}
         class="btn"
       >
-        {$_('settings.resetModal.cancel')}
+        {$_('common.cancel')}
       </button>
       <button
         onclick={handleReset}
@@ -248,6 +248,6 @@
         <RotateCcw size={14} />
         {resetting ? $_('settings.resetModal.resetting') : $_('settings.resetModal.confirm')}
       </button>
-    </div>
+    {/snippet}
   </Modal>
 {/if}

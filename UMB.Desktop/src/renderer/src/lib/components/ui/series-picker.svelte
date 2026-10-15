@@ -50,7 +50,7 @@
   {:else}
     <div class="shrink-0 border-b border-line2 px-3 py-2">
       <div class="flex items-center gap-1.5">
-        <h2 class="min-w-0 flex-1 truncate text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('seriesPicker.heading')}</h2>
+        <h2 class="min-w-0 flex-1 truncate kicker">{$_('seriesPicker.heading')}</h2>
         {#if actions}
           {@render actions()}
         {/if}

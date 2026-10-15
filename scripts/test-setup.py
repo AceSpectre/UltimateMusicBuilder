@@ -64,7 +64,7 @@ class SetupTests(unittest.TestCase):
         (self.bin / 'dirname').symlink_to('/usr/bin/dirname')
         self.env = dict(os.environ, PATH=str(self.bin), UV_TOOL_BIN_DIR=str(self.bin),
                         UMB_SETUP_TEST_DIR=str(self.base), UMB_SETUP_TEST_OS='Linux')
-        self.add('uname', 'sudo')
+        self.add('uname', 'sudo', 'sh')
 
     def add(self, *names):
         for name in names:
@@ -95,7 +95,6 @@ class SetupTests(unittest.TestCase):
                 calls = self.calls()
                 installs = [c for c in calls if c[0] == manager]
                 self.assertTrue(any(ffmpeg_package in c for c in installs))
-                # uv comes from Homebrew on macOS and Astral's installer on Linux.
                 if manager == 'brew':
                     self.assertIn(['brew', 'install', 'uv'], installs)
                 else:

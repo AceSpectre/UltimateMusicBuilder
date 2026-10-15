@@ -69,25 +69,17 @@
     baselineSnapshot = JSON.stringify(edited)
   }
 
-  // Plain, not $state: the load effect must not depend on it.
-  let loadedPath: string | null = null
-
   async function loadData(seriesPath: string | null) {
     if (!seriesPath) {
       data = null
       return
     }
 
-    // Never show (or save) another series' data while this one loads.
-    if (loadedPath !== seriesPath) data = null
     dataLoading = true
     saveState = 'idle'
     try {
       const result = await window.electron.umb.loadTrackOrder(seriesPath)
-      if (seriesPath === modsStore.activeSeriesPath) {
-        setFrom(result)
-        loadedPath = seriesPath
-      }
+      if (seriesPath === modsStore.activeSeriesPath) setFrom(result)
     } finally {
       dataLoading = false
     }
@@ -108,8 +100,11 @@
     }
   }
 
+  // A new mod or series starts empty, so Save can never write the previous one's data into it.
   $effect(() => {
-    void loadData(modsStore.activeSeriesPath)
+    const path = modsStore.activeSeriesPath
+    data = null
+    void loadData(path)
   })
 
   trackUnsaved(() => isDirty, handleSave)
@@ -201,9 +196,6 @@
             {saveState}
             onclick={handleSave}
             disabled={!data || !isDirty || saveState === 'saving'}
-            save={$_('managePresets.save')}
-            saving={$_('managePresets.saving')}
-            saved={$_('managePresets.saved')}
           />
       </ActionHeader>
 
@@ -215,7 +207,7 @@
         {:else if data}
           <div class="min-w-[800px]">
             <div
-              class="sticky top-0 z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim"
+              class="sticky top-0 z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 kicker"
               style={GRID_COLUMNS}
             >
               {#each COLUMNS as column}

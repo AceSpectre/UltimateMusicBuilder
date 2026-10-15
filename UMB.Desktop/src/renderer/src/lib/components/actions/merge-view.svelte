@@ -192,8 +192,8 @@
                       <table class="w-full border-collapse text-[12px]">
                         <thead>
                           <tr class="border-b border-border">
-                            <th class="px-3 py-1.5 text-left text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('merge.colSeries')}</th>
-                            <th class="px-3 py-1.5 text-left text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim">{$_('merge.colMods')}</th>
+                            <th class="px-3 py-1.5 text-left kicker">{$_('merge.colSeries')}</th>
+                            <th class="px-3 py-1.5 text-left kicker">{$_('merge.colMods')}</th>
                           </tr>
                         </thead>
                         <tbody>

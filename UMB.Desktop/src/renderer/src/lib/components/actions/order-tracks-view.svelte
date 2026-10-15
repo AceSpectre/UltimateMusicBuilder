@@ -17,6 +17,7 @@
   import { createSeriesSelection } from '$lib/series-selection.svelte'
   import ActionHeader from '$lib/components/ui/action-header.svelte'
   import EmptyState from '$lib/components/ui/empty-state.svelte'
+  import MissingFileNote from '$lib/components/ui/missing-file-note.svelte'
   import SaveButton from '$lib/components/ui/save-button.svelte'
   import SeriesPicker from '$lib/components/ui/series-picker.svelte'
   import GameSelect from '$lib/components/ui/game-select.svelte'
@@ -204,23 +205,17 @@
     }
   }
 
-  // Plain, not $state: the load effect must not depend on it.
-  let loadedPath: string | null = null
-
   async function loadOrderData(seriesPath: string | null) {
     if (!seriesPath) {
       orderData = null
       return
     }
 
-    // Never show (or save) another series' data while this one loads.
-    if (loadedPath !== seriesPath) orderData = null
     orderLoading = true
     saveState = 'idle'
     selectedItemId = null
     try {
       orderData = await window.electron.umb.loadTrackOrder(seriesPath)
-      loadedPath = seriesPath
       baselineSnapshot = snapshot(orderData.items)
     } finally {
       orderLoading = false
@@ -257,18 +252,17 @@
     }
   }
 
+  // A new mod or series starts empty, so Save can never write the previous one's data into it.
   $effect(() => {
-    void loadOrderData(modsStore.activeSeriesPath)
+    const path = modsStore.activeSeriesPath
+    orderData = null
+    void loadOrderData(path)
   })
 
   const recordLabel = (value: string): string => $_(`orderTracks.record.${value}`, { default: value })
 
   trackUnsaved(() => isDirty, handleSave)
 </script>
-
-{#snippet missingNote(item: TrackOrderItem)}
-  {#if item.missing}<span class="px-1.5 text-[11px] text-warn">{$_('common.fileNotFound')}</span>{/if}
-{/snippet}
 
 <div class="flex-1 overflow-hidden">
   <div class="flex h-full min-h-0">
@@ -340,9 +334,6 @@
             {saveState}
             onclick={handleSave}
             disabled={!orderData || !isDirty || saveState === 'saving'}
-            save={$_('orderTracks.save')}
-            saving={$_('orderTracks.saving')}
-            saved={$_('orderTracks.saved')}
           />
       </ActionHeader>
 
@@ -368,7 +359,7 @@
 
           <div class="min-w-[1000px]">
             <div
-              class="sticky z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 text-[10.5px] font-semibold uppercase tracking-[.1em] text-dim"
+              class="sticky z-10 grid items-center gap-1 border-b border-border bg-card px-1 py-1 kicker"
               style="{GRID_COLUMNS} top: -14px"
             >
               {#each COLUMNS as column}
@@ -429,7 +420,7 @@
                         title={item.isVanilla ? $_('orderTracks.vanillaHint') : ''}
                         aria-label={$_('orderTracks.colTitle')}
                       ></textarea>
-                      {@render missingNote(item)}
+                      <MissingFileNote missing={item.missing} class="px-1.5" />
                     </div>
 
                     {#if orderData.games.length > 0}
@@ -484,7 +475,7 @@
                     {@const f = item.fields}
                     <div class="flex min-w-0 flex-col self-center">
                       <span class="{lockedCellClass} font-medium {item.isVanilla ? 'italic' : ''}">{f?.title ?? item.title}</span>
-                      {@render missingNote(item)}
+                      <MissingFileNote missing={item.missing} class="px-1.5" />
                     </div>
                     <span class={lockedCellClass}>{f ? gameName(f.game) : ''}</span>
                     <span class={lockedCellClass}>{f?.author ?? ''}</span>
