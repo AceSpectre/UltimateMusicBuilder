@@ -13,13 +13,13 @@ describe('packagedWorkspacePath', () => {
 })
 
 describe('macToolPath', () => {
-  it('adds Homebrew and pipx locations to a Finder PATH', () => {
+  it('adds Homebrew and uv tool locations to a Finder PATH', () => {
     expect(macToolPath('/usr/bin:/bin', '/Users/example')).toBe(
       '/usr/bin:/bin:/opt/homebrew/bin:/usr/local/bin:/Users/example/.local/bin'
     )
   })
 
-  it('preserves existing precedence and a custom pipx directory without duplicates', () => {
+  it('preserves existing precedence and a custom uv tool directory without duplicates', () => {
     expect(macToolPath('/custom/bin:/opt/homebrew/bin', '/Users/example', '/custom/bin')).toBe(
       '/custom/bin:/opt/homebrew/bin:/usr/local/bin'
     )

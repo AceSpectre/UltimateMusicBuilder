@@ -17,6 +17,7 @@ export default {
       ready: 'Ready',
       missing: 'Missing',
       toolNotFound: 'Not found on PATH. Run the setup script.',
+      uvDescription: 'Installs and runs pymusiclooper with its own Python.',
       pymusiclooperDescription: 'Finds loop points for Add Music.',
       ffmpegDescription: 'Decodes audio for conversion, previews and loudness.',
       resourcesName: 'Game resources',

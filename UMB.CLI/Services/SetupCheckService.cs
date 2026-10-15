@@ -16,7 +16,7 @@ namespace UMB.CLI.Services
         /// <summary>Version is the tool's first output line, or null when it can't be run.</summary>
         public record ToolStatus(bool Ok, string Version);
         public record ResourcesStatus(bool Ok, string Path, List<string> Missing);
-        public record SetupStatus(ToolStatus Pymusiclooper, ToolStatus Ffmpeg, ResourcesStatus Resources);
+        public record SetupStatus(ToolStatus Uv, ToolStatus Pymusiclooper, ToolStatus Ffmpeg, ResourcesStatus Resources);
 
         private static readonly TimeSpan ToolTimeout = TimeSpan.FromSeconds(30);
 
@@ -35,6 +35,7 @@ namespace UMB.CLI.Services
         public SetupCheckService(IOptionsMonitor<Sma5hOptions> config) => _config = config;
 
         public SetupStatus Check() => new(
+            CheckTool("uv", "--version"),
             CheckTool("pymusiclooper", "--version"),
             CheckTool("ffmpeg", "-version"),
             CheckResources(_config.CurrentValue.GameResourcesPath));

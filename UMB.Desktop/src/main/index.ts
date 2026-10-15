@@ -15,7 +15,7 @@ import type {
 let mainWindow: BrowserWindow | null = null
 
 if (process.platform === 'darwin') {
-  process.env.PATH = macToolPath(process.env.PATH ?? '', homedir(), process.env.PIPX_BIN_DIR)
+  process.env.PATH = macToolPath(process.env.PATH ?? '', homedir(), process.env.UV_TOOL_BIN_DIR)
 }
 
 if (process.env['NODE_ENV'] === 'test') {

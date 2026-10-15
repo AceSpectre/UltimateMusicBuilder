@@ -268,7 +268,7 @@
       </button>
     </div>
 
-    {#each ['pymusiclooper', 'ffmpeg'] as const as tool (tool)}
+    {#each ['uv', 'pymusiclooper', 'ffmpeg'] as const as tool (tool)}
       <CommandRow
         name={tool}
         description={$_(`build.setup.${tool}Description`)}

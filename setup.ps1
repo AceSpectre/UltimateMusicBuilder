@@ -58,29 +58,20 @@ if (-not (Test-Command ffmpeg) -or -not (Test-Command ffprobe) -or -not (Test-Co
     Write-Host 'FFmpeg is already available.'
 }
 
+if (-not (Test-Command uv)) {
+    Install-WinGetPackage 'astral-sh.uv'
+    if (-not $DryRun -and -not (Test-Command uv)) {
+        throw 'uv was installed but is not on PATH. Open a new terminal and rerun setup.'
+    }
+} else {
+    Write-Host 'uv is already available.'
+}
+
+if (Test-Command uv) { $env:Path = "$(& uv tool dir --bin);$env:Path" }
 if (-not (Test-Command pymusiclooper)) {
-    # py selects a real Python installation rather than the Windows Store alias.
-    if (-not (Test-Command py)) { Install-WinGetPackage 'Python.Python.3.12' }
-    if (-not $DryRun -and -not (Test-Command py)) {
-        throw 'Python was installed but py is not on PATH. Open a new terminal and rerun setup.'
-    }
-    $HasPipx = $false
-    if (-not $DryRun) {
-        $HasPipx = (& py -3 -c "import importlib.util; print(importlib.util.find_spec('pipx') is not None)") -eq 'True'
-        if ($LASTEXITCODE -ne 0) { throw 'Cannot run Python. Open a new terminal and rerun setup.' }
-    }
-    if (-not $HasPipx) {
-        Invoke-SetupCommand py @('-3', '-m', 'pip', 'install', '--user', 'pipx')
-    }
-    if (-not $DryRun) {
-        $PipxBin = & py -3 -m pipx environment --value PIPX_BIN_DIR
-        if ($LASTEXITCODE -ne 0) { throw 'Cannot locate the pipx application directory.' }
-        $env:Path = "$PipxBin;$env:Path"
-    }
-    if (-not (Test-Command pymusiclooper)) {
-        Invoke-SetupCommand py @('-3', '-m', 'pipx', 'install', 'pymusiclooper')
-    }
-    Invoke-SetupCommand py @('-3', '-m', 'pipx', 'ensurepath')
+    # uv fetches a Python that pymusiclooper's dependencies support, so no system Python is needed.
+    Invoke-SetupCommand uv @('tool', 'install', '--python', '3.12', 'pymusiclooper')
+    Invoke-SetupCommand uv @('tool', 'update-shell')
 } else {
     Write-Host 'pymusiclooper is already available.'
 }
@@ -102,7 +93,7 @@ if ($Dev) {
 if ($DryRun) {
     Write-Host 'Dry run complete; nothing was installed.'
 } else {
-    foreach ($Tool in 'ffmpeg', 'ffprobe', 'ffplay', 'pymusiclooper') {
+    foreach ($Tool in 'ffmpeg', 'ffprobe', 'ffplay', 'uv', 'pymusiclooper') {
         if (-not (Test-Command $Tool)) { throw "$Tool is still missing from PATH." }
     }
     Write-Host 'Setup complete. Open a new terminal before launching UMB.'

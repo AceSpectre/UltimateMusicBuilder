@@ -35,12 +35,14 @@ elif name in ('brew', 'apt-get', 'dnf', 'pacman'):
     if 'ffmpeg' in args or 'ffmpeg-free' in args:
         for tool in ('ffmpeg', 'ffprobe', 'ffplay'):
             if not (base / 'bin' / tool).exists(): install(tool)
-    if 'pipx' in args or 'python-pipx' in args:
-        if not (base / 'bin' / 'pipx').exists(): install('pipx')
-elif name == 'pipx':
-    if args[0] == 'environment':
+    if 'uv' in args and not (base / 'bin' / 'uv').exists():
+        install('uv')
+elif name == 'sh':
+    install('uv')  # Astral's uv installer
+elif name == 'uv':
+    if args[:2] == ['tool', 'dir']:
         print(base / 'bin')
-    elif args[0] == 'install':
+    elif args[:2] == ['tool', 'install']:
         install('pymusiclooper')
 elif name == 'dotnet':
     print('8.0.424 [mock SDK]')
@@ -60,7 +62,7 @@ class SetupTests(unittest.TestCase):
         self.mock.write_text(f'#!{sys.executable}\n' + MOCK)
         self.mock.chmod(0o755)
         (self.bin / 'dirname').symlink_to('/usr/bin/dirname')
-        self.env = dict(os.environ, PATH=str(self.bin), PIPX_BIN_DIR=str(self.bin),
+        self.env = dict(os.environ, PATH=str(self.bin), UV_TOOL_BIN_DIR=str(self.bin),
                         UMB_SETUP_TEST_DIR=str(self.base), UMB_SETUP_TEST_OS='Linux')
         self.add('uname', 'sudo')
 
@@ -80,11 +82,11 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_package_managers_and_repeat_setup(self):
-        for manager, system, ffmpeg_package, pipx_package in (
-            ('brew', 'Darwin', 'ffmpeg', 'pipx'),
-            ('apt-get', 'Linux', 'ffmpeg', 'pipx'),
-            ('dnf', 'Linux', 'ffmpeg-free', 'pipx'),
-            ('pacman', 'Linux', 'ffmpeg', 'python-pipx'),
+        for manager, system, ffmpeg_package in (
+            ('brew', 'Darwin', 'ffmpeg'),
+            ('apt-get', 'Linux', 'ffmpeg'),
+            ('dnf', 'Linux', 'ffmpeg-free'),
+            ('pacman', 'Linux', 'ffmpeg'),
         ):
             with self.subTest(manager=manager):
                 self.env['UMB_SETUP_TEST_OS'] = system
@@ -93,15 +95,19 @@ class SetupTests(unittest.TestCase):
                 calls = self.calls()
                 installs = [c for c in calls if c[0] == manager]
                 self.assertTrue(any(ffmpeg_package in c for c in installs))
-                self.assertTrue(any(pipx_package in c for c in installs))
-                self.assertIn(['pipx', 'install', 'pymusiclooper'], calls)
+                # uv comes from Homebrew on macOS and Astral's installer on Linux.
+                if manager == 'brew':
+                    self.assertIn(['brew', 'install', 'uv'], installs)
+                else:
+                    self.assertTrue(any(c[0] == 'sh' for c in calls))
+                self.assertIn(['uv', 'tool', 'install', '--python', '3.12', 'pymusiclooper'], calls)
                 if manager == 'apt-get':
                     self.assertEqual(installs.count(['apt-get', 'update']), 1)
                 (self.base / 'calls.jsonl').unlink()
                 self.assert_success(self.run_setup())
-                self.assertFalse(any(c[0] in (manager, 'sudo') or c[1:2] == ['install']
+                self.assertFalse(any(c[0] in (manager, 'sudo', 'sh') or 'install' in c[1:3]
                                      for c in self.calls()))
-                for tool in (manager, 'ffmpeg', 'ffprobe', 'ffplay', 'pipx', 'pymusiclooper'):
+                for tool in (manager, 'ffmpeg', 'ffprobe', 'ffplay', 'uv', 'pymusiclooper'):
                     (self.bin / tool).unlink()
                 (self.base / 'calls.jsonl').unlink()
 
@@ -110,16 +116,17 @@ class SetupTests(unittest.TestCase):
         result = self.run_setup('--dry-run')
         self.assert_success(result)
         self.assertIn('apt-get install -y ffmpeg', result.stdout)
-        self.assertIn('pipx install pymusiclooper', result.stdout)
+        self.assertIn('astral.sh/uv/install.sh', result.stdout)
+        self.assertIn('uv tool install --python 3.12 pymusiclooper', result.stdout)
         self.assertEqual(self.calls(), [['uname', '-s']])
 
     def test_existing_dependencies_need_no_package_manager(self):
-        self.add('ffmpeg', 'ffprobe', 'ffplay', 'pymusiclooper')
+        self.add('ffmpeg', 'ffprobe', 'ffplay', 'uv', 'pymusiclooper')
         self.assert_success(self.run_setup())
-        self.assertEqual(self.calls(), [['uname', '-s']])
+        self.assertEqual(self.calls(), [['uname', '-s'], ['uv', 'tool', 'dir', '--bin']])
 
     def test_missing_ffprobe_installs_ffmpeg_package(self):
-        self.add('apt-get', 'ffmpeg', 'ffplay', 'pymusiclooper')
+        self.add('apt-get', 'ffmpeg', 'ffplay', 'uv', 'pymusiclooper')
         self.assert_success(self.run_setup())
         self.assertTrue(any(c[0] == 'apt-get' and 'ffmpeg' in c for c in self.calls()))
 
@@ -129,7 +136,7 @@ class SetupTests(unittest.TestCase):
         result = self.run_setup()
         self.assertNotEqual(result.returncode, 0)
         self.assertNotIn('Setup complete', result.stdout)
-        self.assertFalse(any(c[0] == 'pipx' for c in self.calls()))
+        self.assertFalse(any(c[0] in ('sh', 'uv') for c in self.calls()))
 
     def test_unsupported_system_is_actionable(self):
         self.env['UMB_SETUP_TEST_OS'] = 'MINGW64_NT'
@@ -146,7 +153,7 @@ class SetupTests(unittest.TestCase):
         result = self.run_setup('--dev')
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Node.js', result.stderr)
-        self.assertFalse(any(c[0] in ('apt-get', 'brew', 'pipx') for c in self.calls()))
+        self.assertFalse(any(c[0] in ('apt-get', 'brew', 'sh', 'uv') for c in self.calls()))
 
     def test_dev_dry_run_plans_pinned_tools_and_desktop_dependencies(self):
         self.add('apt-get', 'dotnet', 'node', 'npm', 'cargo')

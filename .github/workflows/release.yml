@@ -127,8 +127,9 @@ jobs:
               Linux:    sudo apt install ffmpeg
                         (or: sudo dnf install ffmpeg / sudo pacman -S ffmpeg)
 
-            pymusiclooper (only needed for the "Convert Nus3" loop-detection flow):
-              All:      pipx install pymusiclooper
+            uv + pymusiclooper (only needed for the "Add Music" loop-detection flow):
+              Install uv: https://docs.astral.sh/uv/getting-started/installation/
+              Then:     uv tool install --python 3.12 pymusiclooper
 
           macOS Gatekeeper:
             After unzipping on macOS, you may need to clear the quarantine

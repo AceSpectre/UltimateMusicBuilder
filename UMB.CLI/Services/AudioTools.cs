@@ -11,7 +11,7 @@ namespace UMB.CLI.Services
 {
     /// <summary>
     /// ffprobe/ffmpeg/pymusiclooper calls shared by nus3 conversion and loop analysis. These tools
-    /// are expected on the system PATH (install via choco/brew/apt/pipx — see scripts/fetch-tools).
+    /// are expected on the system PATH (installed by setup.sh / setup.ps1: FFmpeg, and pymusiclooper via uv).
     /// </summary>
     public static class AudioTools
     {

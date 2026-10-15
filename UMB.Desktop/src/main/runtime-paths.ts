@@ -8,11 +8,12 @@ export function packagedWorkspacePath(resourcesPath: string, platform: NodeJS.Pl
   return resolve(resourcesPath, platform === 'darwin' ? '../../../..' : '../..')
 }
 
-export function macToolPath(currentPath: string, home: string, pipxBinDir?: string): string {
+/** Finder-launched apps get a minimal PATH; add Homebrew and the uv tool directory (uv and pymusiclooper). */
+export function macToolPath(currentPath: string, home: string, uvToolBinDir?: string): string {
   return [...new Set([
     ...currentPath.split(':'),
     '/opt/homebrew/bin',
     '/usr/local/bin',
-    pipxBinDir || posix.join(home, '.local', 'bin')
+    uvToolBinDir || posix.join(home, '.local', 'bin')
   ])].filter(Boolean).join(':')
 }

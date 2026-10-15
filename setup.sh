@@ -13,9 +13,10 @@ for arg in "$@"; do
             cat <<'EOF'
 Usage: bash setup.sh [--dev] [--dry-run]
 
-Installs missing FFmpeg (ffmpeg/ffprobe/ffplay) and pymusiclooper.
-Supports macOS with Homebrew, Debian/Ubuntu with apt, Fedora with dnf,
-and Arch Linux with pacman. Install the package manager first.
+Installs missing FFmpeg (ffmpeg/ffprobe/ffplay) and uv, then uses uv to
+install pymusiclooper with its own Python. Supports macOS with Homebrew,
+Debian/Ubuntu with apt, Fedora with dnf, and Arch Linux with pacman. Install
+the package manager first; on Linux, uv comes from Astral's installer (curl).
 
 --dev      Also fetch pinned native tools and run npm ci. Requires .NET 8
            SDK, Node.js 20+ and npm; Rust/cargo is needed to build a missing
@@ -30,8 +31,6 @@ EOF
 done
 
 have() { command -v "$1" >/dev/null 2>&1; }
-# pipx < 1.1 (e.g. Ubuntu 22.04) has no `environment --value`.
-pipx_bin_dir() { pipx environment --value PIPX_BIN_DIR 2>/dev/null || printf '%s\n' "${PIPX_BIN_DIR:-$HOME/.local/bin}"; }
 fail() { printf 'Setup failed: %s\n' "$*" >&2; exit 1; }
 run() {
     printf '  '
@@ -41,7 +40,7 @@ run() {
 }
 
 # Recognize common per-user installations in this process, without editing profiles.
-export PATH="$PATH:${PIPX_BIN_DIR:-$HOME/.local/bin}:$HOME/.dotnet:$HOME/.cargo/bin"
+export PATH="$PATH:${UV_TOOL_BIN_DIR:-$HOME/.local/bin}:$HOME/.dotnet:$HOME/.cargo/bin"
 case "$(uname -s)" in
     Darwin)
         OS=macos
@@ -81,7 +80,7 @@ install_package() {
         elif have apt-get; then MANAGER=apt
         elif have dnf; then MANAGER=dnf
         elif have pacman; then MANAGER=pacman
-        else fail 'No supported package manager found. Install FFmpeg and pipx manually.'
+        else fail 'No supported package manager found. Install FFmpeg manually.'
         fi
     fi
     case "$MANAGER" in
@@ -96,9 +95,7 @@ install_package() {
             # Fedora ships ffmpeg-free in its official repositories.
             if [[ "$package" == ffmpeg ]]; then package=ffmpeg-free; fi
             as_admin dnf install -y "$package" ;;
-        pacman)
-            if [[ "$package" == pipx ]]; then package=python-pipx; fi
-            as_admin pacman -S --needed "$package" ;;
+        pacman) as_admin pacman -S --needed "$package" ;;
     esac
 }
 as_admin() {
@@ -116,17 +113,25 @@ else
     printf 'FFmpeg is already available.\n'
 fi
 
-if have pipx; then
-    PATH="$(pipx_bin_dir):$PATH"
-fi
-if ! have pymusiclooper; then
-    if ! have pipx; then install_package pipx; fi
-    if (( ! DRY_RUN )); then
-        have pipx || fail 'pipx was installed but is not on PATH. Open a new terminal and rerun setup.'
-        PATH="$(pipx_bin_dir):$PATH"
+if ! have uv; then
+    if [[ "$OS" == macos ]]; then
+        install_package uv
+    else
+        # Most Linux repositories don't ship uv; Astral's installer puts it in ~/.local/bin.
+        run sh -c 'curl -LsSf https://astral.sh/uv/install.sh | sh'
     fi
-    if ! have pymusiclooper; then run pipx install pymusiclooper; fi
-    run pipx ensurepath
+    if (( ! DRY_RUN )); then
+        have uv || fail 'uv was installed but is not on PATH. Open a new terminal and rerun setup.'
+    fi
+else
+    printf 'uv is already available.\n'
+fi
+
+if have uv; then PATH="$(uv tool dir --bin):$PATH"; fi
+if ! have pymusiclooper; then
+    # uv fetches a Python that pymusiclooper's dependencies support, so no system Python is needed.
+    run uv tool install --python 3.12 pymusiclooper
+    run uv tool update-shell
 else
     printf 'pymusiclooper is already available.\n'
 fi
@@ -144,7 +149,7 @@ fi
 if (( DRY_RUN )); then
     printf 'Dry run complete; nothing was installed.\n'
 else
-    for tool in ffmpeg ffprobe ffplay pymusiclooper; do
+    for tool in ffmpeg ffprobe ffplay uv pymusiclooper; do
         have "$tool" || fail "$tool is still missing from PATH."
     done
     printf 'Setup complete. Open a new terminal before launching UMB.\n'

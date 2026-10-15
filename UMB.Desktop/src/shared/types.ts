@@ -382,6 +382,7 @@ export interface ToolStatus {
 }
 
 export interface SetupStatus {
+  uv: ToolStatus
   pymusiclooper: ToolStatus
   ffmpeg: ToolStatus
   resources: { ok: boolean; path: string; missing: string[] }
